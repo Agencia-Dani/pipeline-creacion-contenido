@@ -39,8 +39,8 @@ sistema crece sumando piezas iguales por fuera, sin tocar el centro.
 content-pipeline/
 ├── README.md          ← este archivo (la orientación)
 └── Workflows/         ← un subfolder por flujo de contenido
-    ├── reels-detector/
-    └── substack-newsletter/
+    ├── workflow-short-form-content/
+    └── workflow-substack/
 ```
 
 La unidad es el **workflow**: una carpeta autocontenida dentro de `Workflows/` con todo lo
