@@ -4,6 +4,11 @@
 > outputs a Supabase. El workflow de reels lo implementa en F2; el dispatcher y todo workflow
 > n8n futuro usan el mismo patrón. (El workflow de Substack NO usa esto: su ingesta es el sync
 > Notion → registro de F3, `core/sync/`.)
+>
+> **Estado (2026-06-12):** implementado en el template del wf de reels (nodos *Abrir run en el
+> registro* / *Preparar reporte de outputs* / *Reportar outputs al registro* / *Cerrar run en el
+> registro*, todos Continue On Fail) y el error workflow en
+> [`core/n8n/error-workflow-registro.json`](../n8n/README.md).
 
 ## Principio innegociable
 
@@ -14,12 +19,10 @@ poder reportar.
 
 ## Credencial en n8n (una sola vez)
 
-Credencial tipo **Header Auth** llamada `Supabase Registro`:
-
-```
-apikey:        <SERVICE_ROLE_KEY>
-Authorization: Bearer <SERVICE_ROLE_KEY>
-```
+Credencial nativa de n8n tipo **Supabase API** llamada `Supabase Registro` (host del proyecto +
+service_role key). Los nodos HTTP la usan como *Predefined Credential Type* → manda sola los dos
+headers que Supabase exige (`apikey` y `Authorization: Bearer`). *(Corrección 2026-06-12: antes
+este contrato decía Header Auth, pero esa credencial solo soporta UN header.)*
 
 La service role key bypassa RLS — vive SOLO en n8n (y en el gestor de contraseñas). Base URL:
 `https://<proyecto>.supabase.co/rest/v1`.
@@ -46,8 +49,8 @@ La service role key bypassa RLS — vive SOLO en n8n (y en el gestor de contrase
 ```
 
 - `instance_id` es una **constante de la instancia**: se obtiene del registro al crear la
-  instancia (insert de F2) y se fija en un nodo *Set* al inicio del workflow (entra junto con
-  la config del cliente al resolver placeholders).
+  instancia (insert de F2) y entra como placeholder `<<INSTANCE_ID>>` que resuelve
+  `core/scripts/deploy.mjs` desde la config del cliente (`instance_id` en el yaml).
 - `params`: en corridas cron va vacío o con los defaults; en corridas `on_demand` lleva lo que
   el formulario pidió.
 - La respuesta trae el `id` del run → se conserva en el flujo para los pasos 2 y 3.

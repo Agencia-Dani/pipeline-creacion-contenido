@@ -779,6 +779,139 @@
       "id": "51af4d0f-e133-4547-b7f2-ac82035e86d7",
       "name": "Form — Búsqueda bajo demanda",
       "webhookId": "a8af1805-b037-45e1-a9b6-543c27562c91"
+    },
+    {
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "id": "774332a8-0b4b-49a5-babf-accdcec49e8e",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      },
+      "name": "Abrir run en el registro",
+      "position": [
+        10688,
+        2480
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=<<SUPABASE_URL>>/rest/v1/runs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"instance_id\": \"<<INSTANCE_ID>>\", \"trigger_type\": \"{{ $json.origen === 'formulario' ? 'on_demand' : 'cron' }}\", \"estado\": \"en_curso\", \"params\": {{ JSON.stringify($json) }} }",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "cb359dd3-1fb3-46b1-8bc4-a97147467cce",
+      "name": "Preparar reporte de outputs",
+      "position": [
+        12480,
+        2400
+      ],
+      "parameters": {
+        "jsCode": "// Arma el batch de outputs para el registro central (contrato: core/contracts/ingesta-registro.md).\n// Si \"Abrir run\" falló (Supabase caído), run_id queda null: el POST fallará y el flujo sigue —\n// el registro es sumidero, nunca dependencia.\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst outputs = $input.all().map(f => {\n  const d = f.json;\n  return {\n    run_id: run_id,\n    tipo: 'guion_reel',\n    titulo: d['TITULO (contexto)'] || '(sin título)',\n    contenido_o_link: d['SCRIPT'] || '',\n    estado: 'draft',\n    source_items: [{ platform: d['PLATAFORMA'] || '', url: d['🎯 ENLACE DE REFERENTE'] || '' }],\n    metadata: {\n      views: Number(d['VISTAS'] || 0),\n      likes: Number(d['LIKES'] || 0),\n      followers: Number(d['SEGUIDORES'] || 0),\n      engagement: Number(d['ENGAGEMENT'] || 0),\n      score: Number(d['SCORE'] || 0),\n      hashtags: String(d['HASHTAGS'] || '').split(',').map(s => s.trim()).filter(Boolean),\n      categoria: d['CATEGORIAS'] || '',\n      plataforma: d['PLATAFORMA'] || ''\n    }\n  };\n});\n\nreturn [{ json: { run_id: run_id, n: outputs.length, outputs: outputs } }];\n"
+      }
+    },
+    {
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "id": "ed0d88ec-f959-4d2c-973c-fd3ff5a0909e",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      },
+      "name": "Reportar outputs al registro",
+      "position": [
+        12704,
+        2400
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "POST",
+        "url": "=<<SUPABASE_URL>>/rest/v1/outputs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.outputs) }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "id": "4d3a62ae-4d83-4ec2-9b5b-16fd6470aa46",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      },
+      "name": "Cerrar run en el registro",
+      "position": [
+        12928,
+        2400
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=<<SUPABASE_URL>>/rest/v1/runs?id=eq.{{ $('Preparar reporte de outputs').first().json.run_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"fin\": \"{{ $now.toISO() }}\", \"estado\": \"ok\", \"metricas\": { \"colectados\": {{ $('Merge IG + TikTok').all().length }}, \"filtrados\": {{ $('Filtrar referentes virales — top N').all().length }}, \"outputs\": {{ $('Preparar reporte de outputs').first().json.n }} } }",
+        "options": {
+          "timeout": 15000
+        }
+      }
     }
   ],
   "pinData": {},
@@ -949,6 +1082,11 @@
             "node": "Resumen ejecución",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Preparar reporte de outputs",
+            "type": "main",
+            "index": 0
           }
         ],
         [
@@ -1014,6 +1152,33 @@
           },
           {
             "node": "Apify — Scrape TikTok",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Abrir run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar reporte de outputs": {
+      "main": [
+        [
+          {
+            "node": "Reportar outputs al registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reportar outputs al registro": {
+      "main": [
+        [
+          {
+            "node": "Cerrar run en el registro",
             "type": "main",
             "index": 0
           }

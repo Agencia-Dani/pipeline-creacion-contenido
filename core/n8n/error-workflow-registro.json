@@ -1,0 +1,194 @@
+{
+  "name": "Registro — Error Workflow (fallos → Supabase)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d40cf32b-9aca-4ce1-86f0-eb80b79652fa",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload del Error Trigger → datos para el registro central.\n// v0: una sola instancia (wf reels). Cuando haya más workflows reportando, convertir en un\n// mapa { nombre_del_workflow_en_n8n: instance_id } y resolver con $json.workflow.name.\nconst ex = $json.execution || {};\nconst wf = $json.workflow || {};\nconst msg = (ex.error && ex.error.message) ? ex.error.message : 'sin mensaje';\nconst nodo = ex.lastNodeExecuted || '?';\nreturn [{ json: {\n  instance_id: '<<INSTANCE_ID>>',\n  error_msg: '[' + (wf.name || 'workflow desconocido') + '] ' + msg + ' · nodo: ' + nodo + (ex.url ? ' · ' + ex.url : '')\n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "1f95eee3-8ae2-4abf-84f3-6a32bbe5fc27",
+      "name": "Preparar datos del fallo"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=<<SUPABASE_URL>>/rest/v1/runs?instance_id=eq.{{ $json.instance_id }}&estado=eq.en_curso",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"estado\": \"fallo\", \"fin\": \"{{ $now.toISO() }}\", \"error\": {{ JSON.stringify($json.error_msg) }} }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "54511333-76b2-4d9b-8487-19d7ca6aebd8",
+      "name": "Marcar run en_curso como fallo",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "95ee1f1e-fc51-4556-b749-2b1532aef9e5",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "36b2acf1-1472-415a-8e19-409fcd8462f6",
+      "name": "¿Había run abierto?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=<<SUPABASE_URL>>/rest/v1/runs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"instance_id\": \"<<INSTANCE_ID>>\", \"trigger_type\": \"cron\", \"estado\": \"fallo\", \"fin\": \"{{ $now.toISO() }}\", \"error\": {{ JSON.stringify($('Preparar datos del fallo').first().json.error_msg) }} }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        100
+      ],
+      "id": "46e03a48-9e40-4bae-b64d-fed7ca89b8cd",
+      "name": "Insertar run de fallo",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Preparar datos del fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar datos del fallo": {
+      "main": [
+        [
+          {
+            "node": "Marcar run en_curso como fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar run en_curso como fallo": {
+      "main": [
+        [
+          {
+            "node": "¿Había run abierto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Había run abierto?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Insertar run de fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

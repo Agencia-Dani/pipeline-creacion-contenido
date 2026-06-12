@@ -166,11 +166,23 @@ espacios finales — los escribe el nodo *Parsear respuesta Claude → columnas 
 
 ## Uso
 
+**Camino recomendado (con el pipeline):** llená `clients/<cliente>/short-form-content.yaml` y corré
+`node core/scripts/deploy.mjs <cliente>` — valida la config, resuelve todos los `<<placeholders>>`
+y deja un JSON importable en `dist/`. Después seguí el
+[runbook F2](../../docs/runbooks/f2-puesta-en-marcha.md) (credenciales, Sheet, error workflow).
+
+**Camino manual (sin pipeline):**
+
 1. Importá `workflow.json` en n8n.
 2. Configurá las credenciales (Apify, Anthropic, Supadata, Google, Gmail).
 3. Reemplazá **todos** los placeholders `<<...>>` siguiendo el checklist de arriba.
 4. Asegurate de que el Google Sheet tenga las 20 columnas requeridas.
 5. Activá el workflow — corre cada lunes 8 AM, o usá **Execute Workflow** para una corrida manual de prueba.
+6. **Búsqueda bajo demanda:** al activar, n8n publica la URL del formulario (nodo *Form —
+   Búsqueda bajo demanda* → Production URL).
+
+> Los nodos de ingesta al registro central (*Abrir run / Reportar outputs / Cerrar run*) van con
+> **Continue On Fail**: sin Supabase configurado el workflow corre igual — solo no reporta.
 6. **Búsqueda bajo demanda:** al activar, n8n publica la URL del formulario (nodo *Form —
    Búsqueda bajo demanda* → Production URL). Compartila con quien pueda pedir búsquedas: campos
    vacíos usan los defaults del cliente, y el email de resumen dice con qué filtros corrió.

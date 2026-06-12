@@ -15,6 +15,7 @@ registro: "coloquial | formal"
 pais_acento: "Colombia"
 muletillas_permitidas: []
 cliches_a_evitar: []
+palabras_propias: []              # palabras/expresiones características del cliente
 cta: "El CTA fijo del cliente"
 
 # --- Fuentes a monitorear ---
@@ -37,8 +38,13 @@ tt_results_limit: 60              # videos a colectar por hashtag de TikTok
 categorias: ["cat1", "cat2", "cat3", "cat4", "cat5"]
 
 # --- Destinos ---
+nombre_agencia: "Nombre de la agencia (asunto del email y nombre del workflow)"
 google_sheet_id: "ID del Sheet destino"
 sheet_nombre: "Nombre del documento"
 sheet_pestana: "Pestaña destino (con los encabezados exactos del README)"
 nombre_editor: "Editor responsable"
 email_destinatario: "correo@dominio.com"
+
+# --- Registro central (opcional: vacío = el workflow corre pero no reporta a Supabase) ---
+supabase_url: ""                  # https://<proyecto>.supabase.co — SIN key (la key vive en n8n)
+instance_id: ""                   # uuid de la instancia (insert de F2 Parte A, runbook)
