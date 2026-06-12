@@ -72,7 +72,7 @@ se entera. **El registro central es un sumidero adicional, nunca una dependencia
 
 | # | Componente | Responsabilidad (una frase) | Vive en |
 |---|---|---|---|
-| C1 | **Contrato de workflow** | Describir todo workflow igual por fuera: qué hace, qué necesita, qué produce, cómo se opera | `Workflows/<wf>/workflow.yaml` + schema en `core/contracts/` |
+| C1 | **Contrato de workflow** | Describir todo workflow igual por fuera: qué hace, qué necesita, qué produce, cómo se opera — incluidas sus etapas canónicas (§2.4) | `Workflows/<wf>/workflow.yaml` + schema en `core/contracts/` |
 | C2 | **Config de clientes** | Única fuente de verdad de lo que parametriza cada workflow para cada cliente (los `<<...>>` y `{{...}}` de hoy) | `clients/<cliente>/<wf>.yaml` |
 | C3 | **Registro central** | Persistir toda corrida y todo output de todo workflow, consultable | Supabase (schema versionado en `core/schema/`) |
 | C4 | **Adaptadores de ingesta** | Llevar los resultados de cada motor al registro: nodo HTTP en n8n (push) y sync job para Notion (pull) | dentro de cada workflow / `core/sync/` |
@@ -80,6 +80,7 @@ se entera. **El registro central es un sumidero adicional, nunca una dependencia
 | C6 | **Observabilidad y alertas** | Saber que corrió, cuánto costó, y enterarse de una falla antes que el cliente (heartbeat: "el cron del lunes no corrió") | registro central + workflow de alertas |
 | C7 | **Plantillas y scaffolding** | Que agregar workflow/cliente N+1 sea clonar-y-configurar, con validación automatizada del contrato | `core/templates/` + script validador |
 | C8 | **Documentación viva** | Blueprint lleno, ADRs, runbooks por workflow | `system-blueprint.md` + `docs/` |
+| C9 | **Entrada bajo demanda (dispatcher)** | Formulario simple (no técnico) que dispara corridas con filtros — cliente, plataforma, hashtags, tema, mínimos de views/likes/seguidores — y las rutea al workflow correspondiente | workflow interno de n8n (se construye en F5) |
 
 ### 2.2 Modelo de datos del registro (v0, se refina en F2)
 
@@ -88,10 +89,14 @@ clients      (id, nombre, estado)
 workflows    (id, slug, nombre, motor [n8n|openclaw|script], version, estado)
 instances    (id, workflow_id, client_id, config_ref, estado)      ← "wf reels para cliente X"
 runs         (id, instance_id, inicio, fin, estado [ok|fallo|parcial],
-              trigger [cron|manual], costo_estimado, metricas jsonb, error)
+              trigger [cron|manual|on_demand],
+              params jsonb,                    ← los filtros pedidos en esa corrida
+              costo_estimado, metricas jsonb, error)
 outputs      (id, run_id, tipo [guion|borrador|nugget|research_item],
               titulo, contenido_o_link, estado [draft|aprobado|publicado],
-              publicado_en, metadata jsonb)
+              publicado_en,
+              metadata jsonb)                  ← métricas del item fuente (views, likes,
+                                                 seguidores, hashtags) para filtrar en dashboard
 ```
 
 Reglas: ningún dato con dos dueños — el registro es dueño del *historial*; Sheets/Notion son
@@ -120,6 +125,37 @@ pipeline-creacion-contenido/
     └── workflow-substack/             (+ workflow.yaml)
 ```
 
+### 2.4 Anatomía estándar de un workflow de contenido (etapas canónicas)
+
+Los workflows **no se implementan igual, pero se describen y se conectan igual**: todo workflow
+de contenido se mapea contra estas 8 etapas en su manifest (las que no aplican se declaran `n/a`):
+
+| Etapa | Responsabilidad | En reels hoy | En substack hoy |
+|---|---|---|---|
+| 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok | Bot recorre fuentes validadas |
+| 2. NORMALIZAR | Todo item cae al schema común `content_item` | Nodos "Normalizar IG1/TT1" | Implícito en el playbook |
+| 3. FILTRAR / SCOREAR | Params de la corrida + criterios del cliente → selección | Filtro viral top-25 (umbrales hardcodeados) | Pregunta filtro + scoring 5 criterios |
+| 4. ENRIQUECER | Transcribir, extraer, research profundo | Supadata Whisper | Research profundo del brief |
+| 5. GENERAR | LLM con **perfil de output** (voz del cliente + formato de la plataforma destino) | Claude → guion de reel | Bot → borrador / nugget |
+| 6. CALIDAD | Checklist antes de entregar | ❌ no tiene (hueco conocido) | Checklist de 5 preguntas |
+| 7. ENTREGAR | Destino nativo + registro central | Google Sheets | Notion |
+| 8. NOTIFICAR | Resumen / alerta | Email (Gmail) | Telegram |
+
+Interfaces estándar entre etapas (se definen en F1, viven en `core/contracts/`):
+
+- **`content_item`** — el formato común de "una pieza encontrada": plataforma, url, autor, fecha,
+  métricas (views, likes, seguidores, reach), tema/hashtags, transcripción/extracto.
+- **`output`** — el formato común de "una pieza producida": tipo, plataforma destino, contenido,
+  estado, y trazabilidad al `content_item` de origen.
+
+Dos consecuencias de diseño:
+
+1. **Agregar una fuente nueva = agregar un adaptador** que produzca `content_item`, sin tocar
+   el resto del workflow.
+2. **Cambiar de plataforma destino = cambiar el perfil de la etapa 5** — un mismo research puede
+   generar guion de reel y borrador de newsletter. Esto deja abierta la convergencia hacia un
+   motor único (decisión D7) sin comprometerla hoy.
+
 ---
 
 ## 3. Decisiones
@@ -133,6 +169,8 @@ pipeline-creacion-contenido/
 | D3 | **Multi-cliente desde el día 1** en modelo de datos y config | Retrofittear `client` después es caro; tenerlo ahora cuesta casi nada; el wf de reels ya es "una copia por cliente" | Modelar solo la agencia y migrar después |
 | D4 | **Interfaz del jefe: simple.** Dashboard solo-lectura + resumen push (email/Telegram). Notion curado queda como extensión futura, no se construye ahora | Jefe no técnico: necesita ver outputs y estado sin poder romper nada; herramientas existentes, cero UI custom | Construir web app propia · Notion como UI obligatoria |
 | D5 | **Hosting del wf de reels: n8n managed (fase 1)** según [HOSTING.md](./Workflows/workflow-short-form-content/HOSTING.md) — se eleva a decisión del sistema | Ya investigado y decidido ahí: ~$4/mes, sin administrar servidor, suficiente para el volumen; VPS Hetzner como fase 2 si escala | n8n Cloud ($24/mes) · reescribir a script · Make/Zapier |
+| D6 | **El pipeline central es plano de datos, no un "workflow padre".** No hay orquestador único que dispare a los demás: cada workflow corre en su motor con su propio trigger y reporta al registro. El *dispatcher* de entrada bajo demanda (C9) es un componente opcional dentro de n8n, no el centro del sistema | Un workflow maestro es un punto único de falla (viola el no-negociable de aislamiento: si el padre se rompe, nada corre) y no puede manejar el bot de OpenClaw (conversacional, humano en el loop). La unificación real ocurre en los datos (registro) y en el contrato, no en la ejecución | Workflow padre en n8n/Zapier con un nodo de entrada que rutea a cada workflow hijo |
+| D7 | **Convergencia gradual hacia un motor de research único — dirección, no compromiso.** Las costuras se diseñan ya (adaptadores de fuente en COLECTAR, perfiles de output en GENERAR, §2.4); la unificación se evalúa después del MVP, usando el workflow de búsqueda bajo demanda (F5) como primer slice del motor común | Los workflows comparten esencia (research → filtro → generación tailored) y difieren sobre todo en fuentes y formato destino; pero fusionarlos hoy es un big-bang que rompe lo probado y choca con el valor diferencial del wf substack (proceso editorial con humano en el loop, no solo fuentes) | Fusionar los dos workflows en uno ahora |
 
 ### 3.2 Abiertas (sección 14 del blueprint — bloquean lo que se indica)
 
@@ -144,8 +182,10 @@ pipeline-creacion-contenido/
       Postgres con limitaciones; Metabase = más potente pero hay que hostearlo). Se decide en F4
       con un spike de 1 hora. *Bloquea:* F4.
 - [ ] **Zona horaria oficial de los crons** del sistema. *Bloquea:* activación en F2.
-- [ ] **Qué quiere ver el jefe exactamente** en dashboard/resumen (se le pregunta con un
-      prototipo en mano, no en abstracto). *Bloquea:* cierre de F4.
+- [ ] **Taxonomía y personalización de outputs** — qué tipos de output existen, con qué campos,
+      y qué quiere ver/filtrar el jefe tanto en el dashboard como en la entrada bajo demanda
+      (los specs que ya pidió: views, likes, suscriptores, reach, hashtags, tipo de contenido,
+      temas — se confirman con prototipo en mano, no en abstracto). *Bloquea:* cierre de F1 y F4.
 
 ---
 
@@ -176,16 +216,25 @@ para tener visibilidad real):
 ### F0 — Fundación de diseño *(en curso)*
 Llenar el blueprint y formalizar decisiones. **Nada de código.**
 - Llenar secciones 1–5 del `system-blueprint.md` (objetivo, usuarios, no-negociables,
-  requerimientos, escalabilidad) — sesión de trabajo Mani + Claude.
-- Escribir ADR-001…005 en `docs/adr/` (las 5 decisiones de §3.1, con alternativas y porqués).
-- Preparar un one-pager para la conversación con el jefe: qué es, qué le da, qué cuesta
-  (§4), qué se le va a pedir (presupuesto, prioridades, qué quiere ver).
-- **Hecho cuando:** blueprint 1–5 sin `<<...>>` · 5 ADRs escritos · one-pager listo.
+  requerimientos, escalabilidad) — sesión de trabajo Mani + Claude. ✅ borrador listo
+  (pendiente: Mani confirma no-negociables y métricas de éxito).
+- Escribir ADR-001…007 en `docs/adr/` (las 7 decisiones de §3.1, con alternativas y porqués). ✅
+- Preparar un one-pager para la conversación con el jefe: qué es, qué le da, qué cuesta (§4),
+  y qué se le va a pedir: presupuesto, prioridades, **taxonomía de outputs** (qué quiere ver y
+  cómo) y **los filtros de búsqueda que necesita** (sus specs de views/likes/suscriptores/reach/
+  hashtags/tipo/temas entran acá y alimentan F1 y F5). ✅ `docs/one-pager-jefe.md`
+- **Hecho cuando:** blueprint 1–5 sin `<<...>>` · 7 ADRs escritos · one-pager listo · Mani
+  confirmó no-negociables y métricas de éxito · conversación con el jefe realizada.
 
 ### F1 — El contrato de workflow
 La unidad de extensión queda definida y los dos workflows existentes la cumplen *sin tocar su funcionamiento*.
 - Diseñar el schema de `workflow.yaml`: identidad, motor, trigger, inputs (config + credenciales
-  requeridas), outputs (tipos + dónde caen), runbook (arrancar/parar/probar), estado, costo por corrida.
+  requeridas + **filtros que acepta por corrida**), outputs (tipos + dónde caen), runbook
+  (arrancar/parar/probar), estado, costo por corrida.
+- Definir el **catálogo de outputs** (taxonomía: tipos, campos por tipo, métricas del item
+  fuente) y los schemas `content_item` / `output` de §2.4 — validados con lo que diga el jefe
+  en la conversación de F0.
+- Mapear ambos workflows existentes a las **etapas canónicas** (§2.4) dentro de sus manifests.
 - Escribir el `workflow.yaml` de los dos workflows existentes.
 - Definir el formato de `clients/<cliente>/<wf>.yaml` (mapea 1:1 a los `<<placeholders>>` del
   wf de reels y a las `{{LLAVES}}` del kit Substack — los dos sistemas de variables de hoy quedan
@@ -227,14 +276,26 @@ El sistema se vuelve útil para su usuario final.
 - **Hecho cuando:** el jefe encuentra el último output él solo, sin ayuda · un fallo simulado
   genera alerta antes de 24h · MVP declarado.
 
-### F5 — Templatización (clonar-y-configurar)
-Agregar el flujo/cliente N+1 se vuelve barato y a prueba de descuidos.
+### F5 — Workflow N+1 real: búsqueda bajo demanda + templatización
+El test de clonar-y-configurar se hace con un workflow real pedido por el jefe, no con un
+dry-run ficticio. Este workflow es además el **primer slice del motor de research común** (D7).
 - `core/templates/`: esqueleto de workflow nuevo (manifest + estructura + checklist) y de
   cliente nuevo (config + pasos por motor: duplicar wf en n8n / correr kit OpenClaw).
 - Guías: `docs/runbooks/agregar-workflow.md` y `agregar-cliente.md`.
-- **Test del blueprint (sección 5):** dry-run de agregar un workflow ficticio #3 siguiendo solo
-  la guía. Si algún paso dice "modificar el núcleo", el diseño no está listo — se corrige.
-- **Hecho cuando:** el dry-run completo se hace en < 1 hora sin tocar `core/`.
+- Construir el **workflow #3 — búsqueda de contenido bajo demanda**, siguiendo SOLO la guía:
+  - Entrada: **Form Trigger de n8n** (formulario web simple, apto para no técnicos) con los
+    filtros validados con el jefe: cliente, plataforma, hashtags, temas, tipo de contenido,
+    mínimos de views/likes/suscriptores/reach.
+  - Defaults por cliente desde `clients/<cliente>/`; lo elegido en el formulario los sobreescribe
+    solo para esa corrida.
+  - Reutiliza las etapas COLECTAR/NORMALIZAR del wf de reels (mismos adaptadores Apify); el
+    filtro de la etapa 3 lee los params de la corrida en vez de umbrales hardcodeados.
+  - Output tailored según perfil elegido + registro en Supabase con `runs.params`.
+- Si algún paso de la guía exige "modificar el núcleo", el diseño no está listo — se corrige
+  la guía/el contrato, no se parchea a mano (test del blueprint, sección 5).
+- **Hecho cuando:** el jefe lanza una búsqueda filtrada él solo desde el formulario · el
+  workflow #3 nació de la plantilla sin tocar `core/` · las guías quedaron corregidas con lo
+  aprendido.
 
 ### F6 — Operación sostenible
 El sistema sobrevive sin Mani en la cabeza.
