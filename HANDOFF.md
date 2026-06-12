@@ -57,7 +57,9 @@ Supabase, Airtable y n8n no existen todavía. Arranca la construcción.
   vistas de histórico/selecciones/señal) · cockpit Airtable actualizado (campos `idioma`,
   `link_doc`, `fecha_calificacion` + vista 🔥; `setup-airtable.mjs` los crea) · heat-score v1
   definido (ROADMAP §1) · consolidación de docs: blueprint/runbook/MEJORAS/HOSTING/one-pager-jefe
-  absorbidos en README+ROADMAP+PLAN+ADRs (~900 líneas menos).
+  absorbidos en README+ROADMAP+PLAN+ADRs (~900 líneas menos) · PLAN.md adelgazado: la tabla
+  D1–D7 ahora apunta a los ADRs (dueños del porqué), §2.2 apunta al SQL, F0/F1 cerradas, F2
+  delega al ROADMAP, costos refrescados (~$7–8/mes con InstaPods).
 - **Decisiones de la sesión:** formato del script flexible (Doc = default, lo innegociable es el
   link) · reach no existe en scrapers → proxy `engagement_rate` (en la fórmula) · voces = registros
   de Airtable editables por el equipo cuando quieran · equipo de redes se llama **Majo y Jero**.

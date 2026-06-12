@@ -87,25 +87,11 @@ se entera. **El registro central es un sumidero adicional, nunca una dependencia
 
 ### 2.2 Modelo de datos del registro (v0 — SQL real: `core/schema/001_registro_inicial.sql`)
 
-```
-clients      (id, nombre, estado)
-workflows    (id, nombre, motor [n8n|openclaw|script], estado)
-instances    (id, workflow_id, client_id, config_ref, estado)      ← "wf reels para cliente X"
-runs         (id, instance_id, inicio, fin, estado [en_curso|ok|fallo|parcial],
-              trigger_type [cron|manual|on_demand|conversation],
-              params jsonb,                    ← los filtros pedidos en esa corrida
-              costo_estimado, metricas jsonb, error)
-outputs      (id, run_id, tipo [guion_reel|research_item|borrador_newsletter|nugget],
-              titulo, contenido_o_link, estado [draft|aprobado|publicado|descartado],
-              publicado_en, source_items jsonb,
-              external_id,                     ← id en el destino nativo → sync idempotente (F3)
-              metadata jsonb)                  ← métricas del item fuente (views, likes,
-                                                 seguidores, hashtags) para filtrar en dashboard
-```
-
-Reglas: ningún dato con dos dueños — el registro es dueño del *historial*; Sheets/Notion son
-dueños del *espacio de trabajo* de cada workflow. La entidad `client` existe desde el día 1
-aunque hoy haya un solo cliente (decisión D3).
+La fuente de verdad es el SQL versionado y comentado en [`core/schema/`](./core/schema/):
+`001` = entidades (`clients · workflows · instances · runs · outputs`) + vista de outputs
+recientes · `002` = dedup (`processed_items`) + corpus · `003` = selecciones e histórico
+(ADR-009). La entidad `client` existe desde el día 1 aunque hoy haya un solo cliente (D3);
+la regla de dueños únicos está en §2.5.
 
 ### 2.3 Estructura objetivo del repo
 
@@ -191,42 +177,38 @@ afuera (humano en el loop por diseño).
 
 ## 3. Decisiones
 
-### 3.1 Tomadas (2026-06-11, con Mani — se formalizan como ADRs en F0)
+### 3.1 Tomadas — viven en [`docs/adr/`](./docs/adr/README.md) (porqué + alternativas allá, no acá)
 
-| # | Decisión | Resumen del porqué | Alternativa descartada |
-|---|---|---|---|
-| D1 | **Motores heterogéneos, contrato común.** No se unifican los engines; se estandariza cómo se describen, configuran y reportan | Los dos workflows son extremos a propósito (README); unificar motor = reescribir trabajo probado sin ganancia | Migrar todo a n8n o a agents en VPS |
-| D2 | **Supabase (Postgres) como registro central** de runs/outputs; Sheets/Notion se mantienen como destinos nativos | DB real con SQL, API REST lista (fácil desde n8n), free tier $0, habilita dashboards/queries; el registro es sink adicional, no dependencia | Notion como DB central (queries/dashboards limitados, rate limits) · Sheets central (sin schema, frágil) |
-| D3 | **Multi-cliente desde el día 1** en modelo de datos y config | Retrofittear `client` después es caro; tenerlo ahora cuesta casi nada; el wf de reels ya es "una copia por cliente" | Modelar solo la agencia y migrar después |
-| D4 | **Interfaz del jefe: simple.** Dashboard solo-lectura + resumen push (email/Telegram). Notion curado queda como extensión futura, no se construye ahora | Jefe no técnico: necesita ver outputs y estado sin poder romper nada; herramientas existentes, cero UI custom | Construir web app propia · Notion como UI obligatoria |
-| D5 | **Hosting del wf de reels: n8n managed (fase 1)** ([ADR-005](./docs/adr/ADR-005-hosting-n8n-managed-fase1.md)) | Ya investigado y decidido ahí: ~$4/mes, sin administrar servidor, suficiente para el volumen; VPS Hetzner como fase 2 si escala | n8n Cloud ($24/mes) · reescribir a script · Make/Zapier |
-| D6 | **El pipeline central es plano de datos, no un "workflow padre".** No hay orquestador único que dispare a los demás: cada workflow corre en su motor con su propio trigger y reporta al registro. El *dispatcher* de entrada bajo demanda (C9) es un componente opcional dentro de n8n, no el centro del sistema | Un workflow maestro es un punto único de falla (viola el no-negociable de aislamiento: si el padre se rompe, nada corre) y no puede manejar el bot de OpenClaw (conversacional, humano en el loop). La unificación real ocurre en los datos (registro) y en el contrato, no en la ejecución | Workflow padre en n8n/Zapier con un nodo de entrada que rutea a cada workflow hijo |
-| D7 | **Convergencia gradual hacia un motor de research único — dirección, no compromiso.** Las costuras se diseñan ya (adaptadores de fuente en COLECTAR, perfiles de output en GENERAR, §2.4); la unificación se evalúa después del MVP, usando el workflow de búsqueda bajo demanda (F5) como primer slice del motor común | Los workflows comparten esencia (research → filtro → generación tailored) y difieren sobre todo en fuentes y formato destino; pero fusionarlos hoy es un big-bang que rompe lo probado y choca con el valor diferencial del wf substack (proceso editorial con humano en el loop, no solo fuentes) | Fusionar los dos workflows en uno ahora |
+| # | Decisión (una frase) | ADR |
+|---|---|---|
+| D1 | Motores heterogéneos, contrato común | [ADR-001](./docs/adr/ADR-001-motores-heterogeneos-contrato-comun.md) |
+| D2 | Supabase como registro central; Sheets/Notion siguen como destinos nativos | [ADR-002](./docs/adr/ADR-002-supabase-registro-central.md) |
+| D3 | Multi-cliente desde el día 1 | [ADR-003](./docs/adr/ADR-003-multicliente-desde-dia-1.md) |
+| D4 | Interfaz del jefe simple: dashboard solo-lectura + resumen push | [ADR-004](./docs/adr/ADR-004-interfaz-jefe-dashboard-y-push.md) |
+| D5 | Hosting n8n: managed (fase 1) → VPS (fase 2) | [ADR-005](./docs/adr/ADR-005-hosting-n8n-managed-fase1.md) |
+| D6 | Plano de datos, sin "workflow padre" orquestador | [ADR-006](./docs/adr/ADR-006-plano-de-datos-sin-workflow-padre.md) |
+| D7 | Convergencia gradual a motor único — dirección, no compromiso | [ADR-007](./docs/adr/ADR-007-convergencia-gradual-motor-unico.md) |
+| — | Airtable como cockpit del equipo de redes (revisa D4) | [ADR-008](./docs/adr/ADR-008-airtable-cockpit-equipo-redes.md) |
+| — | Scripts literales + aprendizaje en el scoring (revisa ADR-008) | [ADR-009](./docs/adr/ADR-009-scripts-literales-y-aprendizaje-en-scoring.md) |
 
 ### 3.2 Abiertas (bloquean lo que se indica)
 
-- [ ] **Presupuesto mensual definitivo** — rango tentativo $10–30/mes; el costo fijo proyectado
-      es ~$4–5/mes (ver §4), así que no bloquea F0–F2, pero **hay que validarlo con el jefe**
-      junto con la idea general. *Bloquea:* fase 2 de hosting (VPS) y suscripciones a fuentes.
-- [x] **PikaPods vs InstaPods** — investigado 2026-06-11: **InstaPods recomendado** ($3/mes,
-      SSH y terminal web en todos los planes, útil para debug); PikaPods ($3.80/mes) no da SSH
-      y sus backups son *best-effort* cuando la app usa su propia DB. En ambos el riesgo real es
-      bajo: los workflows viven versionados en el repo y el registro en Supabase — lo único en
-      juego en n8n es el historial de ejecuciones. Decisión liviana (migrar = export/import);
-      Mani confirma al crear la cuenta.
-- [ ] **Looker Studio vs Metabase** para el dashboard (Looker = $0 y cero infra pero conecta a
-      Postgres con limitaciones; Metabase = más potente pero hay que hostearlo). Se decide en F4
-      con un spike de 1 hora. *Bloquea:* F4.
-- [x] **Zona horaria oficial de los crons** — **America/Bogota (GMT-5)**, confirmado por Mani
-      2026-06-12. Ya es el valor del manifest del wf de reels; resta validar la interpretación
-      TZ explícitamente al activar (D1 del runbook F2).
-- [ ] **Taxonomía y personalización de outputs** — qué tipos de output existen, con qué campos,
-      y qué quiere ver/filtrar el jefe tanto en el dashboard como en la entrada bajo demanda
-      (los specs que ya pidió: views, likes, suscriptores, reach, hashtags, tipo de contenido,
-      temas — se confirman con prototipo en mano, no en abstracto). *Bloquea:* cierre de F1 y F4.
-      **Parcialmente resuelto (2026-06-12):** *reach* no se exige — se acepta `views + engagement_rate`
-      como proxy (no cambia herramienta de colecta ni costo). *Qué filtros exponer en el formulario*
-      se decide al montar el dashboard (D3), con datos reales en mano.
+- [ ] **Presupuesto mensual definitivo** — rango tentativo $10–30/mes; el fijo proyectado es
+      ~$7–8/mes (§4), así que no bloquea el MVP, pero **hay que validarlo con el jefe**.
+      *Bloquea:* fase 2 de hosting (VPS) y suscripciones a fuentes.
+- [x] **PikaPods vs InstaPods** — InstaPods (SSH y terminal web, útil para debug). Decisión
+      liviana: migrar = export/import. Mani confirma al crear la cuenta (B1 del ROADMAP).
+- [ ] **Looker Studio vs Metabase** para el dashboard central — se decide en F4 con un spike de
+      1 hora. *Bloquea:* F4. *(El dashboard del equipo de redes no espera a esto: Airtable +
+      Sheet Histórico, ROADMAP §5.)*
+- [x] **Zona horaria de los crons** — **America/Bogota**, confirmado 2026-06-12. Resta la
+      validación explícita al activar (D1 del ROADMAP).
+- [ ] **Taxonomía y filtros del dashboard del jefe** — para reels quedó sellada (tipo
+      `guion_reel`, check en `002`; *reach* → proxy `views + engagement_rate`). Lo que falta:
+      qué quiere ver/filtrar el jefe en el dashboard central — se confirma con prototipo en
+      mano. *Bloquea:* F4.
+- [ ] **Voz/proyecto inicial del MVP de reels** — el jefe no la ha dado; no bloquea (las voces
+      son registros de Airtable editables por el equipo). *Seguimiento:* M0.3 del ROADMAP.
 
 ---
 
@@ -238,12 +220,12 @@ para tener visibilidad real):
 
 | Concepto | Herramienta | Costo/mes | Nota |
 |---|---|---|---|
-| Ejecución wf reels | n8n en PikaPods/InstaPods | ~$3–4 | Decisión D5; ejecuciones ilimitadas |
-| Registro central | Supabase free tier | $0 | Límite 500 MB (años de outputs de texto). ⚠️ El free tier pausa proyectos tras ~7 días sin actividad — la actividad semanal del cron debería mantenerlo vivo; si molesta: Pro $25 o Postgres en el VPS de fase 2 |
-| Dashboard | Looker Studio o Metabase self-host | $0 | Se decide en F4 |
-| Resumen + alertas | El mismo n8n (workflow interno) → Gmail/Telegram | $0 | |
+| Ejecución workflows n8n | InstaPods (D5) | ~$7 | Ejecuciones ilimitadas; motor + archivado + futuros en la misma instancia |
+| Cockpit del equipo | Airtable free | $0 | 1.000 records/base · 1.000 API calls/mes (reglas en el contrato del cockpit) |
+| Registro central | Supabase free | $0 | 500 MB ≈ años de texto. ⚠️ Pausa tras ~7 días sin actividad — el cron diario lo mantiene vivo; plan B: Pro $25 o Postgres en VPS |
+| Histórico + dashboard equipo | Google Sheets + Looker (si hace falta) | $0 | |
 | Bot newsletter | OpenClaw | (ya se paga hoy) | Sin cambio |
-| **Total fijo nuevo** | | **~$4–5/mes** | Dentro del rango tentativo con margen amplio |
+| **Total fijo nuevo** | | **~$7–8/mes** | Dentro del rango tentativo con margen |
 
 ---
 
@@ -263,47 +245,20 @@ para tener visibilidad real):
 > para el workflow de reels; las fases F3–F6 del pipeline general siguen vigentes después.
 
 ### F0 — Fundación de diseño *(✅ completada 2026-06-12)*
-Formalizar el diseño y las decisiones. **Nada de código.**
-- Objetivo, usuarios, no-negociables y escalabilidad definidos (hoy consolidados en §1, §2.5
-  y los ADRs; el system-blueprint de trabajo se retiró al absorberse acá). ✅
-- Escribir ADR-001…007 en `docs/adr/` (las 7 decisiones de §3.1, con alternativas y porqués). ✅
-- Preparar un one-pager para la conversación con el jefe: qué es, qué le da, qué cuesta (§4),
-  y qué se le va a pedir: presupuesto, prioridades, **taxonomía de outputs** (qué quiere ver y
-  cómo) y **los filtros de búsqueda que necesita** (sus specs de views/likes/suscriptores/reach/
-  hashtags/tipo/temas entran acá y alimentan F1 y F5). ✅ `docs/one-pager-jefe.md`
-- **Hecho cuando:** invariantes confirmados · ADRs escritos · one-pager presentado ·
-  conversación con el jefe realizada (✅ visto bueno 2026-06-12 — ver ROADMAP §1).
+Diseño formalizado sin código: invariantes (§2.5), ADR-001…009, one-pager presentado y
+**visto bueno del jefe dado** (ROADMAP §1).
 
-### F1 — El contrato de workflow *(borrador completo 2026-06-11 — pendiente revisión de Mani y taxonomía con el jefe)*
-La unidad de extensión queda definida y los dos workflows existentes la cumplen *sin tocar su funcionamiento*.
-- Diseñar el schema de `workflow.yaml`: identidad, motor, trigger, inputs (config + credenciales
-  requeridas + **filtros que acepta por corrida**), outputs (tipos + dónde caen), runbook
-  (arrancar/parar/probar), estado, costo por corrida.
-- Definir el **catálogo de outputs** (taxonomía: tipos, campos por tipo, métricas del item
-  fuente) y los schemas `content_item` / `output` de §2.4 — validados con lo que diga el jefe
-  en la conversación de F0.
-- Mapear ambos workflows existentes a las **etapas canónicas** (§2.4) dentro de sus manifests.
-- Escribir el `workflow.yaml` de los dos workflows existentes.
-- Definir el formato de `clients/<cliente>/<wf>.yaml` (mapea 1:1 a los `<<placeholders>>` del
-  wf de reels y a las `{{LLAVES}}` del kit Substack — los dos sistemas de variables de hoy quedan
-  unificados en una sola convención).
-- Script validador (`core/scripts/validate`): manifest completo, config sin claves faltantes,
-  **sin secretos en git** (las convenciones se hacen cumplir, no se esperan — principio #8).
-- **Hecho cuando:** el validador pasa en verde · una persona nueva entiende ambos workflows
-  leyendo solo sus manifests.
+### F1 — El contrato de workflow *(✅ construida — cierre formal con el manifest post-rework)*
+El contrato ([workflow-manifest](./core/contracts/workflow-manifest.md)), los schemas
+`content_item`/`output`, el formato de `clients/<cliente>/<wf>.yaml` y el validador existen y
+pasan en verde; el manifest del wf de reels mapea las 8 etapas. Resta solo actualizar ese
+manifest al estado real del motor tras el rework (D2 del ROADMAP).
 
-### F2 — Esqueleto que camina: puesta en marcha del workflow de reels + registro central
-La rebanada fina end-to-end: el workflow de reels montado de cero y una corrida real registrada
-centralmente. Checklist ejecutable: [ROADMAP.md §3](./ROADMAP.md) (carriles A/B/C).
-- **Montar el workflow de reels** (hoy no opera): levantar n8n managed (InstaPods), importar el
-  JSON, cargar credenciales, resolver placeholders con la config del cliente real, corrida
-  manual de prueba (= carril B del ROADMAP).
-- Crear proyecto Supabase + aplicar `core/schema/001_registro_inicial.sql` (las 5 tablas de §2.2).
-- Agregar al final del wf de reels un nodo HTTP que reporta a Supabase: 1 fila en `runs` +
-  N filas en `outputs` (una por guion). Google Sheets sigue funcionando igual.
-- Registrar también las corridas fallidas (el nodo de error de n8n → `runs` con estado `fallo`).
-- **Hecho cuando:** una corrida real del lunes aparece en Supabase con sus ~25 guiones,
-  consultable por SQL · una falla simulada queda registrada como `fallo`.
+### F2 — Esqueleto que camina: el MVP de reels *(en curso — vive en el [ROADMAP](./ROADMAP.md))*
+La rebanada fina end-to-end con la dirección ADR-009: cockpit Airtable + motor n8n
+(dedup/heat/transcribe-traduce) + registro Supabase + histórico en Sheets. Todo el detalle
+(carriles, tasks, validación, criterio de hecho) está en el ROADMAP y el avance en
+[HANDOFF](./HANDOFF.md) — no se duplica acá.
 
 ### F3 — Puesta en marcha del workflow de Substack + conexión al registro
 La prueba de fuego del contrato: el extremo opuesto se monta de cero y entra al mismo registro.

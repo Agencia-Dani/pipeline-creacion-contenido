@@ -19,7 +19,7 @@ owner: mani
 triggers:
   - type: cron
     schedule: "0 8 * * 1"         # lunes 8:00 AM
-    timezone: America/Bogota      # ⚠️ decisión abierta (PLAN.md §3.2) — validar antes de activar
+    timezone: America/Bogota      # confirmada 2026-06-12 — validar interpretación al activar (D1 del ROADMAP)
   - type: form                    # búsqueda bajo demanda (M2): n8n Form Trigger, página web propia
   - type: manual                  # "Execute Workflow" en n8n para corridas de prueba
 
