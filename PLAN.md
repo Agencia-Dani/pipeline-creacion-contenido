@@ -222,6 +222,12 @@ para tener visibilidad real):
 > siguiente con la anterior "casi". El refactor de los workflows existentes es **descriptivo
 > primero** (se les pone contrato encima) y solo después intrusivo (se les agrega el reporte
 > al registro) — nunca se rompe lo que ya funciona.
+>
+> **Nota de prioridad (2026-06-12):** el montaje del workflow de reels va primero y por aparte,
+> con sus filtros bajo demanda y un dashboard por-workflow adelantados de F5/F4. El análisis de
+> brechas y el paquete de mejoras (M1–M6) viven en
+> [Workflows/workflow-short-form-content/MEJORAS.md](./Workflows/workflow-short-form-content/MEJORAS.md).
+> Las etapas F2–F5 no cambian de contenido — cambia el orden en que se ejecutan sus piezas.
 
 ### F0 — Fundación de diseño *(en curso)*
 Llenar el blueprint y formalizar decisiones. **Nada de código.**
