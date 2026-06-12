@@ -1,0 +1,1283 @@
+{
+  "name": "Referentes Virales IG & TikTok → <<NOMBRE_AGENCIA>>",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "6ea5c1bf-d0b2-45ff-9d27-76428f6758b8",
+      "name": "Trigger — Lunes 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        10464,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=<APIFY_TOKEN>",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"directUrls\": [\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_1>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_2>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_3>>/\"\n  ],\n  \"resultsType\": \"posts\",\n  \"resultsLimit\": 12,\n  \"searchType\": \"user\",\n  \"searchLimit\": 1,\n  \"addParentData\": true\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "e1bc3aba-8e81-4148-9bc8-8334354b9164",
+      "name": "Apify — Scrape IG Reels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10688,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/clockworks~free-tiktok-scraper/run-sync-get-dataset-items?token=<APIFY_TOKEN>",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"hashtags\": [\n    \"<<HASHTAG_1>>\",\n    \"<<HASHTAG_2>>\",\n    \"<<HASHTAG_3>>\"\n  ],\n  \"resultsPerPage\": 60,\n  \"shouldDownloadVideos\": false,\n  \"shouldDownloadCovers\": false\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "698bfe99-8ff8-4b8d-9059-fe8633c312d8",
+      "name": "Apify — Scrape TikTok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10688,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "2a1f3c55-5e92-4e77-a08c-105f7a32dbe2",
+      "name": "Merge IG + TikTok",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        11136,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Descargar el audio del video para enviarlo a Groq Whisper\n// Groq acepta URLs públicas directas o base64.\n// Este nodo prepara la URL del video y la pasa al siguiente paso.\n// Si la URL no es descargable directamente (IG/TT requieren auth),\n// usamos el caption como fallback y lo marcamos.\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const d = item.json;\n\n  // Determinar si tenemos URL descargable real\n  const hasDirectVideo = d.video_url &&\n    d.video_url !== d.url &&\n    (d.video_url.includes('.mp4') || d.video_url.includes('download') || d.video_url.includes('video'));\n\n  results.push({ json: {\n    ...d,\n    has_direct_video: hasDirectVideo,\n    transcripcion_fallback: d.caption  // Si no hay video descargable, usamos caption\n  }});\n}\n\nreturn results;"
+      },
+      "id": "92903fb8-747b-4c47-b1c7-871e887feb79",
+      "name": "Preparar para transcripción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11584,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "acf07214-4a1f-422b-a0dc-398c4e95674b",
+      "name": "Merge — datos + transcripción",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        12032,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "<ANTHROPIC_API_KEY>"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2000,\n  \"system\": [{ \"type\": \"text\", \"cache_control\": { \"type\": \"ephemeral\" }, \"text\": \"Sos el ghostwriter de <<NOMBRE_DEL_CLIENTE>>, <<DESCRIPCION_Y_CREDENCIALES_DEL_CLIENTE>>.\\n\\nTU ÚNICA TAREA: Leer el referente viral y escribir un script ORIGINAL en la voz exacta de <<NOMBRE_DEL_CLIENTE>>. No traduzcas el referente. Usalo como inspiración de tema y estructura, pero el contenido, los ejemplos y las ideas deben ser propios de <<NOMBRE_DEL_CLIENTE>>.\\n\\n═══════════════════════════════════\\nVOZ Y ESTILO — EJEMPLOS REALES (FEW-SHOT)\\n═══════════════════════════════════\\n<<PEGAR_AQUI_2_A_4_GUIONES_REALES_DEL_CLIENTE>>\\n\\n(Cada ejemplo debe ser un guion REAL del cliente, 100-200 palabras, en su voz exacta. Estos ejemplos son lo que ancla la calidad: reemplazalos por guiones reales antes de activar el workflow. Sin ejemplos reales, la calidad cae mucho.)\\n\\n═══════════════════════════════════\\nREGLAS OBLIGATORIAS DE ESTILO\\n═══════════════════════════════════\\n1. CREDENCIAL al inicio: <<FRASE_DE_CREDENCIAL_DEL_CLIENTE>> (ej: \\\"Soy X, fundador de Y\\\").\\n2. VOZ: <<TRATAMIENTO: vos / tú / ustedes>>, registro <<COLOQUIAL_O_FORMAL>>, <<PAIS_O_ACENTO>>.\\n3. ESTRUCTURA: Hook con presentación → desarrollo (lista numerada o historia) → CTA final.\\n4. LENGUAJE: <<PALABRAS_O_EXPRESIONES_PROPIAS_DEL_CLIENTE>>. <<MULETILLAS_PERMITIDAS>>.\\n5. EJEMPLOS: concretos, con datos reales y nombres propios cuando aplique.\\n6. RITMO: frases cortas seguidas de frases explicativas más largas. Repetición para énfasis.\\n7. LONGITUD: 150-220 palabras (reel de 45-75 segundos).\\n8. PROHIBIDO: <<CLICHES_A_EVITAR>> (ej: \\\"transformar tu vida\\\", \\\"potencial\\\", \\\"increíble\\\", \\\"épico\\\"). Nada de coach motivacional genérico.\\n9. CTA FIJO al final: <<CTA_DEL_CLIENTE>> (ej: \\\"Seguinos que te contamos...\\\").\\n\\nResponde ÚNICAMENTE con JSON válido. Sin texto antes ni después. Sin backticks.\" }],\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": `Referente viral a analizar:\\n\\nPlataforma: ${$json.plataforma}\\nURL: ${$json.url}\\nAutor original: ${$json.autor}\\nLikes: ${$json.likes} | Vistas: ${$json.vistas}\\nDuración: ${$json.duracion_seg} segundos\\nCaption: ${$json.caption}\\nTranscripción del video: ${$json.transcripcion}\\n\\nEscribí el script de <<NOMBRE_DEL_CLIENTE>> y devolvé este JSON exacto:\\n{\\n  \"titulo_contexto\": \"tema en minúsculas, máx 7 palabras\",\\n  \"categoria\": \"exactamente una de: <<CATEGORIA_1>> / <<CATEGORIA_2>> / <<CATEGORIA_3>> / <<CATEGORIA_4>> / <<CATEGORIA_5>>\",\\n  \"script\": \"el script completo listo para grabar. Hook con presentación + desarrollo + CTA. 150-220 palabras. Voz exacta de <<NOMBRE_DEL_CLIENTE>>.\",\\n  \"hook\": \"solo la primera frase del script, la que abre el video\",\\n  \"formato\": \"uno de: Talking Head / Lista / Historia / Dato Impactante / Comparación\",\\n  \"duracion_estimada\": \"corto 15-30s / medio 30-60s / largo 60-90s\",\\n  \"dificultad\": \"Fácil / Media / Difícil\"\\n}`\n  }]\n} }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "966f9119-b7e7-4588-9c77-4b7c8ece07e4",
+      "name": "Claude — Agente escritor voz cliente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12704,
+        2016
+      ],
+      "notes": "System prompt con prompt caching (cache_control ephemeral) — el bloque de voz/few-shot es idéntico en los 25 ítems, así que se cachea y ahorra ~90% de tokens de entrada del ítem 2 en adelante. Modelo: claude-sonnet-4-6."
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  try {\n    const raw = item.json.content?.[0]?.text || '{}';\n    const clean = raw\n      .replace(/^```json\\s*/i, '')\n      .replace(/^```\\s*/i, '')\n      .replace(/\\s*```$/i, '')\n      .trim();\n    const ai = JSON.parse(clean);\n    const ref = $('Preservar datos referente').item.json;\n\n    const CATS = ['<<CATEGORIA_1>>', '<<CATEGORIA_2>>', '<<CATEGORIA_3>>', '<<CATEGORIA_4>>', '<<CATEGORIA_5>>'];\n    const categoria = CATS.includes(ai.categoria) ? ai.categoria : '<<CATEGORIA_1>>';\n\n    results.push({ json: {\n      \"TITULO (contexto)\":                    ai.titulo_contexto || '',\n      \"🎯 ENLACE DE REFERENTE\":               ref.url || '',\n      \"FORMATO\":                              ai.formato || '',\n      \"DIFICULTAD\":                           ai.dificultad || '',\n      \"CATEGORIAS\":                           categoria,\n      \"SCRIPT\":                               ai.script || '',\n      \"DURACION\":                             ai.duracion_estimada || '',\n      \"FECHA DE PUBLICACION DE REFERENTE\":    ref.fecha_ref || '',\n      \"🗂️ STATUS\":                            'HACER GUION',\n      \"FECHA ULTIMA REVISIÓN\":                $now.toISO().split('T')[0],\n      \"EDITOR\":                               '<<NOMBRE_DEL_EDITOR>>',\n      \"COMENTARIOS \":                         `Hook: ${ai.hook || ''}`,\n      _plataforma:   ref.plataforma || '',\n      _autor:        ref.autor || '',\n      _likes:        ref.likes || 0,\n      _vistas:       ref.vistas || 0,\n      _score:        ref.score || 0\n    }});\n  } catch(e) {\n    console.error('Error:', e.message, '| Raw:', item.json.content?.[0]?.text?.substring(0, 200));\n  }\n}\n\nreturn results;"
+      },
+      "id": "92074333-e24f-4e79-839a-1fe16c11b80c",
+      "name": "Parsear respuesta Claude → columnas Sheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12928,
+        2016
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "<<GOOGLE_SHEET_ID>>",
+          "mode": "list",
+          "cachedResultName": "<<NOMBRE_DEL_SHEET>>",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/<<GOOGLE_SHEET_ID>>/edit"
+        },
+        "sheetName": {
+          "value": "<<PESTAÑA_DEL_SHEET>>",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "TITULO  (contexto)": "={{ $json['TITULO (contexto)'] }}",
+            "FORMATO": "={{ $json.FORMATO }}",
+            "DIFICULTAD": "={{ $json.DIFICULTAD }}",
+            "CATEGORIAS": "={{ $json.CATEGORIAS }}",
+            "SCRIPT": "={{ $json.SCRIPT }}",
+            "DURACION": "={{ $json.DURACION }}",
+            "COMENTARIOS ": "={{ $json['COMENTARIOS '] }}",
+            "🎯 ENLACE DE REFERENTE": "={{ $json['🎯 ENLACE DE REFERENTE'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "131",
+              "displayName": "131",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "TITULO  (contexto)",
+              "displayName": "TITULO  (contexto)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "🎯 ENLACE DE REFERENTE",
+              "displayName": "🎯 ENLACE DE REFERENTE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FORMATO",
+              "displayName": "FORMATO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DIFICULTAD",
+              "displayName": "DIFICULTAD",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CATEGORIAS",
+              "displayName": "CATEGORIAS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SCRIPT",
+              "displayName": "SCRIPT",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DURACION",
+              "displayName": "DURACION",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FECHA DE PUBLICACION DE REFERENTE",
+              "displayName": "FECHA DE PUBLICACION DE REFERENTE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "🗂️ STATUS",
+              "displayName": "🗂️ STATUS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "FECHA ULTIMA REVISIÓN",
+              "displayName": "FECHA ULTIMA REVISIÓN",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "EDITOR",
+              "displayName": "EDITOR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "COMENTARIOS ",
+              "displayName": "COMENTARIOS ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FECHA EN QUE LO VAS A GRABAR",
+              "displayName": "FECHA EN QUE LO VAS A GRABAR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "VIDEO CRUDO",
+              "displayName": "VIDEO CRUDO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "FECHA EDICIÓN",
+              "displayName": "FECHA EDICIÓN",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "VIDEO EDITADO",
+              "displayName": "VIDEO EDITADO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ENLACE DE TU VIDEO PUBLICADO EN IG",
+              "displayName": "ENLACE DE TU VIDEO PUBLICADO EN IG",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ENLACE DE TU VIDEO PUBLICADO EN TIKTOK",
+              "displayName": "ENLACE DE TU VIDEO PUBLICADO EN TIKTOK",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ENLACE DE TU VIDEO PUBLICADO EN FACEBOOK",
+              "displayName": "ENLACE DE TU VIDEO PUBLICADO EN FACEBOOK",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "👁️ VISTAS (+1M)",
+              "displayName": "👁️ VISTAS (+1M)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "VIEWS DE TU VIDEO  INSTAGRAM",
+              "displayName": "VIEWS DE TU VIDEO  INSTAGRAM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "VIEWS DE TU VIDEO  TIKTOK",
+              "displayName": "VIEWS DE TU VIDEO  TIKTOK",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SEGUIDORES INSTAGRAM",
+              "displayName": "SEGUIDORES INSTAGRAM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SEGUIDORES TIKTOK",
+              "displayName": "SEGUIDORES TIKTOK",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "❤️ LIKES +50K",
+              "displayName": "❤️ LIKES +50K",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LIKES DE TU VIDEO",
+              "displayName": "LIKES DE TU VIDEO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "FECHA EN QUE LO VAS A PUBLICAR",
+              "displayName": "FECHA EN QUE LO VAS A PUBLICAR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "FECHA PUBLICACIÓN",
+              "displayName": "FECHA PUBLICACIÓN",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "COMENTARIOS  2",
+              "displayName": "COMENTARIOS  2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ENLACE A GUION ",
+              "displayName": "ENLACE A GUION ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "APROBADO",
+              "displayName": "APROBADO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "GUION",
+              "displayName": "GUION",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LUGAR",
+              "displayName": "LUGAR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "POSICION CAMARA",
+              "displayName": "POSICION CAMARA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LUZ",
+              "displayName": "LUZ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LIMPIAR CAMARA",
+              "displayName": "LIMPIAR CAMARA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "PROTAGONISTAS",
+              "displayName": "PROTAGONISTAS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "AUDIO",
+              "displayName": "AUDIO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "VOLUMEN",
+              "displayName": "VOLUMEN",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "TONO DE VOZ",
+              "displayName": "TONO DE VOZ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LENGUAJE CORPORAL",
+              "displayName": "LENGUAJE CORPORAL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "VIDEOS EXTERNOS",
+              "displayName": "VIDEOS EXTERNOS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SILENCIOS",
+              "displayName": "SILENCIOS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ESCENAS",
+              "displayName": "ESCENAS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SUBITULOS",
+              "displayName": "SUBITULOS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SUBTITULOS ESTILO",
+              "displayName": "SUBTITULOS ESTILO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SUBTITULOS TAMAÑO",
+              "displayName": "SUBTITULOS TAMAÑO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SOMBRA SUBTITULOS",
+              "displayName": "SOMBRA SUBTITULOS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SUBTITULOS BORDE PANTALLA",
+              "displayName": "SUBTITULOS BORDE PANTALLA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "TITULO",
+              "displayName": "TITULO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SONIDOS",
+              "displayName": "SONIDOS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "VOLUMEN MUSICA",
+              "displayName": "VOLUMEN MUSICA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CTA SEGUIR",
+              "displayName": "CTA SEGUIR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Columna 1",
+              "displayName": "Columna 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Columna 2",
+              "displayName": "Columna 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Columna 3",
+              "displayName": "Columna 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Columna 4",
+              "displayName": "Columna 4",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9194343b-85d0-486b-8210-4d84ba0fe1fb",
+      "name": "Google Sheets — BENCHMARKGRABAR",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        13152,
+        2016
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HFCyeToXJrmt6pI9",
+          "name": "<<CREDENCIAL_GOOGLE_SHEETS>>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const total = $input.all().length;\nconsole.log(`✅ Flujo de <<NOMBRE_AGENCIA>> completado. ${total} referentes procesados y escritos en BENCHMARKGRABAR.`);\nreturn [{ json: {\n  total: total,\n  fecha: new Date().toLocaleDateString('es-CO', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),\n  sheet: 'https://docs.google.com/spreadsheets/d/<<GOOGLE_SHEET_ID>>'\n}}];"
+      },
+      "id": "07cddbe0-b548-4e17-ba58-d7595e368713",
+      "name": "Resumen ejecución",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12480,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nconst seguidores = item.ownerFollowersCount || item.ownerFollowerCount || 0;\n\nconst hoy = $now.toISO().split('T')[0];\n\nconst fechaPublicacion = (() => {\n  if (!item.timestamp) return '';\n  const ts = Number(item.timestamp);\n  if (isNaN(ts) || ts <= 0) return '';\n  const d = new Date(ts * 1000);\n  if (isNaN(d.getTime())) return '';\n  return d.toISOString().split('T')[0];\n})();\n\nreturn {\n  json: {\n    plataforma: 'instagram',\n    username: item.ownerUsername || '',\n    nombre: item.ownerFullName || '',\n    seguidores: seguidores,\n    bio: item.ownerBio || '',\n    descripcion: item.caption || '',\n    likes: item.likesCount || 0,\n    comentarios: item.commentsCount || 0,\n    reproducciones: item.videoViewCount || 0,\n    url: item.url || '',\n    perfil_url: 'https://instagram.com/' + (item.ownerUsername || ''),\n    hashtags: (item.hashtags || []).join(', '),\n    duracion_video: item.videoDuration || 0,\n    is_video: item.isVideo || false,\n    tipo_post: item.type || 'Image',\n    engagement_rate: seguidores > 0\n      ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) + '%'\n      : '0%',\n    fecha_publicacion: fechaPublicacion,\n    fecha: hoy\n  }\n};"
+      },
+      "id": "79003e6f-4e86-4e45-b106-1194a35161d5",
+      "name": "Normalizar IG1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10912,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nconst seguidores = item.authorMeta ? (item.authorMeta.fans || 0) : 0;\nreturn {\n  json: {\n    plataforma: 'tiktok',\n    username: item.authorMeta ? (item.authorMeta.name || '') : '',\n    nombre: item.authorMeta ? (item.authorMeta.nickName || '') : '',\n    seguidores: seguidores,\n    bio: item.authorMeta ? (item.authorMeta.signature || '') : '',\n    descripcion: item.text || item.desc || '',\n    likes: item.diggCount || 0,\n    comentarios: item.commentCount || 0,\n    reproducciones: item.playCount || 0,\n    url: item.webVideoUrl || '',\n    perfil_url: 'https://tiktok.com/@' + (item.authorMeta ? (item.authorMeta.name || '') : ''),\n    hashtags: (item.hashtags || []).map(function(h) { return h.name || h; }).join(', '),\n    duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n    is_video: true,\n    tipo_post: 'Video',\n    engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) + '%' : '0%',\n    fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : '',\n    fecha: new Date().toISOString()\n  }\n};"
+      },
+      "id": "08091267-b665-4eda-9a5b-6bee27a48dfd",
+      "name": "Normalizar TT1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10912,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.supadata.ai/v1/transcript?url={{ encodeURIComponent($json.video_url || $json.url) }}&lang=es&text=true&mode=auto",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "<SUPADATA_API_KEY>"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "6c5f07e1-39fc-40d2-86f7-bc05263c0d82",
+      "name": "Supadata Whisper — Transcribir audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        11808,
+        2096
+      ],
+      "notes": "Transcripción vía Supadata (Whisper). Español. API key en el placeholder <SUPADATA_API_KEY> o en una credencial de n8n."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combinar transcripción con datos del referente\n// Prioridad: 1) Supadata response.text, 2) fallback transcripcion field, 3) caption\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  \n  let transcripcion = '';\n  \n  // 1. Check if Supadata returned a successful response with text field\n  if (data?.text && typeof data.text === 'string' && data.text.length > 20) {\n    transcripcion = data.text;\n    console.log('Using Supadata transcription for:', data.url || data.video_url);\n  }\n  // 2. Check if fallback node set transcripcion field\n  else if (data?.transcripcion && typeof data.transcripcion === 'string' && data.transcripcion.length > 0) {\n    transcripcion = data.transcripcion;\n    console.log('Using fallback transcripcion for:', data.url || data.video_url);\n  }\n  // 3. Final fallback to caption\n  else if (data?.caption) {\n    transcripcion = data.caption;\n    console.log('Using caption as final fallback for:', data.url || data.video_url);\n  }\n  else {\n    transcripcion = 'Sin transcripción disponible';\n    console.log('No transcription available for:', data.url || data.video_url);\n  }\n\n  results.push({ json: {\n    ...data,\n    transcripcion: transcripcion.substring(0, 4000)\n  }});\n}\n\nreturn results;"
+      },
+      "id": "dd6dfb3e-f484-4cf6-b29b-300ab14cafa2",
+      "name": "Parsear transcripción Supadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11808,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 13
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        13376,
+        2192
+      ],
+      "id": "41950f5a-3756-4eca-b976-468e7c6cb030",
+      "name": "Wait",
+      "webhookId": "4238d6c7-ee03-48b2-af10-2a574c216b5c"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        12256,
+        2208
+      ],
+      "id": "c1ba7676-7ab9-4c35-9b1e-616f1e396eb4",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "plataforma",
+              "value": "={{ $json.plataforma }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "autor",
+              "value": "={{ $json.autor }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "likes",
+              "value": "={{ $json.likes }}",
+              "type": "number"
+            },
+            {
+              "id": "id-5",
+              "name": "vistas",
+              "value": "={{ $json.vistas }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "score",
+              "value": "={{ $json.score }}",
+              "type": "number"
+            },
+            {
+              "id": "id-7",
+              "name": "fecha_ref",
+              "value": "={{ $json.fecha_ref }}",
+              "type": "string"
+            },
+            {
+              "id": "id-8",
+              "name": "duracion_seg",
+              "value": "={{ $json.duracion_seg }}",
+              "type": "number"
+            },
+            {
+              "id": "id-9",
+              "name": "caption",
+              "value": "={{ $json.caption }}",
+              "type": "string"
+            },
+            {
+              "id": "id-10",
+              "name": "transcripcion",
+              "value": "={{ $json.transcripcion }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "73d3e1f8-ef87-4034-b654-f1260573e1c2",
+      "name": "Preservar datos referente",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        12480,
+        2016
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<<EMAIL_DESTINATARIO>>",
+        "subject": "=<<NOMBRE_AGENCIA>> — {{ $json.total }} referentes con script listos en el Benchmark",
+        "emailType": "text",
+        "message": "Hola, el flujo semanal de referentes ya corrió. Revisá el Benchmark con los scripts listos.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        12688,
+        2208
+      ],
+      "id": "b59329e9-1ef6-4eb7-b322-aa184c4b54d3",
+      "name": "Send a message",
+      "webhookId": "ba35d8ff-c79a-408c-a65d-1553410c723d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "d16clE6QqFjmlH8E",
+          "name": "<<CREDENCIAL_GMAIL>>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const TOPICS = ['<<TEMA_1>>','<<TEMA_2>>','<<TEMA_3>>','<<TEMA_4>>','<<TEMA_5>>'];\n\nconst filtered = $input.all()\n  .map(item => {\n    const d = item.json;\n    const likes  = Number(d.likes || 0);\n    const vistas = Number(d.reproducciones || 0);\n    const segs   = Number(d.seguidores || 0);\n    const txt    = (' ' + (d.descripcion||'') + ' ' + (d.hashtags||'') + ' ').toLowerCase();\n    const pasa   = (likes >= 10000 || vistas >= 100000 || segs >= 500000);\n    const tema   = TOPICS.some(t => txt.includes(t));\n    if (!pasa || !tema || !d.url) return null;\n    return { json: {\n      plataforma: 'TikTok',\n      url: d.url,\n      video_url: d.url,\n      autor: d.username || '',\n      nombre: d.nombre || '',\n      seguidores: segs,\n      likes,\n      vistas,\n      duracion_seg: Number(d.duracion_video || 0),\n      caption: (d.descripcion || '').substring(0, 800),\n      hashtags: d.hashtags || '',\n      fecha_ref: d.fecha_publicacion || '',\n      score: likes + Math.floor(vistas / 10) + Math.floor(segs / 1000)\n    }};\n  })\n  .filter(Boolean)\n  .sort((a, b) => b.json.score - a.json.score)\n  .slice(0, 25);\n\nreturn filtered;"
+      },
+      "id": "a1951ec0-37cb-4e5f-9846-4f1204cc5af2",
+      "name": "Filtrar referentes virales — top 25",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11360,
+        2208
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Trigger — Lunes 8am": {
+      "main": [
+        [
+          {
+            "node": "Apify — Scrape IG Reels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Apify — Scrape TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — Scrape IG Reels": {
+      "main": [
+        [
+          {
+            "node": "Normalizar IG1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — Scrape TikTok": {
+      "main": [
+        [
+          {
+            "node": "Normalizar TT1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge IG + TikTok": {
+      "main": [
+        [
+          {
+            "node": "Filtrar referentes virales — top 25",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar para transcripción": {
+      "main": [
+        [
+          {
+            "node": "Supadata Whisper — Transcribir audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parsear transcripción Supadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge — datos + transcripción": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear respuesta Claude → columnas Sheet": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets — BENCHMARKGRABAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets — BENCHMARKGRABAR": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen ejecución": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar IG1": {
+      "main": [
+        [
+          {
+            "node": "Merge IG + TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar TT1": {
+      "main": [
+        [
+          {
+            "node": "Merge IG + TikTok",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Supadata Whisper — Transcribir audio": {
+      "main": [
+        [
+          {
+            "node": "Merge — datos + transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear transcripción Supadata": {
+      "main": [
+        [
+          {
+            "node": "Merge — datos + transcripción",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Resumen ejecución",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preservar datos referente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preservar datos referente": {
+      "main": [
+        [
+          {
+            "node": "Claude — Agente escritor voz cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar referentes virales — top 25": {
+      "main": [
+        [
+          {
+            "node": "Preparar para transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude — Agente escritor voz cliente": {
+      "main": [
+        [
+          {
+            "node": "Parsear respuesta Claude → columnas Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5ede461c-9724-41bf-bb16-da9dfe898b34",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36271efba4145e6febca668c39e9b0ec62832fee7a2b9294b41b8d1357ae3a66"
+  },
+  "id": "XmUHpRkxYhRhJp2q",
+  "tags": [
+    {
+      "updatedAt": "2026-03-23T18:48:09.229Z",
+      "createdAt": "2026-03-23T18:48:09.229Z",
+      "id": "MYEMZPpWW0T7vIGC",
+      "name": "Content Strategy"
+    },
+    {
+      "updatedAt": "2026-03-23T18:48:09.173Z",
+      "createdAt": "2026-03-23T18:48:09.173Z",
+      "id": "pMYxeIphxGeqlevj",
+      "name": "Scraping"
+    },
+    {
+      "updatedAt": "2026-03-23T18:48:09.242Z",
+      "createdAt": "2026-03-23T18:48:09.242Z",
+      "id": "E8GwDvIr40IyDTSw",
+      "name": "AI Automation"
+    }
+  ]
+}
