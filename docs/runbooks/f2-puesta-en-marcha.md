@@ -1,106 +1,81 @@
-# Runbook F2 — Puesta en marcha: workflow de reels + registro central
+# Runbook — Puesta en marcha del MVP de reels (cockpit Airtable + motor n8n + registro)
 
-> El checklist ejecutable de la etapa F2 ([PLAN.md §5](../../PLAN.md)). Marca `[x]` al avanzar.
+> El checklist ejecutable para construir el MVP del workflow de reels con la arquitectura de
+> [ADR-008](../adr/ADR-008-airtable-cockpit-equipo-redes.md): el equipo de redes opera un
+> **cockpit en Airtable**, el **motor n8n** busca/scorea/genera, y **Supabase** guarda historial +
+> dedup. Marca `[x]` al avanzar.
 >
-> **Trabajo a dos personas (reparto 2026-06-12):** los carriles **A (registro central)** y
-> **B (workflow de reels)** son paralelos por diseño — el registro nunca es dependencia de
-> ejecución (ADR-002/D6): si A se atrasa, B llega igual hasta la corrida sin registro. Hay un
-> solo punto de sincronización, marcado 🔗. La convergencia y la activación se hacen juntos.
+> **Reparto a dos personas:** **Carril A (capa de datos)** y **Carril B (motor)** son paralelos.
+> Hay un punto de sincronización, marcado 🔗. La convergencia y la activación se hacen juntos.
 >
-> | Línea | Dueño | Por qué | Tiempo |
+> | Carril | Dueño | Qué monta | Tiempo |
 > |---|---|---|---|
-> | **Carril A — Registro central** | 👤 **Compañero** | Autocontenido y mecánico (crear proyecto, correr SQL, insertar filas); no depende del cliente ni del jefe | ~45 min |
-> | **Carril B — Workflow en n8n** | 👤 **Mani** | Necesita la config de voz del cliente (B2, criterio + input del jefe) y el remapeo de credenciales | ~1–2 h |
->
-> *(El reparto es intercambiable: ambos carriles llevan algo de skill técnico. Lo que NO se mueve
-> es que B2 —voz y guiones few-shot del cliente— lo decide quien conoce al cliente.)*
->
-> **Prerequisitos (gating de la activación D1, NO del montaje) — estado 2026-06-12:**
-> - ✅ **Timezone:** America/Bogota (GMT-5). Resta validar la interpretación TZ explícitamente en D1.
-> - ✅ **Reach:** no se exige — `views + engagement_rate` como proxy (sin cambio de herramienta ni costo).
-> - ⏳ **Qué filtros exponer en el formulario:** se decide al montar el dashboard (D3), con datos reales.
-> - ⬜ **Cliente real elegido:** pendiente (lo define Mani / el jefe).
+> | **A — Capa de datos** | 👤 **Compañero** | Supabase (registro + dedup) + Airtable (cockpit) + datos semilla | ~1.5 h |
+> | **B — Motor** | 👤 **Mani** | InstaPods online + rework del workflow n8n (lee Airtable → dedup → heat → candidatos) | ~3–4 h |
+
+> **Prerequisito (gating) — antes de construir:** ✅ **visto bueno del jefe** sobre
+> [one-pager-reels-mvp.md](../one-pager-reels-mvp.md) + sus 2 confirmaciones: **umbral del flag
+> viral** (~700K) y **voces reales** (Cora/Alma/30X — cuál primero). La **timezone** ya está
+> resuelta: `America/Bogota`.
 
 ---
 
-## Parte 0 — Ya hecho por Claude (commiteado, no requiere acción)
+## Parte 0 — Ya hecho (formalización, commiteado)
 
-- [x] M1–M3 del paquete de mejoras: filtro parametrizado, Form Trigger de búsqueda bajo demanda,
-      métricas al Sheet ([MEJORAS.md](../../Workflows/workflow-short-form-content/MEJORAS.md)).
-- [x] Patch de ingesta (M6): nodos *Abrir run / Reportar outputs / Cerrar run* en el template,
-      todos **Continue On Fail** ([ingesta-registro.md](../../core/contracts/ingesta-registro.md)).
-- [x] Error Workflow del registro: [`core/n8n/error-workflow-registro.json`](../../core/n8n/README.md).
-- [x] Script de deploy: `node core/scripts/deploy.mjs <cliente>` → JSON importable en
-      `Workflows/workflow-short-form-content/dist/` (valida config, resuelve placeholders,
-      verifica la expresión del nodo Claude; NUNCA toca secretos).
+- [x] Decisión y estructura: [ADR-008](../adr/ADR-008-airtable-cockpit-equipo-redes.md) (Airtable cockpit, revisa D4).
+- [x] Modelo de datos del cockpit + setup por API: [airtable-cockpit.md](../../core/contracts/airtable-cockpit.md) + `core/scripts/setup-airtable.mjs`.
+- [x] Schema de dedup + corpus: [002_cockpit_y_dedup.sql](../../core/schema/002_cockpit_y_dedup.sql).
+- [x] Piloto del motor base (smoke-test): `clients/piloto/short-form-content.yaml` → `deploy.mjs` valida COLECTAR→Claude→entrega. Sirve para probar el espinazo antes del rework de B.
 
-## Carril A — Registro central en Supabase · 👤 Compañero · ~45 min
+## Carril A — Capa de datos · 👤 Compañero · ~1.5 h
 
-- [ ] **A1.** Crear cuenta/proyecto en [supabase.com](https://supabase.com) (free tier, nombre
-      sugerido: `pipeline-contenido`).
-- [ ] **A2.** SQL Editor → pegar y correr
-      [`core/schema/001_registro_inicial.sql`](../../core/schema/001_registro_inicial.sql).
-      Verificar: `select * from workflows;` → deben salir los 2 seeds.
-- [ ] **A3.** Guardar en el gestor de contraseñas (NUNCA en el repo): URL del proyecto +
-      `service_role` key (Settings → API).
-- [ ] **A4.** Insertar cliente + instancia (snippet comentado al final del `001_…sql`) y anotar
-      el `instance_id` resultante (`select id from instances;`).
-- [ ] 🔗 **A5. Sync → carril B:** pasar `supabase_url` + `instance_id` (van en
-      `clients/<cliente>/short-form-content.yaml`) y la service_role key **por el gestor de
-      contraseñas** (va en la credencial de n8n, jamás en el repo).
+**A-Supabase (registro + dedup):**
+- [ ] **A1.** Crear proyecto en [supabase.com](https://supabase.com) (free, nombre `pipeline-contenido`).
+- [ ] **A2.** SQL Editor → correr [`001_registro_inicial.sql`](../../core/schema/001_registro_inicial.sql) y luego [`002_cockpit_y_dedup.sql`](../../core/schema/002_cockpit_y_dedup.sql). Verificar: `select * from workflows;` (2 seeds) y `select * from processed_items;` (existe, vacía).
+- [ ] **A3.** Guardar en el gestor (NUNCA en git): URL del proyecto + `service_role` key (Settings → API).
+- [ ] **A4.** Insertar cliente + instancia (snippet comentado al final del `001`) → anotar `instance_id`.
 
-## Carril B — Workflow de reels montado en n8n · 👤 Mani · ~1–2 h
+**A-Airtable (cockpit del equipo):**
+- [ ] **A5.** Crear cuenta [airtable.com](https://airtable.com) (free) + un workspace → copiar el `workspaceId` (`wsp...`) del URL.
+- [ ] **A6.** Generar un **Personal Access Token** (Builder Hub → Personal access tokens) con scopes `schema.bases:write`, `data.records:read`, `data.records:write`, acceso al workspace. Guardar en el gestor (es secreto).
+- [ ] **A7.** Crear la base de un comando:
+      ```bash
+      export AIRTABLE_PAT='pat...'; export AIRTABLE_WORKSPACE_ID='wsp...'
+      node core/scripts/setup-airtable.mjs        # imprime el baseId (app...)
+      ```
+- [ ] **A8.** Dar acceso de **editor** a Mamo y Jero (Share — hasta 5 en el plan free).
+- [ ] **A9.** Cargar datos semilla en Airtable: 1+ `Proyectos`, las `Voces` confirmadas con el jefe, y `Keywords`/`Referentes` iniciales del nicho.
+- [ ] 🔗 **A10. Sync → carril B:** pasar a Mani por el gestor — `supabase_url` + `service_role` key + `instance_id` (Supabase) y `baseId` + `PAT` (Airtable). Nada de esto va al repo.
 
-- [ ] **B1.** Crear cuenta en **InstaPods** (recomendado — $3/mes, SSH incluido; alternativa
-      PikaPods $3.80/mes) y levantar la app n8n. Confirmar que la persistencia está incluida.
-- [ ] **B2.** Llenar `clients/<cliente>/short-form-content.yaml` (copiar de `clients/_ejemplo/`)
-      con datos reales: voz + guiones few-shot (lo más importante para la calidad), cuentas IG,
-      hashtags TikTok, temas, categorías, umbrales, Sheet y email destino.
-      *Si A5 todavía no llegó, dejá `supabase_url`/`instance_id` vacíos y seguí — el workflow
-      corre sin registro y se redeploya después (es regenerar e importar de nuevo).*
-- [ ] **B3.** `node core/scripts/validate.mjs` en verde → `node core/scripts/deploy.mjs <cliente>`
-      → genera `dist/<cliente>.workflow.json`.
-- [ ] **B4.** Importar el dist en n8n (*Workflows → Import from File*) y hacer los pasos manuales
-      que imprime el script: pegar API keys (Apify ×2, Anthropic, Supadata), remapear OAuth de
-      Google Sheets y Gmail, crear credencial **Supabase Registro** (tipo *Supabase API*: host +
-      service_role key) para los 3 nodos de ingesta.
-- [ ] **B5.** Importar `core/n8n/error-workflow-registro.json`, reemplazar sus 2 placeholders y
-      asignarle la credencial (instrucciones en [core/n8n/README.md](../../core/n8n/README.md));
-      fijarlo como **Error Workflow** del wf de reels (Settings del workflow).
-- [ ] **B6.** Crear la pestaña del Google Sheet con los **20 encabezados exactos** del
-      [README del workflow](../../Workflows/workflow-short-form-content/README.md).
+## Carril B — Motor n8n · 👤 Mani · ~3–4 h
 
-## Convergencia — corrida de validación end-to-end (los dos juntos) · ~1 h
+- [ ] **B1.** Levantar n8n online: cuenta [InstaPods](https://instapods.com) → deploy n8n (~$7/mes, confirmar storage persistente). Setear envs `GENERIC_TIMEZONE=America/Bogota` y `TZ=America/Bogota` + reiniciar.
+- [ ] **B2. (smoke-test opcional)** Importar `dist/piloto.workflow.json`, pegar keys, Execute Workflow → confirma que el espinazo Apify→Claude→entrega corre antes de rehacerlo.
+- [ ] **B3. Rework del workflow** (el build del MVP) — sobre el JSON del piloto, reemplazar las puntas:
+  - **Config:** en vez de leer del `Set` de params, **leer de Airtable** (nodo Airtable: Proyectos activos + sus Keywords/Referentes/Voz/filtros).
+  - **COLECTAR:** Apify con ventana `dias_recencia` (backfill=180 en la 1ª corrida, diario=1–2). Cuentas/hashtags salen de `Referentes`/`Keywords`.
+  - **DEDUP:** antes de generar, consultar `processed_items` de Supabase y descartar lo ya visto; al final, insertar lo nuevo (`Prefer: resolution=ignore-duplicates`).
+  - **SCOREAR (heat, no corte):** ordenar caliente→frío por `views + likes + tema + señal de aprendizaje`; `min_*` ponderan, no cortan. Marcar `flag_viral` si seguidores > umbral (no excluir).
+  - **GENERAR:** Claude escribe `top_n` candidatos en la `Voz` del proyecto, usando el corpus de aprobados (`v_corpus_aprobados`) como few-shot.
+  - **ENTREGAR:** escribir candidatos a Airtable `Candidatos` (estado `nuevo`, batch 10/call) **+** registrar en Supabase (`runs` + `outputs` + `processed_items`) con los nodos de [ingesta-registro.md](../../core/contracts/ingesta-registro.md).
+- [ ] **B4.** Credenciales en n8n: Apify ×2, Anthropic, Supadata, **Airtable (PAT)**, **Supabase Registro** (service_role).
+- [ ] **B5.** Importar [`error-workflow-registro.json`](../../core/n8n/README.md), fijarlo como Error Workflow.
 
-- [ ] **C1.** **Execute Workflow** manual → filas en el Sheet con las 20 columnas pobladas ·
-      email resumen con los filtros · en Supabase: 1 run `ok` + N outputs
-      (`select * from v_outputs_recientes limit 30;`).
-- [ ] **C2.** Probar el **formulario** (Production URL del nodo *Form — Búsqueda bajo demanda*):
-      lanzar una búsqueda con filtros propios → el email refleja esos filtros · el run queda con
-      `trigger_type = 'on_demand'` y los filtros en `params`.
-- [ ] **C3.** Simular un fallo (p. ej. deshabilitar temporalmente una credencial) → queda un run
-      con `estado = 'fallo'` y su error (vía Error Workflow).
-- [ ] **C4.** Probar la resiliencia (no-negociable): romper a propósito la credencial Supabase →
-      el workflow IGUAL escribe el Sheet y manda el email (el registro es sumidero, nunca
-      dependencia). Restaurarla.
-- [ ] **C5.** Anotar el costo real de la corrida → actualizar `cost_per_run` en el
-      `workflow.yaml` del workflow.
+## Convergencia — corridas de validación (los dos juntos) · ~1.5 h
 
-## Activación + capa visual
+- [ ] **C1. Backfill:** corrida con `dias_recencia=180` → N candidatos aparecen en Airtable `Candidatos` · `runs` ok en Supabase · `processed_items` poblada.
+- [ ] **C2. Curación:** Mamo/Jero califican unos candidatos (🔥/👍/👎 + estado) → confirmar que el archivado lleva los `aprobado` a `outputs` y los limpia de Airtable.
+- [ ] **C3. Incremental + dedup:** correr otra vez con `dias_recencia=1` → **no reaparece** contenido ya procesado (el dedup funciona).
+- [ ] **C4. Fallo + resiliencia:** romper a propósito la credencial Supabase → el workflow IGUAL escribe a Airtable (el registro es sumidero, no dependencia). Restaurar. Un fallo real queda como `run` estado `fallo`.
 
-- [ ] **D1.** Validación explícita de timezone (las 3 preguntas del kit, aplicadas al cron:
-      ¿a qué hora UTC corre? ¿próxima ejecución local y UTC? ¿la expresión se interpreta en qué
-      TZ?) → activar el workflow (cron lunes 8:00 AM).
-- [ ] **D2.** `status: active` en el manifest + en la tabla `workflows` · commit.
-- [ ] **D3.** Dashboard por-workflow (M4): [lookerstudio.google.com](https://lookerstudio.google.com)
-      → fuente de datos Google Sheets → la pestaña del workflow; páginas sugeridas en
-      [MEJORAS.md §M4](../../Workflows/workflow-short-form-content/MEJORAS.md). Compartir
-      solo-lectura.
-- [ ] **D4.** Compartir la URL del formulario con quienes piden búsquedas.
+## Activación + loop de mejora
+
+- [ ] **D1.** Validación explícita de timezone (las 3 preguntas del kit sobre el cron `America/Bogota`) → activar el cron diario/cada-2-días.
+- [ ] **D2.** `status: active` en el manifest + tabla `workflows` · commit.
+- [ ] **D3. Loop de mejora v1 (manual):** Mani refresca el `few_shot` de cada `Voz` desde `v_corpus_aprobados` (lo que el equipo aprueba). *v2 automatiza este refresco.*
 
 ---
 
-**Hecho cuando (== PLAN F2 + focus shift 2026-06-12):** una corrida real aparece en Supabase con
-sus guiones, consultable por SQL · una falla simulada queda registrada como `fallo` · una
-búsqueda lanzada desde el formulario produce guiones con los filtros pedidos y el email lo dice ·
-el dashboard muestra producción/referentes/operación.
+**Hecho cuando:** una corrida de backfill deja N candidatos en Airtable que Mamo/Jero califican ·
+una corrida incremental no reprocesa lo ya visto · los aprobados quedan en el corpus de Supabase ·
+una falla simulada no tumba la entrega a Airtable · el cron corre en `America/Bogota`.

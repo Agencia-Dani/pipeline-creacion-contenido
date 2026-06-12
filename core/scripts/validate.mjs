@@ -30,6 +30,7 @@ const SECRET_PATTERNS = [
   [/xox[bpars]-[A-Za-z0-9-]{10,}/, "Slack token"],
   [/AKIA[0-9A-Z]{16}/, "AWS access key"],
   [/apify_api_[A-Za-z0-9]{20,}/, "Apify token"],
+  [/pat[A-Za-z0-9]{14}\.[A-Za-z0-9]{40,}/, "Airtable Personal Access Token"],
   [/eyJ[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/, "JWT"],
 ];
 

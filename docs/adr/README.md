@@ -13,6 +13,7 @@
 | [ADR-005](./ADR-005-hosting-n8n-managed-fase1.md) | Hosting n8n: managed fase 1, VPS fase 2 | Aceptada |
 | [ADR-006](./ADR-006-plano-de-datos-sin-workflow-padre.md) | Pipeline central como plano de datos (sin workflow padre) | Aceptada |
 | [ADR-007](./ADR-007-convergencia-gradual-motor-unico.md) | Convergencia gradual a motor de research único | Aceptada (como dirección) |
+| [ADR-008](./ADR-008-airtable-cockpit-equipo-redes.md) | Airtable como cockpit del equipo de redes (revisa D4) | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

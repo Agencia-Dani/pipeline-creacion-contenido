@@ -9,6 +9,16 @@
 > este workflow, porque la prioridad es montarlo por aparte. Las convenciones del sistema
 > siguen aplicando (contrato, validador, sin secretos).
 
+> ⚠️ **Evolución de arquitectura (2026-06-12 — [ADR-008](../../docs/adr/ADR-008-airtable-cockpit-equipo-redes.md)):**
+> tras la conversación con el jefe, el workflow crece a un **MVP con cockpit en Airtable** (el
+> equipo de redes gestiona referentes/keywords/proyectos y **califica** candidatos) + **dedup
+> incremental** en Supabase + **heat-score** (no corte binario) + **muchos candidatos**. Esto
+> cambia varias mejoras de abajo: **M1** el filtro pasa de umbral a *score caliente→frío*; **M2**
+> la entrada bajo demanda y la config viven en Airtable, no en el Form/yaml; **M3/M4** el destino
+> y el dashboard del equipo son Airtable, no el Sheet/Looker. El runbook vigente es
+> [docs/runbooks/f2-puesta-en-marcha.md](../../docs/runbooks/f2-puesta-en-marcha.md) (carriles A/B).
+> Lo de abajo queda como el **análisis del JSON base** del que parte el rework.
+
 ---
 
 ## 1. Cómo funciona el workflow base (lo que hay)
