@@ -74,7 +74,7 @@ reproducciones (views) · url · perfil_url · hashtags · duracion_video · tip
 
 ## 4. Las mejoras (en orden de implementación)
 
-### M1 — Filtro parametrizado (el corazón del "task de JSON")
+### M1 — Filtro parametrizado (el corazón del "task de JSON") ✅ implementada 2026-06-12
 
 Reescribir el nodo *Filtrar referentes virales — top 25* para leer un objeto `params` en vez de
 constantes, con defaults desde la config del cliente
@@ -95,7 +95,7 @@ Cambios de lógica:
 - Matching de temas con normalización de tildes/case (fix parcial; M5 lo mejora).
 - Los `resultsLimit` de los nodos Apify también leen de `p` (H5).
 
-### M2 — Entrada bajo demanda (Form Trigger)
+### M2 — Entrada bajo demanda (Form Trigger) ✅ implementada 2026-06-12
 
 Agregar un **n8n Form Trigger** en paralelo al cron — n8n genera la página web del formulario
 solo, cero código, ideal para no técnicos:
@@ -105,7 +105,7 @@ solo, cero código, ideal para no técnicos:
   defaults del cliente; el formulario pasa lo elegido.
 - El email resumen indica con qué filtros corrió (transparencia para quien pidió la búsqueda).
 
-### M3 — Las métricas llegan al Sheet (materia prima del dashboard)
+### M3 — Las métricas llegan al Sheet (materia prima del dashboard) ✅ implementada 2026-06-12
 
 Ampliar parser + mapeo de Google Sheets con las columnas que hoy se calculan y se botan:
 

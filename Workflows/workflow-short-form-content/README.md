@@ -10,26 +10,39 @@ Este repo es una **plantilla**: todo lo específico de un cliente está marcado 
 
 ## Qué hace
 
-Cada **lunes a las 8:00 AM** el workflow:
+El workflow corre por **dos entradas** que convergen en el nodo *Parámetros de corrida*:
 
-1. **Scrapea** Reels de Instagram y videos de TikTok vía Apify.
+- **Cron — lunes 8:00 AM:** corrida semanal con los filtros default del cliente.
+- **Formulario web (bajo demanda):** página que genera n8n (*Form — Búsqueda bajo demanda*), apta
+  para no técnicos. Lo que se elige ahí sobreescribe los defaults **solo para esa corrida**:
+  plataformas, mínimos de likes/views/seguidores, temas, hashtags, tipo de contenido, recencia
+  y cuántos referentes devolver.
+
+En cada corrida:
+
+1. **Scrapea** Reels de Instagram y videos de TikTok vía Apify (volúmenes configurables).
 2. **Normaliza** ambas fuentes a un formato común y las une.
-3. **Filtra los referentes virales** (top 25) según umbrales de engagement + relevancia temática.
+3. **Filtra los referentes virales** (top N) según los parámetros de la corrida: umbrales de
+   engagement, temas (matching insensible a tildes/mayúsculas), hashtags, tipo de contenido,
+   recencia y plataforma.
 4. **Transcribe** el audio de cada video con Supadata (Whisper).
 5. **Genera un guion** con la voz del cliente usando **Claude** (`claude-sonnet-4-6`).
-6. **Registra** los resultados en una hoja de Google Sheets.
-7. **Envía un email** de resumen con la cantidad de referentes con script listo.
+6. **Registra** los resultados en una hoja de Google Sheets — guion + métricas del referente
+   (plataforma, autor, seguidores, likes, vistas, engagement, score, hashtags), materia prima
+   del dashboard.
+7. **Envía un email** de resumen que indica **con qué filtros corrió** y cuántos guiones quedaron.
 
 ---
 
 ## Arquitectura del flujo
 
 ```
-Trigger — Lunes 8am (schedule semanal)
+Trigger — Lunes 8am (cron) ──────────┐
+Form — Búsqueda bajo demanda (web) ──┴─► Parámetros de corrida (defaults cliente ⊕ form)
    ├─► Apify — Scrape IG Reels ─► Normalizar IG1 ─┐
    └─► Apify — Scrape TikTok   ─► Normalizar TT1 ─┴─► Merge IG + TikTok
                                                         │
-                                          Filtrar referentes virales — top 25
+                                          Filtrar referentes virales — top N
                                                         │
                                             Preparar para transcripción
                                                         ├─► Supadata Whisper — Transcribir audio ─┐
@@ -44,7 +57,7 @@ Trigger — Lunes 8am (schedule semanal)
                                                                                                     └─► Resumen ejecución ─► Send a message (Gmail)
 ```
 
-**19 nodos** en total. El `Loop Over Items` + `Wait` (13s) procesa los referentes de a uno para respetar rate limits de la API de Claude.
+**21 nodos** en total. El `Loop Over Items` + `Wait` (13s) procesa los referentes de a uno para respetar rate limits de la API de Claude.
 
 ---
 
@@ -56,17 +69,23 @@ Trigger — Lunes 8am (schedule semanal)
 
 ---
 
-## Criterio de "viral" (filtro top 25)
+## Criterio de "viral" (filtro top N, parametrizado)
 
-Un referente pasa el filtro si cumple **al menos uno** de estos umbrales **y** menciona un tema relevante:
+El nodo *Filtrar referentes virales — top N* lee los parámetros de la corrida desde
+*Parámetros de corrida* (defaults del cliente, sobreescribibles desde el formulario):
 
-- `likes >= 10.000`, **o**
-- `reproducciones >= 100.000`, **o**
-- `seguidores >= 500.000`
+- **Umbrales (pasa con al menos uno):** `likes >= min_likes` (default 10.000), `reproducciones
+  >= min_views` (default 100.000), `seguidores >= min_seguidores` (default 500.000).
+- **Temas:** matching sobre descripción + hashtags, insensible a tildes y mayúsculas. Default:
+  `<<TEMA_1..5>>` del cliente; en el formulario, `*` = sin filtro de tema.
+- **Hashtags:** si se piden, el item debe tener al menos uno (intersección exacta).
+- **Tipo de contenido:** `short` (video ≤ 90 s) · `video` · `imagen` — vacío = cualquiera.
+- **Recencia:** `fecha_publicacion` dentro de los últimos `dias_recencia` días (0 = sin límite).
+- **Plataformas:** instagram, tiktok o ambas. La plataforma real del item se conserva hasta el
+  Sheet (columna `PLATAFORMA`).
 
-**Temas:** definidos por los placeholders `<<TEMA_1>>` … `<<TEMA_5>>` en el nodo *Filtrar referentes virales — top 25*.
-
-**Score de ranking:** `likes + (vistas / 10) + (seguidores / 1000)` — se ordena de mayor a menor y se toman los 25 primeros. (Umbrales y fórmula se editan en el `jsCode` de ese nodo.)
+**Score de ranking:** `likes + (vistas / 10) + (seguidores / 1000)` — se ordena de mayor a menor
+y se toman los `top_n` primeros (default 25).
 
 ---
 
@@ -92,7 +111,18 @@ Buscá cada placeholder `<<...>>` (un `Ctrl+F` en `workflow.json`, o en cada nod
 |---|---|
 | `<<CUENTA_REFERENTE_IG_1..3>>` | *Apify — Scrape IG Reels* (agregá las que necesites) |
 | `<<HASHTAG_1..3>>` | *Apify — Scrape TikTok* |
-| `<<TEMA_1..5>>` | *Filtrar referentes virales — top 25* |
+| `<<TEMA_1..5>>` | *Parámetros de corrida* |
+
+### Filtro y volúmenes (defaults del cliente — nodo *Parámetros de corrida*)
+| Placeholder | Qué poner |
+|---|---|
+| `<<MIN_LIKES>>`, `<<MIN_VIEWS>>`, `<<MIN_SEGUIDORES>>` | Umbrales del filtro viral (ej: 10000, 100000, 500000) |
+| `<<TOP_N>>` | Cuántos referentes pasan el filtro (ej: 25) |
+| `<<DIAS_RECENCIA>>` | Solo contenido de los últimos N días (0 = sin límite) |
+| `<<IG_RESULTS_LIMIT>>`, `<<TT_RESULTS_LIMIT>>` | Posts por cuenta de IG / videos por hashtag de TikTok (ej: 12 y 60) |
+
+> Si un placeholder numérico queda sin reemplazar, el nodo usa el default de respaldo indicado
+> arriba — el workflow no se rompe, pero reemplazalos igual para que la config del cliente mande.
 
 ### Destinos y datos
 | Placeholder | Nodo |
@@ -105,9 +135,18 @@ Buscá cada placeholder `<<...>>` (un `Ctrl+F` en `workflow.json`, o en cada nod
 
 ## Columnas requeridas en el Google Sheet
 
-La pestaña destino debe tener exactamente estos encabezados (los escribe el nodo *Parsear respuesta Claude → columnas Sheet*):
+La pestaña destino debe tener **exactamente** estos 20 encabezados (espacios simples, sin
+espacios finales — los escribe el nodo *Parsear respuesta Claude → columnas Sheet*):
 
-`TITULO (contexto)` · `🎯 ENLACE DE REFERENTE` · `FORMATO` · `DIFICULTAD` · `CATEGORIAS` · `SCRIPT` · `DURACION` · `FECHA DE PUBLICACION DE REFERENTE` · `🗂️ STATUS` · `FECHA ULTIMA REVISIÓN` · `EDITOR` · `COMENTARIOS `
+**Guion:** `TITULO (contexto)` · `🎯 ENLACE DE REFERENTE` · `FORMATO` · `DIFICULTAD` ·
+`CATEGORIAS` · `SCRIPT` · `DURACION` · `FECHA DE PUBLICACION DE REFERENTE` · `🗂️ STATUS` ·
+`FECHA ULTIMA REVISIÓN` · `EDITOR` · `COMENTARIOS`
+
+**Métricas del referente (para el dashboard):** `PLATAFORMA` · `AUTOR` · `SEGUIDORES` ·
+`LIKES` · `VISTAS` · `ENGAGEMENT` · `SCORE` · `HASHTAGS`
+
+> `ENGAGEMENT` es numérico (porcentaje sin símbolo, ej: `2.1`). `SCORE` es el ranking del
+> filtro viral. Estas 8 columnas alimentan el dashboard de Looker Studio (M4 de MEJORAS.md).
 
 ---
 
@@ -130,5 +169,8 @@ La pestaña destino debe tener exactamente estos encabezados (los escribe el nod
 1. Importá `workflow.json` en n8n.
 2. Configurá las credenciales (Apify, Anthropic, Supadata, Google, Gmail).
 3. Reemplazá **todos** los placeholders `<<...>>` siguiendo el checklist de arriba.
-4. Asegurate de que el Google Sheet tenga las columnas requeridas.
+4. Asegurate de que el Google Sheet tenga las 20 columnas requeridas.
 5. Activá el workflow — corre cada lunes 8 AM, o usá **Execute Workflow** para una corrida manual de prueba.
+6. **Búsqueda bajo demanda:** al activar, n8n publica la URL del formulario (nodo *Form —
+   Búsqueda bajo demanda* → Production URL). Compartila con quien pueda pedir búsquedas: campos
+   vacíos usan los defaults del cliente, y el email de resumen dice con qué filtros corrió.

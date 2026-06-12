@@ -4,8 +4,13 @@ Guía para trabajar en este repo. Leé también el [README.md](./README.md) (uso
 
 ## Qué es
 
-Un único workflow de **n8n** (`workflow.json`) que, cada lunes 8 AM:
-scrapea Reels de IG + videos de TikTok (Apify) → normaliza y une → filtra top 25 virales → transcribe (Supadata/Whisper) → **Claude escribe un guion en la voz de un cliente** → Google Sheets → email resumen (Gmail).
+Un único workflow de **n8n** (`workflow.json`) con dos entradas — cron lunes 8 AM y un **Form
+Trigger** de búsqueda bajo demanda — que convergen en el nodo *Parámetros de corrida* (defaults
+del cliente; el form los sobreescribe por corrida):
+scrapea Reels de IG + videos de TikTok (Apify) → normaliza y une → filtra top N virales según
+los params (umbrales, temas, hashtags, tipo, recencia, plataformas) → transcribe
+(Supadata/Whisper) → **Claude escribe un guion en la voz de un cliente** → Google Sheets
+(guion + métricas del referente) → email resumen con los filtros usados (Gmail).
 
 Es una **plantilla**: todo lo específico de un cliente está como placeholder `<<...>>`. Pensada para **un cliente/voz por workflow**.
 
@@ -22,8 +27,11 @@ No hay build, tests ni dependencias: es JSON de configuración.
 Todo lo que un cliente debe completar está marcado `<<NOMBRE_EN_MAYUSCULAS>>`. Para listarlos:
 
 ```sh
-node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log([...new Set(s.match(/<<[^>]+>>/g))].sort().join('\n'))"
+node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log([...new Set(s.match(/<<[A-ZÁÉÍÓÚÑ][^>]*>>/g))].sort().join('\n'))"
 ```
+
+(El regex exige mayúscula inicial porque el código del nodo *Parámetros de corrida* contiene el
+literal `'<<'` — con `<<[^>]+>>` a secas salen falsos positivos.)
 
 Las **categorías** (`<<CATEGORIA_1>>`…`<<CATEGORIA_5>>`) aparecen en DOS nodos y deben coincidir: el prompt de Claude (*Claude — Agente escritor voz cliente*) y el parser (*Parsear respuesta Claude → columnas Sheet*, `const CATS`).
 

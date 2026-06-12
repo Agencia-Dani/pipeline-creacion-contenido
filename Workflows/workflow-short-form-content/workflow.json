@@ -20,8 +20,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
       "position": [
-        10464,
-        2208
+        10208,
+        2128
       ]
     },
     {
@@ -39,7 +39,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"directUrls\": [\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_1>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_2>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_3>>/\"\n  ],\n  \"resultsType\": \"posts\",\n  \"resultsLimit\": 12,\n  \"searchType\": \"user\",\n  \"searchLimit\": 1,\n  \"addParentData\": true\n}",
+        "jsonBody": "={\n  \"directUrls\": [\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_1>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_2>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_3>>/\"\n  ],\n  \"resultsType\": \"posts\",\n  \"resultsLimit\": {{ $json.ig_results_limit }},\n  \"searchType\": \"user\",\n  \"searchLimit\": 1,\n  \"addParentData\": true\n}",
         "options": {
           "timeout": 120000
         }
@@ -68,7 +68,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"hashtags\": [\n    \"<<HASHTAG_1>>\",\n    \"<<HASHTAG_2>>\",\n    \"<<HASHTAG_3>>\"\n  ],\n  \"resultsPerPage\": 60,\n  \"shouldDownloadVideos\": false,\n  \"shouldDownloadCovers\": false\n}",
+        "jsonBody": "={\n  \"hashtags\": [\n    \"<<HASHTAG_1>>\",\n    \"<<HASHTAG_2>>\",\n    \"<<HASHTAG_3>>\"\n  ],\n  \"resultsPerPage\": {{ $json.tt_results_limit }},\n  \"shouldDownloadVideos\": false,\n  \"shouldDownloadCovers\": false\n}",
         "options": {
           "timeout": 120000
         }
@@ -165,7 +165,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  try {\n    const raw = item.json.content?.[0]?.text || '{}';\n    const clean = raw\n      .replace(/^```json\\s*/i, '')\n      .replace(/^```\\s*/i, '')\n      .replace(/\\s*```$/i, '')\n      .trim();\n    const ai = JSON.parse(clean);\n    const ref = $('Preservar datos referente').item.json;\n\n    const CATS = ['<<CATEGORIA_1>>', '<<CATEGORIA_2>>', '<<CATEGORIA_3>>', '<<CATEGORIA_4>>', '<<CATEGORIA_5>>'];\n    const categoria = CATS.includes(ai.categoria) ? ai.categoria : '<<CATEGORIA_1>>';\n\n    results.push({ json: {\n      \"TITULO (contexto)\":                    ai.titulo_contexto || '',\n      \"🎯 ENLACE DE REFERENTE\":               ref.url || '',\n      \"FORMATO\":                              ai.formato || '',\n      \"DIFICULTAD\":                           ai.dificultad || '',\n      \"CATEGORIAS\":                           categoria,\n      \"SCRIPT\":                               ai.script || '',\n      \"DURACION\":                             ai.duracion_estimada || '',\n      \"FECHA DE PUBLICACION DE REFERENTE\":    ref.fecha_ref || '',\n      \"🗂️ STATUS\":                            'HACER GUION',\n      \"FECHA ULTIMA REVISIÓN\":                $now.toISO().split('T')[0],\n      \"EDITOR\":                               '<<NOMBRE_DEL_EDITOR>>',\n      \"COMENTARIOS \":                         `Hook: ${ai.hook || ''}`,\n      _plataforma:   ref.plataforma || '',\n      _autor:        ref.autor || '',\n      _likes:        ref.likes || 0,\n      _vistas:       ref.vistas || 0,\n      _score:        ref.score || 0\n    }});\n  } catch(e) {\n    console.error('Error:', e.message, '| Raw:', item.json.content?.[0]?.text?.substring(0, 200));\n  }\n}\n\nreturn results;"
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  try {\n    const raw = item.json.content?.[0]?.text || '{}';\n    const clean = raw\n      .replace(/^```json\\s*/i, '')\n      .replace(/^```\\s*/i, '')\n      .replace(/\\s*```$/i, '')\n      .trim();\n    const ai = JSON.parse(clean);\n    const ref = $('Preservar datos referente').item.json;\n\n    const CATS = ['<<CATEGORIA_1>>', '<<CATEGORIA_2>>', '<<CATEGORIA_3>>', '<<CATEGORIA_4>>', '<<CATEGORIA_5>>'];\n    const categoria = CATS.includes(ai.categoria) ? ai.categoria : '<<CATEGORIA_1>>';\n\n    results.push({ json: {\n      \"TITULO (contexto)\":                    ai.titulo_contexto || '',\n      \"🎯 ENLACE DE REFERENTE\":               ref.url || '',\n      \"FORMATO\":                              ai.formato || '',\n      \"DIFICULTAD\":                           ai.dificultad || '',\n      \"CATEGORIAS\":                           categoria,\n      \"SCRIPT\":                               ai.script || '',\n      \"DURACION\":                             ai.duracion_estimada || '',\n      \"FECHA DE PUBLICACION DE REFERENTE\":    ref.fecha_ref || '',\n      \"🗂️ STATUS\":                            'HACER GUION',\n      \"FECHA ULTIMA REVISIÓN\":                $now.toISO().split('T')[0],\n      \"EDITOR\":                               '<<NOMBRE_DEL_EDITOR>>',\n      \"COMENTARIOS\":                          `Hook: ${ai.hook || ''}`,\n      \"PLATAFORMA\":                           ref.plataforma || '',\n      \"AUTOR\":                                ref.autor || '',\n      \"SEGUIDORES\":                           Number(ref.seguidores || 0),\n      \"LIKES\":                                Number(ref.likes || 0),\n      \"VISTAS\":                               Number(ref.vistas || 0),\n      \"ENGAGEMENT\":                           Number(ref.engagement || 0),\n      \"SCORE\":                                Number(ref.score || 0),\n      \"HASHTAGS\":                             ref.hashtags || ''\n    }});\n  } catch(e) {\n    console.error('Error:', e.message, '| Raw:', item.json.content?.[0]?.text?.substring(0, 200));\n  }\n}\n\nreturn results;\n"
       },
       "id": "92074333-e24f-4e79-839a-1fe16c11b80c",
       "name": "Parsear respuesta Claude → columnas Sheet",
@@ -193,30 +193,32 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "TITULO  (contexto)": "={{ $json['TITULO (contexto)'] }}",
+            "TITULO (contexto)": "={{ $json['TITULO (contexto)'] }}",
+            "🎯 ENLACE DE REFERENTE": "={{ $json['🎯 ENLACE DE REFERENTE'] }}",
             "FORMATO": "={{ $json.FORMATO }}",
             "DIFICULTAD": "={{ $json.DIFICULTAD }}",
             "CATEGORIAS": "={{ $json.CATEGORIAS }}",
             "SCRIPT": "={{ $json.SCRIPT }}",
             "DURACION": "={{ $json.DURACION }}",
-            "COMENTARIOS ": "={{ $json['COMENTARIOS '] }}",
-            "🎯 ENLACE DE REFERENTE": "={{ $json['🎯 ENLACE DE REFERENTE'] }}"
+            "FECHA DE PUBLICACION DE REFERENTE": "={{ $json['FECHA DE PUBLICACION DE REFERENTE'] }}",
+            "🗂️ STATUS": "={{ $json['🗂️ STATUS'] }}",
+            "FECHA ULTIMA REVISIÓN": "={{ $json['FECHA ULTIMA REVISIÓN'] }}",
+            "EDITOR": "={{ $json.EDITOR }}",
+            "COMENTARIOS": "={{ $json.COMENTARIOS }}",
+            "PLATAFORMA": "={{ $json.PLATAFORMA }}",
+            "AUTOR": "={{ $json.AUTOR }}",
+            "SEGUIDORES": "={{ $json.SEGUIDORES }}",
+            "LIKES": "={{ $json.LIKES }}",
+            "VISTAS": "={{ $json.VISTAS }}",
+            "ENGAGEMENT": "={{ $json.ENGAGEMENT }}",
+            "SCORE": "={{ $json.SCORE }}",
+            "HASHTAGS": "={{ $json.HASHTAGS }}"
           },
           "matchingColumns": [],
           "schema": [
             {
-              "id": "131",
-              "displayName": "131",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "TITULO  (contexto)",
-              "displayName": "TITULO  (contexto)",
+              "id": "TITULO (contexto)",
+              "displayName": "TITULO (contexto)",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -284,8 +286,7 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
               "id": "🗂️ STATUS",
@@ -294,8 +295,7 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
               "id": "FECHA ULTIMA REVISIÓN",
@@ -304,8 +304,7 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
               "id": "EDITOR",
@@ -314,12 +313,11 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "COMENTARIOS ",
-              "displayName": "COMENTARIOS ",
+              "id": "COMENTARIOS",
+              "displayName": "COMENTARIOS",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -327,454 +325,76 @@
               "canBeUsedToMatch": true
             },
             {
-              "id": "FECHA EN QUE LO VAS A GRABAR",
-              "displayName": "FECHA EN QUE LO VAS A GRABAR",
+              "id": "PLATAFORMA",
+              "displayName": "PLATAFORMA",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "VIDEO CRUDO",
-              "displayName": "VIDEO CRUDO",
+              "id": "AUTOR",
+              "displayName": "AUTOR",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "FECHA EDICIÓN",
-              "displayName": "FECHA EDICIÓN",
+              "id": "SEGUIDORES",
+              "displayName": "SEGUIDORES",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "VIDEO EDITADO",
-              "displayName": "VIDEO EDITADO",
+              "id": "LIKES",
+              "displayName": "LIKES",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "ENLACE DE TU VIDEO PUBLICADO EN IG",
-              "displayName": "ENLACE DE TU VIDEO PUBLICADO EN IG",
+              "id": "VISTAS",
+              "displayName": "VISTAS",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "ENLACE DE TU VIDEO PUBLICADO EN TIKTOK",
-              "displayName": "ENLACE DE TU VIDEO PUBLICADO EN TIKTOK",
+              "id": "ENGAGEMENT",
+              "displayName": "ENGAGEMENT",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "ENLACE DE TU VIDEO PUBLICADO EN FACEBOOK",
-              "displayName": "ENLACE DE TU VIDEO PUBLICADO EN FACEBOOK",
+              "id": "SCORE",
+              "displayName": "SCORE",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "👁️ VISTAS (+1M)",
-              "displayName": "👁️ VISTAS (+1M)",
+              "id": "HASHTAGS",
+              "displayName": "HASHTAGS",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "VIEWS DE TU VIDEO  INSTAGRAM",
-              "displayName": "VIEWS DE TU VIDEO  INSTAGRAM",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "VIEWS DE TU VIDEO  TIKTOK",
-              "displayName": "VIEWS DE TU VIDEO  TIKTOK",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SEGUIDORES INSTAGRAM",
-              "displayName": "SEGUIDORES INSTAGRAM",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SEGUIDORES TIKTOK",
-              "displayName": "SEGUIDORES TIKTOK",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "❤️ LIKES +50K",
-              "displayName": "❤️ LIKES +50K",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "LIKES DE TU VIDEO",
-              "displayName": "LIKES DE TU VIDEO",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "FECHA EN QUE LO VAS A PUBLICAR",
-              "displayName": "FECHA EN QUE LO VAS A PUBLICAR",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "FECHA PUBLICACIÓN",
-              "displayName": "FECHA PUBLICACIÓN",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "COMENTARIOS  2",
-              "displayName": "COMENTARIOS  2",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "ENLACE A GUION ",
-              "displayName": "ENLACE A GUION ",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "APROBADO",
-              "displayName": "APROBADO",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "GUION",
-              "displayName": "GUION",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "LUGAR",
-              "displayName": "LUGAR",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "POSICION CAMARA",
-              "displayName": "POSICION CAMARA",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "LUZ",
-              "displayName": "LUZ",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "LIMPIAR CAMARA",
-              "displayName": "LIMPIAR CAMARA",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "PROTAGONISTAS",
-              "displayName": "PROTAGONISTAS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "AUDIO",
-              "displayName": "AUDIO",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "VOLUMEN",
-              "displayName": "VOLUMEN",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "TONO DE VOZ",
-              "displayName": "TONO DE VOZ",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "LENGUAJE CORPORAL",
-              "displayName": "LENGUAJE CORPORAL",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "VIDEOS EXTERNOS",
-              "displayName": "VIDEOS EXTERNOS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SILENCIOS",
-              "displayName": "SILENCIOS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "ESCENAS",
-              "displayName": "ESCENAS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SUBITULOS",
-              "displayName": "SUBITULOS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SUBTITULOS ESTILO",
-              "displayName": "SUBTITULOS ESTILO",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SUBTITULOS TAMAÑO",
-              "displayName": "SUBTITULOS TAMAÑO",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SOMBRA SUBTITULOS",
-              "displayName": "SOMBRA SUBTITULOS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SUBTITULOS BORDE PANTALLA",
-              "displayName": "SUBTITULOS BORDE PANTALLA",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "TITULO",
-              "displayName": "TITULO",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "SONIDOS",
-              "displayName": "SONIDOS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "VOLUMEN MUSICA",
-              "displayName": "VOLUMEN MUSICA",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "CTA SEGUIR",
-              "displayName": "CTA SEGUIR",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Columna 1",
-              "displayName": "Columna 1",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "Columna 2",
-              "displayName": "Columna 2",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "Columna 3",
-              "displayName": "Columna 3",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "Columna 4",
-              "displayName": "Columna 4",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
+              "canBeUsedToMatch": true
             }
           ],
           "attemptToConvertTypes": false,
@@ -799,7 +419,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const total = $input.all().length;\nconsole.log(`✅ Flujo de <<NOMBRE_AGENCIA>> completado. ${total} referentes procesados y escritos en BENCHMARKGRABAR.`);\nreturn [{ json: {\n  total: total,\n  fecha: new Date().toLocaleDateString('es-CO', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),\n  sheet: 'https://docs.google.com/spreadsheets/d/<<GOOGLE_SHEET_ID>>'\n}}];"
+        "jsCode": "const total = $input.all().length;\nconst p = $('Parámetros de corrida').first().json;\nconsole.log(`✅ Flujo de <<NOMBRE_AGENCIA>> completado. ${total} referentes procesados y escritos en BENCHMARKGRABAR.`);\nreturn [{ json: {\n  total: total,\n  fecha: new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),\n  origen: p.origen === 'formulario' ? 'búsqueda desde el formulario' : 'corrida programada (cron)',\n  filtros: p.resumen_filtros,\n  sheet: 'https://docs.google.com/spreadsheets/d/<<GOOGLE_SHEET_ID>>'\n}}];\n"
       },
       "id": "07cddbe0-b548-4e17-ba58-d7595e368713",
       "name": "Resumen ejecución",
@@ -978,6 +598,30 @@
               "name": "transcripcion",
               "value": "={{ $json.transcripcion }}",
               "type": "string"
+            },
+            {
+              "id": "id-11",
+              "name": "nombre",
+              "value": "={{ $json.nombre }}",
+              "type": "string"
+            },
+            {
+              "id": "id-12",
+              "name": "seguidores",
+              "value": "={{ $json.seguidores }}",
+              "type": "number"
+            },
+            {
+              "id": "id-13",
+              "name": "engagement",
+              "value": "={{ $json.engagement }}",
+              "type": "number"
+            },
+            {
+              "id": "id-14",
+              "name": "hashtags",
+              "value": "={{ $json.hashtags }}",
+              "type": "string"
             }
           ]
         },
@@ -997,7 +641,7 @@
         "sendTo": "<<EMAIL_DESTINATARIO>>",
         "subject": "=<<NOMBRE_AGENCIA>> — {{ $json.total }} referentes con script listos en el Benchmark",
         "emailType": "text",
-        "message": "Hola, el flujo semanal de referentes ya corrió. Revisá el Benchmark con los scripts listos.",
+        "message": "=Hola, el flujo de referentes ya corrió — {{ $json.origen }}, {{ $json.fecha }}.\n\nFiltros de esta corrida:\n{{ $json.filtros }}\n\n{{ $json.total }} guiones listos en el Benchmark: {{ $json.sheet }}",
         "options": {}
       },
       "type": "n8n-nodes-base.gmail",
@@ -1018,16 +662,123 @@
     },
     {
       "parameters": {
-        "jsCode": "const TOPICS = ['<<TEMA_1>>','<<TEMA_2>>','<<TEMA_3>>','<<TEMA_4>>','<<TEMA_5>>'];\n\nconst filtered = $input.all()\n  .map(item => {\n    const d = item.json;\n    const likes  = Number(d.likes || 0);\n    const vistas = Number(d.reproducciones || 0);\n    const segs   = Number(d.seguidores || 0);\n    const txt    = (' ' + (d.descripcion||'') + ' ' + (d.hashtags||'') + ' ').toLowerCase();\n    const pasa   = (likes >= 10000 || vistas >= 100000 || segs >= 500000);\n    const tema   = TOPICS.some(t => txt.includes(t));\n    if (!pasa || !tema || !d.url) return null;\n    return { json: {\n      plataforma: 'TikTok',\n      url: d.url,\n      video_url: d.url,\n      autor: d.username || '',\n      nombre: d.nombre || '',\n      seguidores: segs,\n      likes,\n      vistas,\n      duracion_seg: Number(d.duracion_video || 0),\n      caption: (d.descripcion || '').substring(0, 800),\n      hashtags: d.hashtags || '',\n      fecha_ref: d.fecha_publicacion || '',\n      score: likes + Math.floor(vistas / 10) + Math.floor(segs / 1000)\n    }};\n  })\n  .filter(Boolean)\n  .sort((a, b) => b.json.score - a.json.score)\n  .slice(0, 25);\n\nreturn filtered;"
+        "jsCode": "// Lee los parámetros de la corrida (cron = defaults del cliente; formulario = lo elegido ahí).\nconst p = $('Parámetros de corrida').first().json;\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n\nconst TEMAS = (p.temas || []).map(norm).filter(Boolean);\nconst HASHTAGS = (p.hashtags || []).map(h => norm(h).replace(/^#/, '')).filter(Boolean);\nconst TIPOS = p.tipos_contenido || [];\nconst PLATAFORMAS = (p.plataformas && p.plataformas.length) ? p.plataformas.map(norm) : ['instagram', 'tiktok'];\nconst ahora = Date.now();\nconst maxEdadMs = (Number(p.dias_recencia) || 0) * 86400000;\n\nconst filtered = $input.all()\n  .map(item => {\n    const d = item.json;\n    if (!d.url) return null;\n\n    const likes  = Number(d.likes || 0);\n    const vistas = Number(d.reproducciones || 0);\n    const segs   = Number(d.seguidores || 0);\n\n    if (!PLATAFORMAS.includes(norm(d.plataforma))) return null;\n\n    // viral: pasa si supera AL MENOS UNO de los umbrales\n    if (!(likes >= p.min_likes || vistas >= p.min_views || segs >= p.min_seguidores)) return null;\n\n    // temas (lista vacía = sin filtro de tema)\n    const txt = norm(' ' + (d.descripcion || '') + ' ' + (d.hashtags || '') + ' ');\n    if (TEMAS.length && !TEMAS.some(t => txt.includes(t))) return null;\n\n    // hashtags específicos (intersección con los del item)\n    if (HASHTAGS.length) {\n      const propios = norm(d.hashtags || '').split(',').map(h => h.trim().replace(/^#/, '')).filter(Boolean);\n      if (!HASHTAGS.some(h => propios.includes(h))) return null;\n    }\n\n    // tipo de contenido: short (video ≤ 90 s) | video | imagen\n    if (TIPOS.length) {\n      const dur = Number(d.duracion_video || 0);\n      const esVideo = !!d.is_video || d.tipo_post === 'Video';\n      const ok = TIPOS.some(t =>\n        (t === 'short'  && esVideo && dur > 0 && dur <= 90) ||\n        (t === 'video'  && esVideo) ||\n        (t === 'imagen' && !esVideo));\n      if (!ok) return null;\n    }\n\n    // recencia\n    if (maxEdadMs > 0) {\n      const f = Date.parse(d.fecha_publicacion || '');\n      if (!Number.isFinite(f) || (ahora - f) > maxEdadMs) return null;\n    }\n\n    return { json: {\n      plataforma: d.plataforma || '',\n      url: d.url,\n      video_url: d.url,\n      autor: d.username || '',\n      nombre: d.nombre || '',\n      seguidores: segs,\n      likes,\n      vistas,\n      engagement: parseFloat(d.engagement_rate) || 0,\n      duracion_seg: Number(d.duracion_video || 0),\n      caption: (d.descripcion || '').substring(0, 800),\n      hashtags: d.hashtags || '',\n      fecha_ref: d.fecha_publicacion || '',\n      score: likes + Math.floor(vistas / 10) + Math.floor(segs / 1000)\n    }};\n  })\n  .filter(Boolean)\n  .sort((a, b) => b.json.score - a.json.score)\n  .slice(0, Number(p.top_n) || 25);\n\nreturn filtered;\n"
       },
       "id": "a1951ec0-37cb-4e5f-9846-4f1204cc5af2",
-      "name": "Filtrar referentes virales — top 25",
+      "name": "Filtrar referentes virales — top N",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         11360,
         2208
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convergencia de triggers (cron + formulario): arma los parámetros de ESTA corrida.\n// Defaults del cliente vía placeholders <<...>>; si la corrida vino del formulario,\n// lo elegido ahí los sobreescribe SOLO para esta corrida.\nconst j = $input.first().json;\n\nconst num = (v, fb) => {\n  if (v === '' || v === null || v === undefined) return fb;\n  if (String(v).includes('<<')) return fb;\n  const n = Number(v);\n  return Number.isFinite(n) ? n : fb;\n};\nconst lista = (v) => String(v || '').split(',').map(s => s.trim()).filter(s => s && !s.includes('<<'));\n\nconst DEFAULTS = {\n  plataformas:      ['instagram', 'tiktok'],\n  min_likes:        num('<<MIN_LIKES>>', 10000),\n  min_views:        num('<<MIN_VIEWS>>', 100000),\n  min_seguidores:   num('<<MIN_SEGUIDORES>>', 500000),\n  temas:            lista('<<TEMA_1>>,<<TEMA_2>>,<<TEMA_3>>,<<TEMA_4>>,<<TEMA_5>>'),\n  hashtags:         [],            // [] = sin filtro de hashtags\n  tipos_contenido:  [],            // [] = cualquier tipo\n  dias_recencia:    num('<<DIAS_RECENCIA>>', 0),   // 0 = sin límite de fecha\n  top_n:            num('<<TOP_N>>', 25),\n  ig_results_limit: num('<<IG_RESULTS_LIMIT>>', 12),\n  tt_results_limit: num('<<TT_RESULTS_LIMIT>>', 60)\n};\n\nconst esForm = j.submittedAt !== undefined;\nconst p = { ...DEFAULTS, origen: esForm ? 'formulario' : 'cron' };\n\nif (esForm) {\n  const PLAT = { 'Ambas': ['instagram', 'tiktok'], 'Solo Instagram': ['instagram'], 'Solo TikTok': ['tiktok'] };\n  const TIPO = { 'Cualquiera': [], 'Short-form (video ≤ 90 s)': ['short'], 'Video': ['video'], 'Imagen / carrusel': ['imagen'] };\n  if (PLAT[j['Plataformas']]) p.plataformas = PLAT[j['Plataformas']];\n  p.min_likes      = num(j['Mínimo de likes'], p.min_likes);\n  p.min_views      = num(j['Mínimo de views'], p.min_views);\n  p.min_seguidores = num(j['Mínimo de seguidores'], p.min_seguidores);\n  const temasForm = lista(j['Temas (separados por coma)']);\n  if (temasForm.includes('*')) p.temas = [];        // '*' = buscar sin filtro de tema\n  else if (temasForm.length) p.temas = temasForm;\n  p.hashtags = lista(j['Hashtags (separados por coma)']).map(h => h.replace(/^#/, '').toLowerCase());\n  if (TIPO[j['Tipo de contenido']]) p.tipos_contenido = TIPO[j['Tipo de contenido']];\n  p.dias_recencia = num(j['Recencia (días)'], p.dias_recencia);\n  p.top_n         = num(j['Cuántos referentes (top N)'], p.top_n);\n}\n\np.resumen_filtros = [\n  'Plataformas: ' + p.plataformas.join(', '),\n  'Mínimos — likes: ' + p.min_likes + ' · views: ' + p.min_views + ' · seguidores: ' + p.min_seguidores,\n  'Temas: ' + (p.temas.length ? p.temas.join(', ') : 'sin filtro'),\n  'Hashtags: ' + (p.hashtags.length ? p.hashtags.join(', ') : 'sin filtro'),\n  'Tipo de contenido: ' + (p.tipos_contenido.length ? p.tipos_contenido.join(', ') : 'cualquiera'),\n  'Recencia: ' + (p.dias_recencia > 0 ? 'últimos ' + p.dias_recencia + ' días' : 'sin límite'),\n  'Top N: ' + p.top_n\n].join('\\n');\n\nreturn [{ json: p }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10464,
+        2208
+      ],
+      "id": "426e626b-7f49-4afc-96ae-ee8ea3b7bc74",
+      "name": "Parámetros de corrida"
+    },
+    {
+      "parameters": {
+        "formTitle": "Búsqueda de referentes bajo demanda",
+        "formDescription": "Lanza una corrida del detector con tus propios filtros. Todo campo vacío usa el default del cliente.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Plataformas",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Ambas"
+                  },
+                  {
+                    "option": "Solo Instagram"
+                  },
+                  {
+                    "option": "Solo TikTok"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Mínimo de likes",
+              "fieldType": "number",
+              "placeholder": "vacío = default del cliente"
+            },
+            {
+              "fieldLabel": "Mínimo de views",
+              "fieldType": "number",
+              "placeholder": "vacío = default del cliente"
+            },
+            {
+              "fieldLabel": "Mínimo de seguidores",
+              "fieldType": "number",
+              "placeholder": "vacío = default del cliente"
+            },
+            {
+              "fieldLabel": "Temas (separados por coma)",
+              "fieldType": "text",
+              "placeholder": "vacío = temas del cliente · * = sin filtro de tema"
+            },
+            {
+              "fieldLabel": "Hashtags (separados por coma)",
+              "fieldType": "text",
+              "placeholder": "vacío = sin filtro de hashtag"
+            },
+            {
+              "fieldLabel": "Tipo de contenido",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Cualquiera"
+                  },
+                  {
+                    "option": "Short-form (video ≤ 90 s)"
+                  },
+                  {
+                    "option": "Video"
+                  },
+                  {
+                    "option": "Imagen / carrusel"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Recencia (días)",
+              "fieldType": "number",
+              "placeholder": "vacío o 0 = sin límite de fecha"
+            },
+            {
+              "fieldLabel": "Cuántos referentes (top N)",
+              "fieldType": "number",
+              "placeholder": "vacío = default del cliente"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        10208,
+        2320
+      ],
+      "id": "51af4d0f-e133-4547-b7f2-ac82035e86d7",
+      "name": "Form — Búsqueda bajo demanda",
+      "webhookId": "a8af1805-b037-45e1-a9b6-543c27562c91"
     }
   ],
   "pinData": {},
@@ -1036,12 +787,7 @@
       "main": [
         [
           {
-            "node": "Apify — Scrape IG Reels",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Apify — Scrape TikTok",
+            "node": "Parámetros de corrida",
             "type": "main",
             "index": 0
           }
@@ -1074,7 +820,7 @@
       "main": [
         [
           {
-            "node": "Filtrar referentes virales — top 25",
+            "node": "Filtrar referentes virales — top N",
             "type": "main",
             "index": 0
           }
@@ -1225,7 +971,18 @@
         ]
       ]
     },
-    "Filtrar referentes virales — top 25": {
+    "Claude — Agente escritor voz cliente": {
+      "main": [
+        [
+          {
+            "node": "Parsear respuesta Claude → columnas Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar referentes virales — top N": {
       "main": [
         [
           {
@@ -1236,11 +993,27 @@
         ]
       ]
     },
-    "Claude — Agente escritor voz cliente": {
+    "Form — Búsqueda bajo demanda": {
       "main": [
         [
           {
-            "node": "Parsear respuesta Claude → columnas Sheet",
+            "node": "Parámetros de corrida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parámetros de corrida": {
+      "main": [
+        [
+          {
+            "node": "Apify — Scrape IG Reels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Apify — Scrape TikTok",
             "type": "main",
             "index": 0
           }

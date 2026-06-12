@@ -22,11 +22,16 @@ cuentas_ig: ["cuenta1", "cuenta2", "cuenta3"]
 hashtags_tiktok: ["hashtag1", "hashtag2", "hashtag3"]
 temas: ["tema1", "tema2", "tema3", "tema4", "tema5"]
 
-# --- Filtro viral (defaults del manifest; scope pasa a run en F5) ---
+# --- Filtro viral (defaults del cliente; el formulario los sobreescribe por corrida) ---
 min_likes: 10000
 min_views: 100000
-min_followers: 500000
+min_seguidores: 500000
 top_n: 25
+dias_recencia: 0                  # solo contenido de los últimos N días (0 = sin límite)
+
+# --- Volúmenes de colecta (Apify) ---
+ig_results_limit: 12              # posts a colectar por cuenta de IG
+tt_results_limit: 60              # videos a colectar por hashtag de TikTok
 
 # --- Categorías (DEBEN coincidir en el prompt de Claude y el parser) ---
 categorias: ["cat1", "cat2", "cat3", "cat4", "cat5"]

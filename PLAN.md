@@ -18,7 +18,7 @@ Lo que existe hoy en el repo:
 |---|---|---|
 | `README.md` | Visión del sistema central | ✅ Escrito |
 | `system-blueprint.md` | Plantilla de diseño (10 principios, 14 secciones) | ⬜ Sin llenar — se llena en F0 |
-| `Workflows/workflow-short-form-content/` | **Máquina**: workflow n8n (19 nodos, JSON importable). Cron semanal → Apify (IG+TikTok) → filtro top-25 viral → Supadata transcribe → Claude escribe guiones en voz del cliente → Google Sheets + email | ✅ Funcional como plantilla · ❌ **no hosteado** · placeholders `<<...>>` por cliente |
+| `Workflows/workflow-short-form-content/` | **Máquina**: workflow n8n (21 nodos, JSON importable). Cron semanal + formulario bajo demanda → Apify (IG+TikTok) → filtro parametrizado top-N (M1–M3 de MEJORAS.md aplicadas 2026-06-12) → Supadata transcribe → Claude escribe guiones en voz del cliente → Google Sheets (guion + métricas) + email con filtros | ✅ Funcional como plantilla · ❌ **no hosteado** · placeholders `<<...>>` por cliente |
 | `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) · ❌ **hoy inactivo** — se re-monta en F3 |
 
 > **Estado operativo (2026-06-11):** ninguno de los dos workflows está sirviendo hoy. La puesta

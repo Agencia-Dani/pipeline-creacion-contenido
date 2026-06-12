@@ -15,20 +15,27 @@ triggers:
   - type: cron
     schedule: "0 8 * * 1"         # lunes 8:00 AM
     timezone: America/Bogota      # ⚠️ decisión abierta (PLAN.md §3.2) — validar antes de activar
+  - type: form                    # búsqueda bajo demanda (M2): n8n Form Trigger, página web propia
   - type: manual                  # "Execute Workflow" en n8n para corridas de prueba
 
 inputs:
   client_config: "clients/{cliente}/short-form-content.yaml"
   filters:
-    # scope=client hoy (hardcodeados como <<...>> en workflow.json);
-    # los umbrales y temas pasan a scope=run en F5 (búsqueda bajo demanda).
-    - { key: min_likes,        type: number, scope: client, default: 10000,  desc: "Umbral de likes del filtro viral" }
-    - { key: min_views,        type: number, scope: client, default: 100000, desc: "Umbral de reproducciones" }
-    - { key: min_followers,    type: number, scope: client, default: 500000, desc: "Umbral de seguidores de la cuenta" }
-    - { key: top_n,            type: number, scope: client, default: 25,     desc: "Cuántos referentes pasan el filtro" }
-    - { key: temas,            type: list,   scope: client, desc: "Temas relevantes (hoy <<TEMA_1..5>>)" }
+    # scope=run: el default sale de la config del cliente (placeholders <<...>> en el nodo
+    # "Parámetros de corrida") y el formulario lo sobreescribe SOLO para esa corrida (M1+M2).
+    - { key: min_likes,        type: number, scope: run,    default: 10000,  desc: "Umbral de likes del filtro viral" }
+    - { key: min_views,        type: number, scope: run,    default: 100000, desc: "Umbral de reproducciones" }
+    - { key: min_seguidores,   type: number, scope: run,    default: 500000, desc: "Umbral de seguidores de la cuenta" }
+    - { key: top_n,            type: number, scope: run,    default: 25,     desc: "Cuántos referentes pasan el filtro" }
+    - { key: temas,            type: list,   scope: run,    desc: "Temas relevantes; default = temas del cliente (<<TEMA_1..5>>), '*' en el form = sin filtro" }
+    - { key: hashtags,         type: list,   scope: run,    desc: "Filtro por hashtags sobre lo colectado (vacío = sin filtro)" }
+    - { key: tipos_contenido,  type: list,   scope: run,    desc: "short (video ≤90s) | video | imagen (vacío = cualquiera)" }
+    - { key: dias_recencia,    type: number, scope: run,    default: 0,      desc: "Solo contenido de los últimos N días (0 = sin límite)" }
+    - { key: plataformas,      type: list,   scope: run,    desc: "instagram | tiktok (default: ambas)" }
+    - { key: ig_results_limit, type: number, scope: client, default: 12,     desc: "Posts a colectar por cuenta de IG (H5)" }
+    - { key: tt_results_limit, type: number, scope: client, default: 60,     desc: "Videos a colectar por hashtag de TikTok (H5)" }
     - { key: cuentas_ig,       type: list,   scope: client, desc: "Cuentas referentes de IG a scrapear" }
-    - { key: hashtags_tiktok,  type: list,   scope: client, desc: "Hashtags de TikTok a scrapear" }
+    - { key: hashtags_tiktok,  type: list,   scope: client, desc: "Hashtags de TikTok a scrapear (semilla de colecta, no filtro)" }
     - { key: categorias,       type: list,   scope: client, desc: "5 categorías de guion — DEBEN coincidir en el prompt de Claude y el parser" }
   credentials:
     - apify_token
@@ -38,9 +45,9 @@ inputs:
     - gmail_oauth               # credencial OAuth dentro de n8n
 
 stages:
-  colectar: "Apify — Scrape IG Reels + Scrape TikTok"
+  colectar: "Apify — Scrape IG Reels + Scrape TikTok (volúmenes desde 'Parámetros de corrida')"
   normalizar: "Nodos 'Normalizar IG1' / 'Normalizar TT1' + Merge → formato común"
-  filtrar_scorear: "Filtrar referentes virales — top 25 (umbrales + temas + score de ranking)"
+  filtrar_scorear: "Filtrar referentes virales — top N (params por corrida: umbrales, temas, hashtags, tipo, recencia, plataformas + score de ranking)"
   enriquecer: "Supadata Whisper — transcripción de audio"
   generar: "Claude — agente escritor voz cliente (prompt caching, perfil guion_reel)"
   calidad: n/a                  # hueco conocido — candidato a checklist tipo substack (post-MVP)
