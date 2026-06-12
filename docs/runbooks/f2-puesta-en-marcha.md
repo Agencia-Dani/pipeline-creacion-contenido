@@ -15,9 +15,11 @@
 > *(El reparto es intercambiable: ambos carriles llevan algo de skill técnico. Lo que NO se mueve
 > es que B2 —voz y guiones few-shot del cliente— lo decide quien conoce al cliente.)*
 >
-> **Prerequisitos (gating, los resuelve Mani con el jefe — bloquean la activación D1, no el montaje):**
-> cliente real elegido · timezone de los crons confirmada · lista final de filtros del formulario
-> (PLAN.md §3.2, MEJORAS.md §5).
+> **Prerequisitos (gating de la activación D1, NO del montaje) — estado 2026-06-12:**
+> - ✅ **Timezone:** America/Bogota (GMT-5). Resta validar la interpretación TZ explícitamente en D1.
+> - ✅ **Reach:** no se exige — `views + engagement_rate` como proxy (sin cambio de herramienta ni costo).
+> - ⏳ **Qué filtros exponer en el formulario:** se decide al montar el dashboard (D3), con datos reales.
+> - ⬜ **Cliente real elegido:** pendiente (lo define Mani / el jefe).
 
 ---
 

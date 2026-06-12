@@ -191,11 +191,16 @@ Dos consecuencias de diseño:
 - [ ] **Looker Studio vs Metabase** para el dashboard (Looker = $0 y cero infra pero conecta a
       Postgres con limitaciones; Metabase = más potente pero hay que hostearlo). Se decide en F4
       con un spike de 1 hora. *Bloquea:* F4.
-- [ ] **Zona horaria oficial de los crons** del sistema. *Bloquea:* activación en F2.
+- [x] **Zona horaria oficial de los crons** — **America/Bogota (GMT-5)**, confirmado por Mani
+      2026-06-12. Ya es el valor del manifest del wf de reels; resta validar la interpretación
+      TZ explícitamente al activar (D1 del runbook F2).
 - [ ] **Taxonomía y personalización de outputs** — qué tipos de output existen, con qué campos,
       y qué quiere ver/filtrar el jefe tanto en el dashboard como en la entrada bajo demanda
       (los specs que ya pidió: views, likes, suscriptores, reach, hashtags, tipo de contenido,
       temas — se confirman con prototipo en mano, no en abstracto). *Bloquea:* cierre de F1 y F4.
+      **Parcialmente resuelto (2026-06-12):** *reach* no se exige — se acepta `views + engagement_rate`
+      como proxy (no cambia herramienta de colecta ni costo). *Qué filtros exponer en el formulario*
+      se decide al montar el dashboard (D3), con datos reales en mano.
 
 ---
 

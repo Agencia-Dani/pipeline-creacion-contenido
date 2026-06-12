@@ -149,12 +149,14 @@ dashboard central también filtra).
 
 ## 5. Para cerrar con el jefe (⭐ entra en la conversación de F0)
 
-1. **Reach no existe en la fuente** — los scrapers públicos no lo dan (es dato privado de cada
-   cuenta). ¿Le sirve views + engagement rate como proxy, o reach es indispensable? (Si es
-   indispensable, cambia la herramienta de colecta y el costo.)
-2. Confirmar la lista final de filtros del formulario (M1/M2) y los defaults.
+1. ~~**Reach no existe en la fuente**~~ ✅ **resuelto 2026-06-12:** se acepta `views +
+   engagement_rate` como proxy — **no** se cambia herramienta de colecta ni costo.
+2. **Lista final de filtros del formulario (M1/M2) y defaults** → se decide al montar el
+   dashboard (D3 del runbook F2), con datos reales en mano, no en abstracto.
 3. ¿Qué gráficos del dashboard (M4) le importan más? Enseñarle el borrador con datos de la
    primera corrida real y ajustar.
+
+> **Timezone del cron:** America/Bogota (GMT-5), confirmado 2026-06-12 — ya es el valor del manifest.
 
 ## Criterio de "hecho" de este paquete
 
