@@ -85,19 +85,20 @@ se entera. **El registro central es un sumidero adicional, nunca una dependencia
 | C8 | **Documentación viva** | Blueprint lleno, ADRs, runbooks por workflow | `system-blueprint.md` + `docs/` |
 | C9 | **Entrada bajo demanda (dispatcher)** | Formulario simple (no técnico) que dispara corridas con filtros — cliente, plataforma, hashtags, tema, mínimos de views/likes/seguidores — y las rutea al workflow correspondiente | workflow interno de n8n (se construye en F5) |
 
-### 2.2 Modelo de datos del registro (v0, se refina en F2)
+### 2.2 Modelo de datos del registro (v0 — SQL real: `core/schema/001_registro_inicial.sql`)
 
 ```
 clients      (id, nombre, estado)
-workflows    (id, slug, nombre, motor [n8n|openclaw|script], version, estado)
+workflows    (id, nombre, motor [n8n|openclaw|script], estado)
 instances    (id, workflow_id, client_id, config_ref, estado)      ← "wf reels para cliente X"
-runs         (id, instance_id, inicio, fin, estado [ok|fallo|parcial],
-              trigger [cron|manual|on_demand],
+runs         (id, instance_id, inicio, fin, estado [en_curso|ok|fallo|parcial],
+              trigger_type [cron|manual|on_demand|conversation],
               params jsonb,                    ← los filtros pedidos en esa corrida
               costo_estimado, metricas jsonb, error)
-outputs      (id, run_id, tipo [guion|borrador|nugget|research_item],
-              titulo, contenido_o_link, estado [draft|aprobado|publicado],
-              publicado_en,
+outputs      (id, run_id, tipo [guion_reel|research_item|borrador_newsletter|nugget],
+              titulo, contenido_o_link, estado [draft|aprobado|publicado|descartado],
+              publicado_en, source_items jsonb,
+              external_id,                     ← id en el destino nativo → sync idempotente (F3)
               metadata jsonb)                  ← métricas del item fuente (views, likes,
                                                  seguidores, hashtags) para filtrar en dashboard
 ```
@@ -181,7 +182,12 @@ Dos consecuencias de diseño:
 - [ ] **Presupuesto mensual definitivo** — rango tentativo $10–30/mes; el costo fijo proyectado
       es ~$4–5/mes (ver §4), así que no bloquea F0–F2, pero **hay que validarlo con el jefe**
       junto con la idea general. *Bloquea:* fase 2 de hosting (VPS) y suscripciones a fuentes.
-- [ ] **PikaPods vs InstaPods** (cuál da mejor persistencia/backup en el plan barato). *Bloquea:* F2.
+- [x] **PikaPods vs InstaPods** — investigado 2026-06-11: **InstaPods recomendado** ($3/mes,
+      SSH y terminal web en todos los planes, útil para debug); PikaPods ($3.80/mes) no da SSH
+      y sus backups son *best-effort* cuando la app usa su propia DB. En ambos el riesgo real es
+      bajo: los workflows viven versionados en el repo y el registro en Supabase — lo único en
+      juego en n8n es el historial de ejecuciones. Decisión liviana (migrar = export/import);
+      Mani confirma al crear la cuenta.
 - [ ] **Looker Studio vs Metabase** para el dashboard (Looker = $0 y cero infra pero conecta a
       Postgres con limitaciones; Metabase = más potente pero hay que hostearlo). Se decide en F4
       con un spike de 1 hora. *Bloquea:* F4.
@@ -248,11 +254,13 @@ La unidad de extensión queda definida y los dos workflows existentes la cumplen
 - **Hecho cuando:** el validador pasa en verde · una persona nueva entiende ambos workflows
   leyendo solo sus manifests.
 
-### F2 — Esqueleto que camina: registro central + primer workflow conectado
-La rebanada fina end-to-end: una corrida real registrada centralmente.
-- Levantar n8n managed (checklist fase 1 de HOSTING.md: importar JSON, credenciales,
-  placeholders del cliente real, corrida manual de prueba).
-- Crear proyecto Supabase + aplicar `core/schema/` v0 (las 5 tablas de §2.2).
+### F2 — Esqueleto que camina: puesta en marcha del workflow de reels + registro central
+La rebanada fina end-to-end: el workflow de reels montado de cero y una corrida real registrada
+centralmente. Checklist ejecutable: [docs/runbooks/f2-puesta-en-marcha.md](./docs/runbooks/f2-puesta-en-marcha.md).
+- **Montar el workflow de reels** (hoy no opera): levantar n8n managed (InstaPods), importar el
+  JSON, cargar credenciales, resolver placeholders con la config del cliente real, corrida
+  manual de prueba (= checklist fase 1 de HOSTING.md).
+- Crear proyecto Supabase + aplicar `core/schema/001_registro_inicial.sql` (las 5 tablas de §2.2).
 - Agregar al final del wf de reels un nodo HTTP que reporta a Supabase: 1 fila en `runs` +
   N filas en `outputs` (una por guion). Google Sheets sigue funcionando igual.
 - Registrar también las corridas fallidas (el nodo de error de n8n → `runs` con estado `fallo`).
