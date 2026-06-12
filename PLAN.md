@@ -19,7 +19,10 @@ Lo que existe hoy en el repo:
 | `README.md` | Visión del sistema central | ✅ Escrito |
 | `system-blueprint.md` | Plantilla de diseño (10 principios, 14 secciones) | ⬜ Sin llenar — se llena en F0 |
 | `Workflows/workflow-short-form-content/` | **Máquina**: workflow n8n (19 nodos, JSON importable). Cron semanal → Apify (IG+TikTok) → filtro top-25 viral → Supadata transcribe → Claude escribe guiones en voz del cliente → Google Sheets + email | ✅ Funcional como plantilla · ❌ **no hosteado** · placeholders `<<...>>` por cliente |
-| `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) |
+| `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) · ❌ **hoy inactivo** — se re-monta en F3 |
+
+> **Estado operativo (2026-06-11):** ninguno de los dos workflows está sirviendo hoy. La puesta
+> en producción de ambos **es parte del plan** (reels → F2, Substack → F3), no un prerequisito.
 
 **El hueco que el pipeline llena:** los outputs viven en dos lados desconectados (Google Sheets
 vs Notion), no hay registro central de corridas, ni config estandarizada, ni forma de saber si
@@ -114,8 +117,9 @@ pipeline-creacion-contenido/
 │   ├── adr/                   ← ADR-001..N (decisiones con su porqué)
 │   └── runbooks/              ← cómo operar/arrancar/arreglar cada pieza
 ├── core/                      ← EL NÚCLEO: solo cambia con ADR
-│   ├── contracts/             ← schema del workflow.yaml
+│   ├── contracts/             ← schema del workflow.yaml + schemas de datos
 │   ├── schema/                ← SQL de Supabase, versionado
+│   ├── scripts/               ← validador del contrato
 │   ├── sync/                  ← sync Notion → registro
 │   └── templates/             ← scaffolding de workflow/cliente nuevo
 ├── clients/
@@ -226,7 +230,7 @@ Llenar el blueprint y formalizar decisiones. **Nada de código.**
 - **Hecho cuando:** blueprint 1–5 sin `<<...>>` · 7 ADRs escritos · one-pager listo · Mani
   confirmó no-negociables y métricas de éxito · conversación con el jefe realizada.
 
-### F1 — El contrato de workflow
+### F1 — El contrato de workflow *(borrador completo 2026-06-11 — pendiente revisión de Mani y taxonomía con el jefe)*
 La unidad de extensión queda definida y los dos workflows existentes la cumplen *sin tocar su funcionamiento*.
 - Diseñar el schema de `workflow.yaml`: identidad, motor, trigger, inputs (config + credenciales
   requeridas + **filtros que acepta por corrida**), outputs (tipos + dónde caen), runbook
@@ -255,14 +259,20 @@ La rebanada fina end-to-end: una corrida real registrada centralmente.
 - **Hecho cuando:** una corrida real del lunes aparece en Supabase con sus ~25 guiones,
   consultable por SQL · una falla simulada queda registrada como `fallo`.
 
-### F3 — Segundo workflow conectado
-La prueba de fuego del contrato: el extremo opuesto entra al mismo registro.
+### F3 — Puesta en marcha del workflow de Substack + conexión al registro
+La prueba de fuego del contrato: el extremo opuesto se monta de cero y entra al mismo registro.
+- **Montar el sistema editorial** (hoy inactivo): el jefe llena
+  [INTAKE-AGENCIA.md](./Workflows/workflow-substack/INTAKE-AGENCIA.md), se traduce a
+  `kit/VARIABLES.md` + `clients/`, y se corre el runbook de 25 mensajes (~8 h de conversación
+  con el bot en 1–2 días). Decisión previa (sale de la conversación de F0 con el jefe):
+  ¿newsletter de la agencia o de un cliente primero?
 - Sync job Notion → Supabase (`core/sync/`): lee las 2 DBs de Notion del newsletter y registra
   research items, borradores y nuggets como `runs`/`outputs`. Puede ser un workflow más de n8n
   (cron diario) — cero infra nueva.
 - Mapear estados de Notion (Nuevo/En producción/Publicado…) al ciclo de vida de `outputs`.
-- **Hecho cuando:** los outputs de ambos workflows conviven en el mismo registro con el mismo
-  schema · el sync es idempotente (correrlo dos veces no duplica).
+- **Hecho cuando:** el cron diario del bot corre en producción · los outputs de ambos workflows
+  conviven en el mismo registro con el mismo schema · el sync es idempotente (correrlo dos
+  veces no duplica).
 
 ### F4 — La capa del jefe *(línea de MVP)*
 El sistema se vuelve útil para su usuario final.

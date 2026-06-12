@@ -1,0 +1,68 @@
+# Manifest — cumple core/contracts/workflow-manifest.md (v1)
+contract_version: 1
+
+id: substack
+name: "Newsletter editorial — research, scoring y borradores (OpenClaw)"
+description: >
+  Bot OpenClaw (Telegram) configurado vía kit de 14 fases: cron diario de research en fuentes
+  validadas, filtro editorial + scoring con pesos, banco en Notion, top-3 con recomendación,
+  brief y borrador completo en Notion, nuggets urgentes. Humano en el loop: aprueba temas,
+  revisa borradores y publica manualmente en Substack (sin API pública).
+engine: openclaw
+status: inactive                  # corrió en producción mar–abr 2026 (AI for Executives); se re-monta en F3
+owner: mani
+
+triggers:
+  - type: cron
+    schedule: "0 6 * * *"         # research diario 6:00 AM
+    timezone: America/Bogota      # ⚠️ validar explícitamente al montar (incidente real documentado)
+  - type: cron
+    schedule: "30 6 * * 1"        # arranque semanal de edición larga (opcional)
+    timezone: America/Bogota
+  - type: conversation            # co-creación, aprobaciones y pedidos ad-hoc por Telegram
+
+inputs:
+  client_config: "clients/{cliente}/substack.yaml"
+  filters:
+    # Todo scope=client: el sistema editorial es identidad estable del newsletter.
+    - { key: pregunta_filtro,  type: string, scope: client, desc: "La pregunta editorial que filtra todo hallazgo" }
+    - { key: pesos_scoring,    type: object, scope: client, desc: "relevancia/fuente/urgencia/accionabilidad/unicidad (default 30/25/20/15/10)" }
+    - { key: fuentes,          type: list,   scope: client, desc: "Fuentes validadas con tier y workaround (fuentes_validadas.md)" }
+    - { key: cadencia,         type: object, scope: client, desc: "Research diario + ediciones (día, extensión, estructura)" }
+    - { key: voz_editorial,    type: object, scope: client, desc: "Guía editorial + master prompt (los 16 artefactos del kit)" }
+  credentials:
+    - notion_token              # se le pasa al bot por Telegram — NUNCA al repo
+    - fuentes_suscripciones     # credenciales de fuentes de pago, si las hay (FT, etc.)
+
+stages:
+  colectar: "Bot recorre fuentes_validadas.md (cron diario; bloqueos marcados ⚠️)"
+  normalizar: "Implícito en playbook_research (hallazgo → título/fuente/score/resumen)"
+  filtrar_scorear: "Pregunta filtro + scoring 5 criterios con pesos; corte en 5+"
+  enriquecer: "Research profundo del brief (fuentes verificadas, anexo)"
+  generar: "Borrador completo / nugget según master prompt (perfil editorial del cliente)"
+  calidad: "Checklist de 5 preguntas obligatorias antes de 'Listo para revisión'"
+  entregar: "Notion — DB Banco de Research + DB Pipeline de Contenido (borrador dentro de la página)"
+  notificar: "Telegram — confirmación diaria, top-3 con recomendación, alertas score 9–10"
+
+outputs:
+  - type: research_item
+    destination_native: notion   # DB "Banco de Research" (score 5+)
+    registered: pending          # sync Notion → registro en F3
+  - type: borrador_newsletter
+    destination_native: notion   # DB "Pipeline de Contenido"
+    registered: pending
+  - type: nugget
+    destination_native: notion   # tag "Nugget" + aviso por Telegram
+    registered: pending
+
+runbook:
+  setup: "INTAKE-AGENCIA.md (jefe) → kit/VARIABLES.md → kit/CHECKLIST-25-MENSAJES.md (~8 h en 1–2 días)"
+  start: "Activar crons vía bot (Mensajes 22–25) — SOLO tras dry run + validación de timezone"
+  stop: "Pedir al bot desactivar los crons (IDs en crons_activos.md)"
+  test: "Dry run completo del cron diario (Mensaje 24) + checklist de verificación del primer output"
+  docs:
+    - README.md
+    - master-guia.md
+    - kit/README.md
+
+cost_per_run: "incluido en la suscripción de OpenClaw (sin costo marginal por corrida; fuentes de pago aparte si se contratan)"

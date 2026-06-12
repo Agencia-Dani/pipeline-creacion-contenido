@@ -1,0 +1,12 @@
+{
+  "name": "pipeline-validate",
+  "private": true,
+  "type": "module",
+  "description": "Validador del contrato de workflows del pipeline (core/contracts/workflow-manifest.md)",
+  "scripts": {
+    "validate": "node validate.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.4.0"
+  }
+}

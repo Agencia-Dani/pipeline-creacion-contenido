@@ -1,0 +1,25 @@
+# output — schema v0 (BORRADOR)
+# La "pieza producida": interfaz estándar entre la etapa ENTREGAR y el registro central
+# (tabla `outputs` de PLAN.md §2.2). v0 se cierra con la taxonomía validada con el jefe.
+
+schema: output
+version: 0
+
+# Catálogo de tipos (borrador — validar con el jefe):
+#   guion_reel           ← workflow short-form-content
+#   research_item        ← workflow substack (Banco de Research, score 5+)
+#   borrador_newsletter  ← workflow substack (Pipeline de Contenido)
+#   nugget               ← workflow substack (alerta corta score 9–10)
+
+fields:
+  - { key: type,               type: string,  required: true,  desc: "Tipo del catálogo de outputs" }
+  - { key: title,              type: string,  required: true,  desc: "Título del output" }
+  - { key: content_or_link,    type: string,  required: true,  desc: "Contenido completo, o link al destino nativo (Sheet/Notion)" }
+  - { key: status,             type: string,  required: true,  desc: "draft | aprobado | publicado | descartado" }
+  - { key: client,             type: string,  required: true,  desc: "Slug del cliente dueño (FK clients)" }
+  - { key: workflow,           type: string,  required: true,  desc: "id del workflow productor (FK workflows)" }
+  - { key: run_id,             type: string,  required: true,  desc: "Corrida que lo produjo (FK runs) — trazabilidad" }
+  - { key: source_items,       type: list,    required: false, desc: "content_items de origen (urls o ids) — trazabilidad" }
+  - { key: platform_target,    type: string,  required: false, desc: "Plataforma destino: instagram | tiktok | substack | …" }
+  - { key: published_at,       type: string,  required: false, desc: "Cuándo se publicó (ISO 8601), si aplica" }
+  - { key: metadata,           type: object,  required: false, desc: "Métricas del item fuente (views, likes, followers, hashtags…) + extras del workflow — habilita filtros del dashboard" }

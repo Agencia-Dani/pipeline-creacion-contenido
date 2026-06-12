@@ -1,0 +1,65 @@
+# Manifest — cumple core/contracts/workflow-manifest.md (v1)
+contract_version: 1
+
+id: short-form-content
+name: "Detector de referentes virales → guiones short form"
+description: >
+  Cada lunes detecta Reels de IG y videos de TikTok virales sobre los temas del cliente,
+  los transcribe y genera guiones en la voz del cliente con Claude; registra en Google
+  Sheets y envía resumen por email. Un cliente/voz por copia del workflow.
+engine: n8n
+status: draft                     # construido y probado como plantilla; aún no deployado (F2)
+owner: mani
+
+triggers:
+  - type: cron
+    schedule: "0 8 * * 1"         # lunes 8:00 AM
+    timezone: America/Bogota      # ⚠️ decisión abierta (PLAN.md §3.2) — validar antes de activar
+  - type: manual                  # "Execute Workflow" en n8n para corridas de prueba
+
+inputs:
+  client_config: "clients/{cliente}/short-form-content.yaml"
+  filters:
+    # scope=client hoy (hardcodeados como <<...>> en workflow.json);
+    # los umbrales y temas pasan a scope=run en F5 (búsqueda bajo demanda).
+    - { key: min_likes,        type: number, scope: client, default: 10000,  desc: "Umbral de likes del filtro viral" }
+    - { key: min_views,        type: number, scope: client, default: 100000, desc: "Umbral de reproducciones" }
+    - { key: min_followers,    type: number, scope: client, default: 500000, desc: "Umbral de seguidores de la cuenta" }
+    - { key: top_n,            type: number, scope: client, default: 25,     desc: "Cuántos referentes pasan el filtro" }
+    - { key: temas,            type: list,   scope: client, desc: "Temas relevantes (hoy <<TEMA_1..5>>)" }
+    - { key: cuentas_ig,       type: list,   scope: client, desc: "Cuentas referentes de IG a scrapear" }
+    - { key: hashtags_tiktok,  type: list,   scope: client, desc: "Hashtags de TikTok a scrapear" }
+    - { key: categorias,       type: list,   scope: client, desc: "5 categorías de guion — DEBEN coincidir en el prompt de Claude y el parser" }
+  credentials:
+    - apify_token
+    - anthropic_api_key
+    - supadata_api_key
+    - google_sheets_oauth       # credencial OAuth dentro de n8n
+    - gmail_oauth               # credencial OAuth dentro de n8n
+
+stages:
+  colectar: "Apify — Scrape IG Reels + Scrape TikTok"
+  normalizar: "Nodos 'Normalizar IG1' / 'Normalizar TT1' + Merge → formato común"
+  filtrar_scorear: "Filtrar referentes virales — top 25 (umbrales + temas + score de ranking)"
+  enriquecer: "Supadata Whisper — transcripción de audio"
+  generar: "Claude — agente escritor voz cliente (prompt caching, perfil guion_reel)"
+  calidad: n/a                  # hueco conocido — candidato a checklist tipo substack (post-MVP)
+  entregar: "Google Sheets (pestaña del cliente, columnas fijas)"
+  notificar: "Email resumen vía Gmail"
+
+outputs:
+  - type: guion_reel
+    destination_native: google_sheets
+    registered: pending          # se conecta al registro central en F2
+
+runbook:
+  setup: "HOSTING.md (fase 1) + checklist de placeholders del README.md"
+  start: "Activar el workflow en n8n (cron lunes 8 AM — validar timezone explícitamente)"
+  stop: "Desactivar el workflow en n8n"
+  test: "Execute Workflow manual; verificar filas en el Sheet + email resumen (+ registro desde F2)"
+  docs:
+    - README.md
+    - CLAUDE.md
+    - HOSTING.md
+
+cost_per_run: "por medir en F2 (Apify x2 actors + ~25 transcripciones Supadata + ~25 llamadas Claude con prompt caching)"

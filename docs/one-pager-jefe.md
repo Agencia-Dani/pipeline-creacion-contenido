@@ -34,10 +34,16 @@ o un tipo de contenido nuevo deja de ser un proyecto — es llenar una planilla.
   no cambia — la novedad es que el sistema lo va a **medir por cliente**, así sabremos cuánto
   cuesta producir para cada uno.
 
+## Qué incluye el proyecto
+
+- **Poner ambos flujos en operación** — hoy están construidos y probados, pero no corriendo.
+  El montaje (servidores, credenciales, configuración del cliente) es parte del trabajo.
+
 ## Qué NO cambia
 
-- Los dos flujos actuales siguen funcionando igual durante toda la construcción.
 - Nada se publica solo: tú (o el editor) siguen aprobando y publicando.
+- Las herramientas que ya usamos (n8n, el bot de Telegram, Notion, Google Sheets) siguen siendo
+  las mismas — el sistema las conecta, no las reemplaza.
 
 ## Las 4 decisiones que necesitamos de ti
 

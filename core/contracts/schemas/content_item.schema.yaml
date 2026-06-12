@@ -1,0 +1,21 @@
+# content_item — schema v0 (BORRADOR)
+# La "pieza encontrada": interfaz estándar entre las etapas COLECTAR/NORMALIZAR y el resto
+# del workflow (PLAN.md §2.4). Todo adaptador de fuente DEBE producir items con esta forma.
+# v0 se cierra junto con la taxonomía de outputs validada con el jefe (PLAN.md §3.2).
+
+schema: content_item
+version: 0
+
+fields:
+  - { key: platform,      type: string,  required: true,  desc: "instagram | tiktok | web | newsletter | notion | otra" }
+  - { key: url,           type: string,  required: true,  desc: "Link a la pieza original" }
+  - { key: title,         type: string,  required: true,  desc: "Título o hook de la pieza" }
+  - { key: author,        type: string,  required: false, desc: "Cuenta / autor / medio" }
+  - { key: published_at,  type: string,  required: false, desc: "Fecha de publicación (ISO 8601)" }
+  - { key: source,        type: string,  required: true,  desc: "Adaptador/fuente que lo encontró (ej: apify-ig, reuters)" }
+  - { key: metrics,       type: object,  required: false, desc: "views, likes, followers, reach, shares — las que la fuente dé" }
+  - { key: topics,        type: list,    required: false, desc: "Temas/hashtags detectados" }
+  - { key: content_type,  type: string,  required: false, desc: "news | análisis | caso de uso | reporte | señal temprana | video | otro" }
+  - { key: excerpt,       type: string,  required: false, desc: "Extracto / transcripción / resumen del contenido" }
+  - { key: score,         type: number,  required: false, desc: "Score editorial si el workflow scorea (substack: 1–10)" }
+  - { key: raw,           type: object,  required: false, desc: "Payload original del adaptador (debugging; no se registra centralmente)" }

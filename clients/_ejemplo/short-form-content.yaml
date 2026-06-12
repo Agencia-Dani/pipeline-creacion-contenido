@@ -1,0 +1,39 @@
+# Config de cliente para el workflow short-form-content — EJEMPLO/PLANTILLA
+# Copiar a clients/<cliente>/short-form-content.yaml y llenar. Sin secretos, jamás.
+
+cliente: ejemplo                  # slug del cliente (== nombre de la carpeta)
+
+# --- Identidad y voz (lo más importante para la calidad del guion) ---
+nombre_cliente: "Nombre de la persona/marca cuya voz se imita"
+descripcion_credenciales: "Quién es y por qué tiene autoridad"
+frase_credencial: "La frase de presentación que abre cada video"
+guiones_ejemplo: |
+  Pegar acá 2 a 4 guiones REALES del cliente, completos, en su voz.
+  Son los few-shot que anclan la calidad.
+tratamiento: "tú | usted"
+registro: "coloquial | formal"
+pais_acento: "Colombia"
+muletillas_permitidas: []
+cliches_a_evitar: []
+cta: "El CTA fijo del cliente"
+
+# --- Fuentes a monitorear ---
+cuentas_ig: ["cuenta1", "cuenta2", "cuenta3"]
+hashtags_tiktok: ["hashtag1", "hashtag2", "hashtag3"]
+temas: ["tema1", "tema2", "tema3", "tema4", "tema5"]
+
+# --- Filtro viral (defaults del manifest; scope pasa a run en F5) ---
+min_likes: 10000
+min_views: 100000
+min_followers: 500000
+top_n: 25
+
+# --- Categorías (DEBEN coincidir en el prompt de Claude y el parser) ---
+categorias: ["cat1", "cat2", "cat3", "cat4", "cat5"]
+
+# --- Destinos ---
+google_sheet_id: "ID del Sheet destino"
+sheet_nombre: "Nombre del documento"
+sheet_pestana: "Pestaña destino (con los encabezados exactos del README)"
+nombre_editor: "Editor responsable"
+email_destinatario: "correo@dominio.com"

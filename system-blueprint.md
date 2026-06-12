@@ -94,20 +94,21 @@ Estos no son fases — son lentes que aplicás a cada decisión, siempre. Si una
 
 ## 3. No-negociables (los invariantes que nunca se doblan)
 
-> ⚠️ Propuestos a partir de las decisiones tomadas — confirmar con Mani antes de darlos por sellados.
+> ✅ Confirmados por Mani — 2026-06-11.
 
-- [ ] **Aislamiento de fallos:** la caída de un workflow — o del registro central — nunca
+- [x] **Aislamiento de fallos:** la caída de un workflow — o del registro central — nunca
       detiene a los demás. El registro es sumidero de datos, jamás dependencia de ejecución.
-- [ ] **Lo que el jefe toca es no-code e imposible de romper** (formularios, vistas de solo lectura).
-- [ ] **Agregar un workflow o cliente N+1 no toca el núcleo** (`core/`): solo plantilla + config.
-- [ ] **Ningún dato de un cliente se mezcla con otro** — config y outputs separados por `client`
+- [x] **Lo que el jefe toca es no-code e imposible de romper** (formularios, vistas de solo lectura).
+- [x] **Agregar un workflow o cliente N+1 no toca el núcleo** (`core/`): solo plantilla + config.
+- [x] **Ningún dato de un cliente se mezcla con otro** — config y outputs separados por `client`
       desde el día 1.
-- [ ] **Ningún secreto en git.** API keys y tokens viven en los motores (credentials de n8n,
+- [x] **Ningún secreto en git.** API keys y tokens viven en los motores (credentials de n8n,
       workspace del bot) — en el repo solo placeholders. El validador lo verifica.
-- [ ] **Toda corrida queda registrada** (éxito o fallo) con trazabilidad completa:
+- [x] **Toda corrida queda registrada** (éxito o fallo) con trazabilidad completa:
       corrida → outputs → item fuente.
-- [ ] **Los dos workflows existentes nunca dejan de funcionar** durante el refactor
-      (refactor descriptivo primero, intrusivo después).
+- [x] **El refactor nunca rompe un workflow operativo** (descriptivo primero, intrusivo después).
+      Nota: hoy ninguno de los dos workflows está sirviendo en producción — su **puesta en
+      marcha es parte del plan** (reels en F2, Substack en F3), no un prerequisito.
 
 ---
 
