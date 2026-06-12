@@ -54,6 +54,5 @@
     Supabase sigue siendo la fuente de verdad del historial; el Sheet es una materialización.
   - (−) Dos secretos/credenciales más en n8n (Google Docs; el Sheet usa la credencial OAuth ya
     prevista).
-  - El one-pager de reels queda parcialmente superseded en su paso 4 ("escribe varios guiones…
-    en la voz elegida") — anotado en el propio doc; el norte vigente es
-    [ROADMAP §1](../../ROADMAP.md).
+  - El one-pager de reels se actualizó a la visión aprobada (v2 — la v1 presentada vive en
+    git); el norte operativo es [ROADMAP §1](../../ROADMAP.md).

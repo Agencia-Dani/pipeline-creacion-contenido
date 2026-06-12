@@ -43,7 +43,7 @@ registro de outputs**, no un motor de ejecución único.
    ┌──────────────────────────────┐    ┌──────────────────────────────┐
    │ workflow-short-form-content  │    │ workflow-substack            │
    │ motor: n8n (managed host)    │    │ motor: OpenClaw + Telegram   │
-   │ destino nativo: G. Sheets    │    │ destino nativo: Notion       │
+   │ destino: Airtable + Sheet    │    │ destino nativo: Notion       │
    └─────────────┬────────────────┘    └─────────────┬────────────────┘
                  │ push directo                      │ sync job
                  │ (nodo HTTP al final                │ (lee Notion,
@@ -98,22 +98,25 @@ la regla de dueños únicos está en §2.5.
 ```
 pipeline-creacion-contenido/
 ├── README.md                  ← visión + mapa de documentos
-├── PLAN.md                    ← este documento (diseño + fases)
 ├── ROADMAP.md                 ← ejecución del MVP de reels (norte + checklist)
+├── HANDOFF.md                 ← estado vivo: tablero de tasks + log entre devs
+├── PLAN.md                    ← este documento (diseño + fases)
 ├── docs/
-│   ├── adr/                   ← ADR-001..N (decisiones con su porqué)
-│   └── transcripciones/       ← fuentes de decisiones (conversaciones con el jefe)
+│   ├── adr/                   ← ADR-001..009 (decisiones con su porqué)
+│   ├── transcripciones/       ← fuentes de decisiones (conversaciones con el jefe)
+│   └── one-pager-reels-mvp.md ← la visión del MVP en una página (no técnica)
 ├── core/                      ← EL NÚCLEO: solo cambia con ADR
-│   ├── contracts/             ← schema del workflow.yaml + schemas de datos
-│   ├── schema/                ← SQL de Supabase, versionado
-│   ├── scripts/               ← validador del contrato
-│   ├── sync/                  ← sync Notion → registro
-│   └── templates/             ← scaffolding de workflow/cliente nuevo
+│   ├── contracts/             ← contrato del manifest · cockpit Airtable · ingesta · schemas de datos
+│   ├── schema/                ← SQL de Supabase, versionado (001–003)
+│   ├── scripts/               ← validate.mjs · deploy.mjs · setup-airtable.mjs
+│   ├── n8n/                   ← piezas n8n del núcleo (error workflow del registro)
+│   ├── sync/                  ← (se crea en F3) sync Notion → registro
+│   └── templates/             ← (se crea en F5) scaffolding de workflow/cliente nuevo
 ├── clients/
 │   └── <cliente>/<wf>.yaml    ← config por cliente (sin secretos)
-└── Workflows/
-    ├── workflow-short-form-content/   (+ workflow.yaml)
-    └── workflow-substack/             (+ workflow.yaml)
+└── Workflows/                 ← un subfolder autocontenido por workflow (+ workflow.yaml)
+    ├── workflow-short-form-content/   (workflow.json plantilla · dist/ generado, gitignored)
+    └── workflow-substack/             (kit OpenClaw: plantillas + guía)
 ```
 
 ### 2.4 Anatomía estándar de un workflow de contenido (etapas canónicas)
@@ -121,16 +124,16 @@ pipeline-creacion-contenido/
 Los workflows **no se implementan igual, pero se describen y se conectan igual**: todo workflow
 de contenido se mapea contra estas 8 etapas en su manifest (las que no aplican se declaran `n/a`):
 
-| Etapa | Responsabilidad | En reels hoy | En substack hoy |
+| Etapa | Responsabilidad | En reels (MVP — ADR-009) | En substack hoy |
 |---|---|---|---|
-| 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok | Bot recorre fuentes validadas |
+| 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok (cuentas/keywords desde el cockpit Airtable) | Bot recorre fuentes validadas |
 | 2. NORMALIZAR | Todo item cae al schema común `content_item` | Nodos "Normalizar IG1/TT1" | Implícito en el playbook |
-| 3. FILTRAR / SCOREAR | Params de la corrida + criterios del cliente → selección | Filtro viral top-25 (umbrales hardcodeados) | Pregunta filtro + scoring 5 criterios |
-| 4. ENRIQUECER | Transcribir, extraer, research profundo | Supadata Whisper | Research profundo del brief |
-| 5. GENERAR | LLM con **perfil de output** (voz del cliente + formato de la plataforma destino) | Claude → guion de reel | Bot → borrador / nugget |
+| 3. FILTRAR / SCOREAR | Params de la corrida + criterios del cliente → selección | Heat-score v1: likes+views+engagement × tema/idioma/selección (fórmula: ROADMAP §1) + dedup contra `processed_items` | Pregunta filtro + scoring 5 criterios |
+| 4. ENRIQUECER | Transcribir, extraer, research profundo | Supadata Whisper + traducción literal al español (Claude, solo si hace falta) | Research profundo del brief |
+| 5. GENERAR | **Perfil de output** del workflow (formato + voz si aplica) | Perfil "script literal": Doc linkeado con la transcripción en español (voz propia en pausa — ADR-009) | Bot → borrador / nugget |
 | 6. CALIDAD | Checklist antes de entregar | ❌ no tiene (hueco conocido) | Checklist de 5 preguntas |
-| 7. ENTREGAR | Destino nativo + registro central | Google Sheets | Notion |
-| 8. NOTIFICAR | Resumen / alerta | Email (Gmail) | Telegram |
+| 7. ENTREGAR | Destino nativo + registro central | Airtable `Candidatos` + registro Supabase; seleccionados → Sheet Histórico | Notion |
+| 8. NOTIFICAR | Resumen / alerta | Email resumen (Gmail, heredado del template) | Telegram |
 
 Interfaces estándar entre etapas (se definen en F1, viven en `core/contracts/`):
 

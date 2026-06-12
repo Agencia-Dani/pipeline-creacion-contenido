@@ -59,7 +59,10 @@ Supabase, Airtable y n8n no existen todavía. Arranca la construcción.
   definido (ROADMAP §1) · consolidación de docs: blueprint/runbook/MEJORAS/HOSTING/one-pager-jefe
   absorbidos en README+ROADMAP+PLAN+ADRs (~900 líneas menos) · PLAN.md adelgazado: la tabla
   D1–D7 ahora apunta a los ADRs (dueños del porqué), §2.2 apunta al SQL, F0/F1 cerradas, F2
-  delega al ROADMAP, costos refrescados (~$7–8/mes con InstaPods).
+  delega al ROADMAP, costos refrescados (~$7–8/mes con InstaPods) · pasada de integridad:
+  diagrama y etapas canónicas de PLAN al estado ADR-009 (destino = Airtable, heat v1,
+  traducción literal), estructura real del repo en §2.3, dependencia C2→B1 explícita en
+  ROADMAP, y **one-pager v2** con la visión aprobada (la v1 presentada quedó en git).
 - **Decisiones de la sesión:** formato del script flexible (Doc = default, lo innegociable es el
   link) · reach no existe en scrapers → proxy `engagement_rate` (en la fórmula) · voces = registros
   de Airtable editables por el equipo cuando quieran · equipo de redes se llama **Majo y Jero**.

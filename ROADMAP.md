@@ -71,7 +71,7 @@ flag_viral (seguidores > ~700K): marca, NO altera el score ni excluye
 min_likes/min_views del proyecto: ponderan hacia abajo, NO cortan
 ```
 
-Pesos iniciales razonables, no sagrados: se calibran con datos reales de curación (§5.2).
+Pesos iniciales razonables, no sagrados: se calibran con datos reales de curación (§5, punto 2).
 
 ---
 
@@ -149,7 +149,7 @@ campos ADR-009 + vista "🔥 Seleccionados" · Majo y Jero tienen acceso · A10 
   - **DEDUP:** consultar `processed_items` antes de transcribir; insertar lo nuevo con su `idioma` al final (`Prefer: resolution=ignore-duplicates`).
   - **SCOREAR:** heat-score v1 (fórmula de §1) — ordenar caliente→frío, tomar `top_n`; `flag_viral` marca.
   - **TRANSCRIBIR + TRADUCIR** *(reemplaza GENERAR)*: Supadata transcribe; Claude detecta idioma y **traduce literal al español solo si hace falta** — sin reescribir, sin embellecer. En español = transcripción tal cual (sin llamada de traducción).
-  - **LINK:** crear el destino del script (default: un Google Doc — título + link original + script; formato flexible, ver §1.4) → guardar URL como `link_doc`.
+  - **LINK:** crear el destino del script (default: un Google Doc — título + link original + script; formato flexible, ver §1 punto 4) → guardar URL como `link_doc`.
   - **ENTREGAR:** candidatos a Airtable `Candidatos` (estado `nuevo`, con `idioma` + `link_doc`, batch 10/call) + registro Supabase (`runs`/`outputs`/`processed_items`, patrón [ingesta-registro](./core/contracts/ingesta-registro.md)). En `outputs.metadata`: proyecto, voz, referente, url_referente, link_doc, idioma, métricas, heat_score, calificacion.
 - [ ] **B4.** Credenciales en n8n: Apify ×2, Anthropic, Supadata, Airtable (PAT), Supabase
       Registro (service_role), Google Docs/Sheets (OAuth).
@@ -158,7 +158,7 @@ campos ADR-009 + vista "🔥 Seleccionados" · Majo y Jero tienen acceso · A10 
 **Hecho cuando:** una corrida manual de backfill (180 días) deja candidatos en Airtable con
 script en español, `idioma` y `link_doc` funcionales, y su rastro completo en Supabase.
 
-### Carril C — Curación e histórico · 👤 Dev 3 · ~2–3 h *(tras A10; paralelo a B3)*
+### Carril C — Curación e histórico · 👤 Dev 3 · ~2–3 h *(C1 arranca ya; C2 necesita A10 + B1 — corre en la misma instancia n8n)*
 
 - [ ] **C1. Sheet "Histórico":** crear el Google Sheet del histórico de seleccionados (columnas =
       `v_historico_seleccionados`: `FECHA CALIFICACION · PROYECTO · VOZ · TITULO · URL ORIGINAL ·

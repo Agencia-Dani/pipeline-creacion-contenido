@@ -112,6 +112,7 @@ El repo se mantiene a propósito con **pocos documentos, cada uno con un dueño 
 | **[ROADMAP.md](./ROADMAP.md)** | ¿Qué pidió el jefe (el norte) y cómo se ejecuta cada task? Milestones + checklist del MVP de reels | El manual del MVP |
 | **[PLAN.md](./PLAN.md)** | ¿Cómo está diseñado el sistema? Arquitectura, invariantes (§2.5), decisiones, costos, fases post-MVP | Antes de tocar `core/` o decidir algo estructural |
 | **[docs/adr/](./docs/adr/README.md)** | ¿Por qué se decidió así? Una decisión por archivo, con alternativas descartadas | Antes de revertir o re-discutir una decisión |
+| **[docs/one-pager-reels-mvp.md](./docs/one-pager-reels-mvp.md)** | ¿Qué estamos tratando de conseguir? La visión aprobada del MVP en una página, no técnica | Para no perder el norte / hablar con el jefe |
 | **[core/contracts/](./core/contracts/)** | Las especificaciones exactas: manifest de workflow, ingesta al registro, cockpit de Airtable, schemas de datos | Al implementar |
 | **[docs/transcripciones/](./docs/transcripciones/)** | Las fuentes crudas de las decisiones de producto | Para verificar qué se dijo de verdad |
 | `Workflows/<wf>/README.md` | Cómo funciona ese workflow por dentro | Al trabajar en ese workflow |
