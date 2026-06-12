@@ -2,12 +2,22 @@
 
 > El checklist ejecutable de la etapa F2 ([PLAN.md §5](../../PLAN.md)). Marca `[x]` al avanzar.
 >
-> **Trabajo a dos personas (2026-06-12):** los carriles **A (registro central)** y **B (workflow
-> de reels)** son paralelos por diseño — el registro nunca es dependencia de ejecución
-> (ADR-002/D6): si A se atrasa, B llega igual hasta la corrida sin registro. Hay un solo punto
-> de sincronización, marcado 🔗. La convergencia y la activación se hacen juntos.
+> **Trabajo a dos personas (reparto 2026-06-12):** los carriles **A (registro central)** y
+> **B (workflow de reels)** son paralelos por diseño — el registro nunca es dependencia de
+> ejecución (ADR-002/D6): si A se atrasa, B llega igual hasta la corrida sin registro. Hay un
+> solo punto de sincronización, marcado 🔗. La convergencia y la activación se hacen juntos.
 >
-> **Prerequisitos:** cliente real elegido · timezone de los crons confirmada (PLAN.md §3.2).
+> | Línea | Dueño | Por qué | Tiempo |
+> |---|---|---|---|
+> | **Carril A — Registro central** | 👤 **Compañero** | Autocontenido y mecánico (crear proyecto, correr SQL, insertar filas); no depende del cliente ni del jefe | ~45 min |
+> | **Carril B — Workflow en n8n** | 👤 **Mani** | Necesita la config de voz del cliente (B2, criterio + input del jefe) y el remapeo de credenciales | ~1–2 h |
+>
+> *(El reparto es intercambiable: ambos carriles llevan algo de skill técnico. Lo que NO se mueve
+> es que B2 —voz y guiones few-shot del cliente— lo decide quien conoce al cliente.)*
+>
+> **Prerequisitos (gating, los resuelve Mani con el jefe — bloquean la activación D1, no el montaje):**
+> cliente real elegido · timezone de los crons confirmada · lista final de filtros del formulario
+> (PLAN.md §3.2, MEJORAS.md §5).
 
 ---
 
@@ -22,7 +32,7 @@
       `Workflows/workflow-short-form-content/dist/` (valida config, resuelve placeholders,
       verifica la expresión del nodo Claude; NUNCA toca secretos).
 
-## Carril A — Registro central en Supabase · ~45 min
+## Carril A — Registro central en Supabase · 👤 Compañero · ~45 min
 
 - [ ] **A1.** Crear cuenta/proyecto en [supabase.com](https://supabase.com) (free tier, nombre
       sugerido: `pipeline-contenido`).
@@ -37,7 +47,7 @@
       `clients/<cliente>/short-form-content.yaml`) y la service_role key **por el gestor de
       contraseñas** (va en la credencial de n8n, jamás en el repo).
 
-## Carril B — Workflow de reels montado en n8n · ~1–2 h
+## Carril B — Workflow de reels montado en n8n · 👤 Mani · ~1–2 h
 
 - [ ] **B1.** Crear cuenta en **InstaPods** (recomendado — $3/mes, SSH incluido; alternativa
       PikaPods $3.80/mes) y levantar la app n8n. Confirmar que la persistencia está incluida.
