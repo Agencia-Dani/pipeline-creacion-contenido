@@ -1,0 +1,70 @@
+# Config PILOTO del workflow short-form-content — para validar el end-to-end del Carril B.
+# Voz de prueba (nicho IA/productividad). La voz se cambia después regenerando el deploy.
+# ⚠️ Antes de B3 (deploy), Mani reemplaza los 3 campos marcados con 👉 (Sheet + email).
+# Sin secretos, jamás.
+
+cliente: piloto                   # slug del cliente (== nombre de la carpeta)
+
+# --- Identidad y voz (lo más importante para la calidad del guion) ---
+nombre_cliente: "Creador piloto de IA y productividad"
+descripcion_credenciales: "Consultor que ayuda a profesionales y equipos a adoptar IA en su día a día; explica herramientas complejas en lenguaje simple y accionable."
+frase_credencial: "Soy quien te ahorra horas enseñándote a usar la IA sin volverte técnico."
+guiones_ejemplo: |
+  GUION 1 — Tutorial de herramienta
+  ¿Sabías que puedes ahorrar 5 horas a la semana con una sola herramienta de IA? Te muestro cómo.
+  Entra a la herramienta, conecta tu correo y en dos minutos ya tienes tu primer flujo corriendo solo.
+  Lo mejor es que no necesitas saber programar: todo es arrastrar y soltar.
+  Si esto te sirvió, sígueme que cada semana te traigo una herramienta nueva.
+
+  GUION 2 — Tip de productividad
+  Deja de copiar y pegar entre apps como si fuera 2015. Te explico cómo automatizarlo en 3 pasos.
+  Primero identificas la tarea que repites todos los días. Segundo, la conectas con un asistente de IA.
+  Tercero, la dejas corriendo y te olvidas. Eso es trabajar con cabeza, no con fuerza.
+  Guárdate este video para cuando lo vayas a montar.
+
+  GUION 3 — Caso de uso
+  Un equipo de ventas estaba perdiendo 10 horas semanales escribiendo correos de seguimiento.
+  Les monté un agente de IA que los redacta solo con el contexto de cada cliente.
+  Resultado: esas 10 horas ahora se van en cerrar negocios, no en escribir.
+  La IA no te reemplaza, te quita lo aburrido. Sígueme para más casos reales.
+tratamiento: "tú"
+registro: "coloquial"
+pais_acento: "Colombia"
+muletillas_permitidas: []
+cliches_a_evitar: ["la inteligencia artificial llegó para quedarse", "en este mundo cambiante"]
+palabras_propias: []
+cta: "Sígueme para aprender a usar la IA sin volverte técnico"
+
+# --- Fuentes a monitorear ---
+# ⚠️ Cuentas/hashtags de muestra del nicho — confirmá que estén activas antes de correr
+# (handles inexistentes = scrape vacío). Cambialas por las que conozcas del nicho real.
+cuentas_ig: ["midudev", "platzi", "andresbilbao"]
+hashtags_tiktok: ["inteligenciaartificial", "productividad", "iaparanegocios"]
+temas: ["inteligencia artificial", "productividad", "automatizacion", "herramientas de IA", "negocios"]
+
+# --- Filtro viral (defaults del cliente; el formulario los sobreescribe por corrida) ---
+# Para la corrida de prueba podés bajar los umbrales si el nicho no tiene posts tan grandes.
+min_likes: 10000
+min_views: 100000
+min_seguidores: 500000
+top_n: 25
+dias_recencia: 0                  # solo contenido de los últimos N días (0 = sin límite)
+
+# --- Volúmenes de colecta (Apify) ---
+ig_results_limit: 12              # posts a colectar por cuenta de IG
+tt_results_limit: 60              # videos a colectar por hashtag de TikTok
+
+# --- Categorías (DEBEN coincidir en el prompt de Claude y el parser — el deploy las inyecta en ambos) ---
+categorias: ["Tutorial de herramienta", "Caso de uso", "Noticia de IA", "Tip de productividad", "Reflexion"]
+
+# --- Destinos ---
+nombre_agencia: "30X"
+google_sheet_id: "1AFDHEwYYm_GtlBjBw17MYL0_B42z3g4PbicutnKG560"   # ID extraído del link del Sheet
+sheet_nombre: "Piloto Reels"
+sheet_pestana: "BENCHMARKGRABAR"                            # pestaña con los encabezados exactos del README
+nombre_editor: "Mani"
+email_destinatario: "manuel.mejia@30x.com"             # 👉 Mani: tu correo para el resumen
+
+# --- Registro central (vacío = el workflow corre pero no reporta a Supabase; se llena tras Carril A) ---
+supabase_url: ""                  # https://<proyecto>.supabase.co — SIN key (la key vive en n8n)
+instance_id: ""                   # uuid de la instancia (Carril A, paso A4)
