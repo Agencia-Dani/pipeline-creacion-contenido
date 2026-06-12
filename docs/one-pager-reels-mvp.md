@@ -2,6 +2,13 @@
 
 > **Para:** Andrés · **De:** Mani · **Fecha:** 2026-06 · **Pide:** visto bueno + 2 confirmaciones.
 > Versión no técnica; los términos de máquina van *(entre paréntesis)* por si interesan.
+>
+> ✅ **Resultado (2026-06-12): visto bueno DADO, con ajustes.** El paso 4 cambió: los guiones
+> **no se reescriben con IA** — son la **transcripción literal del video, traducida al español**
+> si hace falta; además: prioridad a creadores en otros idiomas, histórico de selecciones
+> exportable a Sheets, y un Google Doc por script. La dirección vigente es
+> [ROADMAP §1](../ROADMAP.md) ([ADR-009](./adr/ADR-009-scripts-literales-y-aprendizaje-en-scoring.md));
+> este doc queda como registro de lo presentado.
 
 ---
 
@@ -33,7 +40,7 @@ No es "buscar referentes a mano cada vez". Es un **banco de conocimiento que se 
 
 4. **Escribe varios guiones candidatos** *(con IA, Claude, en la voz elegida)* — no uno, **muchos**.
 
-5. **El equipo elige los que sirven** *(Mamo y Jero califican en el tablero)*. De esas elecciones
+5. **El equipo elige los que sirven** *(Majo y Jero califican en el tablero)*. De esas elecciones
    el sistema **aprende qué priorizar y cómo escribir mejor** la próxima vez.
 
 ---

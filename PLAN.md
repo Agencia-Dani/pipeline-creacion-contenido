@@ -1,12 +1,13 @@
 # Plan de ejecución — Pipeline Central de Creación de Contenido
 
-> **Qué es este documento:** el plan concreto y por etapas para construir el pipeline central,
-> derivado del diagnóstico completo del repo (2026-06-11) y de las decisiones tomadas con Mani.
-> El [README](./README.md) da la visión; el [system-blueprint](./system-blueprint.md) da el método;
-> este plan da el **orden de ejecución**. Si el plan y la realidad se contradicen, gana la realidad:
-> se actualiza el plan.
+> **Qué es este documento:** el diseño del sistema y el plan por etapas del pipeline central.
+> El [README](./README.md) da la visión y el mapa de documentos; el [ROADMAP](./ROADMAP.md) da
+> la ejecución del MVP de reels (la prioridad actual); este plan da la arquitectura, los
+> invariantes y el **orden de las fases**. Si el plan y la realidad se contradicen, gana la
+> realidad: se actualiza el plan.
 >
-> **Estado:** aprobado en diseño · pendiente validación de presupuesto con el jefe (ver §3.2).
+> **Estado:** aprobado en diseño · MVP de reels con visto bueno (2026-06-12) · pendiente
+> validación de presupuesto con el jefe (ver §3.2).
 
 ---
 
@@ -17,8 +18,7 @@ Lo que existe hoy en el repo:
 | Pieza | Qué es | Estado |
 |---|---|---|
 | `README.md` | Visión del sistema central | ✅ Escrito |
-| `system-blueprint.md` | Plantilla de diseño (10 principios, 14 secciones) | ⬜ Sin llenar — se llena en F0 |
-| `Workflows/workflow-short-form-content/` | **Máquina**: workflow n8n (21 nodos, JSON importable). Cron semanal + formulario bajo demanda → Apify (IG+TikTok) → filtro parametrizado top-N (M1–M3 de MEJORAS.md aplicadas 2026-06-12) → Supadata transcribe → Claude escribe guiones en voz del cliente → Google Sheets (guion + métricas) + email con filtros | ✅ Funcional como plantilla · ❌ **no hosteado** · placeholders `<<...>>` por cliente |
+| `Workflows/workflow-short-form-content/` | **Máquina**: workflow n8n (21 nodos, JSON importable). Cron semanal + formulario bajo demanda → Apify (IG+TikTok) → filtro parametrizado top-N → Supadata transcribe → Claude escribe guiones en voz del cliente → Google Sheets (guion + métricas) + email con filtros. *El rework ADR-009 (ROADMAP, carril B) cambia generación y destinos.* | ✅ Funcional como plantilla · ❌ **no hosteado** · placeholders `<<...>>` por cliente |
 | `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) · ❌ **hoy inactivo** — se re-monta en F3 |
 
 > **Estado operativo (2026-06-11):** ninguno de los dos workflows está sirviendo hoy. La puesta
@@ -82,7 +82,7 @@ se entera. **El registro central es un sumidero adicional, nunca una dependencia
 | C5 | **Capa de visibilidad** | Dashboard solo-lectura + resumen push para el jefe | Looker Studio o Metabase + workflow de resumen |
 | C6 | **Observabilidad y alertas** | Saber que corrió, cuánto costó, y enterarse de una falla antes que el cliente (heartbeat: "el cron del lunes no corrió") | registro central + workflow de alertas |
 | C7 | **Plantillas y scaffolding** | Que agregar workflow/cliente N+1 sea clonar-y-configurar, con validación automatizada del contrato | `core/templates/` + script validador |
-| C8 | **Documentación viva** | Blueprint lleno, ADRs, runbooks por workflow | `system-blueprint.md` + `docs/` |
+| C8 | **Documentación viva** | Invariantes (§2.5), ADRs con su porqué, checklists ejecutables | este PLAN + `docs/adr/` + `ROADMAP.md` |
 | C9 | **Entrada bajo demanda (dispatcher)** | Formulario simple (no técnico) que dispara corridas con filtros — cliente, plataforma, hashtags, tema, mínimos de views/likes/seguidores — y las rutea al workflow correspondiente | workflow interno de n8n (se construye en F5) |
 
 ### 2.2 Modelo de datos del registro (v0 — SQL real: `core/schema/001_registro_inicial.sql`)
@@ -111,12 +111,12 @@ aunque hoy haya un solo cliente (decisión D3).
 
 ```
 pipeline-creacion-contenido/
-├── README.md                  ← visión (existe)
-├── PLAN.md                    ← este documento
-├── system-blueprint.md        ← se llena en F0 (deja de ser plantilla vacía)
+├── README.md                  ← visión + mapa de documentos
+├── PLAN.md                    ← este documento (diseño + fases)
+├── ROADMAP.md                 ← ejecución del MVP de reels (norte + checklist)
 ├── docs/
 │   ├── adr/                   ← ADR-001..N (decisiones con su porqué)
-│   └── runbooks/              ← cómo operar/arrancar/arreglar cada pieza
+│   └── transcripciones/       ← fuentes de decisiones (conversaciones con el jefe)
 ├── core/                      ← EL NÚCLEO: solo cambia con ADR
 │   ├── contracts/             ← schema del workflow.yaml + schemas de datos
 │   ├── schema/                ← SQL de Supabase, versionado
@@ -161,6 +161,32 @@ Dos consecuencias de diseño:
    generar guion de reel y borrador de newsletter. Esto deja abierta la convergencia hacia un
    motor único (decisión D7) sin comprometerla hoy.
 
+### 2.5 Invariantes del diseño (no-negociables — confirmados con Mani 2026-06-11)
+
+Los que nunca se doblan; toda decisión nueva se chequea contra esta lista:
+
+1. **Aislamiento de fallos:** la caída de un workflow — o del registro central — nunca detiene a
+   los demás. **El registro es sumidero de datos, jamás dependencia de ejecución.**
+2. **Lo que el equipo no técnico toca es no-code e imposible de romper** (Airtable, Sheets,
+   formularios, vistas de solo lectura).
+3. **Agregar un workflow o cliente N+1 no toca el núcleo** (`core/`): solo plantilla + config.
+   Las unidades de extensión: un *cliente* = carpeta en `clients/` · un *workflow* = carpeta en
+   `Workflows/` con manifest · una *fuente* = un adaptador que produce `content_item`.
+4. **Ningún dato de un cliente se mezcla con otro** — separados por `client` desde el día 1.
+5. **Ningún secreto en git** — keys y tokens viven en los motores; en el repo solo placeholders.
+   El validador (`core/scripts/validate.mjs`) lo hace cumplir, junto con el contrato del manifest.
+6. **Toda corrida queda registrada** (éxito o fallo) con trazabilidad corrida → output → fuente.
+7. **El refactor nunca rompe un workflow operativo** (descriptivo primero, intrusivo después).
+
+**Una sola fuente de verdad por cada cosa:** la *config* vive en el repo (`clients/`,
+`workflow.yaml`); el *historial* en Supabase; el *espacio de trabajo* en el destino nativo de
+cada workflow (Airtable/Sheets/Notion). Ningún dato con dos dueños.
+
+**Límites conocidos (cuándo repensar):** Supabase free (500 MB, pausa por inactividad) → upgrade
+o Postgres en VPS · n8n managed single-instance → suficiente hasta decenas de clientes; después
+VPS (fase 2 de D5) · Apify/scrapers = la dependencia más frágil · OpenClaw no se orquesta desde
+afuera (humano en el loop por diseño).
+
 ---
 
 ## 3. Decisiones
@@ -173,11 +199,11 @@ Dos consecuencias de diseño:
 | D2 | **Supabase (Postgres) como registro central** de runs/outputs; Sheets/Notion se mantienen como destinos nativos | DB real con SQL, API REST lista (fácil desde n8n), free tier $0, habilita dashboards/queries; el registro es sink adicional, no dependencia | Notion como DB central (queries/dashboards limitados, rate limits) · Sheets central (sin schema, frágil) |
 | D3 | **Multi-cliente desde el día 1** en modelo de datos y config | Retrofittear `client` después es caro; tenerlo ahora cuesta casi nada; el wf de reels ya es "una copia por cliente" | Modelar solo la agencia y migrar después |
 | D4 | **Interfaz del jefe: simple.** Dashboard solo-lectura + resumen push (email/Telegram). Notion curado queda como extensión futura, no se construye ahora | Jefe no técnico: necesita ver outputs y estado sin poder romper nada; herramientas existentes, cero UI custom | Construir web app propia · Notion como UI obligatoria |
-| D5 | **Hosting del wf de reels: n8n managed (fase 1)** según [HOSTING.md](./Workflows/workflow-short-form-content/HOSTING.md) — se eleva a decisión del sistema | Ya investigado y decidido ahí: ~$4/mes, sin administrar servidor, suficiente para el volumen; VPS Hetzner como fase 2 si escala | n8n Cloud ($24/mes) · reescribir a script · Make/Zapier |
+| D5 | **Hosting del wf de reels: n8n managed (fase 1)** ([ADR-005](./docs/adr/ADR-005-hosting-n8n-managed-fase1.md)) | Ya investigado y decidido ahí: ~$4/mes, sin administrar servidor, suficiente para el volumen; VPS Hetzner como fase 2 si escala | n8n Cloud ($24/mes) · reescribir a script · Make/Zapier |
 | D6 | **El pipeline central es plano de datos, no un "workflow padre".** No hay orquestador único que dispare a los demás: cada workflow corre en su motor con su propio trigger y reporta al registro. El *dispatcher* de entrada bajo demanda (C9) es un componente opcional dentro de n8n, no el centro del sistema | Un workflow maestro es un punto único de falla (viola el no-negociable de aislamiento: si el padre se rompe, nada corre) y no puede manejar el bot de OpenClaw (conversacional, humano en el loop). La unificación real ocurre en los datos (registro) y en el contrato, no en la ejecución | Workflow padre en n8n/Zapier con un nodo de entrada que rutea a cada workflow hijo |
 | D7 | **Convergencia gradual hacia un motor de research único — dirección, no compromiso.** Las costuras se diseñan ya (adaptadores de fuente en COLECTAR, perfiles de output en GENERAR, §2.4); la unificación se evalúa después del MVP, usando el workflow de búsqueda bajo demanda (F5) como primer slice del motor común | Los workflows comparten esencia (research → filtro → generación tailored) y difieren sobre todo en fuentes y formato destino; pero fusionarlos hoy es un big-bang que rompe lo probado y choca con el valor diferencial del wf substack (proceso editorial con humano en el loop, no solo fuentes) | Fusionar los dos workflows en uno ahora |
 
-### 3.2 Abiertas (sección 14 del blueprint — bloquean lo que se indica)
+### 3.2 Abiertas (bloquean lo que se indica)
 
 - [ ] **Presupuesto mensual definitivo** — rango tentativo $10–30/mes; el costo fijo proyectado
       es ~$4–5/mes (ver §4), así que no bloquea F0–F2, pero **hay que validarlo con el jefe**
@@ -228,24 +254,25 @@ para tener visibilidad real):
 > primero** (se les pone contrato encima) y solo después intrusivo (se les agrega el reporte
 > al registro) — nunca se rompe lo que ya funciona.
 >
-> **Nota de prioridad (2026-06-12):** el montaje del workflow de reels va primero y por aparte,
-> con sus filtros bajo demanda y un dashboard por-workflow adelantados de F5/F4. El análisis de
-> brechas y el paquete de mejoras (M1–M6) viven en
-> [Workflows/workflow-short-form-content/MEJORAS.md](./Workflows/workflow-short-form-content/MEJORAS.md).
-> Las etapas F2–F5 no cambian de contenido — cambia el orden en que se ejecutan sus piezas.
+> **Nota de prioridad (2026-06-12, visto bueno del jefe):** el MVP de reels va primero y por
+> aparte, con dirección de producto nueva — scripts **literales** (transcripción/traducción, no
+> reescritura en voz), prioridad multiidioma, histórico de selecciones exportable, script
+> linkeado, aprendizaje dirigido al scoring
+> ([ADR-009](./docs/adr/ADR-009-scripts-literales-y-aprendizaje-en-scoring.md)). El norte y la
+> ejecución con los 3 devs viven en [ROADMAP.md](./ROADMAP.md), que manda sobre el orden de F2
+> para el workflow de reels; las fases F3–F6 del pipeline general siguen vigentes después.
 
-### F0 — Fundación de diseño *(en curso)*
-Llenar el blueprint y formalizar decisiones. **Nada de código.**
-- Llenar secciones 1–5 del `system-blueprint.md` (objetivo, usuarios, no-negociables,
-  requerimientos, escalabilidad) — sesión de trabajo Mani + Claude. ✅ borrador listo
-  (pendiente: Mani confirma no-negociables y métricas de éxito).
+### F0 — Fundación de diseño *(✅ completada 2026-06-12)*
+Formalizar el diseño y las decisiones. **Nada de código.**
+- Objetivo, usuarios, no-negociables y escalabilidad definidos (hoy consolidados en §1, §2.5
+  y los ADRs; el system-blueprint de trabajo se retiró al absorberse acá). ✅
 - Escribir ADR-001…007 en `docs/adr/` (las 7 decisiones de §3.1, con alternativas y porqués). ✅
 - Preparar un one-pager para la conversación con el jefe: qué es, qué le da, qué cuesta (§4),
   y qué se le va a pedir: presupuesto, prioridades, **taxonomía de outputs** (qué quiere ver y
   cómo) y **los filtros de búsqueda que necesita** (sus specs de views/likes/suscriptores/reach/
   hashtags/tipo/temas entran acá y alimentan F1 y F5). ✅ `docs/one-pager-jefe.md`
-- **Hecho cuando:** blueprint 1–5 sin `<<...>>` · 7 ADRs escritos · one-pager listo · Mani
-  confirmó no-negociables y métricas de éxito · conversación con el jefe realizada.
+- **Hecho cuando:** invariantes confirmados · ADRs escritos · one-pager presentado ·
+  conversación con el jefe realizada (✅ visto bueno 2026-06-12 — ver ROADMAP §1).
 
 ### F1 — El contrato de workflow *(borrador completo 2026-06-11 — pendiente revisión de Mani y taxonomía con el jefe)*
 La unidad de extensión queda definida y los dos workflows existentes la cumplen *sin tocar su funcionamiento*.
@@ -267,10 +294,10 @@ La unidad de extensión queda definida y los dos workflows existentes la cumplen
 
 ### F2 — Esqueleto que camina: puesta en marcha del workflow de reels + registro central
 La rebanada fina end-to-end: el workflow de reels montado de cero y una corrida real registrada
-centralmente. Checklist ejecutable: [docs/runbooks/f2-puesta-en-marcha.md](./docs/runbooks/f2-puesta-en-marcha.md).
+centralmente. Checklist ejecutable: [ROADMAP.md §3](./ROADMAP.md) (carriles A/B/C).
 - **Montar el workflow de reels** (hoy no opera): levantar n8n managed (InstaPods), importar el
   JSON, cargar credenciales, resolver placeholders con la config del cliente real, corrida
-  manual de prueba (= checklist fase 1 de HOSTING.md).
+  manual de prueba (= carril B del ROADMAP).
 - Crear proyecto Supabase + aplicar `core/schema/001_registro_inicial.sql` (las 5 tablas de §2.2).
 - Agregar al final del wf de reels un nodo HTTP que reporta a Supabase: 1 fila en `runs` +
   N filas en `outputs` (una por guion). Google Sheets sigue funcionando igual.
@@ -321,7 +348,7 @@ dry-run ficticio. Este workflow es además el **primer slice del motor de resear
     filtro de la etapa 3 lee los params de la corrida en vez de umbrales hardcodeados.
   - Output tailored según perfil elegido + registro en Supabase con `runs.params`.
 - Si algún paso de la guía exige "modificar el núcleo", el diseño no está listo — se corrige
-  la guía/el contrato, no se parchea a mano (test del blueprint, sección 5).
+  la guía/el contrato, no se parchea a mano (invariante #3, §2.5).
 - **Hecho cuando:** el jefe lanza una búsqueda filtrada él solo desde el formulario · el
   workflow #3 nació de la plantilla sin tocar `core/` · las guías quedaron corregidas con lo
   aprendido.
@@ -332,9 +359,11 @@ El sistema sobrevive sin Mani en la cabeza.
   modos de falla conocidos (Apify cambia formato, fuente bloqueada, Supabase pausado, TZ mal).
 - Backups: export periódico de workflows n8n al repo + backup del schema/datos de Supabase.
 - Revisión mensual de costos (query sobre `runs.costo_estimado`).
-- Evaluar disparador de fase 2 de hosting (VPS Hetzner) según D5/HOSTING.md.
-- **Hecho cuando:** checklist de salud del blueprint pasa entero, incluido "¿un recién llegado
-  podría operarlo solo con esto?".
+- Evaluar disparador de fase 2 de hosting (VPS Hetzner) según D5/ADR-005.
+- **Hecho cuando:** la prueba de salud pasa entera: ¿§1–§2 siguen siendo verdad? · ¿cada
+  decisión estructural tiene su porqué en un ADR? · ¿sigue siendo barato agregar el N+1? ·
+  ¿los docs reflejan lo que el sistema *realmente* hace? · ¿un recién llegado podría operarlo
+  solo con esto?
 
 ---
 
@@ -361,7 +390,7 @@ El sistema sobrevive sin Mani en la cabeza.
 | OpenClaw (servicio externo, bot semi-autónomo) cambia comportamiento | El workflow de newsletter degrada sin aviso | Playbooks versionados en el repo (ya existen en el kit); log de revisión semanal; el sync de F3 detecta caída de actividad |
 | Supabase free tier pausa el proyecto por inactividad | Registro inaccesible (los workflows siguen — D2) | Actividad semanal real + heartbeat; upgrade documentado como plan B |
 | Secretos en el JSON de n8n / en configs | Filtración de API keys | Convención F1: credenciales solo en n8n/bot, placeholders en git, validador lo verifica |
-| Bus factor: solo Mani entiende el sistema | Insostenible (viola principio #10) | F6 completo + blueprint vivo + ADRs |
+| Bus factor: solo Mani entiende el sistema | Insostenible | F6 completo + PLAN/ROADMAP vivos + ADRs |
 | Crons en TZ equivocada (ya pasó — incidente real documentado en la master guía) | Corridas a horas equivocadas | Validación explícita de TZ en runbooks (ya es práctica del kit; se hereda como convención del sistema) |
 | Costo variable crece con clientes sin que nadie lo vea | Sorpresa en la factura | `costo_estimado` por corrida desde F2 + panel de costos en F4 |
 
@@ -369,7 +398,6 @@ El sistema sobrevive sin Mani en la cabeza.
 
 ## 8. Próximos pasos inmediatos
 
-1. **[Mani + jefe]** Presentar la idea con el one-pager de F0 → validar presupuesto y prioridades.
-2. **[Mani + Claude]** Sesión F0: llenar blueprint secciones 1–5 + escribir los 5 ADRs.
-3. **[Claude]** F1: primer draft del schema `workflow.yaml` + manifests de los dos workflows,
-   para revisión de Mani.
+1. **[los 3 devs]** Ejecutar el [ROADMAP](./ROADMAP.md) del MVP de reels (M0 → activación).
+2. **[Mani + jefe]** Validar presupuesto techo (§3.2) y la voz/proyecto inicial.
+3. **Después del MVP:** retomar F3 (Substack) y F4 (capa del jefe) de este plan.

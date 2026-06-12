@@ -14,6 +14,7 @@
 | [ADR-006](./ADR-006-plano-de-datos-sin-workflow-padre.md) | Pipeline central como plano de datos (sin workflow padre) | Aceptada |
 | [ADR-007](./ADR-007-convergencia-gradual-motor-unico.md) | Convergencia gradual a motor de research único | Aceptada (como dirección) |
 | [ADR-008](./ADR-008-airtable-cockpit-equipo-redes.md) | Airtable como cockpit del equipo de redes (revisa D4) | Aceptada |
+| [ADR-009](./ADR-009-scripts-literales-y-aprendizaje-en-scoring.md) | Scripts literales (transcribir/traducir) y aprendizaje en el scoring (revisa ADR-008) | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

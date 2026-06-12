@@ -1,4 +1,9 @@
 # Manifest — cumple core/contracts/workflow-manifest.md (v1)
+#
+# ⚠️ Este manifest describe el TEMPLATE actual (workflow.json: genera guiones en voz del
+# cliente → Sheets). El rework del MVP (ADR-009 + runbook F2, carril B3) lo cambia: config
+# desde Airtable, GENERAR → transcripción literal + traducción al español, entrega a
+# Airtable + Google Doc por script. El manifest se actualiza al completar el rework.
 contract_version: 1
 
 id: short-form-content
@@ -60,13 +65,12 @@ outputs:
     registered: pending          # se conecta al registro central en F2
 
 runbook:
-  setup: "HOSTING.md (fase 1) + checklist de placeholders del README.md"
+  setup: "ROADMAP carril B (hosting: ADR-005) + checklist de placeholders del README.md"
   start: "Activar el workflow en n8n (cron lunes 8 AM — validar timezone explícitamente)"
   stop: "Desactivar el workflow en n8n"
   test: "Execute Workflow manual; verificar filas en el Sheet + email resumen (+ registro desde F2)"
   docs:
     - README.md
     - CLAUDE.md
-    - HOSTING.md
 
 cost_per_run: "por medir en F2 (Apify x2 actors + ~25 transcripciones Supadata + ~25 llamadas Claude con prompt caching)"

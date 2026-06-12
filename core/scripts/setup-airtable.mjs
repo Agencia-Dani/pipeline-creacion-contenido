@@ -56,8 +56,9 @@ const tables = [
   { name: "Referentes", description: "Banco de perfiles referentes (fuente propia).",
     fields: [txt("handle"), sel("plataforma", "instagram", "tiktok"), num("seguidores"),
              check("flag_viral"), check("activo"), long("notas")] },
-  { name: "Candidatos", description: "Guiones generados a calificar por el equipo.",
-    fields: [txt("titulo"), long("script"), txt("referente"), url("url_referente"),
+  { name: "Candidatos", description: "Scripts (transcripción/traducción literal — ADR-009) a calificar por el equipo.",
+    fields: [txt("titulo"), long("script"), sel("idioma", "es", "en", "pt", "it", "fr", "otro"),
+             url("link_doc"), txt("referente"), url("url_referente"),
              num("views"), num("likes"), num("seguidores"), num("engagement", 1), num("heat_score", 1),
              check("viral_por_tamano"), sel("categoria", "Tutorial", "Caso de uso", "Noticia", "Tip", "Reflexion"),
              sel("calificacion", "🔥", "👍", "👎"),
@@ -86,10 +87,28 @@ const run = async () => {
     });
   }
 
+  // fecha_calificacion: cuándo calificó el equipo (tracking de selecciones — ADR-009).
+  // lastModifiedTime atado SOLO al campo 'calificacion'. Si la API lo rechaza, se crea a mano.
+  try {
+    const cand = base.tables.find((t) => t.name === "Candidatos");
+    const calif = cand.fields.find((f) => f.name === "calificacion");
+    await api("POST", `/bases/${baseId}/tables/${cand.id}/fields`, {
+      name: "fecha_calificacion", type: "lastModifiedTime",
+      options: { referencedFieldIds: [calif.id] },
+    });
+    console.log("→ Campo Candidatos.fecha_calificacion (last modified de 'calificacion')");
+  } catch (e) {
+    console.warn("⚠ No se pudo crear 'fecha_calificacion' por API — crealo a mano en Candidatos:");
+    console.warn("  tipo 'Last modified time' → track solo el campo 'calificacion'. (" + e.message + ")");
+  }
+
   console.log(`\n✅ Cockpit creado.\n   baseId: ${baseId}`);
   console.log("   → Pegá ese baseId en la credencial de Airtable de n8n.");
-  console.log("   → Dale acceso de editor a Mamo y Jero (Share → hasta 5 en el plan free).");
-  console.log("   → Cargá los datos semilla: Proyectos, Voces, Keywords y Referentes iniciales.");
+  console.log("   → Dale acceso de editor a Majo y Jero (Share → hasta 5 en el plan free).");
+  console.log("   → Cargá los datos semilla: Proyectos, Voces, Keywords y Referentes iniciales");
+  console.log("     (incluí referentes en EN/PT/IT/FR — prioridad del jefe, ADR-009).");
+  console.log("   → Creá a mano la vista '🔥 Seleccionados' en Candidatos: filtro estado=aprobado,");
+  console.log("     orden heat_score desc (el re-rank de seleccionados).");
 };
 
 run().catch((e) => { console.error("\n✗ " + e.message); process.exit(1); });

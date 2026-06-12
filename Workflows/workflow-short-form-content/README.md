@@ -146,7 +146,7 @@ espacios finales — los escribe el nodo *Parsear respuesta Claude → columnas 
 `LIKES` · `VISTAS` · `ENGAGEMENT` · `SCORE` · `HASHTAGS`
 
 > `ENGAGEMENT` es numérico (porcentaje sin símbolo, ej: `2.1`). `SCORE` es el ranking del
-> filtro viral. Estas 8 columnas alimentan el dashboard de Looker Studio (M4 de MEJORAS.md).
+> filtro viral. Estas 8 columnas son la materia prima de cualquier dashboard de métricas.
 
 ---
 
@@ -169,7 +169,7 @@ espacios finales — los escribe el nodo *Parsear respuesta Claude → columnas 
 **Camino recomendado (con el pipeline):** llená `clients/<cliente>/short-form-content.yaml` y corré
 `node core/scripts/deploy.mjs <cliente>` — valida la config, resuelve todos los `<<placeholders>>`
 y deja un JSON importable en `dist/`. Después seguí el
-[runbook F2](../../docs/runbooks/f2-puesta-en-marcha.md) (credenciales, Sheet, error workflow).
+[ROADMAP §3](../../ROADMAP.md) (credenciales, Sheet, error workflow).
 
 **Camino manual (sin pipeline):**
 
@@ -183,6 +183,3 @@ y deja un JSON importable en `dist/`. Después seguí el
 
 > Los nodos de ingesta al registro central (*Abrir run / Reportar outputs / Cerrar run*) van con
 > **Continue On Fail**: sin Supabase configurado el workflow corre igual — solo no reporta.
-6. **Búsqueda bajo demanda:** al activar, n8n publica la URL del formulario (nodo *Form —
-   Búsqueda bajo demanda* → Production URL). Compartila con quien pueda pedir búsquedas: campos
-   vacíos usan los defaults del cliente, y el email de resumen dice con qué filtros corrió.

@@ -84,36 +84,38 @@ No son reglas técnicas — son las decisiones de fondo que mantienen el sistema
 - **Optimizado para el que mantiene.** Esto se lee muchas más veces de las que se escribe. Claridad
   antes que inteligencia.
 
-> El detalle completo de estos principios y el método de diseño vive en el **system-blueprint**
-> (plantilla de diseño de sistemas). Este README es la versión de orientación; el blueprint es el
-> documento de trabajo de la planeación.
+> El detalle operativo de estos principios (los no-negociables confirmados) vive en
+> [PLAN.md §2.5](./PLAN.md); el porqué de cada decisión estructural, en `docs/adr/`.
 
 ---
 
 ## Estado actual y qué sigue
 
-**Dónde estamos:** este repo es la semilla. Los dos workflows entran **tal cual están hoy**, cada uno
-en su subfolder, sin reestructurar todavía.
-
-**Qué sigue (planeado, por partes):**
-
-1. **Meter los dos workflows** como subfolders bajo `Workflows/` — tal cual, sin tocarlos.
-2. **Planear la arquitectura** del sistema central en una sesión dedicada, usando el system-blueprint
-   como contrato de diseño. Acá se define la base común: cómo se describe un workflow, dónde vive la
-   config de cliente, dónde viven los resultados.
-3. **Estandarizar** los dos workflows existentes contra esa base, una vez decidida.
-4. **Templatizar** para que sumar el siguiente flujo/cliente sea clonar-y-configurar.
+**Dónde estamos (2026-06-12):** diseño aprobado, decisiones formalizadas (9 ADRs), y el MVP del
+workflow de reels con **visto bueno del jefe** — es la prioridad y se ejecuta entre 3 devs según
+el [ROADMAP](./ROADMAP.md). El pipeline general (Substack, capa del jefe, templatización) sigue
+después, por fases ([PLAN.md §5](./PLAN.md)).
 
 > **Importante:** la estandarización y el refactor se hacen **planeados y por partes**, no de un
-> golpe. Primero entra todo tal cual y funciona; después se reorganiza sobre una base pensada. Un
-> esqueleto que camina antes que una pieza perfecta y desconectada.
+> golpe. Un esqueleto que camina antes que una pieza perfecta y desconectada.
 
 ---
 
-## Cómo orientarte si entrás ahora
+## Mapa de documentos (qué leer para qué)
 
-- **¿Querés entender la visión?** Ya la leíste — es este archivo.
-- **¿Querés entender un workflow puntual?** Entrá a su carpeta en `Workflows/` y leé su README.
-- **¿Vas a planear la arquitectura?** Abrí el system-blueprint y empezá por las secciones 1–5
-  (objetivo, usuarios, no-negociables, requerimientos, escalabilidad). Este README te da el contexto;
-  el blueprint te da el método.
+El repo se mantiene a propósito con **pocos documentos, cada uno con un dueño claro**:
+
+| Documento | Qué responde | Cuándo leerlo |
+|---|---|---|
+| **[README.md](./README.md)** (este) | ¿Qué es esto y por qué existe? | Al entrar al repo |
+| **[HANDOFF.md](./HANDOFF.md)** | ¿En qué va el trabajo y qué task tomo? Tablero vivo + log de avance entre devs | **Antes de cada sesión de trabajo** |
+| **[ROADMAP.md](./ROADMAP.md)** | ¿Qué pidió el jefe (el norte) y cómo se ejecuta cada task? Milestones + checklist del MVP de reels | El manual del MVP |
+| **[PLAN.md](./PLAN.md)** | ¿Cómo está diseñado el sistema? Arquitectura, invariantes (§2.5), decisiones, costos, fases post-MVP | Antes de tocar `core/` o decidir algo estructural |
+| **[docs/adr/](./docs/adr/README.md)** | ¿Por qué se decidió así? Una decisión por archivo, con alternativas descartadas | Antes de revertir o re-discutir una decisión |
+| **[core/contracts/](./core/contracts/)** | Las especificaciones exactas: manifest de workflow, ingesta al registro, cockpit de Airtable, schemas de datos | Al implementar |
+| **[docs/transcripciones/](./docs/transcripciones/)** | Las fuentes crudas de las decisiones de producto | Para verificar qué se dijo de verdad |
+| `Workflows/<wf>/README.md` | Cómo funciona ese workflow por dentro | Al trabajar en ese workflow |
+
+Reglas para que siga siendo liviano: **un hecho, un dueño** (nada se documenta dos veces — se
+linkea) · lo histórico vive en git, no en archivos `*-old` · un doc nuevo solo si ningún dueño
+existente le queda natural.

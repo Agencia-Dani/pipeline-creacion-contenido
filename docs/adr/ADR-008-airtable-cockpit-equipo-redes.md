@@ -2,10 +2,10 @@
 
 - **Estado:** aceptada — 2026-06-12
 - **Contexto:** la conversación con el jefe (2026-06-12) elevó el alcance del workflow de reels.
-  Ya no es "una corrida que escribe ~25 guiones a un Sheet": el **equipo de redes** (Mamo, Jero)
+  Ya no es "una corrida que escribe ~25 guiones a un Sheet": el **equipo de redes** (Majo, Jero)
   debe poder **gestionar referentes, palabras clave y proyectos**, y **calificar** los guiones
   candidatos — y el sistema debe **aprender de esas elecciones** para mejorar (ver
-  [json-reels-tool-spec](../../README.md) y la nota del vault). Esto reabre la decisión D4/ADR-004,
+  [one-pager](../one-pager-reels-mvp.md)). Esto reabre la decisión D4/ADR-004,
   que había **diferido** una UI para el usuario no técnico: ahora una superficie editable para el
   equipo entra al MVP, no como extensión futura.
 - **Decisión:** el equipo de redes opera sobre un **cockpit en Airtable** (plan free):

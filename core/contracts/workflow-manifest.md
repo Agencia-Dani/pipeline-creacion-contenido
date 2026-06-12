@@ -59,7 +59,7 @@ outputs:                          # qué produce cada corrida
     registered: pending           # pending | yes — si ya reporta al registro central (F2/F3)
 
 runbook:                          # cómo se opera (texto corto o link a doc)
-  setup: "Ver HOSTING.md + checklist del README"
+  setup: "Ver ROADMAP/runbook del workflow + checklist del README"
   start: "Activar el workflow en n8n"
   stop: "Desactivar el workflow en n8n"
   test: "Execute Workflow manual; verificar Sheet + registro"
