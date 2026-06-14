@@ -21,8 +21,10 @@
 
 ## Estado en una línea
 
-**2026-06-12** — Fundación lista (diseño, contratos, schemas, scripts). Nada deployado aún:
-Supabase, Airtable y n8n no existen todavía. Arranca la construcción.
+**2026-06-13** — Carril A en curso (Alejo): Supabase con la `service_role`/secret key a mano,
+**base Airtable creada por script** (`baseId appkdNLlN1v6XdKHn`). Faltan 2 pasos manuales en
+Airtable (campo `fecha_calificacion` + vista 🔥), accesos a Majo/Jero, **semillas (A9, en pausa
+hasta definir nicho)** y A10. Motor (B1) lo monta Mani.
 
 ## Tablero de tasks
 
@@ -30,9 +32,9 @@ Supabase, Airtable y n8n no existen todavía. Arranca la construcción.
 |---|---|---|---|---|
 | M0.2 | Cuentas/accesos de cada carril → gestor | — | ⬜ | cada uno la suya |
 | M0.3 | Pedir al jefe la voz/proyecto inicial (no bloquea: se siembra provisional) | — | ⬜ | Mani |
-| A1–A4 | Supabase: proyecto + schemas 001–003 + cliente/instancia | — | ⬜ | Dev 2 |
-| A5–A9 | Airtable: PAT + base por script + vista 🔥 + accesos Majo/Jero + semillas (referentes EN/PT/IT/FR) | — | ⬜ | Dev 2 |
-| A10 | Entregar credenciales/IDs a B y C por el gestor | A1–A9 | ⬜ | Dev 2 |
+| A1–A4 | Supabase: proyecto + schemas 001–003 + cliente/instancia | — | 🔧 | **Alejo** |
+| A5–A9 | Airtable: base creada (`appkdNLlN1v6XdKHn`); faltan campo `fecha_calificacion` + vista 🔥 + accesos Majo/Jero + semillas | — | 🔧 | **Alejo** |
+| A10 | Entregar credenciales/IDs a B y C por el gestor | A1–A9 | ⬜ | **Alejo** |
 | B1 | n8n online en InstaPods + TZ `America/Bogota` | — | 🔧 | **Mani** |
 | B2 | Smoke-test del piloto (`deploy.mjs piloto` → corrida manual) | B1 + keys Apify/Anthropic/Supadata | ⬜ | Mani |
 | B3 | **Rework del motor** (Airtable→dedup→heat v1→transcribe/traduce→link→candidatos) | A10 + B2 | ⬜ | Mani |
@@ -48,6 +50,32 @@ Supabase, Airtable y n8n no existen todavía. Arranca la construcción.
 > El cuello es **A10**: destranca B3/B4 y C2.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-13 — Carril A: Supabase + base Airtable creada *(Alejo + Claude)*
+
+- **Hecho:** ubicada la key de Supabase (ojo: con el renombrado de Supabase, la **publishable**
+  key = vieja `anon` (respeta RLS, NO sirve); la que va a n8n es la **Secret key** `sb_secret_…`
+  = equivalente al `service_role`, o el `service_role` legacy si el proyecto lo tiene) ·
+  **base Airtable "Reels Cockpit" creada** con `setup-airtable.mjs` → **`baseId appkdNLlN1v6XdKHn`**
+  (5 tablas + links OK).
+- **Gotcha confirmado (era riesgo, ahora es hecho):** Airtable **ya no permite crear campos
+  `lastModifiedTime` por API** (`422 UNSUPPORTED_FIELD_TYPE_FOR_CREATE`). El script lo previó y no
+  se cayó. → **`Candidatos.fecha_calificacion` hay que crearlo a mano**: tipo "Last modified time",
+  monitoreando SOLO el campo `calificacion` (si no, ensucia el tracking de selecciones).
+- **Pendiente del carril A (manual, no bloquea a otros carriles salvo A10):**
+  1. Campo `fecha_calificacion` a mano (arriba).
+  2. Vista **"🔥 Seleccionados"** en `Candidatos` (filtro `estado=aprobado`, orden `heat_score` desc).
+  3. **A8** acceso editor a Majo y Jero.
+  4. **A9 semillas EN PAUSA** — el nicho/voz provisional no se definió en sesión; sigue atado a
+     **M0.3** (el jefe no dio voz/proyecto). El piloto usa IA/productividad pero solo con referentes
+     en español → faltan referentes EN/PT/IT/FR (prioridad del jefe). Retomar al sembrar.
+  5. Confirmar que **A2 (schemas 001–003)** y **A4 (cliente/instancia → `instance_id`)** quedaron
+     corridos en Supabase (la sesión no lo verificó).
+  6. **A10** — entregar a Mani (B) y Dev 3 (C) por el gestor: `supabase_url` + secret key +
+     `instance_id` + `baseId` + PAT de Airtable.
+- **Seguridad:** el PAT de Airtable original se expuso en el chat de trabajo → **se debe revocar y
+  regenerar** uno nuevo para n8n (la base ya está creada, el viejo no hace falta). El gestor
+  compartido **sigue sin definirse** (hueco real de M0.2; por ahora Alejo lo guarda local).
 
 ### 2026-06-12 — Fundación: norte del jefe + repo consolidado *(Mani + Claude)*
 
