@@ -1,5 +1,12 @@
 # reelsdetector — plantilla para la agencia de Dani
 
+> ⚠️ **DESACTUALIZADO (2026-06-14).** Este README describe el **template VIEJO** (genera guiones
+> en voz del cliente → Google Sheets + email). El `workflow.json` ya es el **motor reworkeado B3**
+> (ADR-009): config desde Airtable, heat-score v1, transcribir + **traducir literal** (Claude
+> Haiku), entrega a **Airtable** + registro en Supabase, **sin Google**. El estado real está en
+> [workflow.yaml](./workflow.yaml), [CLAUDE.md](./CLAUDE.md) y [ROADMAP §3](../../ROADMAP.md).
+> **Reescribir este README es un pendiente.**
+
 Workflow de **n8n** que detecta automáticamente Reels de Instagram y videos de TikTok virales sobre los temas de un cliente, los transcribe, genera guiones con la **voz del cliente** usando Claude, los registra en Google Sheets y envía un resumen por email.
 
 > **Archivo:** [`workflow.json`](./workflow.json) — importable directamente en n8n (`Workflows → Import from File`).

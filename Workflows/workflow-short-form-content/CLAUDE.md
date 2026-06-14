@@ -1,18 +1,30 @@
 # CLAUDE.md
 
-Guía para trabajar en este repo. Leé también el [README.md](./README.md) (uso y checklist de adaptación).
+Guía para trabajar en este repo. El estado real y los contratos viven en
+[ROADMAP.md](../../ROADMAP.md) + [workflow.yaml](./workflow.yaml). **El [README.md](./README.md)
+todavía describe el template VIEJO (en voz → Sheets) y está pendiente de reescribir.**
 
-## Qué es
+## Qué es (post-rework B3 — ADR-009, 2026-06-14)
 
-Un único workflow de **n8n** (`workflow.json`) con dos entradas — cron lunes 8 AM y un **Form
-Trigger** de búsqueda bajo demanda — que convergen en el nodo *Parámetros de corrida* (defaults
-del cliente; el form los sobreescribe por corrida):
-scrapea Reels de IG + videos de TikTok (Apify) → normaliza y une → filtra top N virales según
-los params (umbrales, temas, hashtags, tipo, recencia, plataformas) → transcribe
-(Supadata/Whisper) → **Claude escribe un guion en la voz de un cliente** → Google Sheets
-(guion + métricas del referente) → email resumen con los filtros usados (Gmail).
+Un único workflow de **n8n** (`workflow.json`) con dos entradas — cron semanal + Execute manual —
+que es el **motor de reels** del MVP: lee la config del equipo en **Airtable** (Proyectos, Voces,
+Keywords, Referentes) → scrapea Reels IG + TikTok (Apify) → normaliza y une → ordena con el
+**heat-score v1** (percentil de views/likes/eng × boosts de tema/idioma/selección) → **dedup**
+contra `processed_items` (Supabase) → top_n por proyecto → transcribe (Supadata) → **traduce
+literal al español con Claude Haiku SOLO si el original no está en español** (si ya está en
+español, el script es la transcripción tal cual) → entrega **candidatos a Airtable** (tabla
+Candidatos, estado `nuevo`) + registra la corrida en **Supabase** (sumidero, continue-on-fail).
+**El motor no usa ninguna credencial de Google.**
 
-Es una **plantilla**: todo lo específico de un cliente está como placeholder `<<...>>`. Pensada para **un cliente/voz por workflow**.
+El equipo de redes (Majo, Jero) **solo toca Airtable**: arma la búsqueda (input), ve el mapa de
+calor (vista 🔥), califica/selecciona scripts. El script se guarda como **campo de texto** (sin
+Google Doc — ver ADR-009 nota 2026-06-14); el "link" es la URL del video original.
+
+> **Construido por script, no a mano.** El rework se generó con un builder Node que carga el JSON,
+> arma nodos por nombre y reescribe con `JSON.stringify`. Para cambios estructurales seguí ese
+> patrón (no edites a mano las expresiones grandes `={{ ... }}`).
+
+Único cliente/voz por copia sigue siendo el modelo; la multi-instancia real es F5.
 
 ## Archivos
 

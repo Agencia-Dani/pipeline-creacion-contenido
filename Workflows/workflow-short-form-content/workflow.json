@@ -1,5 +1,5 @@
 {
-  "name": "Referentes Virales IG & TikTok → <<NOMBRE_AGENCIA>>",
+  "name": "Motor de reels — referentes → candidatos (ADR-009)",
   "nodes": [
     {
       "parameters": {
@@ -15,13 +15,249 @@
           ]
         }
       },
-      "id": "6ea5c1bf-d0b2-45ff-9d27-76428f6758b8",
-      "name": "Trigger — Lunes 8am",
+      "id": "cron-semanal",
+      "name": "Cron — semanal (lunes 8am)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
       "position": [
-        10208,
-        2128
+        0,
+        240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ejecutar-manual",
+      "name": "Ejecutar manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "airtable_base_id",
+              "value": "<<AIRTABLE_BASE_ID>>",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "supabase_url",
+              "value": "<<SUPABASE_URL>>",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "instance_id",
+              "value": "<<INSTANCE_ID>>",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "ig_results_limit",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "c5",
+              "name": "tt_results_limit",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "c6",
+              "name": "peso_views",
+              "value": 0.4,
+              "type": "number"
+            },
+            {
+              "id": "c7",
+              "name": "peso_likes",
+              "value": 0.4,
+              "type": "number"
+            },
+            {
+              "id": "c8",
+              "name": "peso_eng",
+              "value": 0.2,
+              "type": "number"
+            },
+            {
+              "id": "c9",
+              "name": "boost_tema",
+              "value": 0.5,
+              "type": "number"
+            },
+            {
+              "id": "c10",
+              "name": "boost_idioma",
+              "value": 0.3,
+              "type": "number"
+            },
+            {
+              "id": "c11",
+              "name": "umbral_viral",
+              "value": 700000,
+              "type": "number"
+            },
+            {
+              "id": "c12",
+              "name": "top_n_fallback",
+              "value": 25,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Proyectos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "{activo}"
+            }
+          ]
+        }
+      },
+      "id": "leer-proyectos",
+      "name": "Leer Proyectos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        400
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Voces' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "leer-voces",
+      "name": "Leer Voces",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        400
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Keywords' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "{activo}"
+            }
+          ]
+        }
+      },
+      "id": "leer-keywords",
+      "name": "Leer Keywords",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        400
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "{activo}"
+            }
+          ]
+        }
+      },
+      "id": "leer-referentes",
+      "name": "Leer Referentes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        400
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst recs = (n) => { const r = $(n).first().json; return (r && r.records) || []; };\nconst proyectos = recs('Leer Proyectos');\nconst voces = recs('Leer Voces');\nconst keywords = recs('Leer Keywords');\nconst referentes = recs('Leer Referentes');\n\nconst vozById = {};\nvoces.forEach(v => { vozById[v.id] = (v.fields && v.fields.nombre) || ''; });\n\nconst projects = {};\nproyectos.forEach(p => {\n  const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = {\n    id: p.id, nombre: f.nombre || '',\n    voz_id: vozId, voz_nombre: vozId && vozById[vozId] ? vozById[vozId] : '',\n    min_likes: Number(f.min_likes || 0), min_views: Number(f.min_views || 0),\n    dias_recencia: Number(f.dias_recencia || 0), top_n: Number(f.top_n || 0),\n    keywords: [], ig_handles: [], tt_handles: []\n  };\n});\nkeywords.forEach(k => {\n  const f = k.fields || {}; const proy = Array.isArray(f.proyecto) ? f.proyecto[0] : null;\n  if (proy && projects[proy] && f.termino) projects[proy].keywords.push(String(f.termino).trim());\n});\nreferentes.forEach(r => {\n  const f = r.fields || {}; const proy = Array.isArray(f.proyecto) ? f.proyecto[0] : null;\n  const handle = String(f.handle || '').trim().replace(/^@/, '');\n  if (!proy || !projects[proy] || !handle) return;\n  const plat = String(f.plataforma || '').toLowerCase();\n  if (plat.indexOf('insta') >= 0) projects[proy].ig_handles.push(handle);\n  else if (plat.indexOf('tik') >= 0) projects[proy].tt_handles.push(handle);\n});\n\nconst ig_urls = []; const ig_owner_to_proj = {};\nconst tt_hashtags = []; const kw_to_proj = {};\nObject.values(projects).forEach(p => {\n  p.ig_handles.forEach(h => { ig_urls.push('https://www.instagram.com/' + h + '/'); ig_owner_to_proj[h.toLowerCase()] = p.id; });\n  p.keywords.forEach(k => { const kk = k.replace(/^#/, '').toLowerCase(); tt_hashtags.push(kk); (kw_to_proj[kk] = kw_to_proj[kk] || []).push(p.id); });\n});\n\nreturn [{ json: {\n  projects, ig_urls: [...new Set(ig_urls)], tt_hashtags: [...new Set(tt_hashtags)],\n  ig_owner_to_proj, kw_to_proj, active_project_ids: Object.keys(projects)\n} }];\n"
+      },
+      "id": "armar-plan-de-corrida",
+      "name": "Armar plan de corrida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        400
       ]
     },
     {
@@ -39,19 +275,21 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"directUrls\": [\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_1>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_2>>/\",\n    \"https://www.instagram.com/<<CUENTA_REFERENTE_IG_3>>/\"\n  ],\n  \"resultsType\": \"posts\",\n  \"resultsLimit\": {{ $json.ig_results_limit }},\n  \"searchType\": \"user\",\n  \"searchLimit\": 1,\n  \"addParentData\": true\n}",
+        "jsonBody": "={{ { directUrls: $('Armar plan de corrida').first().json.ig_urls, resultsType: 'posts', resultsLimit: $('Config').first().json.ig_results_limit, searchType: 'user', searchLimit: 1, addParentData: true } }}",
         "options": {
           "timeout": 120000
         }
       },
-      "id": "e1bc3aba-8e81-4148-9bc8-8334354b9164",
-      "name": "Apify — Scrape IG Reels",
+      "id": "apify-ig-reels",
+      "name": "Apify — IG Reels",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        10688,
-        2096
-      ]
+        1960,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -68,47 +306,179 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"hashtags\": [\n    \"<<HASHTAG_1>>\",\n    \"<<HASHTAG_2>>\",\n    \"<<HASHTAG_3>>\"\n  ],\n  \"resultsPerPage\": {{ $json.tt_results_limit }},\n  \"shouldDownloadVideos\": false,\n  \"shouldDownloadCovers\": false\n}",
+        "jsonBody": "={{ { hashtags: $('Armar plan de corrida').first().json.tt_hashtags, resultsPerPage: $('Config').first().json.tt_results_limit, shouldDownloadVideos: false, shouldDownloadCovers: false } }}",
         "options": {
           "timeout": 120000
         }
       },
-      "id": "698bfe99-8ff8-4b8d-9059-fe8633c312d8",
-      "name": "Apify — Scrape TikTok",
+      "id": "apify-tiktok",
+      "name": "Apify — TikTok",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        10688,
-        2288
-      ]
+        2240,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
-        "mode": "combine",
-        "combinationMode": "mergeByPosition",
-        "options": {}
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst item = $input.item.json;\nconst seguidores = item.ownerFollowersCount || item.ownerFollowerCount || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.ownerBio || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.timestamp ? new Date(Number(item.timestamp) * 1000).toISOString().split('T')[0] : ''\n} };\n"
       },
-      "id": "2a1f3c55-5e92-4e77-a08c-105f7a32dbe2",
-      "name": "Merge IG + TikTok",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
-      "position": [
-        11136,
-        2208
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Descargar el audio del video para enviarlo a Groq Whisper\n// Groq acepta URLs públicas directas o base64.\n// Este nodo prepara la URL del video y la pasa al siguiente paso.\n// Si la URL no es descargable directamente (IG/TT requieren auth),\n// usamos el caption como fallback y lo marcamos.\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const d = item.json;\n\n  // Determinar si tenemos URL descargable real\n  const hasDirectVideo = d.video_url &&\n    d.video_url !== d.url &&\n    (d.video_url.includes('.mp4') || d.video_url.includes('download') || d.video_url.includes('video'));\n\n  results.push({ json: {\n    ...d,\n    has_direct_video: hasDirectVideo,\n    transcripcion_fallback: d.caption  // Si no hay video descargable, usamos caption\n  }});\n}\n\nreturn results;"
-      },
-      "id": "92903fb8-747b-4c47-b1c7-871e887feb79",
-      "name": "Preparar para transcripción",
+      "id": "normalizar-ig",
+      "name": "Normalizar IG",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        11584,
-        2208
+        2520,
+        400
       ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst item = $input.item.json;\nconst am = item.authorMeta || {};\nconst seguidores = am.fans || 0;\nreturn { json: {\n  plataforma: 'tiktok',\n  external_id: String(item.id || ''),\n  username: am.name || '',\n  nombre: am.nickName || '',\n  seguidores,\n  bio: am.signature || '',\n  descripcion: item.text || item.desc || '',\n  likes: item.diggCount || 0,\n  comentarios: item.commentCount || 0,\n  reproducciones: item.playCount || 0,\n  url: item.webVideoUrl || '',\n  video_url: item.webVideoUrl || '',\n  hashtags: (item.hashtags || []).map(function (h) { return h.name || h; }).join(', '),\n  duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n  engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : ''\n} };\n"
+      },
+      "id": "normalizar-tt",
+      "name": "Normalizar TT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "merge-scrapes",
+      "name": "Merge scrapes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        3080,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst plan = $('Armar plan de corrida').first().json;\nconst projects = plan.projects, ig_owner = plan.ig_owner_to_proj, kw = plan.kw_to_proj;\nconst activeIds = plan.active_project_ids || [];\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  if (!d.url) continue;\n  let proyId = null;\n  if ((d.plataforma || '') === 'instagram') {\n    const u = String(d.username || '').toLowerCase().replace(/^@/, '');\n    if (ig_owner[u]) proyId = ig_owner[u];\n  } else if ((d.plataforma || '') === 'tiktok') {\n    const tags = String(d.hashtags || '').toLowerCase().split(',').map(s => s.trim().replace(/^#/, '')).filter(Boolean);\n    for (const t of tags) { if (kw[t]) { proyId = kw[t][0]; break; } }\n  }\n  if (!proyId && activeIds.length === 1) proyId = activeIds[0];\n  if (!proyId || !projects[proyId]) continue;\n  const p = projects[proyId];\n  out.push({ json: Object.assign({}, d, {\n    proyecto_id: proyId, proyecto_nombre: p.nombre, voz_id: p.voz_id, voz_nombre: p.voz_nombre,\n    _top_n: p.top_n, _keywords: p.keywords\n  }) });\n}\nreturn out;\n"
+      },
+      "id": "asignar-proyecto-voz",
+      "name": "Asignar proyecto+voz",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,idioma,tasa_seleccion' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "leer-se-al-selecci-n",
+      "name": "Leer señal selección",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3640,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items?select=external_id,platform&limit=20000' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "leer-procesados",
+      "name": "Leer procesados",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3920,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cfg = $('Config').first().json;\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Asignar proyecto+voz').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais ']\n};\nconst guessLang = (txt) => {\n  const t = ' ' + norm(txt) + ' '; let best = 'es', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  return bestN === 0 ? 'es' : best;\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const kws = (d._keywords || []).map(norm).filter(Boolean);\n    const txt = norm(' ' + (d.descripcion || '') + ' ' + (d.hashtags || '') + ' ');\n    const tema = kws.length && kws.some(k => txt.indexOf(k) >= 0) ? Number(cfg.boost_tema || 0.5) : 0;\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const sel = signal[(d.username || '') + '|' + idioma] || 0;\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + tema) * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)));\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  const topn = Number((arr[0] && arr[0]._top_n) || cfg.top_n_fallback || 25);\n  fresh.slice(0, topn).forEach(d => out.push({ json: d }));\n}\nreturn out;\n"
+      },
+      "id": "heat-score-v1",
+      "name": "Heat-score v1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.supadata.ai/v1/transcript?url={{ encodeURIComponent($json.video_url || $json.url) }}&text=true&mode=auto",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "<SUPADATA_API_KEY>"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "supadata-transcribir",
+      "name": "Supadata — transcribir",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4480,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -116,13 +486,70 @@
         "combinationMode": "mergeByPosition",
         "options": {}
       },
-      "id": "acf07214-4a1f-422b-a0dc-398c4e95674b",
-      "name": "Merge — datos + transcripción",
+      "id": "merge-transcripcion",
+      "name": "Merge transcripción",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        12032,
-        2208
+        4760,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  let txt = (typeof d.content === 'string' && d.content) || (typeof d.text === 'string' && d.text) || d.transcripcion || '';\n  txt = String(txt || '').trim();\n  let lang = String(d.lang || d.language || '').toLowerCase().slice(0, 2);\n  if (!lang) lang = d.idioma_guess || 'es';\n  out.push({ json: Object.assign({}, d, { transcripcion: txt.substring(0, 6000), idioma_detectado: lang }) });\n}\nreturn out;\n"
+      },
+      "id": "parsear-transcripci-n",
+      "name": "Parsear transcripción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-es",
+              "leftValue": "={{ $json.idioma_detectado }}",
+              "rightValue": "es",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "if-espanol",
+      "name": "IF — ya está en español",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5320,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn $input.all().map(i => ({ json: Object.assign({}, i.json, { script: i.json.transcripcion, idioma: i.json.idioma_detectado }) }));\n"
+      },
+      "id": "script-desde-transcripci-n",
+      "name": "Script desde transcripción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5600,
+        400
       ]
     },
     {
@@ -148,333 +575,12 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2000,\n  \"system\": [{ \"type\": \"text\", \"cache_control\": { \"type\": \"ephemeral\" }, \"text\": \"Sos el ghostwriter de <<NOMBRE_DEL_CLIENTE>>, <<DESCRIPCION_Y_CREDENCIALES_DEL_CLIENTE>>.\\n\\nTU ÚNICA TAREA: Leer el referente viral y escribir un script ORIGINAL en la voz exacta de <<NOMBRE_DEL_CLIENTE>>. No traduzcas el referente. Usalo como inspiración de tema y estructura, pero el contenido, los ejemplos y las ideas deben ser propios de <<NOMBRE_DEL_CLIENTE>>.\\n\\n═══════════════════════════════════\\nVOZ Y ESTILO — EJEMPLOS REALES (FEW-SHOT)\\n═══════════════════════════════════\\n<<PEGAR_AQUI_2_A_4_GUIONES_REALES_DEL_CLIENTE>>\\n\\n(Cada ejemplo debe ser un guion REAL del cliente, 100-200 palabras, en su voz exacta. Estos ejemplos son lo que ancla la calidad: reemplazalos por guiones reales antes de activar el workflow. Sin ejemplos reales, la calidad cae mucho.)\\n\\n═══════════════════════════════════\\nREGLAS OBLIGATORIAS DE ESTILO\\n═══════════════════════════════════\\n1. CREDENCIAL al inicio: <<FRASE_DE_CREDENCIAL_DEL_CLIENTE>> (ej: \\\"Soy X, fundador de Y\\\").\\n2. VOZ: <<TRATAMIENTO: vos / tú / ustedes>>, registro <<COLOQUIAL_O_FORMAL>>, <<PAIS_O_ACENTO>>.\\n3. ESTRUCTURA: Hook con presentación → desarrollo (lista numerada o historia) → CTA final.\\n4. LENGUAJE: <<PALABRAS_O_EXPRESIONES_PROPIAS_DEL_CLIENTE>>. <<MULETILLAS_PERMITIDAS>>.\\n5. EJEMPLOS: concretos, con datos reales y nombres propios cuando aplique.\\n6. RITMO: frases cortas seguidas de frases explicativas más largas. Repetición para énfasis.\\n7. LONGITUD: 150-220 palabras (reel de 45-75 segundos).\\n8. PROHIBIDO: <<CLICHES_A_EVITAR>> (ej: \\\"transformar tu vida\\\", \\\"potencial\\\", \\\"increíble\\\", \\\"épico\\\"). Nada de coach motivacional genérico.\\n9. CTA FIJO al final: <<CTA_DEL_CLIENTE>> (ej: \\\"Seguinos que te contamos...\\\").\\n\\nResponde ÚNICAMENTE con JSON válido. Sin texto antes ni después. Sin backticks.\" }],\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": `Referente viral a analizar:\\n\\nPlataforma: ${$json.plataforma}\\nURL: ${$json.url}\\nAutor original: ${$json.autor}\\nLikes: ${$json.likes} | Vistas: ${$json.vistas}\\nDuración: ${$json.duracion_seg} segundos\\nCaption: ${$json.caption}\\nTranscripción del video: ${$json.transcripcion}\\n\\nEscribí el script de <<NOMBRE_DEL_CLIENTE>> y devolvé este JSON exacto:\\n{\\n  \"titulo_contexto\": \"tema en minúsculas, máx 7 palabras\",\\n  \"categoria\": \"exactamente una de: <<CATEGORIA_1>> / <<CATEGORIA_2>> / <<CATEGORIA_3>> / <<CATEGORIA_4>> / <<CATEGORIA_5>>\",\\n  \"script\": \"el script completo listo para grabar. Hook con presentación + desarrollo + CTA. 150-220 palabras. Voz exacta de <<NOMBRE_DEL_CLIENTE>>.\",\\n  \"hook\": \"solo la primera frase del script, la que abre el video\",\\n  \"formato\": \"uno de: Talking Head / Lista / Historia / Dato Impactante / Comparación\",\\n  \"duracion_estimada\": \"corto 15-30s / medio 30-60s / largo 60-90s\",\\n  \"dificultad\": \"Fácil / Media / Difícil\"\\n}`\n  }]\n} }}",
-        "options": {
-          "timeout": 60000
-        }
-      },
-      "id": "966f9119-b7e7-4588-9c77-4b7c8ece07e4",
-      "name": "Claude — Agente escritor voz cliente",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        12704,
-        2016
-      ],
-      "notes": "System prompt con prompt caching (cache_control ephemeral) — el bloque de voz/few-shot es idéntico en los 25 ítems, así que se cachea y ahorra ~90% de tokens de entrada del ítem 2 en adelante. Modelo: claude-sonnet-4-6."
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  try {\n    const raw = item.json.content?.[0]?.text || '{}';\n    const clean = raw\n      .replace(/^```json\\s*/i, '')\n      .replace(/^```\\s*/i, '')\n      .replace(/\\s*```$/i, '')\n      .trim();\n    const ai = JSON.parse(clean);\n    const ref = $('Preservar datos referente').item.json;\n\n    const CATS = ['<<CATEGORIA_1>>', '<<CATEGORIA_2>>', '<<CATEGORIA_3>>', '<<CATEGORIA_4>>', '<<CATEGORIA_5>>'];\n    const categoria = CATS.includes(ai.categoria) ? ai.categoria : '<<CATEGORIA_1>>';\n\n    results.push({ json: {\n      \"TITULO (contexto)\":                    ai.titulo_contexto || '',\n      \"🎯 ENLACE DE REFERENTE\":               ref.url || '',\n      \"FORMATO\":                              ai.formato || '',\n      \"DIFICULTAD\":                           ai.dificultad || '',\n      \"CATEGORIAS\":                           categoria,\n      \"SCRIPT\":                               ai.script || '',\n      \"DURACION\":                             ai.duracion_estimada || '',\n      \"FECHA DE PUBLICACION DE REFERENTE\":    ref.fecha_ref || '',\n      \"🗂️ STATUS\":                            'HACER GUION',\n      \"FECHA ULTIMA REVISIÓN\":                $now.toISO().split('T')[0],\n      \"EDITOR\":                               '<<NOMBRE_DEL_EDITOR>>',\n      \"COMENTARIOS\":                          `Hook: ${ai.hook || ''}`,\n      \"PLATAFORMA\":                           ref.plataforma || '',\n      \"AUTOR\":                                ref.autor || '',\n      \"SEGUIDORES\":                           Number(ref.seguidores || 0),\n      \"LIKES\":                                Number(ref.likes || 0),\n      \"VISTAS\":                               Number(ref.vistas || 0),\n      \"ENGAGEMENT\":                           Number(ref.engagement || 0),\n      \"SCORE\":                                Number(ref.score || 0),\n      \"HASHTAGS\":                             ref.hashtags || ''\n    }});\n  } catch(e) {\n    console.error('Error:', e.message, '| Raw:', item.json.content?.[0]?.text?.substring(0, 200));\n  }\n}\n\nreturn results;\n"
-      },
-      "id": "92074333-e24f-4e79-839a-1fe16c11b80c",
-      "name": "Parsear respuesta Claude → columnas Sheet",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        12928,
-        2016
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "<<GOOGLE_SHEET_ID>>",
-          "mode": "list",
-          "cachedResultName": "<<NOMBRE_DEL_SHEET>>",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/<<GOOGLE_SHEET_ID>>/edit"
-        },
-        "sheetName": {
-          "value": "<<PESTAÑA_DEL_SHEET>>",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "TITULO (contexto)": "={{ $json['TITULO (contexto)'] }}",
-            "🎯 ENLACE DE REFERENTE": "={{ $json['🎯 ENLACE DE REFERENTE'] }}",
-            "FORMATO": "={{ $json.FORMATO }}",
-            "DIFICULTAD": "={{ $json.DIFICULTAD }}",
-            "CATEGORIAS": "={{ $json.CATEGORIAS }}",
-            "SCRIPT": "={{ $json.SCRIPT }}",
-            "DURACION": "={{ $json.DURACION }}",
-            "FECHA DE PUBLICACION DE REFERENTE": "={{ $json['FECHA DE PUBLICACION DE REFERENTE'] }}",
-            "🗂️ STATUS": "={{ $json['🗂️ STATUS'] }}",
-            "FECHA ULTIMA REVISIÓN": "={{ $json['FECHA ULTIMA REVISIÓN'] }}",
-            "EDITOR": "={{ $json.EDITOR }}",
-            "COMENTARIOS": "={{ $json.COMENTARIOS }}",
-            "PLATAFORMA": "={{ $json.PLATAFORMA }}",
-            "AUTOR": "={{ $json.AUTOR }}",
-            "SEGUIDORES": "={{ $json.SEGUIDORES }}",
-            "LIKES": "={{ $json.LIKES }}",
-            "VISTAS": "={{ $json.VISTAS }}",
-            "ENGAGEMENT": "={{ $json.ENGAGEMENT }}",
-            "SCORE": "={{ $json.SCORE }}",
-            "HASHTAGS": "={{ $json.HASHTAGS }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "TITULO (contexto)",
-              "displayName": "TITULO (contexto)",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "🎯 ENLACE DE REFERENTE",
-              "displayName": "🎯 ENLACE DE REFERENTE",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "FORMATO",
-              "displayName": "FORMATO",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "DIFICULTAD",
-              "displayName": "DIFICULTAD",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "CATEGORIAS",
-              "displayName": "CATEGORIAS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "SCRIPT",
-              "displayName": "SCRIPT",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "DURACION",
-              "displayName": "DURACION",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "FECHA DE PUBLICACION DE REFERENTE",
-              "displayName": "FECHA DE PUBLICACION DE REFERENTE",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "🗂️ STATUS",
-              "displayName": "🗂️ STATUS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "FECHA ULTIMA REVISIÓN",
-              "displayName": "FECHA ULTIMA REVISIÓN",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "EDITOR",
-              "displayName": "EDITOR",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "COMENTARIOS",
-              "displayName": "COMENTARIOS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "PLATAFORMA",
-              "displayName": "PLATAFORMA",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "AUTOR",
-              "displayName": "AUTOR",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "SEGUIDORES",
-              "displayName": "SEGUIDORES",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "LIKES",
-              "displayName": "LIKES",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "VISTAS",
-              "displayName": "VISTAS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "ENGAGEMENT",
-              "displayName": "ENGAGEMENT",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "SCORE",
-              "displayName": "SCORE",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "HASHTAGS",
-              "displayName": "HASHTAGS",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "id": "9194343b-85d0-486b-8210-4d84ba0fe1fb",
-      "name": "Google Sheets — BENCHMARKGRABAR",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "position": [
-        13152,
-        2016
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HFCyeToXJrmt6pI9",
-          "name": "<<CREDENCIAL_GOOGLE_SHEETS>>"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const total = $input.all().length;\nconst p = $('Parámetros de corrida').first().json;\nconsole.log(`✅ Flujo de <<NOMBRE_AGENCIA>> completado. ${total} referentes procesados y escritos en BENCHMARKGRABAR.`);\nreturn [{ json: {\n  total: total,\n  fecha: new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),\n  origen: p.origen === 'formulario' ? 'búsqueda desde el formulario' : 'corrida programada (cron)',\n  filtros: p.resumen_filtros,\n  sheet: 'https://docs.google.com/spreadsheets/d/<<GOOGLE_SHEET_ID>>'\n}}];\n"
-      },
-      "id": "07cddbe0-b548-4e17-ba58-d7595e368713",
-      "name": "Resumen ejecución",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        12480,
-        2208
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const item = $input.item.json;\nconst seguidores = item.ownerFollowersCount || item.ownerFollowerCount || 0;\n\nconst hoy = $now.toISO().split('T')[0];\n\nconst fechaPublicacion = (() => {\n  if (!item.timestamp) return '';\n  const ts = Number(item.timestamp);\n  if (isNaN(ts) || ts <= 0) return '';\n  const d = new Date(ts * 1000);\n  if (isNaN(d.getTime())) return '';\n  return d.toISOString().split('T')[0];\n})();\n\nreturn {\n  json: {\n    plataforma: 'instagram',\n    username: item.ownerUsername || '',\n    nombre: item.ownerFullName || '',\n    seguidores: seguidores,\n    bio: item.ownerBio || '',\n    descripcion: item.caption || '',\n    likes: item.likesCount || 0,\n    comentarios: item.commentsCount || 0,\n    reproducciones: item.videoViewCount || 0,\n    url: item.url || '',\n    perfil_url: 'https://instagram.com/' + (item.ownerUsername || ''),\n    hashtags: (item.hashtags || []).join(', '),\n    duracion_video: item.videoDuration || 0,\n    is_video: item.isVideo || false,\n    tipo_post: item.type || 'Image',\n    engagement_rate: seguidores > 0\n      ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) + '%'\n      : '0%',\n    fecha_publicacion: fechaPublicacion,\n    fecha: hoy\n  }\n};"
-      },
-      "id": "79003e6f-4e86-4e45-b106-1194a35161d5",
-      "name": "Normalizar IG1",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        10912,
-        2096
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const item = $input.item.json;\nconst seguidores = item.authorMeta ? (item.authorMeta.fans || 0) : 0;\nreturn {\n  json: {\n    plataforma: 'tiktok',\n    username: item.authorMeta ? (item.authorMeta.name || '') : '',\n    nombre: item.authorMeta ? (item.authorMeta.nickName || '') : '',\n    seguidores: seguidores,\n    bio: item.authorMeta ? (item.authorMeta.signature || '') : '',\n    descripcion: item.text || item.desc || '',\n    likes: item.diggCount || 0,\n    comentarios: item.commentCount || 0,\n    reproducciones: item.playCount || 0,\n    url: item.webVideoUrl || '',\n    perfil_url: 'https://tiktok.com/@' + (item.authorMeta ? (item.authorMeta.name || '') : ''),\n    hashtags: (item.hashtags || []).map(function(h) { return h.name || h; }).join(', '),\n    duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n    is_video: true,\n    tipo_post: 'Video',\n    engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) + '%' : '0%',\n    fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : '',\n    fecha: new Date().toISOString()\n  }\n};"
-      },
-      "id": "08091267-b665-4eda-9a5b-6bee27a48dfd",
-      "name": "Normalizar TT1",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        10912,
-        2288
-      ]
-    },
-    {
-      "parameters": {
-        "url": "=https://api.supadata.ai/v1/transcript?url={{ encodeURIComponent($json.video_url || $json.url) }}&lang=es&text=true&mode=auto",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "<SUPADATA_API_KEY>"
-            }
-          ]
-        },
+        "jsonBody": "={{ { \"model\": \"claude-haiku-4-5\", \"max_tokens\": 2000, \"system\": \"Sos un traductor literal. Traduci el texto al espanol neutro de forma fiel y literal: sin reescribir, sin resumir, sin embellecer, sin agregar ni quitar nada; conserva el sentido y el orden. Devolve UNICAMENTE el texto traducido, sin comillas ni comentarios.\", \"messages\": [{ \"role\": \"user\", \"content\": String($json.transcripcion || \"\").substring(0, 6000) }] } }}",
         "options": {
           "batching": {
             "batch": {
               "batchSize": 1,
-              "batchInterval": 2000
+              "batchInterval": 1000
             }
           },
           "response": {
@@ -482,377 +588,142 @@
               "neverError": true
             }
           },
-          "timeout": 90000
+          "timeout": 60000
         }
       },
-      "id": "6c5f07e1-39fc-40d2-86f7-bc05263c0d82",
-      "name": "Supadata Whisper — Transcribir audio",
+      "id": "claude-haiku-traducir",
+      "name": "Claude Haiku — traducir",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        11808,
-        2096
+        5880,
+        400
       ],
-      "notes": "Transcripción vía Supadata (Whisper). Español. API key en el placeholder <SUPADATA_API_KEY> o en una credencial de n8n."
-    },
-    {
-      "parameters": {
-        "jsCode": "// Combinar transcripción con datos del referente\n// Prioridad: 1) Supadata response.text, 2) fallback transcripcion field, 3) caption\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  \n  let transcripcion = '';\n  \n  // 1. Check if Supadata returned a successful response with text field\n  if (data?.text && typeof data.text === 'string' && data.text.length > 20) {\n    transcripcion = data.text;\n    console.log('Using Supadata transcription for:', data.url || data.video_url);\n  }\n  // 2. Check if fallback node set transcripcion field\n  else if (data?.transcripcion && typeof data.transcripcion === 'string' && data.transcripcion.length > 0) {\n    transcripcion = data.transcripcion;\n    console.log('Using fallback transcripcion for:', data.url || data.video_url);\n  }\n  // 3. Final fallback to caption\n  else if (data?.caption) {\n    transcripcion = data.caption;\n    console.log('Using caption as final fallback for:', data.url || data.video_url);\n  }\n  else {\n    transcripcion = 'Sin transcripción disponible';\n    console.log('No transcription available for:', data.url || data.video_url);\n  }\n\n  results.push({ json: {\n    ...data,\n    transcripcion: transcripcion.substring(0, 4000)\n  }});\n}\n\nreturn results;"
-      },
-      "id": "dd6dfb3e-f484-4cf6-b29b-300ab14cafa2",
-      "name": "Parsear transcripción Supadata",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        11808,
-        2288
-      ]
-    },
-    {
-      "parameters": {
-        "amount": 13
-      },
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        13376,
-        2192
-      ],
-      "id": "41950f5a-3756-4eca-b976-468e7c6cb030",
-      "name": "Wait",
-      "webhookId": "4238d6c7-ee03-48b2-af10-2a574c216b5c"
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        12256,
-        2208
-      ],
-      "id": "c1ba7676-7ab9-4c35-9b1e-616f1e396eb4",
-      "name": "Loop Over Items"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "id-1",
-              "name": "url",
-              "value": "={{ $json.url }}",
-              "type": "string"
-            },
-            {
-              "id": "id-2",
-              "name": "plataforma",
-              "value": "={{ $json.plataforma }}",
-              "type": "string"
-            },
-            {
-              "id": "id-3",
-              "name": "autor",
-              "value": "={{ $json.autor }}",
-              "type": "string"
-            },
-            {
-              "id": "id-4",
-              "name": "likes",
-              "value": "={{ $json.likes }}",
-              "type": "number"
-            },
-            {
-              "id": "id-5",
-              "name": "vistas",
-              "value": "={{ $json.vistas }}",
-              "type": "number"
-            },
-            {
-              "id": "id-6",
-              "name": "score",
-              "value": "={{ $json.score }}",
-              "type": "number"
-            },
-            {
-              "id": "id-7",
-              "name": "fecha_ref",
-              "value": "={{ $json.fecha_ref }}",
-              "type": "string"
-            },
-            {
-              "id": "id-8",
-              "name": "duracion_seg",
-              "value": "={{ $json.duracion_seg }}",
-              "type": "number"
-            },
-            {
-              "id": "id-9",
-              "name": "caption",
-              "value": "={{ $json.caption }}",
-              "type": "string"
-            },
-            {
-              "id": "id-10",
-              "name": "transcripcion",
-              "value": "={{ $json.transcripcion }}",
-              "type": "string"
-            },
-            {
-              "id": "id-11",
-              "name": "nombre",
-              "value": "={{ $json.nombre }}",
-              "type": "string"
-            },
-            {
-              "id": "id-12",
-              "name": "seguidores",
-              "value": "={{ $json.seguidores }}",
-              "type": "number"
-            },
-            {
-              "id": "id-13",
-              "name": "engagement",
-              "value": "={{ $json.engagement }}",
-              "type": "number"
-            },
-            {
-              "id": "id-14",
-              "name": "hashtags",
-              "value": "={{ $json.hashtags }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "73d3e1f8-ef87-4034-b654-f1260573e1c2",
-      "name": "Preservar datos referente",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        12480,
-        2016
-      ]
-    },
-    {
-      "parameters": {
-        "sendTo": "<<EMAIL_DESTINATARIO>>",
-        "subject": "=<<NOMBRE_AGENCIA>> — {{ $json.total }} referentes con script listos en el Benchmark",
-        "emailType": "text",
-        "message": "=Hola, el flujo de referentes ya corrió — {{ $json.origen }}, {{ $json.fecha }}.\n\nFiltros de esta corrida:\n{{ $json.filtros }}\n\n{{ $json.total }} guiones listos en el Benchmark: {{ $json.sheet }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.2,
-      "position": [
-        12688,
-        2208
-      ],
-      "id": "b59329e9-1ef6-4eb7-b322-aa184c4b54d3",
-      "name": "Send a message",
-      "webhookId": "ba35d8ff-c79a-408c-a65d-1553410c723d",
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "d16clE6QqFjmlH8E",
-          "name": "<<CREDENCIAL_GMAIL>>"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Lee los parámetros de la corrida (cron = defaults del cliente; formulario = lo elegido ahí).\nconst p = $('Parámetros de corrida').first().json;\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n\nconst TEMAS = (p.temas || []).map(norm).filter(Boolean);\nconst HASHTAGS = (p.hashtags || []).map(h => norm(h).replace(/^#/, '')).filter(Boolean);\nconst TIPOS = p.tipos_contenido || [];\nconst PLATAFORMAS = (p.plataformas && p.plataformas.length) ? p.plataformas.map(norm) : ['instagram', 'tiktok'];\nconst ahora = Date.now();\nconst maxEdadMs = (Number(p.dias_recencia) || 0) * 86400000;\n\nconst filtered = $input.all()\n  .map(item => {\n    const d = item.json;\n    if (!d.url) return null;\n\n    const likes  = Number(d.likes || 0);\n    const vistas = Number(d.reproducciones || 0);\n    const segs   = Number(d.seguidores || 0);\n\n    if (!PLATAFORMAS.includes(norm(d.plataforma))) return null;\n\n    // viral: pasa si supera AL MENOS UNO de los umbrales\n    if (!(likes >= p.min_likes || vistas >= p.min_views || segs >= p.min_seguidores)) return null;\n\n    // temas (lista vacía = sin filtro de tema)\n    const txt = norm(' ' + (d.descripcion || '') + ' ' + (d.hashtags || '') + ' ');\n    if (TEMAS.length && !TEMAS.some(t => txt.includes(t))) return null;\n\n    // hashtags específicos (intersección con los del item)\n    if (HASHTAGS.length) {\n      const propios = norm(d.hashtags || '').split(',').map(h => h.trim().replace(/^#/, '')).filter(Boolean);\n      if (!HASHTAGS.some(h => propios.includes(h))) return null;\n    }\n\n    // tipo de contenido: short (video ≤ 90 s) | video | imagen\n    if (TIPOS.length) {\n      const dur = Number(d.duracion_video || 0);\n      const esVideo = !!d.is_video || d.tipo_post === 'Video';\n      const ok = TIPOS.some(t =>\n        (t === 'short'  && esVideo && dur > 0 && dur <= 90) ||\n        (t === 'video'  && esVideo) ||\n        (t === 'imagen' && !esVideo));\n      if (!ok) return null;\n    }\n\n    // recencia\n    if (maxEdadMs > 0) {\n      const f = Date.parse(d.fecha_publicacion || '');\n      if (!Number.isFinite(f) || (ahora - f) > maxEdadMs) return null;\n    }\n\n    return { json: {\n      plataforma: d.plataforma || '',\n      url: d.url,\n      video_url: d.url,\n      autor: d.username || '',\n      nombre: d.nombre || '',\n      seguidores: segs,\n      likes,\n      vistas,\n      engagement: parseFloat(d.engagement_rate) || 0,\n      duracion_seg: Number(d.duracion_video || 0),\n      caption: (d.descripcion || '').substring(0, 800),\n      hashtags: d.hashtags || '',\n      fecha_ref: d.fecha_publicacion || '',\n      score: likes + Math.floor(vistas / 10) + Math.floor(segs / 1000)\n    }};\n  })\n  .filter(Boolean)\n  .sort((a, b) => b.json.score - a.json.score)\n  .slice(0, Number(p.top_n) || 25);\n\nreturn filtered;\n"
-      },
-      "id": "a1951ec0-37cb-4e5f-9846-4f1204cc5af2",
-      "name": "Filtrar referentes virales — top N",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        11360,
-        2208
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Convergencia de triggers (cron + formulario): arma los parámetros de ESTA corrida.\n// Defaults del cliente vía placeholders <<...>>; si la corrida vino del formulario,\n// lo elegido ahí los sobreescribe SOLO para esta corrida.\nconst j = $input.first().json;\n\nconst num = (v, fb) => {\n  if (v === '' || v === null || v === undefined) return fb;\n  if (String(v).includes('<<')) return fb;\n  const n = Number(v);\n  return Number.isFinite(n) ? n : fb;\n};\nconst lista = (v) => String(v || '').split(',').map(s => s.trim()).filter(s => s && !s.includes('<<'));\n\nconst DEFAULTS = {\n  plataformas:      ['instagram', 'tiktok'],\n  min_likes:        num('<<MIN_LIKES>>', 10000),\n  min_views:        num('<<MIN_VIEWS>>', 100000),\n  min_seguidores:   num('<<MIN_SEGUIDORES>>', 500000),\n  temas:            lista('<<TEMA_1>>,<<TEMA_2>>,<<TEMA_3>>,<<TEMA_4>>,<<TEMA_5>>'),\n  hashtags:         [],            // [] = sin filtro de hashtags\n  tipos_contenido:  [],            // [] = cualquier tipo\n  dias_recencia:    num('<<DIAS_RECENCIA>>', 0),   // 0 = sin límite de fecha\n  top_n:            num('<<TOP_N>>', 25),\n  ig_results_limit: num('<<IG_RESULTS_LIMIT>>', 12),\n  tt_results_limit: num('<<TT_RESULTS_LIMIT>>', 60)\n};\n\nconst esForm = j.submittedAt !== undefined;\nconst p = { ...DEFAULTS, origen: esForm ? 'formulario' : 'cron' };\n\nif (esForm) {\n  const PLAT = { 'Ambas': ['instagram', 'tiktok'], 'Solo Instagram': ['instagram'], 'Solo TikTok': ['tiktok'] };\n  const TIPO = { 'Cualquiera': [], 'Short-form (video ≤ 90 s)': ['short'], 'Video': ['video'], 'Imagen / carrusel': ['imagen'] };\n  if (PLAT[j['Plataformas']]) p.plataformas = PLAT[j['Plataformas']];\n  p.min_likes      = num(j['Mínimo de likes'], p.min_likes);\n  p.min_views      = num(j['Mínimo de views'], p.min_views);\n  p.min_seguidores = num(j['Mínimo de seguidores'], p.min_seguidores);\n  const temasForm = lista(j['Temas (separados por coma)']);\n  if (temasForm.includes('*')) p.temas = [];        // '*' = buscar sin filtro de tema\n  else if (temasForm.length) p.temas = temasForm;\n  p.hashtags = lista(j['Hashtags (separados por coma)']).map(h => h.replace(/^#/, '').toLowerCase());\n  if (TIPO[j['Tipo de contenido']]) p.tipos_contenido = TIPO[j['Tipo de contenido']];\n  p.dias_recencia = num(j['Recencia (días)'], p.dias_recencia);\n  p.top_n         = num(j['Cuántos referentes (top N)'], p.top_n);\n}\n\np.resumen_filtros = [\n  'Plataformas: ' + p.plataformas.join(', '),\n  'Mínimos — likes: ' + p.min_likes + ' · views: ' + p.min_views + ' · seguidores: ' + p.min_seguidores,\n  'Temas: ' + (p.temas.length ? p.temas.join(', ') : 'sin filtro'),\n  'Hashtags: ' + (p.hashtags.length ? p.hashtags.join(', ') : 'sin filtro'),\n  'Tipo de contenido: ' + (p.tipos_contenido.length ? p.tipos_contenido.join(', ') : 'cualquiera'),\n  'Recencia: ' + (p.dias_recencia > 0 ? 'últimos ' + p.dias_recencia + ' días' : 'sin límite'),\n  'Top N: ' + p.top_n\n].join('\\n');\n\nreturn [{ json: p }];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        10464,
-        2208
-      ],
-      "id": "426e626b-7f49-4afc-96ae-ee8ea3b7bc74",
-      "name": "Parámetros de corrida"
-    },
-    {
-      "parameters": {
-        "formTitle": "Búsqueda de referentes bajo demanda",
-        "formDescription": "Lanza una corrida del detector con tus propios filtros. Todo campo vacío usa el default del cliente.",
-        "formFields": {
-          "values": [
-            {
-              "fieldLabel": "Plataformas",
-              "fieldType": "dropdown",
-              "fieldOptions": {
-                "values": [
-                  {
-                    "option": "Ambas"
-                  },
-                  {
-                    "option": "Solo Instagram"
-                  },
-                  {
-                    "option": "Solo TikTok"
-                  }
-                ]
-              }
-            },
-            {
-              "fieldLabel": "Mínimo de likes",
-              "fieldType": "number",
-              "placeholder": "vacío = default del cliente"
-            },
-            {
-              "fieldLabel": "Mínimo de views",
-              "fieldType": "number",
-              "placeholder": "vacío = default del cliente"
-            },
-            {
-              "fieldLabel": "Mínimo de seguidores",
-              "fieldType": "number",
-              "placeholder": "vacío = default del cliente"
-            },
-            {
-              "fieldLabel": "Temas (separados por coma)",
-              "fieldType": "text",
-              "placeholder": "vacío = temas del cliente · * = sin filtro de tema"
-            },
-            {
-              "fieldLabel": "Hashtags (separados por coma)",
-              "fieldType": "text",
-              "placeholder": "vacío = sin filtro de hashtag"
-            },
-            {
-              "fieldLabel": "Tipo de contenido",
-              "fieldType": "dropdown",
-              "fieldOptions": {
-                "values": [
-                  {
-                    "option": "Cualquiera"
-                  },
-                  {
-                    "option": "Short-form (video ≤ 90 s)"
-                  },
-                  {
-                    "option": "Video"
-                  },
-                  {
-                    "option": "Imagen / carrusel"
-                  }
-                ]
-              }
-            },
-            {
-              "fieldLabel": "Recencia (días)",
-              "fieldType": "number",
-              "placeholder": "vacío o 0 = sin límite de fecha"
-            },
-            {
-              "fieldLabel": "Cuántos referentes (top N)",
-              "fieldType": "number",
-              "placeholder": "vacío = default del cliente"
-            }
-          ]
-        },
-        "options": {
-          "appendAttribution": false
-        }
-      },
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.2,
-      "position": [
-        10208,
-        2320
-      ],
-      "id": "51af4d0f-e133-4547-b7f2-ac82035e86d7",
-      "name": "Form — Búsqueda bajo demanda",
-      "webhookId": "a8af1805-b037-45e1-a9b6-543c27562c91"
-    },
-    {
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "id": "774332a8-0b4b-49a5-babf-accdcec49e8e",
       "onError": "continueRegularOutput",
-      "credentials": {
-        "supabaseApi": {
-          "name": "Supabase Registro"
-        }
+      "alwaysOutputData": true,
+      "notes": "Haiku 4.5 (claude-haiku-4-5) como traductor literal. Sin thinking/effort. Solo se llama si el original NO está en español."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
       },
-      "name": "Abrir run en el registro",
+      "id": "merge-traduccion",
+      "name": "Merge traducción",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
       "position": [
-        10688,
-        2480
-      ],
+        6160,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  let tr = '';\n  try { tr = (d.content && Array.isArray(d.content) && d.content[0] && d.content[0].text) || ''; } catch (e) {}\n  tr = String(tr || '').trim();\n  out.push({ json: Object.assign({}, d, { script: tr || d.transcripcion || '', idioma: d.idioma_detectado || d.idioma_guess || '' }) });\n}\nreturn out;\n"
+      },
+      "id": "parsear-traducci-n",
+      "name": "Parsear traducción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "merge-candidatos",
+      "name": "Merge candidatos",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        6720,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || '')\n  } });\n}\nreturn out;\n"
+      },
+      "id": "armar-candidato",
+      "name": "Armar candidato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7000,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
+      },
+      "id": "preparar-batch-airtable",
+      "name": "Preparar batch Airtable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7280,
+        400
+      ]
+    },
+    {
       "parameters": {
         "method": "POST",
-        "url": "=<<SUPABASE_URL>>/rest/v1/runs",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Candidatos' }}",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "supabaseApi",
+        "nodeCredentialType": "airtableTokenApi",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Content-Type",
               "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"instance_id\": \"<<INSTANCE_ID>>\", \"trigger_type\": \"{{ $json.origen === 'formulario' ? 'on_demand' : 'cron' }}\", \"estado\": \"en_curso\", \"params\": {{ JSON.stringify($json) }} }",
+        "jsonBody": "={{ $json }}",
         "options": {
-          "timeout": 15000
-        }
-      }
-    },
-    {
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "cb359dd3-1fb3-46b1-8bc4-a97147467cce",
-      "name": "Preparar reporte de outputs",
-      "position": [
-        12480,
-        2400
-      ],
-      "parameters": {
-        "jsCode": "// Arma el batch de outputs para el registro central (contrato: core/contracts/ingesta-registro.md).\n// Si \"Abrir run\" falló (Supabase caído), run_id queda null: el POST fallará y el flujo sigue —\n// el registro es sumidero, nunca dependencia.\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst outputs = $input.all().map(f => {\n  const d = f.json;\n  return {\n    run_id: run_id,\n    tipo: 'guion_reel',\n    titulo: d['TITULO (contexto)'] || '(sin título)',\n    contenido_o_link: d['SCRIPT'] || '',\n    estado: 'draft',\n    source_items: [{ platform: d['PLATAFORMA'] || '', url: d['🎯 ENLACE DE REFERENTE'] || '' }],\n    metadata: {\n      views: Number(d['VISTAS'] || 0),\n      likes: Number(d['LIKES'] || 0),\n      followers: Number(d['SEGUIDORES'] || 0),\n      engagement: Number(d['ENGAGEMENT'] || 0),\n      score: Number(d['SCORE'] || 0),\n      hashtags: String(d['HASHTAGS'] || '').split(',').map(s => s.trim()).filter(Boolean),\n      categoria: d['CATEGORIAS'] || '',\n      plataforma: d['PLATAFORMA'] || ''\n    }\n  };\n});\n\nreturn [{ json: { run_id: run_id, n: outputs.length, outputs: outputs } }];\n"
-      }
-    },
-    {
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "id": "ed0d88ec-f959-4d2c-973c-fd3ff5a0909e",
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "supabaseApi": {
-          "name": "Supabase Registro"
+          "timeout": 20000
         }
       },
-      "name": "Reportar outputs al registro",
+      "id": "post-airtable-candidatos",
+      "name": "POST Airtable Candidatos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        12704,
-        2400
+        7560,
+        400
       ],
-      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\nconst outputs = $input.all().map(i => {\n  const d = i.json;\n  return {\n    run_id, tipo: 'guion_reel', titulo: d.titulo || '(sin titulo)',\n    contenido_o_link: d.script || '', estado: 'draft',\n    source_items: [{ platform: d.plataforma || '', url: d.url_referente || '' }],\n    metadata: {\n      proyecto: d.proyecto_nombre || '', voz: d.voz_nombre || '', referente: d.referente || '',\n      url_referente: d.url_referente || '', idioma: d.idioma || '',\n      views: d.views || 0, likes: d.likes || 0, seguidores: d.seguidores || 0,\n      engagement: d.engagement || 0, heat_score: d.heat_score || 0, link_doc: ''\n    }\n  };\n});\nreturn [{ json: { run_id, n: outputs.length, outputs } }];\n"
+      },
+      "id": "preparar-outputs-supabase",
+      "name": "Preparar outputs Supabase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7840,
+        400
+      ]
+    },
+    {
       "parameters": {
         "method": "POST",
-        "url": "=<<SUPABASE_URL>>/rest/v1/outputs",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -874,26 +745,26 @@
         "options": {
           "timeout": 15000
         }
-      }
-    },
-    {
+      },
+      "id": "reportar-outputs-al-registro",
+      "name": "Reportar outputs al registro",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "id": "4d3a62ae-4d83-4ec2-9b5b-16fd6470aa46",
+      "position": [
+        8120,
+        400
+      ],
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
           "name": "Supabase Registro"
         }
-      },
-      "name": "Cerrar run en el registro",
-      "position": [
-        12928,
-        2400
-      ],
+      }
+    },
+    {
       "parameters": {
         "method": "PATCH",
-        "url": "=<<SUPABASE_URL>>/rest/v1/runs?id=eq.{{ $('Preparar reporte de outputs').first().json.run_id }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?id=eq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -907,251 +778,151 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"fin\": \"{{ $now.toISO() }}\", \"estado\": \"ok\", \"metricas\": { \"colectados\": {{ $('Merge IG + TikTok').all().length }}, \"filtrados\": {{ $('Filtrar referentes virales — top N').all().length }}, \"outputs\": {{ $('Preparar reporte de outputs').first().json.n }} } }",
+        "jsonBody": "={ \"fin\": \"{{ $now.toISO() }}\", \"estado\": \"ok\", \"metricas\": { \"colectados\": {{ $('Merge scrapes').all().length }}, \"filtrados\": {{ $('Heat-score v1').all().length }}, \"outputs\": {{ $('Preparar outputs Supabase').first().json.n }} } }",
         "options": {
           "timeout": 15000
+        }
+      },
+      "id": "cerrar-run-en-el-registro",
+      "name": "Cerrar run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8400,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cfg = $('Config').first().json;\nconst iid = cfg.instance_id && String(cfg.instance_id).indexOf('<<') < 0 ? cfg.instance_id : null;\nconst batch = $input.all().map(i => {\n  const d = i.json;\n  return {\n    instance_id: iid, platform: d.plataforma || '', external_id: String(d.external_id || ''),\n    url: d.url || '', seguidores: Number(d.seguidores || 0),\n    flag_viral: !!d.viral_por_tamano, idioma: d.idioma_guess || null\n  };\n}).filter(r => r.external_id);\nreturn [{ json: { batch } }];\n"
+      },
+      "id": "preparar-procesados",
+      "name": "Preparar procesados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8680,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.batch) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "post-processed_items",
+      "name": "POST processed_items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8960,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"cron\", \"estado\": \"en_curso\", \"params\": {} }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "abrir-run-en-el-registro",
+      "name": "Abrir run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9240,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
         }
       }
     }
   ],
   "pinData": {},
   "connections": {
-    "Trigger — Lunes 8am": {
+    "Cron — semanal (lunes 8am)": {
       "main": [
         [
           {
-            "node": "Parámetros de corrida",
+            "node": "Config",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Apify — Scrape IG Reels": {
+    "Ejecutar manual": {
       "main": [
         [
           {
-            "node": "Normalizar IG1",
+            "node": "Config",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Apify — Scrape TikTok": {
+    "Config": {
       "main": [
         [
           {
-            "node": "Normalizar TT1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge IG + TikTok": {
-      "main": [
-        [
-          {
-            "node": "Filtrar referentes virales — top N",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preparar para transcripción": {
-      "main": [
-        [
-          {
-            "node": "Supadata Whisper — Transcribir audio",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Parsear transcripción Supadata",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge — datos + transcripción": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parsear respuesta Claude → columnas Sheet": {
-      "main": [
-        [
-          {
-            "node": "Google Sheets — BENCHMARKGRABAR",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Google Sheets — BENCHMARKGRABAR": {
-      "main": [
-        [
-          {
-            "node": "Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Resumen ejecución": {
-      "main": [
-        [
-          {
-            "node": "Send a message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalizar IG1": {
-      "main": [
-        [
-          {
-            "node": "Merge IG + TikTok",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalizar TT1": {
-      "main": [
-        [
-          {
-            "node": "Merge IG + TikTok",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Supadata Whisper — Transcribir audio": {
-      "main": [
-        [
-          {
-            "node": "Merge — datos + transcripción",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parsear transcripción Supadata": {
-      "main": [
-        [
-          {
-            "node": "Merge — datos + transcripción",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Wait": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Loop Over Items": {
-      "main": [
-        [
-          {
-            "node": "Resumen ejecución",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Preparar reporte de outputs",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Preservar datos referente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preservar datos referente": {
-      "main": [
-        [
-          {
-            "node": "Claude — Agente escritor voz cliente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Claude — Agente escritor voz cliente": {
-      "main": [
-        [
-          {
-            "node": "Parsear respuesta Claude → columnas Sheet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filtrar referentes virales — top N": {
-      "main": [
-        [
-          {
-            "node": "Preparar para transcripción",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Form — Búsqueda bajo demanda": {
-      "main": [
-        [
-          {
-            "node": "Parámetros de corrida",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parámetros de corrida": {
-      "main": [
-        [
-          {
-            "node": "Apify — Scrape IG Reels",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Apify — Scrape TikTok",
+            "node": "Leer Proyectos",
             "type": "main",
             "index": 0
           },
@@ -1163,7 +934,314 @@
         ]
       ]
     },
-    "Preparar reporte de outputs": {
+    "Leer Proyectos": {
+      "main": [
+        [
+          {
+            "node": "Leer Voces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Voces": {
+      "main": [
+        [
+          {
+            "node": "Leer Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Keywords": {
+      "main": [
+        [
+          {
+            "node": "Leer Referentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Referentes": {
+      "main": [
+        [
+          {
+            "node": "Armar plan de corrida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar plan de corrida": {
+      "main": [
+        [
+          {
+            "node": "Apify — IG Reels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Apify — TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — IG Reels": {
+      "main": [
+        [
+          {
+            "node": "Normalizar IG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — TikTok": {
+      "main": [
+        [
+          {
+            "node": "Normalizar TT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar IG": {
+      "main": [
+        [
+          {
+            "node": "Merge scrapes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar TT": {
+      "main": [
+        [
+          {
+            "node": "Merge scrapes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge scrapes": {
+      "main": [
+        [
+          {
+            "node": "Asignar proyecto+voz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asignar proyecto+voz": {
+      "main": [
+        [
+          {
+            "node": "Leer señal selección",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer señal selección": {
+      "main": [
+        [
+          {
+            "node": "Leer procesados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer procesados": {
+      "main": [
+        [
+          {
+            "node": "Heat-score v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Heat-score v1": {
+      "main": [
+        [
+          {
+            "node": "Supadata — transcribir",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge transcripción",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Preparar procesados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supadata — transcribir": {
+      "main": [
+        [
+          {
+            "node": "Merge transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge transcripción": {
+      "main": [
+        [
+          {
+            "node": "Parsear transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear transcripción": {
+      "main": [
+        [
+          {
+            "node": "IF — ya está en español",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — ya está en español": {
+      "main": [
+        [
+          {
+            "node": "Script desde transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claude Haiku — traducir",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge traducción",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Claude Haiku — traducir": {
+      "main": [
+        [
+          {
+            "node": "Merge traducción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge traducción": {
+      "main": [
+        [
+          {
+            "node": "Parsear traducción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script desde transcripción": {
+      "main": [
+        [
+          {
+            "node": "Merge candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear traducción": {
+      "main": [
+        [
+          {
+            "node": "Merge candidatos",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge candidatos": {
+      "main": [
+        [
+          {
+            "node": "Armar candidato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar candidato": {
+      "main": [
+        [
+          {
+            "node": "Preparar batch Airtable",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Preparar outputs Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar batch Airtable": {
+      "main": [
+        [
+          {
+            "node": "POST Airtable Candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar outputs Supabase": {
       "main": [
         [
           {
@@ -1184,20 +1262,28 @@
           }
         ]
       ]
+    },
+    "Preparar procesados": {
+      "main": [
+        [
+          {
+            "node": "POST processed_items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "5ede461c-9724-41bf-bb16-da9dfe898b34",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "36271efba4145e6febca668c39e9b0ec62832fee7a2b9294b41b8d1357ae3a66"
   },
-  "id": "XmUHpRkxYhRhJp2q",
   "tags": [
     {
       "updatedAt": "2026-03-23T18:48:09.229Z",
