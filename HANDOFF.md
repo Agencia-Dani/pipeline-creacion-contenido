@@ -21,11 +21,13 @@
 
 ## Estado en una línea
 
-**2026-06-14** — **Motor B3 reworkeado y construido** (`workflow.json` nuevo, ADR-009): 35 nodos,
-valida estructural. Alejo entregó las credenciales a Mani (Supabase URL + secret key, Airtable PAT
-+ `baseId`). Falta **B4** (pegar credenciales/keys en n8n), **B1** (confirmar TZ del InstaPods ya
-creado) y la **validación en vivo V1–V6**. **Decisión estructural abierta para el equipo: Airtable
-vs Supabase / alcance del registro central** — ver §"Decisiones a consultar con el equipo".
+**2026-06-14** — **Motor B3 construido + n8n listo para correr.** `workflow.json` (ADR-009, 35
+nodos, valida estructural) importado; **B1/B4/B5 ✅**: TZ `America/Bogota` confirmada, credenciales
+nativas (Airtable PAT + Supabase Registro) creadas/asignadas, nodo Config con los IDs, keys
+placeholder en los nodos HTTP, error workflow publicado e instalado. **Único pendiente del carril B:
+validación en vivo V1–V6** (camino crítico V1–V3 también depende de C2/Sheet del carril C). **Decisión
+estructural abierta para el equipo: Airtable vs Supabase / alcance del registro central** — ver
+§"Decisiones a consultar con el equipo".
 
 **2026-06-13** — Carril A en curso (Alejo): Supabase con la `service_role`/secret key a mano,
 **base Airtable creada por script** (`baseId` en el gestor). Faltan 2 pasos manuales en
@@ -41,11 +43,11 @@ hasta definir nicho)**.
 | A1–A4 | Supabase: schemas 001–003 ✅ (verificado) + cliente `piloto` + instancia ✅ (`instance_id` generado, en gestor/Config) | — | ✅ | Alejo + Mani |
 | A5–A9 | Airtable: base + semillas provisionales ✅ (proyecto "IA y Productividad", 1 voz, 9 keywords multiidioma, 3 referentes IG); faltan **campo `fecha_calificacion` a mano + vista 🔥 + accesos Majo/Jero** | — | 🔧 | Alejo |
 | A10 | Entregar credenciales/IDs a B y C por el gestor | A1–A9 | ✅ | **Alejo** (Supabase URL+key, PAT, baseId → Mani) |
-| B1 | n8n online en InstaPods + TZ `America/Bogota` | — | 🔧 | **Mani** (server creado; falta confirmar TZ) |
+| B1 | n8n online en InstaPods + TZ `America/Bogota` | — | ✅ | **Mani** (server + TZ confirmada) |
 | B2 | Smoke-test del piloto (`deploy.mjs piloto` → corrida manual) | B1 + keys | ⬜ | Mani — *omitido: fuimos directo a B3* |
-| B3 | **Rework del motor** (Airtable→heat v1→dedup→transcribe/traduce→candidatos) | A10 | 🔧 | **Mani** (motor construido; falta B4 + validar V1–V6) |
-| B4 | Credenciales en n8n (Apify, Anthropic/Haiku, Supadata, Airtable PAT, Supabase) — **sin Google** | A10 + B1 | ⬜ | Mani |
-| B5 | Error workflow del registro instalado | B1 | ⬜ | Mani |
+| B3 | **Rework del motor** (Airtable→heat v1→dedup→transcribe/traduce→candidatos) | A10 | 🔧 | **Mani** (motor construido + setup completo; falta validar V1–V6) |
+| B4 | Credenciales en n8n (Apify, Anthropic/Haiku, Supadata, Airtable PAT, Supabase) — **sin Google** | A10 + B1 | ✅ | **Mani** (cred. nativas creadas/asignadas, Config con IDs, keys placeholder en HTTP) |
+| B5 | Error workflow del registro instalado | B1 | ✅ | **Mani** (publicado e instalado como error workflow) |
 | C1 | Google Sheet "Histórico" (columnas de `v_historico_seleccionados`) + compartir | — | ⬜ | Dev 3 |
 | C2 | Workflow de archivado (Airtable→Supabase+Sheet→limpieza; idempotente; corre en el mismo n8n) | A10 + B1 + C1 | ⬜ | Dev 3 |
 | C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ⬜ | Dev 3 |
