@@ -38,8 +38,8 @@ hasta definir nicho)**.
 |---|---|---|---|---|
 | M0.2 | Cuentas/accesos de cada carril → gestor | — | ⬜ | cada uno la suya |
 | M0.3 | Pedir al jefe la voz/proyecto inicial (no bloquea: se siembra provisional) | — | ⬜ | Mani |
-| A1–A4 | Supabase: proyecto + schemas 001–003 + cliente/instancia (confirmar `instance_id`) | — | 🔧 | **Alejo** |
-| A5–A9 | Airtable: base creada; faltan campo `fecha_calificacion` + vista 🔥 + accesos Majo/Jero + semillas | — | 🔧 | **Alejo** |
+| A1–A4 | Supabase: schemas 001–003 ✅ (verificado) + cliente `piloto` + instancia ✅ (`instance_id` generado, en gestor/Config) | — | ✅ | Alejo + Mani |
+| A5–A9 | Airtable: base + semillas provisionales ✅ (proyecto "IA y Productividad", 1 voz, 9 keywords multiidioma, 3 referentes IG); faltan **campo `fecha_calificacion` a mano + vista 🔥 + accesos Majo/Jero** | — | 🔧 | Alejo |
 | A10 | Entregar credenciales/IDs a B y C por el gestor | A1–A9 | ✅ | **Alejo** (Supabase URL+key, PAT, baseId → Mani) |
 | B1 | n8n online en InstaPods + TZ `America/Bogota` | — | 🔧 | **Mani** (server creado; falta confirmar TZ) |
 | B2 | Smoke-test del piloto (`deploy.mjs piloto` → corrida manual) | B1 + keys | ⬜ | Mani — *omitido: fuimos directo a B3* |
@@ -85,6 +85,27 @@ hasta definir nicho)**.
    es 1 instancia editada a mano en el nodo Config. Rewrite multi-cliente = F5.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-14 (tarde) — Verificación carril A + semillas piloto *(Mani + Claude)*
+
+- **Verificado por API (read-only) el estado real de A:** Supabase **schemas 001+002+003 aplicados**
+  (las 8 tablas/vistas responden; `workflows` con 2 seeds) → **A2 ✅**. Credenciales Supabase
+  (URL+service_role) y Airtable (PAT+baseId) **funcionan**. Airtable: 5 tablas existían pero
+  **vacías**.
+- **Sembrado (A4 + A9 provisional):** insertado en Supabase **cliente `piloto` + instancia**
+  (`instance_id` generado → va en el nodo **Config** de n8n; es un ID, no se commitea). En Airtable:
+  **Proyecto "IA y Productividad"** (`activo`, `dias_recencia=180` = backfill 1ª corrida, `top_n=15`),
+  **1 Voz** provisional, **9 Keywords** multiidioma (es/en/pt/it/fr → hashtags TikTok), **3
+  Referentes IG** (garyvee/thedankoe/openai, marcados "provisional — verificar/cambiar"). El motor
+  ve 1 proyecto activo / 9 kw / 3 ref / 1 voz con el filtro `{activo}`.
+- **Pendiente para V1 (primera corrida real):** **B4** en n8n (importar + Config con `instance_id` +
+  credenciales `Airtable PAT`/`Supabase Registro` + pegar keys Apify/Anthropic/Supadata) · **B1**
+  TZ del InstaPods · **B5** error workflow. Luego Execute manual = backfill 180d → candidatos en
+  Airtable. Tras validar, bajar `dias_recencia` a 7 (semanal).
+- **Aviso:** el PAT de Airtable se expuso en chats → **rotarlo** (la base ya existe). Faltan los
+  pasos manuales de Airtable (campo `fecha_calificacion` tipo *Last modified time* sobre
+  `calificacion`, vista 🔥 `estado=aprobado` orden `heat_score` desc, accesos Majo/Jero) — los hace
+  el equipo/Alejo; no bloquean la corrida del motor pero sí la curación/tracking.
 
 ### 2026-06-14 — Rework B3: motor de reels construido *(Mani + Claude)*
 
