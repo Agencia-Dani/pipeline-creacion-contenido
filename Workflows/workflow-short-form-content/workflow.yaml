@@ -54,8 +54,8 @@ inputs:
 
 stages:
   config: "Lee Proyectos/Voces/Keywords/Referentes de Airtable y arma el plan de corrida (targets IG + hashtags TT, map a proyecto/voz)."
-  colectar: "Apify — IG Reels (directUrls de referentes) + TikTok (hashtags de keywords). 2 corridas por ejecución."
-  normalizar: "Normalizar IG/TT → formato común (+ external_id para el dedup) → Merge (append) → Asignar proyecto+voz."
+  colectar: "Apify — IG Reels (directUrls de referentes; onlyPostsNewerThan = ventana de recencia) + TikTok (hashtags de keywords). 2 corridas por ejecución."
+  normalizar: "Normalizar IG/TT → formato común (+ external_id) → Merge (append) → Asignar proyecto+voz (descarta lo más viejo que dias_recencia — capa 2)."
   scorear: "Heat-score v1 = 0.4·norm(views)+0.4·norm(likes)+0.2·norm(eng) ×(1+tema)×(1+idioma)×(1+selección); flag_viral marca; top_n por proyecto."
   dedup: "Consulta processed_items (Supabase) y descarta lo ya visto antes de top_n; inserta los top_n (Prefer ignore-duplicates)."
   transcribir: "Supadata transcribe (batch). Idioma detectado del response."

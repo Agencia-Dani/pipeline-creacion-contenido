@@ -94,6 +94,7 @@ hasta definir nicho)**.
   **leer Airtable** (Proyectos/Voces/Keywords/Referentes) → **Armar plan** → **Apify** IG+TT →
   Normalizar (+`external_id`) → Merge → **Asignar proyecto/voz** → **heat-score v1** (percentil
   views/likes/eng × boosts tema/idioma/selección; `flag_viral` marca; top_n por proyecto) →
+  **recencia 2 capas** (Apify `onlyPostsNewerThan` + guardia por `dias_recencia` del proyecto) →
   **dedup** vs `processed_items` → **Supadata** transcribe → **IF idioma=es** (passthrough) /
   **Claude Haiku** traduce literal (`claude-haiku-4-5`, sin thinking/effort) → **candidatos a
   Airtable** (batch 10) + **registro Supabase** (runs/outputs, schema 003) + insert
