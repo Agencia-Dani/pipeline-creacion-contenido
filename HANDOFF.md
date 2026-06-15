@@ -21,6 +21,15 @@
 
 ## Estado en una línea
 
+**2026-06-15** — **Carril C arrancado (Alejo).** Workflow de archivado **C2 construido y validado
+estructural** (`Workflows/workflow-archivado/`, 16 nodos: lee `Candidatos` calificados → resuelve
+proyecto/voz → `outputs` Supabase + append Sheet + borra de Airtable; Supabase continue-on-fail,
+Sheet corta antes de borrar). `004_historico_script_texto.sql` creado (la vista del histórico expone
+el **texto** del script, no `link_doc`). **Decisiones #1 y #2 resueltas** (ver §abajo). **C1 ✅**
+(Sheet con 13 columnas, pestaña `Sheet1`) y **`004` ✅ aplicado** en Supabase. **Pendiente C:**
+desplegar C2 en n8n (import + Config + cred. OAuth Google) · corrida de prueba (C3) · activar cron.
+C2 corre en el mismo n8n que el motor (B1) — ya está online.
+
 **2026-06-14** — **Motor B3 construido + n8n listo para correr.** `workflow.json` (ADR-009, 35
 nodos, valida estructural) importado; **B1/B4/B5 ✅**: TZ `America/Bogota` confirmada, credenciales
 nativas (Airtable PAT + Supabase Registro) creadas/asignadas, nodo Config con los IDs, keys
@@ -48,9 +57,9 @@ hasta definir nicho)**.
 | B3 | **Rework del motor** (Airtable→heat v1→dedup→transcribe/traduce→candidatos) | A10 | 🔧 | **Mani** (motor construido + setup completo; falta validar V1–V6) |
 | B4 | Credenciales en n8n (Apify, Anthropic/Haiku, Supadata, Airtable PAT, Supabase) — **sin Google** | A10 + B1 | ✅ | **Mani** (cred. nativas creadas/asignadas, Config con IDs, keys placeholder en HTTP) |
 | B5 | Error workflow del registro instalado | B1 | ✅ | **Mani** (publicado e instalado como error workflow) |
-| C1 | Google Sheet "Histórico" (columnas de `v_historico_seleccionados`) + compartir | — | ⬜ | Dev 3 |
-| C2 | Workflow de archivado (Airtable→Supabase+Sheet→limpieza; idempotente; corre en el mismo n8n) | A10 + B1 + C1 | ⬜ | Dev 3 |
-| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ⬜ | Dev 3 |
+| C1 | Google Sheet "Histórico" (13 columnas, con **SCRIPT** texto) + compartir | — | ✅ | **Alejo** (Sheet creado, pestaña `Sheet1`, encabezados OK; `sheet_id` → gestor) |
+| C2 | Workflow de archivado (Airtable→Supabase+Sheet→limpieza; idempotente; corre en el mismo n8n) | A10 + B1 + C1 | 🔧 | **Alejo** (workflow construido + valida estructural; falta aplicar `004` + import/Config/cred Google en n8n + prueba) |
+| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ⬜ | **Alejo** |
 | V1–V6 | Corridas de validación (backfill, literalidad, curación, re-rank, dedup, resiliencia) | B3 + C2 | ⬜ | los 3 |
 | D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | V1–V6 | ⬜ | los 3 |
 
@@ -62,7 +71,9 @@ hasta definir nicho)**.
 > Surgieron al construir B3. No bloquean avanzar (el motor corre igual), pero conviene cerrarlas
 > con Andrés/el equipo porque tocan el alcance y posiblemente un ADR.
 
-1. **¿Airtable + Supabase, o solo Airtable? (alcance del registro central — toca ADR-002)**
+1. **✅ RESUELTA (2026-06-15): se mantiene Supabase + Airtable.** Decisión al arrancar carril C:
+   Supabase queda **acotado a dedup + histórico + señal de aprendizaje** (la recomendación de Mani).
+   C2 se construyó completo (escribe a `outputs` Y al Sheet). Texto original abajo por contexto.
    Pregunta de Mani 2026-06-14: ambas son bases de datos, ¿no sobra Supabase? Estado actual del
    motor: **el equipo SOLO toca Airtable** (input, búsqueda, mapa de calor, selección). Supabase es
    *sala de máquinas*, invisible al equipo, y hace **dos cosas que Airtable free no hace bien**:
@@ -75,18 +86,51 @@ hasta definir nicho)**.
    Mani:** mantener Supabase **acotado a dedup + histórico**, no expandirlo. **A decidir con el
    equipo:** ¿se mantiene, o MVP solo-Airtable + Sheet aceptando reprocesar? (Si se saca, también
    cambia carril C.)
-2. **Sin "link al script" separado (desvío de ADR-009 §4).** Decisión de Mani 2026-06-14: nada de
-   un Google Doc por script (llenaría el Drive). El script vive como **campo de texto** en Airtable
-   y en Supabase `outputs.contenido_o_link`; el "link" es la URL del video original. → El motor
-   **no usa ninguna credencial de Google**. Falta: nota de 1 línea en ADR-009 y en
-   `airtable-cockpit.md` (`link_doc` queda vestigial), y el Sheet Histórico (carril C) debe llevar
-   el **texto del script** en vez de `link_doc` → posible `004_*.sql` para `v_historico_seleccionados`.
+2. **✅ RESUELTA (2026-06-15): el script va como TEXTO, sin Google Doc.** El Sheet Histórico lleva el
+   **texto del script** — implementado en [`004_historico_script_texto.sql`](./core/schema/004_historico_script_texto.sql)
+   (la vista `v_historico_seleccionados` expone `outputs.contenido_o_link` como `script` en vez de
+   `link_doc`) y en C2. **Falta aplicar el `004` en Supabase.** Pendiente menor de docs: nota de 1
+   línea en ADR-009 y en `airtable-cockpit.md` (`link_doc` queda vestigial). Texto original:
+   Decisión de Mani 2026-06-14: nada de un Google Doc por script (llenaría el Drive). El script vive
+   como **campo de texto** en Airtable y en Supabase `outputs.contenido_o_link`; el "link" es la URL
+   del video original. → El motor **no usa ninguna credencial de Google**.
 3. **TikTok solo por hashtag (keywords).** El motor scrapea TikTok por hashtags; los Referentes con
    `plataforma=tiktok` no se scrapean aún (requiere actor de perfil). Enhancement posterior.
 4. **`deploy.mjs` quedó obsoleto** para este motor (resolvía placeholders en voz/categorías). El MVP
    es 1 instancia editada a mano en el nodo Config. Rewrite multi-cliente = F5.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-15 — Carril C: archivado construido (C2) *(Alejo + Claude)*
+
+- **Hecho:** workflow de archivado **C2** creado en
+  [`Workflows/workflow-archivado/`](./Workflows/workflow-archivado/) (`workflow.json` + README) —
+  16 nodos, **valida estructural** (JSON ok · 15 conexiones a nodos existentes · sin huérfanos ·
+  todos los `jsCode` parsean). Flujo: cron diario → Config → Abrir run → leer Proyectos/Voces (mapa
+  id→nombre) → leer `Candidatos` con `calificacion` → IF ¿hay? → Armar filas → `outputs` Supabase
+  (continue-on-fail) → append Sheet → borrar de Airtable (batch 10) → cerrar run.
+  **`004_historico_script_texto.sql`** creado: la vista del histórico expone el **texto** del script
+  (`contenido_o_link`) en vez de `link_doc`.
+- **Decisiones de diseño (registradas en el README):** (1) **idempotencia por borrado** + índice
+  único parcial como backstop — **no** se usa upsert `on_conflict` porque el índice de
+  `outputs.external_id` es parcial y PostgREST no lo soporta limpio; (2) **orden**: el Sheet NO es
+  continue-on-fail → si falla, corta **antes** de borrar de Airtable (no se pierde curación);
+  (3) `proyecto`/`voz` son links en Airtable → se resuelven leyendo Proyectos/Voces (id→nombre).
+  **Decisiones #1 (mantener Supabase) y #2 (script texto) cerradas** — ver §arriba.
+- **C1 ✅** — Sheet "Histórico" ya existía con las 13 columnas exactas (pestaña `Sheet1`,
+  encabezados verificados por API, incluido **SCRIPT**). `sheet_id` y `sheet_tab=Sheet1` → al gestor.
+- **`004` ✅ aplicado** en Supabase (2026-06-15, por Alejo en el SQL Editor) → `v_historico_seleccionados`
+  ya expone `script` (texto).
+- **Pendiente para terminar C (todo en n8n — lo retoma Alejo en la próxima sesión):**
+  1. Importar `Workflows/workflow-archivado/workflow.json`, completar el nodo **Config** (`base_id`,
+     `supabase_url`, `instance_id`, `sheet_id`, `sheet_tab=Sheet1`) y mapear la **credencial OAuth de
+     Google Sheets** (única dependencia de Google del pipeline → configurar test user del OAuth).
+  2. **C3** — corrida de prueba: calificar 1 candidato → ver fila en el Sheet con su script, salir
+     de Airtable, y `v_selecciones_por_dia` responder. Luego activar el cron diario.
+- **Gotcha para el que siga:** el workflow es JSON sin correr (validado solo estructural) → probable
+  iteración en la primera corrida real, sobre todo el nodo *Append al Sheet* (autoMap exige que los
+  encabezados del Sheet coincidan **exactos** con las keys que emite *Preparar filas Sheet*). Sin
+  paginación: lee 1 página (≤100 calificados/corrida) — suficiente con cron diario.
 
 ### 2026-06-14 (tarde) — Verificación carril A + semillas piloto *(Mani + Claude)*
 

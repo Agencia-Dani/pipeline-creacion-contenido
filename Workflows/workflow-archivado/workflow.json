@@ -1,0 +1,307 @@
+{
+  "name": "Archivado de curación — Candidatos calificados → Supabase + Sheet (carril C)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 9 * * *" }
+          ]
+        }
+      },
+      "id": "cron-diario",
+      "name": "Cron — diario 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 200]
+    },
+    {
+      "id": "ejecutar-manual",
+      "name": "Ejecutar manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "airtable_base_id", "value": "<<AIRTABLE_BASE_ID>>", "type": "string" },
+            { "id": "a2", "name": "supabase_url", "value": "<<SUPABASE_URL>>", "type": "string" },
+            { "id": "a3", "name": "instance_id", "value": "<<INSTANCE_ID>>", "type": "string" },
+            { "id": "a4", "name": "sheet_id", "value": "<<GOOGLE_SHEET_ID>>", "type": "string" },
+            { "id": "a5", "name": "sheet_tab", "value": "<<NOMBRE_PESTANA_SHEET>>", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { instance_id: $('Config').first().json.instance_id, trigger_type: 'cron', estado: 'en_curso', params: { workflow: 'archivado' } } }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "abrir-run",
+      "name": "Abrir run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "onError": "continueRegularOutput",
+      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Proyectos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [ { "name": "pageSize", "value": "100" } ]
+        },
+        "options": { "timeout": 20000 }
+      },
+      "id": "leer-proyectos",
+      "name": "Leer Proyectos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300],
+      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Voces' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [ { "name": "pageSize", "value": "100" } ]
+        },
+        "options": { "timeout": 20000 }
+      },
+      "id": "leer-voces",
+      "name": "Leer Voces",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300],
+      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Candidatos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "filterByFormula", "value": "NOT({calificacion} = '')" },
+            { "name": "pageSize", "value": "100" }
+          ]
+        },
+        "options": { "timeout": 20000 }
+      },
+      "id": "leer-candidatos",
+      "name": "Leer Candidatos calificados",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 300],
+      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ($json.records || []).length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-hay",
+      "name": "IF — hay calificados",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst base = $('Leer Candidatos calificados').first().json;\nconst recs = base.records || [];\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst projMap = {};\n($('Leer Proyectos').first().json.records || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || ''; });\nconst vozMap = {};\n($('Leer Voces').first().json.records || []).forEach(r => { vozMap[r.id] = (r.fields || {}).nombre || ''; });\n\nconst ESTADOS = { aprobado: 'aprobado', publicado: 'publicado', descartado: 'descartado' };\n\nreturn recs.map(r => {\n  const f = r.fields || {};\n  const estado = ESTADOS[String(f.estado || '').toLowerCase()] || 'descartado';\n  const proyecto = Array.isArray(f.proyecto) ? (projMap[f.proyecto[0]] || '') : '';\n  const voz = Array.isArray(f.voz) ? (vozMap[f.voz[0]] || '') : '';\n  const calificado_en = f.fecha_calificacion || new Date().toISOString();\n  const output = {\n    run_id,\n    tipo: 'guion_reel',\n    titulo: f.titulo || '(sin titulo)',\n    contenido_o_link: f.script || '',\n    estado,\n    calificado_en,\n    external_id: r.id,\n    source_items: [{ platform: '', url: f.url_referente || '' }],\n    metadata: {\n      proyecto, voz, referente: f.referente || '', url_referente: f.url_referente || '',\n      idioma: f.idioma || '', views: f.views || 0, likes: f.likes || 0,\n      seguidores: f.seguidores || 0, engagement: f.engagement || 0,\n      heat_score: f.heat_score || 0, calificacion: f.calificacion || '', link_doc: f.link_doc || ''\n    }\n  };\n  const sheet = {\n    'FECHA CALIFICACION': calificado_en, 'PROYECTO': proyecto, 'VOZ': voz,\n    'TITULO': f.titulo || '', 'URL ORIGINAL': f.url_referente || '', 'SCRIPT': f.script || '',\n    'IDIOMA': f.idioma || '', 'VIEWS': f.views || 0, 'LIKES': f.likes || 0,\n    'SEGUIDORES': f.seguidores || 0, 'HEAT SCORE': f.heat_score || 0,\n    'CALIFICACION': f.calificacion || '', 'ESTADO': estado\n  };\n  return { json: { record_id: r.id, output, sheet } };\n});\n"
+      },
+      "id": "armar-filas",
+      "name": "Armar filas archivado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst outputs = $('Armar filas archivado').all().map(i => i.json.output);\nreturn [{ json: { n: outputs.length, outputs } }];\n"
+      },
+      "id": "preparar-outputs",
+      "name": "Preparar outputs Supabase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.outputs }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "registrar-outputs",
+      "name": "Registrar outputs (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 200],
+      "onError": "continueRegularOutput",
+      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn $('Armar filas archivado').all().map(i => ({ json: i.json.sheet }));\n"
+      },
+      "id": "preparar-sheet",
+      "name": "Preparar filas Sheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, 200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheet_tab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "append-sheet",
+      "name": "Append al Sheet Histórico",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2640, 200],
+      "credentials": { "googleSheetsOAuth2Api": { "name": "<<CREDENCIAL_GOOGLE_SHEETS>>" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst ids = $('Armar filas archivado').all().map(i => i.json.record_id);\nconst base = $('Config').first().json.airtable_base_id;\nconst out = [];\nfor (let i = 0; i < ids.length; i += 10) {\n  const qs = ids.slice(i, i + 10).map(id => 'records[]=' + encodeURIComponent(id)).join('&');\n  out.push({ json: { url: 'https://api.airtable.com/v0/' + base + '/Candidatos?' + qs } });\n}\nreturn out;\n"
+      },
+      "id": "preparar-delete",
+      "name": "Preparar borrado Airtable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2880, 200]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": { "timeout": 20000 }
+      },
+      "id": "borrar-airtable",
+      "name": "Borrar de Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3120, 200],
+      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?id=eq.' + ($('Abrir run en el registro').first().json.id || '') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [ { "name": "Content-Type", "value": "application/json" } ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fin: $now.toISO(), estado: 'ok', costo_estimado: 0, metricas: { archivados: $('Armar filas archivado').all().length } } }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "cerrar-run",
+      "name": "Cerrar run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3360, 300],
+      "onError": "continueRegularOutput",
+      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+    }
+  ],
+  "connections": {
+    "Cron — diario 9am": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
+    "Ejecutar manual": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
+    "Config": { "main": [[{ "node": "Abrir run en el registro", "type": "main", "index": 0 }]] },
+    "Abrir run en el registro": { "main": [[{ "node": "Leer Proyectos", "type": "main", "index": 0 }]] },
+    "Leer Proyectos": { "main": [[{ "node": "Leer Voces", "type": "main", "index": 0 }]] },
+    "Leer Voces": { "main": [[{ "node": "Leer Candidatos calificados", "type": "main", "index": 0 }]] },
+    "Leer Candidatos calificados": { "main": [[{ "node": "IF — hay calificados", "type": "main", "index": 0 }]] },
+    "IF — hay calificados": {
+      "main": [
+        [{ "node": "Armar filas archivado", "type": "main", "index": 0 }],
+        [{ "node": "Cerrar run en el registro", "type": "main", "index": 0 }]
+      ]
+    },
+    "Armar filas archivado": { "main": [[{ "node": "Preparar outputs Supabase", "type": "main", "index": 0 }]] },
+    "Preparar outputs Supabase": { "main": [[{ "node": "Registrar outputs (Supabase)", "type": "main", "index": 0 }]] },
+    "Registrar outputs (Supabase)": { "main": [[{ "node": "Preparar filas Sheet", "type": "main", "index": 0 }]] },
+    "Preparar filas Sheet": { "main": [[{ "node": "Append al Sheet Histórico", "type": "main", "index": 0 }]] },
+    "Append al Sheet Histórico": { "main": [[{ "node": "Preparar borrado Airtable", "type": "main", "index": 0 }]] },
+    "Preparar borrado Airtable": { "main": [[{ "node": "Borrar de Airtable", "type": "main", "index": 0 }]] },
+    "Borrar de Airtable": { "main": [[{ "node": "Cerrar run en el registro", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "active": false
+}
