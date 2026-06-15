@@ -21,14 +21,13 @@
 
 ## Estado en una línea
 
-**2026-06-15** — **Carril C arrancado (Alejo) + C2 configurado en n8n (Dev 3).** Workflow de archivado
-**C2 construido, validado estructural e importado en n8n** (`Workflows/workflow-archivado/`, 16 nodos).
-Flujo: lee `Candidatos` calificados → resuelve proyecto/voz → `outputs` Supabase + append Sheet +
-borra de Airtable; Supabase continue-on-fail, Sheet corta antes de borrar.
-`004_historico_script_texto.sql` creado y aplicado. **Decisiones #1 y #2 resueltas.** **C1 ✅**
-(Sheet con 13 columnas, pestaña `Historico`). **C2 ✅ configurado:** workflow importado, nodo Config
-completado (todos los IDs), credenciales asignadas (Airtable PAT + Supabase Registro + Google Sheets
-OAuth). **Pendiente C:** corrida de prueba (C3) → activar cron.
+**2026-06-15** — **Carril C arrancado (Alejo) + C2 casi listo (Dev 3). ⛔ Bloqueado en Google Sheets OAuth.**
+Workflow importado en n8n, nodo Config completo, Airtable PAT y Supabase Registro asignados. Primera
+corrida ejecutada → falló en nodo `Append al Sheet Histórico` ("Unable to sign without access token"):
+la credencial Google Sheets OAuth2 requiere un **Client ID y Client Secret de Google Cloud Console**
+(no es un login con email). Dev 3 no tiene acceso a GCP. **Mise en place listo** — ver log
+2026-06-15 más abajo: quien tenga acceso a GCP puede desbloquear en ~15 min. **C1 ✅** (Sheet 13
+columnas, pestaña `Historico`). **Pendiente C:** OAuth Google → corrida de prueba (C3) → cron.
 
 **2026-06-14** — **Motor B3 construido + n8n listo para correr.** `workflow.json` (ADR-009, 35
 nodos, valida estructural) importado; **B1/B4/B5 ✅**: TZ `America/Bogota` confirmada, credenciales
@@ -58,8 +57,8 @@ hasta definir nicho)**.
 | B4 | Credenciales en n8n (Apify, Anthropic/Haiku, Supadata, Airtable PAT, Supabase) — **sin Google** | A10 + B1 | ✅ | **Mani** (cred. nativas creadas/asignadas, Config con IDs, keys placeholder en HTTP) |
 | B5 | Error workflow del registro instalado | B1 | ✅ | **Mani** (publicado e instalado como error workflow) |
 | C1 | Google Sheet "Histórico" (13 columnas, con **SCRIPT** texto) + compartir | — | ✅ | **Dev 3** (Sheet en `https://docs.google.com/spreadsheets/d/1Ngzjjsw2sMU-y6NienN-YHxro6o8BcOzmszZH9C3Av4`, pestaña `Historico`; ID va en `<<GOOGLE_SHEET_ID>>` del C2) |
-| C2 | Workflow de archivado — importado + configurado en n8n (Config + credenciales); falta **corrida de prueba** | A10 + B1 + C1 | 🔧 | **Dev 3** · JSON por Alejo (`Workflows/workflow-archivado/`) |
-| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | 🔧 | **Dev 3** (a punto de correr) |
+| C2 | Workflow de archivado — importado + Config completo; **⛔ bloqueado: falta Google Sheets OAuth2** (ver log 2026-06-15 para el step-by-step) | A10 + B1 + C1 | ⛔ | **Quien tenga acceso a GCP** (15 min) · Dev 3 tiene todo lo demás listo |
+| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ⬜ | **Dev 3** |
 | V1–V6 | Corridas de validación (backfill, literalidad, curación, re-rank, dedup, resiliencia) | B3 + C2 | ⬜ | los 3 |
 | D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | V1–V6 | ⬜ | los 3 |
 
@@ -100,6 +99,69 @@ hasta definir nicho)**.
    es 1 instancia editada a mano en el nodo Config. Rewrite multi-cliente = F5.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-15 — C2: primera corrida bloqueada por Google Sheets OAuth *(Dev 3 + Claude)*
+
+- **Hecho:** corrida manual ejecutada en n8n. Todos los nodos anteriores al Sheet pasaron OK
+  (Config, Supabase, Airtable). Fallo en `Append al Sheet Histórico`: `"Unable to sign without
+  access token"`. Causa raíz: la credencial Google Sheets OAuth2 tiene Client ID y Client Secret
+  vacíos/incorrectos — se llenó el campo "Client ID" con un email de Gmail, que NO es lo que
+  pide el formulario.
+- **Por qué:** n8n self-hosted requiere que creés tu propia app OAuth en Google Cloud Console para
+  poder autenticar con Google APIs. No alcanza con "Sign in with Google" directo — primero hay que
+  crear el Client ID/Secret en GCP.
+- **Dev 3 no tiene acceso a la cuenta de GCP.** Todo lo demás está listo. Quien tenga acceso puede
+  desbloquear esto en ~15 minutos siguiendo el step-by-step de abajo.
+
+#### ⚙️ MISE EN PLACE — Quien tiene GCP: hacé esto para desbloquear C2 (~15 min)
+
+**Qué necesitás:** acceso a la cuenta de Google Cloud Console de la agencia.
+
+**URL de callback de n8n** (la necesitás en el paso 3):
+```
+https://workflow-shortform-content.nbg1-5.instapods.app/rest/oauth2-credential/callback
+```
+
+**Paso 1 — Habilitá las APIs en GCP**
+1. Andá a [console.cloud.google.com](https://console.cloud.google.com) con la cuenta de la agencia
+2. Seleccioná el proyecto (o creá uno nuevo, ej: `n8n-reels`)
+3. "APIs & Services" → "Library"
+4. Buscá **"Google Sheets API"** → Enable
+5. Buscá **"Google Drive API"** → Enable
+
+**Paso 2 — Configurá la pantalla de consentimiento OAuth**
+1. "APIs & Services" → "OAuth consent screen"
+2. User Type: **External** → Create
+3. App name: cualquiera (ej: `n8n pipeline`)
+4. User support email: email de la agencia
+5. "Save and Continue" en todos los pasos siguientes
+6. En el paso **"Test users"** → agregá `DanielTovarTech@gmail.com`
+7. Guardá
+
+**Paso 3 — Creá el OAuth Client ID**
+1. "APIs & Services" → "Credentials" → "+ Create Credentials" → "OAuth client ID"
+2. Application type: **Web application**
+3. Name: `n8n` (o cualquiera)
+4. En **"Authorized redirect URIs"** → agregá exactamente:
+   ```
+   https://workflow-shortform-content.nbg1-5.instapods.app/rest/oauth2-credential/callback
+   ```
+5. "Create" → copiá el **Client ID** (termina en `.apps.googleusercontent.com`) y el **Client Secret**
+
+**Paso 4 — Completá la credencial en n8n**
+1. En n8n → "Credentials" → buscá "Google Sheets account" (la que creó Dev 3)
+2. **Client ID** → pegá el código que termina en `.apps.googleusercontent.com`
+3. **Client Secret** → pegá el secret
+4. Guardá → **"Sign in with Google"** → autorizá con `DanielTovarTech@gmail.com`
+5. Debería quedar con un tick verde de conexión exitosa
+
+**Paso 5 — Avisale a Dev 3**
+Dev 3 ya tiene el candidato de prueba y el workflow listo. Solo necesita que le confirmes que la
+credencial quedó autorizada (tick verde) para correr Execute Workflow y completar C3.
+
+> **Importante:** si la pantalla de consentimiento queda en modo "Testing", la autorización vence
+> cada 7 días. Para producción publicar la app (o agregar todos los usuarios necesarios como test
+> users). Para el MVP con 1–3 usuarios, modo Testing alcanza.
 
 ### 2026-06-15 — Carril C: C2 desplegado en n8n *(Dev 3 + Claude)*
 
