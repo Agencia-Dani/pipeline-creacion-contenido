@@ -21,14 +21,14 @@
 
 ## Estado en una línea
 
-**2026-06-15** — **Carril C arrancado (Alejo).** Workflow de archivado **C2 construido y validado
-estructural** (`Workflows/workflow-archivado/`, 16 nodos: lee `Candidatos` calificados → resuelve
-proyecto/voz → `outputs` Supabase + append Sheet + borra de Airtable; Supabase continue-on-fail,
-Sheet corta antes de borrar). `004_historico_script_texto.sql` creado (la vista del histórico expone
-el **texto** del script, no `link_doc`). **Decisiones #1 y #2 resueltas** (ver §abajo). **C1 ✅**
-(Sheet con 13 columnas, pestaña `Sheet1`) y **`004` ✅ aplicado** en Supabase. **Pendiente C:**
-desplegar C2 en n8n (import + Config + cred. OAuth Google) · corrida de prueba (C3) · activar cron.
-C2 corre en el mismo n8n que el motor (B1) — ya está online.
+**2026-06-15** — **Carril C arrancado (Alejo) + C2 configurado en n8n (Dev 3).** Workflow de archivado
+**C2 construido, validado estructural e importado en n8n** (`Workflows/workflow-archivado/`, 16 nodos).
+Flujo: lee `Candidatos` calificados → resuelve proyecto/voz → `outputs` Supabase + append Sheet +
+borra de Airtable; Supabase continue-on-fail, Sheet corta antes de borrar.
+`004_historico_script_texto.sql` creado y aplicado. **Decisiones #1 y #2 resueltas.** **C1 ✅**
+(Sheet con 13 columnas, pestaña `Historico`). **C2 ✅ configurado:** workflow importado, nodo Config
+completado (todos los IDs), credenciales asignadas (Airtable PAT + Supabase Registro + Google Sheets
+OAuth). **Pendiente C:** corrida de prueba (C3) → activar cron.
 
 **2026-06-14** — **Motor B3 construido + n8n listo para correr.** `workflow.json` (ADR-009, 35
 nodos, valida estructural) importado; **B1/B4/B5 ✅**: TZ `America/Bogota` confirmada, credenciales
@@ -57,9 +57,9 @@ hasta definir nicho)**.
 | B3 | **Rework del motor** (Airtable→heat v1→dedup→transcribe/traduce→candidatos) | A10 | 🔧 | **Mani** (motor construido + setup completo; falta validar V1–V6) |
 | B4 | Credenciales en n8n (Apify, Anthropic/Haiku, Supadata, Airtable PAT, Supabase) — **sin Google** | A10 + B1 | ✅ | **Mani** (cred. nativas creadas/asignadas, Config con IDs, keys placeholder en HTTP) |
 | B5 | Error workflow del registro instalado | B1 | ✅ | **Mani** (publicado e instalado como error workflow) |
-| C1 | Google Sheet "Histórico" (13 columnas, con **SCRIPT** texto) + compartir | — | ✅ | **Alejo** (Sheet creado, pestaña `Sheet1`, encabezados OK; `sheet_id` → gestor) |
-| C2 | Workflow de archivado (Airtable→Supabase+Sheet→limpieza; idempotente; corre en el mismo n8n) | A10 + B1 + C1 | 🔧 | **Alejo** (workflow construido + valida estructural; falta aplicar `004` + import/Config/cred Google en n8n + prueba) |
-| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ⬜ | **Alejo** |
+| C1 | Google Sheet "Histórico" (13 columnas, con **SCRIPT** texto) + compartir | — | ✅ | **Dev 3** (Sheet en `https://docs.google.com/spreadsheets/d/1Ngzjjsw2sMU-y6NienN-YHxro6o8BcOzmszZH9C3Av4`, pestaña `Historico`; ID va en `<<GOOGLE_SHEET_ID>>` del C2) |
+| C2 | Workflow de archivado — importado + configurado en n8n (Config + credenciales); falta **corrida de prueba** | A10 + B1 + C1 | 🔧 | **Dev 3** · JSON por Alejo (`Workflows/workflow-archivado/`) |
+| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | 🔧 | **Dev 3** (a punto de correr) |
 | V1–V6 | Corridas de validación (backfill, literalidad, curación, re-rank, dedup, resiliencia) | B3 + C2 | ⬜ | los 3 |
 | D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | V1–V6 | ⬜ | los 3 |
 
@@ -101,6 +101,27 @@ hasta definir nicho)**.
 
 ## Log de avance (más reciente arriba)
 
+### 2026-06-15 — Carril C: C2 desplegado en n8n *(Dev 3 + Claude)*
+
+- **Hecho:** C2 completamente configurado y listo para correr.
+  - Credenciales recibidas de Alejo/gestor: `supabase_url`, `service_role_key`, `airtable_PAT`,
+    `baseId`, `instance_id`.
+  - Nombre de pestaña del Sheet confirmado: `Historico` (sin tilde) — corregido en todo el HANDOFF
+    (antes decía `Sheet1`).
+  - `Workflows/workflow-archivado/workflow.json` importado en n8n (reemplaza el import anterior de
+    Dev 3, que era inferior — 11 nodos vs 16).
+  - Nodo **Config** completado con los 5 valores: `AIRTABLE_BASE_ID`, `SUPABASE_URL`,
+    `INSTANCE_ID`, `GOOGLE_SHEET_ID`, `NOMBRE_PESTANA_SHEET=Historico`.
+  - Credenciales asignadas en n8n: `Airtable PAT`, `Supabase Registro`, Google Sheets OAuth2.
+  - `004_historico_script_texto.sql` aplicado en Supabase (ya estaba, confirmado por Alejo).
+  - Dev 3 tiene acceso directo a Supabase (dashboard + SQL Editor).
+- **Pendiente:** corrida de prueba manual (C3) → calificar 1 candidato en Airtable → Execute
+  Workflow → verificar fila en Sheet + `v_selecciones_por_dia` + candidato borrado de Airtable.
+  Luego activar cron diario.
+- **Gotcha:** las credenciales reales (Supabase service_role key + Airtable PAT) se compartieron
+  en el chat en esta sesión — **rotarlas** antes de la corrida en producción (igual que pasó con el
+  PAT de sesiones anteriores). Nada de secretos en chat: van al gestor compartido.
+
 ### 2026-06-15 — Carril C: archivado construido (C2) *(Alejo + Claude)*
 
 - **Hecho:** workflow de archivado **C2** creado en
@@ -117,8 +138,8 @@ hasta definir nicho)**.
   continue-on-fail → si falla, corta **antes** de borrar de Airtable (no se pierde curación);
   (3) `proyecto`/`voz` son links en Airtable → se resuelven leyendo Proyectos/Voces (id→nombre).
   **Decisiones #1 (mantener Supabase) y #2 (script texto) cerradas** — ver §arriba.
-- **C1 ✅** — Sheet "Histórico" ya existía con las 13 columnas exactas (pestaña `Sheet1`,
-  encabezados verificados por API, incluido **SCRIPT**). `sheet_id` y `sheet_tab=Sheet1` → al gestor.
+- **C1 ✅** — Sheet "Histórico" ya existía con las 13 columnas exactas (pestaña `Historico` — sin
+  tilde, confirmado por Dev 3). `sheet_id` y `sheet_tab=Historico` → al gestor.
 - **`004` ✅ aplicado** en Supabase (2026-06-15, por Alejo en el SQL Editor) → `v_historico_seleccionados`
   ya expone `script` (texto).
 - **Pendiente para terminar C (todo en n8n — lo retoma Alejo en la próxima sesión):**
