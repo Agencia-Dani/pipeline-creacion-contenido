@@ -277,7 +277,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var d=Number(p.max_dias_recencia||0); var b={ directUrls: p.ig_urls, resultsType: 'posts', resultsLimit: $('Config').first().json.ig_results_limit, searchType: 'user', searchLimit: 1, addParentData: true }; if(d>0) b.onlyPostsNewerThan = d + ' days'; return b; })() }}",
         "options": {
-          "timeout": 120000
+          "timeout": 300000
         }
       },
       "id": "apify-ig-reels",
@@ -308,7 +308,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ { hashtags: $('Armar plan de corrida').first().json.tt_hashtags, resultsPerPage: $('Config').first().json.tt_results_limit, shouldDownloadVideos: false, shouldDownloadCovers: false } }}",
         "options": {
-          "timeout": 120000
+          "timeout": 300000
         }
       },
       "id": "apify-tiktok",

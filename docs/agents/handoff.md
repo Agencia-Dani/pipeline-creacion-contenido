@@ -136,9 +136,12 @@ hasta definir nicho)**.
 5. **Dedup con tope fijo de 20 000 filas.** `Leer procesados` hace `...&limit=20000`. Cuando
    `processed_items` lo supere, las filas viejas no se cargan → dedup parcial → re-pago de
    Supadata/Claude. Mejor: filtrar por los `external_id` de la corrida (`in.(...)`), no traer toda la tabla.
-6. **Timeout de Apify de 120 s con `run-sync-get-dataset-items`.** El backfill inicial (`dias_recencia=180`)
-   puede pasar los 2 min → el nodo hace timeout (`continueRegularOutput` → sigue vacío) **pero el run de
-   Apify sigue y se paga**, entregando 0 candidatos sin error visible. Subir timeout o usar patrón async.
+6. **Timeout de Apify con `run-sync-get-dataset-items`.** El backfill inicial (`dias_recencia=180`)
+   puede pasar el timeout → el nodo hace timeout (`continueRegularOutput` → sigue vacío) **pero el run de
+   Apify sigue y se paga**, entregando 0 candidatos sin error visible. **Confirmado en vivo (V1, 2026-06-16):
+   el nodo IG dio `ECONNABORTED` a los 120 s. Mitigado: timeout subido a 300000 ms (= techo del endpoint
+   sync de Apify) en los dos nodos Apify.** Si a 300 s aún corta, pasar a patrón async (POST `/runs` → poll →
+   GET dataset) — sigue siendo el fix real.
 7. **Detección de idioma por conteo de stopwords (`guessLang`), default `'es'`.** Frágil: un video EN con
    pocas stopwords cae a `'es'` → se salta la traducción → el equipo recibe el script en inglés. Además el
    idioma alimenta un boost del heat-score. Usar el `lang` de Supadata como fuente primaria.
@@ -203,6 +206,27 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 — V1 primera corrida del motor: debug en vivo *(Mani + Claude)*
+
+- **Contexto:** primer Execute manual del motor B3 (parte de V1, backfill 180d). Tres síntomas
+  encadenados, todos diagnosticados a partir del output real de los nodos:
+  1. **Apify TikTok no recibía input** → faltaba el cable `Armar plan de corrida → Apify — TikTok`
+     en el canvas (el `workflow.json` del repo ya lo trae en paralelo; la copia importada estaba
+     desincronizada). **Mani lo dibujó.**
+  2. **Normalizar TT no corría** → puro efecto dominó del #1.
+  3. **`Asignar proyecto+voz` frenaba con output vacío** → no era match de proyecto: el único ítem
+     que llegaba venía **vacío y sin `url`**, y el nodo descarta `if (!d.url) continue`. La causa del
+     ítem vacío era el nodo Apify IG: **timeout a los 120 s (`ECONNABORTED`)** con
+     `run-sync-get-dataset-items` → con `onError: continueRegularOutput` + `alwaysOutputData` deja el
+     objeto de error como 1 ítem, que `Normalizar IG` mapea a campos vacíos. (Esto es el ítem **#6**
+     de la auditoría, ahora confirmado en vivo.)
+- **Hecho:** timeout de los dos nodos Apify subido **120000 → 300000 ms** en `workflow.json`
+  (techo útil del endpoint sync de Apify). Verificado que la **config de Airtable está sana** (el
+  output de `Armar plan de corrida` muestra 1 proyecto activo, voz linkeada, 9 keywords, 3 handles IG).
+- **Pendiente:** re-correr V1 con los dos fixes (cable TikTok + timeout 300s) y confirmar que llegan
+  posts reales al Merge. Si a 300 s aún corta → patrón async (ver #6). Recordatorios ya trackeados:
+  `deploy.mjs` obsoleto/crashea con los nombres de nodo viejos (#11), referentes de TikTok sin usar (#15).
 
 ### 2026-06-16 — Carril C completo: C2 + C3 ✅ *(Dev 3)*
 
