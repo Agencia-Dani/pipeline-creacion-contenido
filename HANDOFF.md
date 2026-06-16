@@ -92,10 +92,35 @@ hasta definir nicho)**.
    Decisión de Mani 2026-06-14: nada de un Google Doc por script (llenaría el Drive). El script vive
    como **campo de texto** en Airtable y en Supabase `outputs.contenido_o_link`; el "link" es la URL
    del video original. → El motor **no usa ninguna credencial de Google**.
-3. **TikTok solo por hashtag (keywords).** El motor scrapea TikTok por hashtags; los Referentes con
-   `plataforma=tiktok` no se scrapean aún (requiere actor de perfil). Enhancement posterior.
-4. **`deploy.mjs` quedó obsoleto** para este motor (resolvía placeholders en voz/categorías). El MVP
+3. **`deploy.mjs` quedó obsoleto** para este motor (resolvía placeholders en voz/categorías). El MVP
    es 1 instancia editada a mano en el nodo Config. Rewrite multi-cliente = F5.
+
+## Mejoras pendientes (motor completo — esto es lo que sigue)
+
+> Carriles A, B y C cerrados: el motor entrega y el equipo cura. Lo de abajo **no bloquea el MVP**,
+> son los límites conocidos del **modelo de búsqueda** que salieron al documentar el flujo para el
+> equipo de redes (2026-06-16, verificado en `workflow.json` → nodo *Armar plan de corrida* + nodos
+> Apify). Priorizar después de validar V1–V6.
+
+**Cómo busca hoy el motor (asimétrico por plataforma):**
+- **Instagram = por cuenta.** Baja los posts recientes de cada `Referentes` con `plataforma=instagram`
+  (`directUrls`, `searchType:user`). Las **Keywords NO aplican a IG**: un reel entra por venir de una
+  cuenta seguida, tenga o no las palabras.
+- **TikTok = por hashtag.** Busca con las `Keywords` (cada `termino` → un hashtag). Es un **OR**: entra
+  el video con **al menos una** keyword, no todas. Un TikTok sin esos hashtags es invisible al motor.
+  *(Las keywords tienen un uso secundario en el heat-score: el "boost de tema" matchea la descripción,
+  pero solo ordena, no filtra.)*
+
+**Mejoras:**
+1. **Scrapear Referentes de TikTok por perfil.** Hoy las cuentas con `plataforma=tiktok` se ignoran (el
+   código las junta en `tt_handles` pero no las usa). Requiere un actor de perfil de TikTok en Apify.
+   Sin esto, en TikTok solo se pueden seguir hashtags, no cuentas.
+2. **Keywords multi-palabra.** La keyword se pasa como hashtag literal → una palabra (`liderazgo`)
+   matchea, una frase con espacios (`liderazgo efectivo`) no. Mejora: tokenizar/mapear frases a
+   hashtags o buscar también por texto. Mientras tanto: cargar Keywords como hashtags de una palabra.
+3. **Instagram por tema/hashtag (descubrimiento).** Hoy IG solo trae lo de cuentas ya seguidas. Para
+   descubrir cuentas nuevas por tema (no solo curar a las conocidas) habría que scrapear IG por hashtag
+   además de por cuenta.
 
 ## Log de avance (más reciente arriba)
 
