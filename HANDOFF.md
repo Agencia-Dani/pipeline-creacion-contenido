@@ -21,13 +21,12 @@
 
 ## Estado en una línea
 
-**2026-06-15** — **Carril C arrancado (Alejo) + C2 casi listo (Dev 3). ⛔ Bloqueado en Google Sheets OAuth.**
-Workflow importado en n8n, nodo Config completo, Airtable PAT y Supabase Registro asignados. Primera
-corrida ejecutada → falló en nodo `Append al Sheet Histórico` ("Unable to sign without access token"):
-la credencial Google Sheets OAuth2 requiere un **Client ID y Client Secret de Google Cloud Console**
-(no es un login con email). Dev 3 no tiene acceso a GCP. **Mise en place listo** — ver log
-2026-06-15 más abajo: quien tenga acceso a GCP puede desbloquear en ~15 min. **C1 ✅** (Sheet 13
-columnas, pestaña `Historico`). **Pendiente C:** OAuth Google → corrida de prueba (C3) → cron.
+**2026-06-16** — **Carril C completo. C2 ✅ + C3 ✅ (Dev 3).** Dev 3 creó su propia cuenta GCP,
+configuró OAuth2 (Client ID + Secret, APIs habilitadas, test user), conectó Google Sheets en n8n y
+ejecutó el workflow completo exitosamente: candidatos archivados en Supabase + fila en Sheet Histórico
++ records borrados de Airtable. **Carril C cerrado.** Camino crítico ahora: V1–V6 (validación en
+vivo del motor B3, depende también de carril A terminando A5–A9). ⚠️ GCP en créditos gratuitos
+($300 USD) — ver gotcha en log.
 
 **2026-06-14** — **Motor B3 construido + n8n listo para correr.** `workflow.json` (ADR-009, 35
 nodos, valida estructural) importado; **B1/B4/B5 ✅**: TZ `America/Bogota` confirmada, credenciales
@@ -57,8 +56,8 @@ hasta definir nicho)**.
 | B4 | Credenciales en n8n (Apify, Anthropic/Haiku, Supadata, Airtable PAT, Supabase) — **sin Google** | A10 + B1 | ✅ | **Mani** (cred. nativas creadas/asignadas, Config con IDs, keys placeholder en HTTP) |
 | B5 | Error workflow del registro instalado | B1 | ✅ | **Mani** (publicado e instalado como error workflow) |
 | C1 | Google Sheet "Histórico" (13 columnas, con **SCRIPT** texto) + compartir | — | ✅ | **Dev 3** (Sheet en `https://docs.google.com/spreadsheets/d/1Ngzjjsw2sMU-y6NienN-YHxro6o8BcOzmszZH9C3Av4`, pestaña `Historico`; ID va en `<<GOOGLE_SHEET_ID>>` del C2) |
-| C2 | Workflow de archivado — importado + Config completo; **⛔ bloqueado: falta Google Sheets OAuth2** (ver log 2026-06-15 para el step-by-step) | A10 + B1 + C1 | ⛔ | **Quien tenga acceso a GCP** (15 min) · Dev 3 tiene todo lo demás listo |
-| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ⬜ | **Dev 3** |
+| C2 | Workflow de archivado — desplegado, configurado y probado en n8n | A10 + B1 + C1 | ✅ | **Dev 3** (2026-06-16) |
+| C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ✅ | **Dev 3** (2026-06-16 — corrida exitosa) |
 | V1–V6 | Corridas de validación (backfill, literalidad, curación, re-rank, dedup, resiliencia) | B3 + C2 | ⬜ | los 3 |
 | D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | V1–V6 | ⬜ | los 3 |
 
@@ -99,6 +98,27 @@ hasta definir nicho)**.
    es 1 instancia editada a mano en el nodo Config. Rewrite multi-cliente = F5.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 — Carril C completo: C2 + C3 ✅ *(Dev 3)*
+
+- **Hecho:** workflow de archivado C2 corriendo en producción y verificado.
+  - Dev 3 creó su propia cuenta de **Google Cloud Console** para obtener las credenciales OAuth2
+    que n8n self-hosted requiere (Client ID + Client Secret).
+  - Configuró la app OAuth: tipo "Web application", redirect URI de n8n como URI autorizado,
+    habilitó **Google Sheets API** y **Google Drive API** (desactivadas por defecto en GCP).
+  - Resolvió error **403 `access_denied`**: la app estaba en modo Testing sin usuario de prueba
+    → solución: agregar `danieltovartech@gmail.com` como test user en la pantalla de consentimiento.
+  - Nodo `Append al Sheet Histórico` quedó con credencial OAuth2 activa (tick verde en n8n).
+  - **Corrida manual exitosa:** candidato calificado → archivado en Supabase + fila en Google Sheet
+    "Histórico" + record borrado de Airtable.
+- **C3 ✅:** tracking verificado — `v_selecciones_por_dia` responde con datos post-corrida.
+- **Carril C cerrado.** Todos los tasks C1–C3 en ✅.
+- **Gotcha — GCP en créditos gratuitos ($300 USD):** Dev 3 usó créditos de prueba de GCP que
+  eventualmente se agotan. Google Sheets API y Drive API son gratuitas en volumen MVP (no generan
+  costo por sí solas), pero si el proyecto GCP de Dev 3 tiene otras cosas corriendo o si Google
+  empieza a cobrar por algo, los créditos se consumen. **Acción futura:** antes de que se agoten,
+  mover el OAuth client a la cuenta/proyecto GCP permanente de la agencia (es solo exportar las
+  credenciales y reemplazarlas en n8n — 10 min).
 
 ### 2026-06-15 — C2: primera corrida bloqueada por Google Sheets OAuth *(Dev 3 + Claude)*
 
