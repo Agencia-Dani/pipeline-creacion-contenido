@@ -97,51 +97,13 @@ hasta definir nicho)**.
 
 ## Mejoras pendientes (motor completo — esto es lo que sigue)
 
-> Carriles A, B y C cerrados: el motor entrega y el equipo cura. Lo de abajo **no bloquea el MVP**,
-> son los límites conocidos del **modelo de búsqueda** que salieron al documentar el flujo para el
-> equipo de redes (2026-06-16, verificado en `workflow.json` → nodo *Armar plan de corrida* + nodos
-> Apify). Priorizar después de validar V1–V6.
-
-**Cómo busca hoy el motor (asimétrico por plataforma):**
-- **Instagram = por cuenta.** Baja los posts recientes de cada `Referentes` con `plataforma=instagram`
-  (`directUrls`, `searchType:user`). Las **Keywords NO aplican a IG**: un reel entra por venir de una
-  cuenta seguida, tenga o no las palabras.
-- **TikTok = por hashtag.** Busca con las `Keywords` (cada `termino` → un hashtag). Es un **OR**: entra
-  el video con **al menos una** keyword, no todas. Un TikTok sin esos hashtags es invisible al motor.
-  *(Las keywords tienen un uso secundario en el heat-score: el "boost de tema" matchea la descripción,
-  pero solo ordena, no filtra.)*
-
-**Mejoras:**
-1. **Scrapear Referentes de TikTok por perfil.** Hoy las cuentas con `plataforma=tiktok` se ignoran (el
-   código las junta en `tt_handles` pero no las usa). Requiere un actor de perfil de TikTok en Apify.
-   Sin esto, en TikTok solo se pueden seguir hashtags, no cuentas.
-2. **Keywords multi-palabra.** La keyword se pasa como hashtag literal → una palabra (`liderazgo`)
-   matchea, una frase con espacios (`liderazgo efectivo`) no. Mejora: tokenizar/mapear frases a
-   hashtags o buscar también por texto. Mientras tanto: cargar Keywords como hashtags de una palabra.
-3. **Instagram por tema/hashtag (descubrimiento).** Hoy IG solo trae lo de cuentas ya seguidas. Para
-   descubrir cuentas nuevas por tema (no solo curar a las conocidas) habría que scrapear IG por hashtag
-   además de por cuenta.
-4. **Idioma: detección limitada + boost binario** (nodo `Heat-score v1` + `Config.boost_idioma`).
-   - El **boost es binario**: español = 0, cualquier no-español = `+boost_idioma` (0.3 default). No
-     distingue inglés/portugués/etc., los premia igual. Mejora: boost por idioma con pesos propios.
-   - La **detección** (diccionario `DICT` de stopwords en `Heat-score v1`) solo conoce **es/en/pt/it/fr**.
-     Un video en otro idioma (alemán, japonés…) cae a `es` por defecto y **no recibe boost**. Mejora:
-     ampliar el `DICT` o detectar con librería/LLM. *(Premiar más fuerte lo no-español sí se puede ya,
-     sin tocar código: subir `boost_idioma` en el nodo `Config`.)*
-5. **No hay forma de que el equipo de redes ajuste los parámetros del scoring.** Hoy los knobs
-   (`peso_views`/`peso_likes`/`peso_eng`, `boost_tema`, `boost_idioma`, `umbral_viral`, `top_n_fallback`
-   y la lista de idiomas) viven en el motor: los pesos/boosts en el nodo `Config`, pero la lista de
-   idiomas hardcodeada en el `DICT` del nodo `Heat-score v1`. Cambiar cualquiera requiere un dev
-   editando n8n. **Puede quedar dev-only, pero debería ser fácil:** (a) sacar el `DICT` de idiomas a
-   `Config` para que todos los knobs vivan en **un solo lugar obvio**; (b) idealmente, mover esos
-   ajustes a una tabla **Ajustes** en Airtable (no-code, consistente con el resto del diseño) para que
-   el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
-
-### Auditoría técnica 2026-06-16 — limitaciones de correctitud/rendimiento *(Claude)*
-
-> Pasada completa sobre los artefactos reales (`workflow.json` del motor y del archivado, schemas
-> `001`–`004`, `validate.mjs`, manifests). Ordenado por impacto. **#1, #2, #4 y #9 deberían cerrarse
-> ANTES de activar los crons (D1–D3): son los que fallan en silencio en producción.**
+> Carriles A, B y C cerrados: el motor entrega y el equipo cura. Esta es la **lista única** de lo que
+> falta, ordenada por impacto: primero la **auditoría técnica** (correctitud/rendimiento, pasada
+> 2026-06-16 sobre los artefactos reales — `workflow.json` del motor y del archivado, schemas
+> `001`–`004`, `validate.mjs`, manifests), y al final las mejoras de **producto/alcance** (modelo de
+> búsqueda y tuning, salidas al documentar el flujo para el equipo de redes). Nada de esto bloquea el
+> MVP. **#1, #2, #4 y #9 deberían cerrarse ANTES de activar los crons (D1–D3): fallan en silencio en
+> producción.**
 
 **🔴 Crítico (correctitud / rompe en prod):**
 
@@ -201,6 +163,44 @@ hasta definir nicho)**.
     por seguidores (>700k) es proxy grueso. Modelo v1 conocido; documentar que es poco estable sin volumen.
 14. **Metadata residual del template original** (`instanceId`, `tags`) quedó en el `workflow.json` del motor
     (líneas ~1283-1306). No es secreto, pero ensucia el diff.
+
+**🔵 Producto / alcance (modelo de búsqueda y tuning — post-MVP):**
+
+Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verificado en `workflow.json` (nodo
+*Armar plan de corrida* + nodos Apify):
+- **Instagram = por cuenta.** Baja los posts recientes de cada `Referentes` con `plataforma=instagram`
+  (`directUrls`, `searchType:user`). Las **Keywords NO aplican a IG**: un reel entra por venir de una
+  cuenta seguida, tenga o no las palabras.
+- **TikTok = por hashtag.** Busca con las `Keywords` (cada `termino` → un hashtag). Es un **OR**: entra
+  el video con **al menos una** keyword, no todas. Un TikTok sin esos hashtags es invisible al motor.
+  *(Las keywords tienen un uso secundario en el heat-score: el "boost de tema" matchea la descripción,
+  pero solo ordena, no filtra.)*
+
+15. **Scrapear Referentes de TikTok por perfil.** Hoy las cuentas con `plataforma=tiktok` se ignoran (el
+    código las junta en `tt_handles` pero no las usa). Requiere un actor de perfil de TikTok en Apify.
+    Sin esto, en TikTok solo se pueden seguir hashtags, no cuentas.
+16. **Keywords multi-palabra.** La keyword se pasa como hashtag literal → una palabra (`liderazgo`)
+    matchea, una frase con espacios (`liderazgo efectivo`) no. Mejora: tokenizar/mapear frases a
+    hashtags o buscar también por texto. Mientras tanto: cargar Keywords como hashtags de una palabra.
+17. **Instagram por tema/hashtag (descubrimiento).** Hoy IG solo trae lo de cuentas ya seguidas. Para
+    descubrir cuentas nuevas por tema (no solo curar a las conocidas) habría que scrapear IG por hashtag
+    además de por cuenta.
+18. **Idioma: detección limitada + boost binario** (nodo `Heat-score v1` + `Config.boost_idioma`; ver
+    también **#7**, que pide usar el `lang` de Supadata como fuente primaria de detección).
+    - El **boost es binario**: español = 0, cualquier no-español = `+boost_idioma` (0.3 default). No
+      distingue inglés/portugués/etc., los premia igual. Mejora: boost por idioma con pesos propios.
+    - La **detección** (diccionario `DICT` de stopwords en `Heat-score v1`) solo conoce **es/en/pt/it/fr**.
+      Un video en otro idioma (alemán, japonés…) cae a `es` por defecto y **no recibe boost**. Mejora:
+      ampliar el `DICT` o detectar con librería/LLM. *(Premiar más fuerte lo no-español sí se puede ya,
+      sin tocar código: subir `boost_idioma` en el nodo `Config`.)*
+19. **No hay forma de que el equipo de redes ajuste los parámetros del scoring.** Hoy los knobs
+    (`peso_views`/`peso_likes`/`peso_eng`, `boost_tema`, `boost_idioma`, `umbral_viral`, `top_n_fallback`
+    y la lista de idiomas) viven en el motor: los pesos/boosts en el nodo `Config`, pero la lista de
+    idiomas hardcodeada en el `DICT` del nodo `Heat-score v1`. Cambiar cualquiera requiere un dev
+    editando n8n. **Puede quedar dev-only, pero debería ser fácil:** (a) sacar el `DICT` de idiomas a
+    `Config` para que todos los knobs vivan en **un solo lugar obvio**; (b) idealmente, mover esos
+    ajustes a una tabla **Ajustes** en Airtable (no-code, consistente con el resto del diseño) para que
+    el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
 
