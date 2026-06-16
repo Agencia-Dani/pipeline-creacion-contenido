@@ -145,13 +145,21 @@ hasta definir nicho)**.
    nodos Apify (ya no es opcional): POST `/v2/acts/<actor>/runs` (arranca, devuelve `runId`+`datasetId`) →
    `Wait`+poll `/v2/actor-runs/{runId}` hasta `status=SUCCEEDED` → GET `/v2/datasets/{datasetId}/items`.
    Alternativa: nodo nativo Apify (community) que maneja el async solo. Pendiente de implementar (refactor
-   estructural ~6-8 nodos → hacerlo con el patrón builder, no a mano).
+   estructural ~6-8 nodos → hacerlo con el patrón builder, no a mano). *(🔶 PARCIAL en rama
+   `fix/altos-auditoria`: agregada solo la **visibilidad** — el run cierra como `degradado` si el heat no
+   produjo items, para que el timeout no quede como "ok" con 0 candidatos. El **async sigue pendiente** —
+   es el fix obligatorio.)*
 7. **Detección de idioma por conteo de stopwords (`guessLang`), default `'es'`.** Frágil: un video EN con
    pocas stopwords cae a `'es'` → se salta la traducción → el equipo recibe el script en inglés. Además el
-   idioma alimenta un boost del heat-score. Usar el `lang` de Supadata como fuente primaria.
+   idioma alimenta un boost del heat-score. Usar el `lang` de Supadata como fuente primaria. *(✅ abordado en
+   rama `fix/altos-auditoria` — `lang` de Supadata como fuente primaria; fallback adivina sobre el transcript,
+   no la descripción. Pendiente V-run.)*
 8. **`Merge transcripción`/`Merge traducción` por posición (`mergeByPosition`).** Recombina por índice; si
    Supadata reordena o cambia el conteo de items, pega la transcripción al metadato equivocado. Hoy se
    sostiene por `batchSize:1`+`neverError`, pero es alineación implícita peligrosa → merge por `external_id`.
+   *(✅ abordado en rama `fix/altos-auditoria` — enriquecimiento consolidado en 2 Code nodes
+   (`this.helpers.httpRequest`); se eliminaron ambos Merge por posición y el `external_id` queda atado al
+   item. Pendiente V-run.)*
 
 **🟡 Medio (deuda / operativo):**
 
@@ -210,6 +218,28 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 — Altos #6(parcial)/#7/#8/#3 en rama `fix/altos-auditoria` *(Claude)*
+
+- **Contexto:** mientras se cierra lo crítico (otra persona), se atacaron los Altos de **baja colisión**
+  en un **worktree aislado** (`../pipeline-altos`, rama `fix/altos-auditoria`) para no pisar el motor en vivo.
+  **#5 se difiere** hasta que #4 (paginación) cierre.
+- **Hecho (rama, sin mergear):**
+  - **#7 + #8:** enriquecimiento consolidado en 2 Code nodes (`Transcribir (Supadata)` + `Traducir (Claude
+    Haiku)`) con `this.helpers.httpRequest`. Elimina los 6 nodos frágiles (Supadata HTTP + 2 Merge por
+    posición + 2 Parsear + Claude HTTP). Mata el `mergeByPosition` (#8 — `external_id` queda atado al item)
+    y usa el `lang` de Supadata como fuente primaria, con fallback que adivina sobre el transcript (#7).
+    Misma llamada Anthropic (`claude-haiku-4-5`, `anthropic-version: 2023-06-01`) — no cambia modelo ni
+    semántica (confirmado con el skill `claude-api`).
+  - **#6 (parcial):** el run cierra como `degradado` si el heat no produjo items → el timeout de Apify se ve
+    en el registro. **El async sigue pendiente** (es el fix obligatorio — ver #6, escaló a 🔴).
+  - **#3:** corregida en §Decisiones 1a la justificación de Supabase (la dedup NO ahorra Apify).
+- **Validación:** estructural OK (31 nodos, 0 conexiones rotas, sin huérfanos, `jsCode` async parsea).
+  **NO probado en n8n** → requiere iteración en la V-run (norma del repo).
+- **Qué toca hacer:** **mergear `fix/altos-auditoria` a `main` cuando lo crítico (#1/#2/#4) quede listo y
+  commiteado**, luego `git worktree remove ../pipeline-altos`. La rama toca solo la etapa de enriquecimiento
+  (entre Heat-score y Merge candidatos); no solapa con los nodos Apify (#6 async) ni con `outputs` (#12),
+  así que el merge debería ser limpio. Tras mergear: probar en V-run.
 
 ### 2026-06-16 — V1 primera corrida del motor: debug en vivo *(Mani + Claude)*
 
