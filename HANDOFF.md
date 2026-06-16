@@ -137,6 +137,71 @@ hasta definir nicho)**.
    ajustes a una tabla **Ajustes** en Airtable (no-code, consistente con el resto del diseño) para que
    el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
+### Auditoría técnica 2026-06-16 — limitaciones de correctitud/rendimiento *(Claude)*
+
+> Pasada completa sobre los artefactos reales (`workflow.json` del motor y del archivado, schemas
+> `001`–`004`, `validate.mjs`, manifests). Ordenado por impacto. **#1, #2, #4 y #9 deberían cerrarse
+> ANTES de activar los crons (D1–D3): son los que fallan en silencio en producción.**
+
+**🔴 Crítico (correctitud / rompe en prod):**
+
+1. **El validador del proyecto está en rojo (13 errores).** `node core/scripts/validate.mjs` falla
+   (además requería `npm install` en `core/scripts`, que no estaba hecho). El protocolo dice que
+   escanea secretos "en cada corrida" → hoy no protege de nada. Causas: (a) `workflow-archivado/`
+   **no tiene `workflow.yaml`** (carril C fuera del contrato); (b) el manifest de `short-form-content`
+   usa stages inventados (`config/scorear/dedup/transcribir/traducir/registrar`) en vez de las 8
+   canónicas, le falta `inputs.client_config` e `inputs.filters`, y `registered: supabase` es inválido
+   (debe ser `pending|yes`). → Decidir: arreglar manifests al contrato, o actualizar el contrato al
+   motor real.
+2. **El archivado NO es idempotente si falla el borrado de Airtable.** Orden: `outputs → Sheet →
+   borrar Airtable`. `Borrar de Airtable` no es continue-on-fail; si el delete falla DESPUÉS del
+   append, los records quedan en Airtable y la corrida siguiente los re-toma. Como `outputs.external_id`
+   tiene índice UNIQUE (`outputs_external_id_key`, schema 001) y el POST no usa `on_conflict`, el batch
+   entero falla en PostgREST → como `Registrar outputs` es continue-on-fail, sigue igual → **fila
+   duplicada en el Sheet** y los candidatos nuevos del mismo batch **nunca llegan a `outputs`** (se
+   pierden del histórico y de la señal de aprendizaje). Fix: `Prefer: resolution=ignore-duplicates` en
+   el POST de outputs (igual que `processed_items`) y/o delete con reintento.
+3. **La dedup NO ahorra costo de Apify (contradice el HANDOFF §Decisiones 1a).** El scrape (Apify) corre
+   ANTES del dedup (`Apify → … → Leer procesados → Heat-score filtra`). Apify se paga en cada corrida;
+   el dedup solo ahorra Supadata + Claude. La justificación de mantener Supabase está sobredimensionada.
+
+**🟠 Alto (escala / costo):**
+
+4. **Sin paginación en NINGUNA lectura de Airtable.** Airtable devuelve máx. 100 records/página y exige
+   seguir `offset`. Ni el motor (`Leer Keywords/Referentes/Proyectos/Voces`) ni el archivado
+   (`Leer Candidatos`, `pageSize 100`) iteran el offset → en cuanto algo pase de 100 se **trunca en
+   silencio** (keywords ignoradas, candidatos sin archivar).
+5. **Dedup con tope fijo de 20 000 filas.** `Leer procesados` hace `...&limit=20000`. Cuando
+   `processed_items` lo supere, las filas viejas no se cargan → dedup parcial → re-pago de
+   Supadata/Claude. Mejor: filtrar por los `external_id` de la corrida (`in.(...)`), no traer toda la tabla.
+6. **Timeout de Apify de 120 s con `run-sync-get-dataset-items`.** El backfill inicial (`dias_recencia=180`)
+   puede pasar los 2 min → el nodo hace timeout (`continueRegularOutput` → sigue vacío) **pero el run de
+   Apify sigue y se paga**, entregando 0 candidatos sin error visible. Subir timeout o usar patrón async.
+7. **Detección de idioma por conteo de stopwords (`guessLang`), default `'es'`.** Frágil: un video EN con
+   pocas stopwords cae a `'es'` → se salta la traducción → el equipo recibe el script en inglés. Además el
+   idioma alimenta un boost del heat-score. Usar el `lang` de Supadata como fuente primaria.
+8. **`Merge transcripción`/`Merge traducción` por posición (`mergeByPosition`).** Recombina por índice; si
+   Supadata reordena o cambia el conteo de items, pega la transcripción al metadato equivocado. Hoy se
+   sostiene por `batchSize:1`+`neverError`, pero es alineación implícita peligrosa → merge por `external_id`.
+
+**🟡 Medio (deuda / operativo):**
+
+9. **OAuth de Google Sheets en modo "Testing" → vence cada 7 días.** El cron de archivado es diario →
+   falla en silencio ~1 vez/semana hasta re-autorizar. Sumado a los créditos gratuitos de GCP ($300) que
+   se agotan, el carril C tiene dos relojes corriendo. Publicar la app OAuth / mover a la cuenta GCP
+   permanente ANTES de activar el cron.
+10. **`Workflows/workflow-short-form-content/CLAUDE.md` está desactualizado.** Describe el template VIEJO
+    (Claude **Sonnet** escritor, `Loop Over Items`+`Wait` 13s, prompt caching, categorías, salida a
+    Sheets) — nada de eso existe en el `workflow.json` actual (Haiku traductor, sin loop, sin caching, sin
+    Sheets). Trampa para el próximo dev. El README también está marcado como viejo.
+11. **`core/scripts/deploy.mjs` es código muerto** (HANDOFF §3 lo declara obsoleto). Borrar o marcar claro.
+12. **`outputs.external_id` siempre NULL en el motor** (`Preparar outputs Supabase` no lo setea) → el índice
+    de idempotencia no protege re-ejecuciones manuales del motor (inserta duplicados).
+13. **Percentiles del heat-score sobre muestras chicas** (IG ~8×3 + TT 30) → ranking ruidoso; `flag_viral`
+    por seguidores (>700k) es proxy grueso. Modelo v1 conocido; documentar que es poco estable sin volumen.
+14. **Metadata residual del template original** (`instanceId`, `tags`) quedó en el `workflow.json` del motor
+    (líneas ~1283-1306). No es secreto, pero ensucia el diff.
+
 ## Log de avance (más reciente arriba)
 
 ### 2026-06-16 — Carril C completo: C2 + C3 ✅ *(Dev 3)*
