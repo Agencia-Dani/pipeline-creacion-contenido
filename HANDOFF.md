@@ -121,6 +121,21 @@ hasta definir nicho)**.
 3. **Instagram por tema/hashtag (descubrimiento).** Hoy IG solo trae lo de cuentas ya seguidas. Para
    descubrir cuentas nuevas por tema (no solo curar a las conocidas) habría que scrapear IG por hashtag
    además de por cuenta.
+4. **Idioma: detección limitada + boost binario** (nodo `Heat-score v1` + `Config.boost_idioma`).
+   - El **boost es binario**: español = 0, cualquier no-español = `+boost_idioma` (0.3 default). No
+     distingue inglés/portugués/etc., los premia igual. Mejora: boost por idioma con pesos propios.
+   - La **detección** (diccionario `DICT` de stopwords en `Heat-score v1`) solo conoce **es/en/pt/it/fr**.
+     Un video en otro idioma (alemán, japonés…) cae a `es` por defecto y **no recibe boost**. Mejora:
+     ampliar el `DICT` o detectar con librería/LLM. *(Premiar más fuerte lo no-español sí se puede ya,
+     sin tocar código: subir `boost_idioma` en el nodo `Config`.)*
+5. **No hay forma de que el equipo de redes ajuste los parámetros del scoring.** Hoy los knobs
+   (`peso_views`/`peso_likes`/`peso_eng`, `boost_tema`, `boost_idioma`, `umbral_viral`, `top_n_fallback`
+   y la lista de idiomas) viven en el motor: los pesos/boosts en el nodo `Config`, pero la lista de
+   idiomas hardcodeada en el `DICT` del nodo `Heat-score v1`. Cambiar cualquiera requiere un dev
+   editando n8n. **Puede quedar dev-only, pero debería ser fácil:** (a) sacar el `DICT` de idiomas a
+   `Config` para que todos los knobs vivan en **un solo lugar obvio**; (b) idealmente, mover esos
+   ajustes a una tabla **Ajustes** en Airtable (no-code, consistente con el resto del diseño) para que
+   el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
 
