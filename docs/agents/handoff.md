@@ -21,6 +21,15 @@
 
 ## Estado en una línea
 
+**2026-06-16 (tarde) — Bloqueante #6 resuelto: Apify migrado a community node (Mani).** Los dos
+nodos Apify (`run-sync-get-dataset-items`, tope 300s) → `@apify/n8n-nodes-apify.apify` op
+**"Run actor and get dataset"** (espera al run, sin tope de 5 min) en `workflow.json`. Mismos
+nombre/id/posición → conexiones intactas; el token sale de la URL a la credencial `apifyApi`.
+**Falta:** re-importar en InstaPods, asignar credencial Apify en los 2 nodos, verificar
+`actorId`/`customBody`, y re-correr V1. **Convención nueva:** `temp/` (gitignored) guarda la copia
+viva del workflow descargada de InstaPods — la fuente sobre la que probamos; no commitear (trae
+secretos).
+
 **2026-06-16** — **Carril C completo. C2 ✅ + C3 ✅ (Dev 3).** Dev 3 creó su propia cuenta GCP,
 configuró OAuth2 (Client ID + Secret, APIs habilitadas, test user), conectó Google Sheets en n8n y
 ejecutó el workflow completo exitosamente: candidatos archivados en Supabase + fila en Sheet Histórico
@@ -136,16 +145,14 @@ hasta definir nicho)**.
 5. **Dedup con tope fijo de 20 000 filas.** `Leer procesados` hace `...&limit=20000`. Cuando
    `processed_items` lo supere, las filas viejas no se cargan → dedup parcial → re-pago de
    Supadata/Claude. Mejor: filtrar por los `external_id` de la corrida (`in.(...)`), no traer toda la tabla.
-6. **🔴 `run-sync-get-dataset-items` NO sirve: el run de IG dura 6-7 min y el endpoint sync de Apify
-   topa a 300 s (5 min).** Subir el timeout de n8n NO arregla nada — aunque pongas 300000+ ms, Apify corta
-   la conexión sync a los 5 min, y el run de IG (instagram-scraper, 3 cuentas × backfill 180d) tarda 6-7 min.
-   El run igual corre del lado de Apify **y se paga**, entregando 0 candidatos. **Confirmado en vivo
-   (V1, 2026-06-16): IG dio `ECONNABORTED`; en consola de Apify el run duraba 6-7 min.** El timeout quedó en
-   300000 ms en `workflow.json` (best-effort, no resuelve). **Fix obligatorio = patrón async** en los dos
-   nodos Apify (ya no es opcional): POST `/v2/acts/<actor>/runs` (arranca, devuelve `runId`+`datasetId`) →
-   `Wait`+poll `/v2/actor-runs/{runId}` hasta `status=SUCCEEDED` → GET `/v2/datasets/{datasetId}/items`.
-   Alternativa: nodo nativo Apify (community) que maneja el async solo. Pendiente de implementar (refactor
-   estructural ~6-8 nodos → hacerlo con el patrón builder, no a mano). *(🔶 PARCIAL en rama
+6. **✅ RESUELTO (2026-06-16, Mani): Apify migrado a community node.** Era el bloqueante de V1:
+   `run-sync-get-dataset-items` topa a 300 s y el run de IG dura 6-7 min → entregaba 0 candidatos
+   (confirmado en vivo: IG `ECONNABORTED`). **Fix:** los dos nodos Apify pasaron de
+   `n8n-nodes-base.httpRequest` a `@apify/n8n-nodes-apify.apify` op **"Run actor and get dataset"**
+   (espera al run, sin tope sync) en `workflow.json`. Se eligió el community node sobre el patrón
+   async a mano (Mani ya lo instaló en InstaPods). Mismos nombre/id/posición → conexiones intactas;
+   el token sale de la URL a la credencial `apifyApi`. **Pendiente:** re-importar, asignar credencial
+   Apify en los 2 nodos, verificar `actorId` (string vs resourceLocator) + `customBody`, re-correr V1. *(🔶 PARCIAL en rama
    `fix/altos-auditoria`: agregada solo la **visibilidad** — el run cierra como `degradado` si el heat no
    produjo items, para que el timeout no quede como "ok" con 0 candidatos. El **async sigue pendiente** —
    es el fix obligatorio.)*
@@ -240,6 +247,30 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
   commiteado**, luego `git worktree remove ../pipeline-altos`. La rama toca solo la etapa de enriquecimiento
   (entre Heat-score y Merge candidatos); no solapa con los nodos Apify (#6 async) ni con `outputs` (#12),
   así que el merge debería ser limpio. Tras mergear: probar en V-run.
+
+### 2026-06-16 (tarde) — Apify async vía community node: bloqueante #6 resuelto *(Mani + Claude)*
+
+- **Contexto:** Mani descargó de InstaPods la copia viva del workflow a `temp/` para trabajar sobre
+  ella. Diff contra el repo: **estructuralmente idéntica** (35 nodos, mismas conexiones — el cable
+  TikTok ya estaba; timeouts ya en 300000). Única diferencia: el live trae los **tokens reales**
+  embebidos (Apify/Anthropic/Supadata) + IDs. → `temp/` agregado a `.gitignore` (traía secretos y no
+  estaba ignorado). **Recordatorio:** rotar esas keys al cerrar pruebas.
+- **Hecho:** resuelto el bloqueante #6. Mani instaló el community node `@apify/n8n-nodes-apify` en
+  InstaPods. Los dos nodos Apify pasaron de HTTP `run-sync-get-dataset-items` (tope 300s) a
+  `@apify/n8n-nodes-apify.apify` op **"Run actor and get dataset"** (espera al run, sin tope sync)
+  en `Workflows/workflow-short-form-content/workflow.json`. Preservados nombre/id/posición y las
+  expresiones `customBody` (IG con `onlyPostsNewerThan`; TT con hashtags) → conexiones intactas
+  (validado: 0 rotas; `Armar plan → Apify IG/TT → Normalizar IG/TT`). El token salió de la URL → va
+  en la credencial `apifyApi`.
+- **Decisión:** community node sobre patrón async a mano (Mani lo prefirió y ya lo instaló). Schema
+  confirmado del fuente del paquete (type `@apify/n8n-nodes-apify.apify` tv1, resource `Actors`,
+  op `Run actor and get dataset`, `actorId`, `customBody`, cred `apifyApi`).
+- **Convención nueva:** `temp/` (gitignored) = copia viva del workflow de InstaPods, fuente de las
+  pruebas. No commitear (secretos).
+- **Pendiente:** re-importar en InstaPods → asignar credencial Apify en los 2 nodos → verificar
+  `actorId` (si aparece como dropdown/resourceLocator en vez de string, reseleccionar el actor) +
+  `customBody` → **re-correr V1**. Si IG trae posts reales al `Merge scrapes`, #6 queda cerrado en
+  vivo. Independientes y aún abiertos: paginación Airtable (#4), idempotencia archivado (#2).
 
 ### 2026-06-16 — V1 primera corrida del motor: debug en vivo *(Mani + Claude)*
 
