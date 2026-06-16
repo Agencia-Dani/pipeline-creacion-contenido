@@ -136,12 +136,16 @@ hasta definir nicho)**.
 5. **Dedup con tope fijo de 20 000 filas.** `Leer procesados` hace `...&limit=20000`. Cuando
    `processed_items` lo supere, las filas viejas no se cargan → dedup parcial → re-pago de
    Supadata/Claude. Mejor: filtrar por los `external_id` de la corrida (`in.(...)`), no traer toda la tabla.
-6. **Timeout de Apify con `run-sync-get-dataset-items`.** El backfill inicial (`dias_recencia=180`)
-   puede pasar el timeout → el nodo hace timeout (`continueRegularOutput` → sigue vacío) **pero el run de
-   Apify sigue y se paga**, entregando 0 candidatos sin error visible. **Confirmado en vivo (V1, 2026-06-16):
-   el nodo IG dio `ECONNABORTED` a los 120 s. Mitigado: timeout subido a 300000 ms (= techo del endpoint
-   sync de Apify) en los dos nodos Apify.** Si a 300 s aún corta, pasar a patrón async (POST `/runs` → poll →
-   GET dataset) — sigue siendo el fix real.
+6. **🔴 `run-sync-get-dataset-items` NO sirve: el run de IG dura 6-7 min y el endpoint sync de Apify
+   topa a 300 s (5 min).** Subir el timeout de n8n NO arregla nada — aunque pongas 300000+ ms, Apify corta
+   la conexión sync a los 5 min, y el run de IG (instagram-scraper, 3 cuentas × backfill 180d) tarda 6-7 min.
+   El run igual corre del lado de Apify **y se paga**, entregando 0 candidatos. **Confirmado en vivo
+   (V1, 2026-06-16): IG dio `ECONNABORTED`; en consola de Apify el run duraba 6-7 min.** El timeout quedó en
+   300000 ms en `workflow.json` (best-effort, no resuelve). **Fix obligatorio = patrón async** en los dos
+   nodos Apify (ya no es opcional): POST `/v2/acts/<actor>/runs` (arranca, devuelve `runId`+`datasetId`) →
+   `Wait`+poll `/v2/actor-runs/{runId}` hasta `status=SUCCEEDED` → GET `/v2/datasets/{datasetId}/items`.
+   Alternativa: nodo nativo Apify (community) que maneja el async solo. Pendiente de implementar (refactor
+   estructural ~6-8 nodos → hacerlo con el patrón builder, no a mano).
 7. **Detección de idioma por conteo de stopwords (`guessLang`), default `'es'`.** Frágil: un video EN con
    pocas stopwords cae a `'es'` → se salta la traducción → el equipo recibe el script en inglés. Además el
    idioma alimenta un boost del heat-score. Usar el `lang` de Supadata como fuente primaria.
@@ -225,8 +229,12 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
   (techo útil del endpoint sync de Apify). Verificado que la **config de Airtable está sana** (el
   output de `Armar plan de corrida` muestra 1 proyecto activo, voz linkeada, 9 keywords, 3 handles IG).
 - **Pendiente:** re-correr V1 con los dos fixes (cable TikTok + timeout 300s) y confirmar que llegan
-  posts reales al Merge. Si a 300 s aún corta → patrón async (ver #6). Recordatorios ya trackeados:
-  `deploy.mjs` obsoleto/crashea con los nombres de nodo viejos (#11), referentes de TikTok sin usar (#15).
+  posts reales al Merge. Recordatorios ya trackeados: `deploy.mjs` obsoleto/crashea con los nombres de
+  nodo viejos (#11), referentes de TikTok sin usar (#15).
+- **🔴 BLOQUEANTE para V1 (actualización tarde 2026-06-16):** subir el timeout a 300000 **no alcanza** —
+  el run de IG dura **6-7 min** y el endpoint `run-sync-get-dataset-items` de Apify topa a 300 s. El motor
+  no puede traer scrapes con el patrón sync actual. **Hay que migrar los dos nodos Apify a patrón async
+  antes de que V1 pueda correr** (ver #6 para el detalle de endpoints). Es el próximo paso real del carril B.
 
 ### 2026-06-16 — Carril C completo: C2 + C3 ✅ *(Dev 3)*
 

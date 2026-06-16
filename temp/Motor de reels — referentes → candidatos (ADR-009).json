@@ -1,0 +1,1313 @@
+{
+  "name": "Motor de reels — referentes → candidatos (ADR-009)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "b66dfba4-aef6-4a7c-a87b-95a095607a18",
+      "name": "Cron — semanal (lunes 8am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "2f6882b2-5c79-4b0f-a3c2-bb7455402dbd",
+      "name": "Ejecutar manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "airtable_base_id",
+              "value": "appkdNLlN1v6XdKHn",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "supabase_url",
+              "value": "https://zdeqabvcdqhbcnwivwwk.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "instance_id",
+              "value": "83abbf60-18ae-4072-a7da-48f04bf39f54",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "ig_results_limit",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "c5",
+              "name": "tt_results_limit",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "c6",
+              "name": "peso_views",
+              "value": 0.4,
+              "type": "number"
+            },
+            {
+              "id": "c7",
+              "name": "peso_likes",
+              "value": 0.4,
+              "type": "number"
+            },
+            {
+              "id": "c8",
+              "name": "peso_eng",
+              "value": 0.2,
+              "type": "number"
+            },
+            {
+              "id": "c9",
+              "name": "boost_tema",
+              "value": 0.5,
+              "type": "number"
+            },
+            {
+              "id": "c10",
+              "name": "boost_idioma",
+              "value": 0.3,
+              "type": "number"
+            },
+            {
+              "id": "c11",
+              "name": "umbral_viral",
+              "value": 700000,
+              "type": "number"
+            },
+            {
+              "id": "c12",
+              "name": "top_n_fallback",
+              "value": 25,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4f495432-1406-44c6-bd34-cc7ffd392bfe",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Proyectos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "{activo}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "9296d562-be3d-44c0-9671-7e170eb1fc7e",
+      "name": "Leer Proyectos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        160
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ORyowBWsPgaqXnN6",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Voces' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "af08ed97-4cad-4f9d-b22e-8bc2a625ff1e",
+      "name": "Leer Voces",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        160
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ORyowBWsPgaqXnN6",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Keywords' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "{activo}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "1f057998-b65a-4708-beb0-b8815f2b01b5",
+      "name": "Leer Keywords",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        160
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ORyowBWsPgaqXnN6",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "{activo}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "b991248d-66fd-4bbc-82af-84ae66587d24",
+      "name": "Leer Referentes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1408,
+        160
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ORyowBWsPgaqXnN6",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst recs = (n) => { const r = $(n).first().json; return (r && r.records) || []; };\nconst proyectos = recs('Leer Proyectos');\nconst voces = recs('Leer Voces');\nconst keywords = recs('Leer Keywords');\nconst referentes = recs('Leer Referentes');\n\nconst vozById = {};\nvoces.forEach(v => { vozById[v.id] = (v.fields && v.fields.nombre) || ''; });\n\nconst projects = {};\nproyectos.forEach(p => {\n  const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = {\n    id: p.id, nombre: f.nombre || '',\n    voz_id: vozId, voz_nombre: vozId && vozById[vozId] ? vozById[vozId] : '',\n    min_likes: Number(f.min_likes || 0), min_views: Number(f.min_views || 0),\n    dias_recencia: Number(f.dias_recencia || 0), top_n: Number(f.top_n || 0),\n    keywords: [], ig_handles: [], tt_handles: []\n  };\n});\nkeywords.forEach(k => {\n  const f = k.fields || {}; const proy = Array.isArray(f.proyecto) ? f.proyecto[0] : null;\n  if (proy && projects[proy] && f.termino) projects[proy].keywords.push(String(f.termino).trim());\n});\nreferentes.forEach(r => {\n  const f = r.fields || {}; const proy = Array.isArray(f.proyecto) ? f.proyecto[0] : null;\n  const handle = String(f.handle || '').trim().replace(/^@/, '');\n  if (!proy || !projects[proy] || !handle) return;\n  const plat = String(f.plataforma || '').toLowerCase();\n  if (plat.indexOf('insta') >= 0) projects[proy].ig_handles.push(handle);\n  else if (plat.indexOf('tik') >= 0) projects[proy].tt_handles.push(handle);\n});\n\nconst ig_urls = []; const ig_owner_to_proj = {};\nconst tt_hashtags = []; const kw_to_proj = {};\nObject.values(projects).forEach(p => {\n  p.ig_handles.forEach(h => { ig_urls.push('https://www.instagram.com/' + h + '/'); ig_owner_to_proj[h.toLowerCase()] = p.id; });\n  p.keywords.forEach(k => { const kk = k.replace(/^#/, '').toLowerCase(); tt_hashtags.push(kk); (kw_to_proj[kk] = kw_to_proj[kk] || []).push(p.id); });\n});\n\n// ventana de recencia para el filtro de Apify: si algún proyecto pide 0 (sin límite),\n// no se filtra; si no, se usa el máximo dias_recencia de los proyectos activos.\nconst diasVals = Object.values(projects).map(p => p.dias_recencia);\nconst anyUnlimited = diasVals.some(d => !d || d <= 0);\nconst max_dias_recencia = anyUnlimited ? 0 : Math.max.apply(null, diasVals.concat(0));\n\nreturn [{ json: {\n  projects, ig_urls: [...new Set(ig_urls)], tt_hashtags: [...new Set(tt_hashtags)],\n  ig_owner_to_proj, kw_to_proj, active_project_ids: Object.keys(projects),\n  max_dias_recencia\n} }];\n"
+      },
+      "id": "cc03c903-d04a-4f5e-9ba2-4f362d40d118",
+      "name": "Armar plan de corrida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=apify_api_8utfX37dgwj8o8MqyOKE9Q78TChKNN4DiOm2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var d=Number(p.max_dias_recencia||0); var b={ directUrls: p.ig_urls, resultsType: 'posts', resultsLimit: $('Config').first().json.ig_results_limit, searchType: 'user', searchLimit: 1, addParentData: true }; if(d>0) b.onlyPostsNewerThan = d + ' days'; return b; })() }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "bf4e28e4-0c90-4f2a-aa8c-373aaeaa2c89",
+      "name": "Apify — IG Reels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        256
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/clockworks~free-tiktok-scraper/run-sync-get-dataset-items?token=apify_api_8utfX37dgwj8o8MqyOKE9Q78TChKNN4DiOm2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { hashtags: $('Armar plan de corrida').first().json.tt_hashtags, resultsPerPage: $('Config').first().json.tt_results_limit, shouldDownloadVideos: false, shouldDownloadCovers: false } }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "df333bb3-fcf6-4702-a96d-9b4236901fce",
+      "name": "Apify — TikTok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        48
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst item = $input.item.json;\nconst seguidores = item.ownerFollowersCount || item.ownerFollowerCount || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.ownerBio || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.timestamp ? new Date(Number(item.timestamp) * 1000).toISOString().split('T')[0] : ''\n} };\n"
+      },
+      "id": "5fb4b57f-7e40-41f8-8ec2-64b23b844106",
+      "name": "Normalizar IG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst item = $input.item.json;\nconst am = item.authorMeta || {};\nconst seguidores = am.fans || 0;\nreturn { json: {\n  plataforma: 'tiktok',\n  external_id: String(item.id || ''),\n  username: am.name || '',\n  nombre: am.nickName || '',\n  seguidores,\n  bio: am.signature || '',\n  descripcion: item.text || item.desc || '',\n  likes: item.diggCount || 0,\n  comentarios: item.commentCount || 0,\n  reproducciones: item.playCount || 0,\n  url: item.webVideoUrl || '',\n  video_url: item.webVideoUrl || '',\n  hashtags: (item.hashtags || []).map(function (h) { return h.name || h; }).join(', '),\n  duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n  engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : ''\n} };\n"
+      },
+      "id": "b5321dcb-f941-402c-a3dc-d9c54f359f90",
+      "name": "Normalizar TT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        48
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f8e363ab-0255-4aa7-b650-bc14a1b9c0b5",
+      "name": "Merge scrapes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2576,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst plan = $('Armar plan de corrida').first().json;\nconst projects = plan.projects, ig_owner = plan.ig_owner_to_proj, kw = plan.kw_to_proj;\nconst activeIds = plan.active_project_ids || [];\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  if (!d.url) continue;\n  let proyId = null;\n  if ((d.plataforma || '') === 'instagram') {\n    const u = String(d.username || '').toLowerCase().replace(/^@/, '');\n    if (ig_owner[u]) proyId = ig_owner[u];\n  } else if ((d.plataforma || '') === 'tiktok') {\n    const tags = String(d.hashtags || '').toLowerCase().split(',').map(s => s.trim().replace(/^#/, '')).filter(Boolean);\n    for (const t of tags) { if (kw[t]) { proyId = kw[t][0]; break; } }\n  }\n  if (!proyId && activeIds.length === 1) proyId = activeIds[0];\n  if (!proyId || !projects[proyId]) continue;\n  const p = projects[proyId];\n  // guardia de recencia (capa 2): descarta lo más viejo que dias_recencia del proyecto.\n  // 0 = sin límite. Si no hay fecha, se conserva (no se puede juzgar la edad).\n  if (p.dias_recencia > 0 && d.fecha_publicacion) {\n    const ts = Date.parse(d.fecha_publicacion);\n    if (Number.isFinite(ts) && (Date.now() - ts) > p.dias_recencia * 86400000) continue;\n  }\n  out.push({ json: Object.assign({}, d, {\n    proyecto_id: proyId, proyecto_nombre: p.nombre, voz_id: p.voz_id, voz_nombre: p.voz_nombre,\n    _top_n: p.top_n, _dias: p.dias_recencia, _keywords: p.keywords\n  }) });\n}\nreturn out;\n"
+      },
+      "id": "1f7be7db-9948-47e0-9b64-0956e11c0061",
+      "name": "Asignar proyecto+voz",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2864,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,idioma,tasa_seleccion' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "18809860-924a-448a-adc4-1167e63f65d6",
+      "name": "Leer señal selección",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3152,
+        160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "41vvyPObOz1K82qN",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items?select=external_id,platform&limit=20000' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "6974b9d6-cecc-4a41-a758-1e183f5afe80",
+      "name": "Leer procesados",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3424,
+        160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "41vvyPObOz1K82qN",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cfg = $('Config').first().json;\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Asignar proyecto+voz').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais ']\n};\nconst guessLang = (txt) => {\n  const t = ' ' + norm(txt) + ' '; let best = 'es', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  return bestN === 0 ? 'es' : best;\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const kws = (d._keywords || []).map(norm).filter(Boolean);\n    const txt = norm(' ' + (d.descripcion || '') + ' ' + (d.hashtags || '') + ' ');\n    const tema = kws.length && kws.some(k => txt.indexOf(k) >= 0) ? Number(cfg.boost_tema || 0.5) : 0;\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const sel = signal[(d.username || '') + '|' + idioma] || 0;\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + tema) * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)));\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  const topn = Number((arr[0] && arr[0]._top_n) || cfg.top_n_fallback || 25);\n  fresh.slice(0, topn).forEach(d => out.push({ json: d }));\n}\nreturn out;\n"
+      },
+      "id": "ab84ecf5-ebf5-42c1-ba3f-89f4b03a81f9",
+      "name": "Heat-score v1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3712,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.supadata.ai/v1/transcript?url={{ encodeURIComponent($json.video_url || $json.url) }}&text=true&mode=auto",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "sd_8f8c95f8db71055c91f64dad60510e18"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "abe34d8b-17e3-4d37-b2cf-8c5d96084cdf",
+      "name": "Supadata — transcribir",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3984,
+        160
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "acadfca4-19d7-414b-8c43-e5a2b3a343b6",
+      "name": "Merge transcripción",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        4272,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  let txt = (typeof d.content === 'string' && d.content) || (typeof d.text === 'string' && d.text) || d.transcripcion || '';\n  txt = String(txt || '').trim();\n  let lang = String(d.lang || d.language || '').toLowerCase().slice(0, 2);\n  if (!lang) lang = d.idioma_guess || 'es';\n  out.push({ json: Object.assign({}, d, { transcripcion: txt.substring(0, 6000), idioma_detectado: lang }) });\n}\nreturn out;\n"
+      },
+      "id": "bceace45-e006-4373-b60b-003b37392d23",
+      "name": "Parsear transcripción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4544,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-es",
+              "leftValue": "={{ $json.idioma_detectado }}",
+              "rightValue": "es",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aed4b9ea-3e66-4e39-b30e-615dd776b931",
+      "name": "IF — ya está en español",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4832,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn $input.all().map(i => ({ json: Object.assign({}, i.json, { script: i.json.transcripcion, idioma: i.json.idioma_detectado }) }));\n"
+      },
+      "id": "a364cd27-604a-487b-9364-9de73faccd29",
+      "name": "Script desde transcripción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5104,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"model\": \"claude-haiku-4-5\", \"max_tokens\": 2000, \"system\": \"Sos un traductor literal. Traduci el texto al espanol neutro de forma fiel y literal: sin reescribir, sin resumir, sin embellecer, sin agregar ni quitar nada; conserva el sentido y el orden. Devolve UNICAMENTE el texto traducido, sin comillas ni comentarios.\", \"messages\": [{ \"role\": \"user\", \"content\": String($json.transcripcion || \"\").substring(0, 6000) }] } }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "86ac4df4-b5bd-457b-9797-df9518971f08",
+      "name": "Claude Haiku — traducir",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5392,
+        160
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "notes": "Haiku 4.5 (claude-haiku-4-5) como traductor literal. Sin thinking/effort. Solo se llama si el original NO está en español."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "cecb368b-ec72-4057-90d6-5968198d5f87",
+      "name": "Merge traducción",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        5664,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  let tr = '';\n  try { tr = (d.content && Array.isArray(d.content) && d.content[0] && d.content[0].text) || ''; } catch (e) {}\n  tr = String(tr || '').trim();\n  out.push({ json: Object.assign({}, d, { script: tr || d.transcripcion || '', idioma: d.idioma_detectado || d.idioma_guess || '' }) });\n}\nreturn out;\n"
+      },
+      "id": "4cb17fa6-2509-4699-9dde-522ea17660dd",
+      "name": "Parsear traducción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5952,
+        160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e0b45a14-802c-46fa-90c3-c2cd2d3b3cc4",
+      "name": "Merge candidatos",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        6224,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || '')\n  } });\n}\nreturn out;\n"
+      },
+      "id": "be466684-f0a8-4c82-865a-f5a0bb3f0a4a",
+      "name": "Armar candidato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6512,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
+      },
+      "id": "b1bd610a-cc38-4e7a-a5e8-b03add43add5",
+      "name": "Preparar batch Airtable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6784,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Candidatos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "15d13586-6279-48c9-aed2-5157037bfa15",
+      "name": "POST Airtable Candidatos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7072,
+        160
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ORyowBWsPgaqXnN6",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\nconst outputs = $input.all().map(i => {\n  const d = i.json;\n  return {\n    run_id, tipo: 'guion_reel', titulo: d.titulo || '(sin titulo)',\n    contenido_o_link: d.script || '', estado: 'draft',\n    source_items: [{ platform: d.plataforma || '', url: d.url_referente || '' }],\n    metadata: {\n      proyecto: d.proyecto_nombre || '', voz: d.voz_nombre || '', referente: d.referente || '',\n      url_referente: d.url_referente || '', idioma: d.idioma || '',\n      views: d.views || 0, likes: d.likes || 0, seguidores: d.seguidores || 0,\n      engagement: d.engagement || 0, heat_score: d.heat_score || 0, link_doc: ''\n    }\n  };\n});\nreturn [{ json: { run_id, n: outputs.length, outputs } }];\n"
+      },
+      "id": "a8bbce55-9f77-4673-9698-a1c5f6e6fd88",
+      "name": "Preparar outputs Supabase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7344,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.outputs) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "c43cf98b-9c06-4e93-a838-d2cee2dfccbc",
+      "name": "Reportar outputs al registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7632,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "41vvyPObOz1K82qN",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?id=eq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"fin\": \"{{ $now.toISO() }}\", \"estado\": \"ok\", \"metricas\": { \"colectados\": {{ $('Merge scrapes').all().length }}, \"filtrados\": {{ $('Heat-score v1').all().length }}, \"outputs\": {{ $('Preparar outputs Supabase').first().json.n }} } }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "f379491a-e6aa-49bd-8d6b-66888529db23",
+      "name": "Cerrar run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7904,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "41vvyPObOz1K82qN",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cfg = $('Config').first().json;\nconst iid = cfg.instance_id && String(cfg.instance_id).indexOf('<<') < 0 ? cfg.instance_id : null;\nconst batch = $input.all().map(i => {\n  const d = i.json;\n  return {\n    instance_id: iid, platform: d.plataforma || '', external_id: String(d.external_id || ''),\n    url: d.url || '', seguidores: Number(d.seguidores || 0),\n    flag_viral: !!d.viral_por_tamano, idioma: d.idioma_guess || null\n  };\n}).filter(r => r.external_id);\nreturn [{ json: { batch } }];\n"
+      },
+      "id": "0e2a4ef7-17a5-4a39-a2b4-70d4577c5c18",
+      "name": "Preparar procesados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8192,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.batch) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "d0981ce7-7d9b-42d3-9af1-a4f5b017cee8",
+      "name": "POST processed_items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "41vvyPObOz1K82qN",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"cron\", \"estado\": \"en_curso\", \"params\": {} }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "c5dd7f1b-692f-41e2-b250-d887949b115c",
+      "name": "Abrir run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8752,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "41vvyPObOz1K82qN",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron — semanal (lunes 8am)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar manual": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Leer Proyectos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Abrir run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Proyectos": {
+      "main": [
+        [
+          {
+            "node": "Leer Voces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Voces": {
+      "main": [
+        [
+          {
+            "node": "Leer Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Keywords": {
+      "main": [
+        [
+          {
+            "node": "Leer Referentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Referentes": {
+      "main": [
+        [
+          {
+            "node": "Armar plan de corrida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar plan de corrida": {
+      "main": [
+        [
+          {
+            "node": "Apify — IG Reels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Apify — TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — IG Reels": {
+      "main": [
+        [
+          {
+            "node": "Normalizar IG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — TikTok": {
+      "main": [
+        [
+          {
+            "node": "Normalizar TT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar IG": {
+      "main": [
+        [
+          {
+            "node": "Merge scrapes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar TT": {
+      "main": [
+        [
+          {
+            "node": "Merge scrapes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge scrapes": {
+      "main": [
+        [
+          {
+            "node": "Asignar proyecto+voz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asignar proyecto+voz": {
+      "main": [
+        [
+          {
+            "node": "Leer señal selección",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer señal selección": {
+      "main": [
+        [
+          {
+            "node": "Leer procesados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer procesados": {
+      "main": [
+        [
+          {
+            "node": "Heat-score v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Heat-score v1": {
+      "main": [
+        [
+          {
+            "node": "Supadata — transcribir",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge transcripción",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Preparar procesados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supadata — transcribir": {
+      "main": [
+        [
+          {
+            "node": "Merge transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge transcripción": {
+      "main": [
+        [
+          {
+            "node": "Parsear transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear transcripción": {
+      "main": [
+        [
+          {
+            "node": "IF — ya está en español",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — ya está en español": {
+      "main": [
+        [
+          {
+            "node": "Script desde transcripción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claude Haiku — traducir",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge traducción",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Claude Haiku — traducir": {
+      "main": [
+        [
+          {
+            "node": "Merge traducción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge traducción": {
+      "main": [
+        [
+          {
+            "node": "Parsear traducción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script desde transcripción": {
+      "main": [
+        [
+          {
+            "node": "Merge candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear traducción": {
+      "main": [
+        [
+          {
+            "node": "Merge candidatos",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge candidatos": {
+      "main": [
+        [
+          {
+            "node": "Armar candidato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar candidato": {
+      "main": [
+        [
+          {
+            "node": "Preparar batch Airtable",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Preparar outputs Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar batch Airtable": {
+      "main": [
+        [
+          {
+            "node": "POST Airtable Candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar outputs Supabase": {
+      "main": [
+        [
+          {
+            "node": "Reportar outputs al registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reportar outputs al registro": {
+      "main": [
+        [
+          {
+            "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar procesados": {
+      "main": [
+        [
+          {
+            "node": "POST processed_items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "America/Bogota",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "zU8UUzY1P83VRtj0"
+  },
+  "versionId": "1fd3c8fe-9ac0-4418-be28-9dfb9efdcd57",
+  "meta": {
+    "instanceId": "0b9143f2af75be0bd6303a9dd6b39af9f777307c4f35a87e89454f703848516f"
+  },
+  "id": "usgozjRE2K1lMHYd",
+  "tags": [
+    {
+      "updatedAt": "2026-06-14T19:50:25.895Z",
+      "createdAt": "2026-06-14T19:50:25.895Z",
+      "id": "090mIiRtDo1vDqdX",
+      "name": "Content Strategy"
+    },
+    {
+      "updatedAt": "2026-06-14T19:50:25.908Z",
+      "createdAt": "2026-06-14T19:50:25.908Z",
+      "id": "bR0Vbp6BGV3UwDRG",
+      "name": "AI Automation"
+    },
+    {
+      "updatedAt": "2026-06-14T19:50:25.905Z",
+      "createdAt": "2026-06-14T19:50:25.905Z",
+      "id": "eJHKSsNEFc1w5yL2",
+      "name": "Scraping"
+    }
+  ]
+}
