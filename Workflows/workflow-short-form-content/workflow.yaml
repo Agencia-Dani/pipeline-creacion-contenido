@@ -1,10 +1,11 @@
 # Manifest — cumple core/contracts/workflow-manifest.md (v1)
 #
-# Estado 2026-06-14: REWORK B3 hecho (ADR-009). Este manifest describe el motor nuevo:
-# config desde Airtable → scrape (Apify) → heat-score v1 → dedup → transcribe (Supadata)
-# → traduce literal al español SOLO si hace falta (Claude Haiku) → candidatos a Airtable
-# + registro en Supabase. Sin Google (ni Docs ni Sheets ni Gmail) en el motor.
-# Falta validación en vivo (V1–V6 del ROADMAP) y entregar credenciales en n8n (B4).
+# Estado 2026-06-16: REWORK B3 (ADR-009) corrido en vivo (V1 pobló Candidatos). Este manifest
+# mapea el motor real a las 8 etapas canónicas (PLAN §2.4): config en Airtable → scrape (Apify) →
+# heat-score v1 + dedup → transcribe (Supadata) → traduce literal SOLO si hace falta (Claude Haiku)
+# → candidatos a Airtable + registro en Supabase. Sin Google en el motor.
+# CALIDAD = n/a (hueco conocido) → lo llena el refactor de relevancia (ADR-010,
+# docs/agents/refactor-relevancia.md, Stage 3): gate Haiku sobre el transcript.
 contract_version: 1
 
 id: short-form-content
@@ -17,7 +18,7 @@ description: >
   candidatos a la tabla Candidatos de Airtable para que el equipo de redes los califique.
   Registra cada corrida y salida en Supabase (sumidero, no dependencia).
 engine: n8n
-status: draft                     # construido; sin deployar ni validar en vivo (B4 + V1–V6)
+status: draft                     # corrió manual (V1); cron sin activar (D1–D3 del ROADMAP)
 owner: mani
 
 triggers:
@@ -28,47 +29,48 @@ triggers:
   # (El Form Trigger del template viejo se eliminó: Airtable es la única superficie de config.)
 
 inputs:
+  # MVP: 1 instancia editada a mano en el nodo 'Config' de n8n (deploy.mjs quedó obsoleto;
+  # multi-cliente real = F5). El patrón de ruta queda declarado para cuando exista.
+  client_config: "clients/{cliente}/short-form-content.yaml"
   config_node: "Nodo 'Config' (editar tras importar): airtable_base_id, supabase_url, instance_id + pesos del heat y límites de scrape."
   airtable_cockpit: "core/contracts/airtable-cockpit.md — Proyectos/Voces/Keywords/Referentes (lectura) + Candidatos (escritura)."
-  por_proyecto:                   # se leen de Airtable en cada corrida
-    - { key: top_n,         scope: proyecto, desc: "Cuántos candidatos por proyecto entran a Airtable" }
-    - { key: dias_recencia, scope: proyecto, desc: "Ventana de fetch (backfill grande la 1ª vez)" }
-    - { key: min_likes,     scope: proyecto, desc: "Piso blando (hoy informativo; el heat es percentil)" }
-    - { key: min_views,     scope: proyecto, desc: "Piso blando (idem)" }
-  tunables:                       # nodo Config, calibrables (ROADMAP §5)
-    - { key: peso_views,  default: 0.4 }
-    - { key: peso_likes,  default: 0.4 }
-    - { key: peso_eng,    default: 0.2 }
-    - { key: boost_tema,  default: 0.5 }
-    - { key: boost_idioma, default: 0.3 }
-    - { key: umbral_viral, default: 700000 }
-    - { key: ig_results_limit, default: 8 }
-    - { key: tt_results_limit, default: 30 }
-  credentials:                    # TODAS en credenciales de n8n / gestor — JAMÁS en git
-    - apify_token                 # placeholder <APIFY_TOKEN> en los 2 nodos Apify
+  # filtros calibrables. scope: client = identidad estable del cliente (hoy viven en Airtable
+  # por-proyecto + en el nodo Config; ninguno se pasa por corrida porque no hay form trigger).
+  filters:
+    - { key: top_n,            type: number, scope: client, desc: "Candidatos por proyecto a Airtable (Proyectos.top_n)" }
+    - { key: dias_recencia,    type: number, scope: client, desc: "Ventana de fetch por proyecto (backfill grande la 1ª vez)" }
+    - { key: min_likes,        type: number, scope: client, desc: "Piso blando informativo (el heat es percentil)" }
+    - { key: min_views,        type: number, scope: client, desc: "Piso blando informativo" }
+    - { key: peso_views,       type: number, scope: client, default: 0.4 }
+    - { key: peso_likes,       type: number, scope: client, default: 0.4 }
+    - { key: peso_eng,         type: number, scope: client, default: 0.2 }
+    - { key: boost_tema,       type: number, scope: client, default: 0.5, desc: "Sale con ADR-010 (lo reemplaza el juicio semántico)" }
+    - { key: boost_idioma,     type: number, scope: client, default: 0.3 }
+    - { key: umbral_viral,     type: number, scope: client, default: 700000 }
+    - { key: ig_results_limit, type: number, scope: client, default: 8 }
+    - { key: tt_results_limit, type: number, scope: client, default: 30 }
+  credentials:                    # SOLO NOMBRES — los valores viven en n8n / gestor, JAMÁS en git
+    - apify_token                 # placeholder <APIFY_TOKEN> / credencial apifyApi en los 2 nodos Apify
     - anthropic_api_key           # placeholder <ANTHROPIC_API_KEY> en el nodo Claude Haiku
     - supadata_api_key            # placeholder <SUPADATA_API_KEY> en el nodo Supadata
     - airtable_token              # credencial n8n 'Airtable PAT' (airtableTokenApi)
     - supabase_service_role       # credencial n8n 'Supabase Registro' (supabaseApi)
     # NINGUNA credencial de Google.
 
-stages:
-  config: "Lee Proyectos/Voces/Keywords/Referentes de Airtable y arma el plan de corrida (targets IG + hashtags TT, map a proyecto/voz)."
-  colectar: "Apify — IG Reels (directUrls de referentes; onlyPostsNewerThan = ventana de recencia) + TikTok (hashtags de keywords). 2 corridas por ejecución."
-  normalizar: "Normalizar IG/TT → formato común (+ external_id) → Merge (append) → Asignar proyecto+voz (descarta lo más viejo que dias_recencia — capa 2)."
-  scorear: "Heat-score v1 = 0.4·norm(views)+0.4·norm(likes)+0.2·norm(eng) ×(1+tema)×(1+idioma)×(1+selección); flag_viral marca; top_n por proyecto."
-  dedup: "Consulta processed_items (Supabase) y descarta lo ya visto antes de top_n; inserta los top_n (Prefer ignore-duplicates)."
-  transcribir: "Supadata transcribe (batch). Idioma detectado del response."
-  traducir: "IF idioma=es → script = transcripción tal cual; si no → Claude Haiku traduce literal (sin reescribir)."
-  entregar: "Candidatos a Airtable (estado 'nuevo', batch 10/call, links proyecto/voz)."
-  registrar: "Supabase: runs (abrir/cerrar) + outputs (metadata schema 003). Todo continue-on-fail (sumidero)."
-  calidad: n/a                    # hueco conocido (post-MVP)
+stages:                           # las 8 etapas canónicas de PLAN §2.4 (sin vacíos; n/a si no aplica)
+  colectar: "Lee la config del equipo en Airtable (Proyectos/Voces/Keywords/Referentes), arma el plan, y scrapea con Apify: IG Reels (directUrls de referentes, onlyPostsNewerThan) + TikTok (hashtags de keywords)."
+  normalizar: "Normalizar IG/TT → formato común content_item (+ external_id) → Merge (append) → Asignar proyecto+voz (capa 2 de recencia: descarta lo más viejo que dias_recencia)."
+  filtrar_scorear: "Heat-score v1 = 0.4·norm(views)+0.4·norm(likes)+0.2·norm(eng) ×(1+tema)×(1+idioma)×(1+selección) + dedup contra processed_items (Supabase); flag_viral marca, no corta; top_n por proyecto."
+  enriquecer: "Supadata transcribe (batch); idioma del response. Claude Haiku traduce literal al español SOLO si el original no está en español (sin reescribir)."
+  generar: "Perfil 'script literal' (ADR-009): el script es la transcripción/traducción tal cual, sin reescritura ni voz."
+  calidad: n/a                    # hueco conocido → lo llena el gate Haiku del refactor (ADR-010, Stage 3)
+  entregar: "Candidatos a Airtable (estado 'nuevo', batch 10/call, links proyecto/voz) + registro en Supabase (runs abrir/cerrar + outputs metadata schema 003; todo continue-on-fail, sumidero)."
   notificar: n/a                  # sin email en el MVP (el equipo vive en Airtable)
 
 outputs:
   - type: guion_reel
     destination_native: airtable  # tabla Candidatos
-    registered: supabase          # outputs (contenido_o_link = texto del script; sin link_doc — ver ADR-009 nota 2026-06-14)
+    registered: yes               # reporta al registro central (Supabase outputs; contenido_o_link = texto del script — ADR-009 nota 2026-06-14)
 
 runbook:
   setup: "Importar workflow.json en n8n → editar nodo Config (base_id, supabase_url, instance_id) → pegar API keys/credenciales (B4) → importar error-workflow-registro.json como Error Workflow."
@@ -79,5 +81,6 @@ runbook:
     - README.md
     - CLAUDE.md
     - ../../ROADMAP.md
+    - ../../docs/agents/refactor-relevancia.md
 
-cost_per_run: "por medir (B3): Apify x2 actors + ~top_n transcripciones Supadata + solo las traducciones no-español vía Claude Haiku (claude-haiku-4-5, $1/$5 por Mtok)."
+cost_per_run: "por medir (B3): Apify x2 actors + ~top_n transcripciones Supadata + solo las traducciones no-español vía Claude Haiku (claude-haiku-4-5, $1/$5 por Mtok). ADR-010 suma 2 llamadas Haiku batch (pre-trim + gate)."

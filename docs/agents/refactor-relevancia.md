@@ -1,0 +1,102 @@
+# Refactor de relevancia — plan por stages
+
+> **Qué es esto:** el plan para que el motor entregue **videos que de verdad se alinean al Proyecto**,
+> no solo virales. Pensado para ejecutarse en **sesiones distintas**: cada stage es autónomo, tiene su
+> "hecho cuando", y arranca leyendo este doc + el [handoff](./handoff.md). El **porqué** de las
+> decisiones grandes vive en ADR-010 (se escribe en Stage 0); los términos, en
+> [context.md](./context.md) (Heat-score, Relevancia tópica, Utilidad, Criterios de relevancia).
+>
+> **Disparador:** V1 corrió end-to-end y pobló `Candidatos`, pero el ranking deja pasar contenido
+> viral-pero-irrelevante (hashtag farming, viral sin razón). El heat-score solo mira métricas + match
+> de keyword por **substring** (gameable). Falta un juicio sobre el **contenido** del video.
+
+## Norte (decisiones lockeadas en la sesión de grilling 2026-06-16)
+
+1. **Driver:** relevancia (alineación real al Proyecto). Transcripción exacta = secundario (confiamos
+   en Supadata; el único arreglo es el micro-fix de idioma, ya hecho — ver Stage 3).
+2. **Descubrimiento = 2 ejes:** referentes (cuentas) + términos (hashtags/keywords). Las métricas son
+   señal de **ranking** transversal, no un modo de búsqueda.
+3. **Relevancia en doble capa Haiku:**
+   - **Pre-trim** (sobre caption, etapa FILTRAR/SCOREAR): colador **amplio**, optimiza *recall*. Tira
+     solo lo obviamente off-topic para no transcribir basura. En la duda, deja pasar.
+   - **Gate / jurado** (sobre transcript, etapa **CALIDAD**): **estricto**, optimiza *precision*.
+     Produce el score de relevancia/calidad. Llena el hueco ❌ de CALIDAD en PLAN §2.4.
+4. **Heat-score nuevo = composite:** juicio semántico de Haiku ⊕ métricas objetivas
+   (views/likes/eng/selección). El substring `tema` **sale**. Haiku es el eje principal; las métricas
+   pesan (ordenan fino entre los relevantes). Pesos exactos = a calibrar con data real.
+5. **Criterios en Airtable** (`Proyectos.criterios_relevancia`, opcional `Voces`), editables por el
+   equipo — no-code, consistente con el norte (ROADMAP §1: Airtable es el punto de entrada único).
+6. **Gates fail-open:** si Haiku falla, el video **pasa** (no se vacía la entrega). Invariante #1
+   (servicios externos no son dependencia de ejecución).
+7. **Estructura:** un solo workflow (ADR-006: sin workflow padre), expresando las **8 etapas
+   canónicas** (PLAN §2.4). Incremental, nunca rompe el V1 operativo (invariante #7). Se construye con
+   el builder Node, se valida por re-import + Execute (CLAUDE.md del workflow).
+
+## Stages
+
+> Orden recomendado. Stages 0-1 son baratos y sin riesgo de runtime; 2-4 son intrusivos (builder Node
+> + validar por re-import). **Precondición de 3-4:** mergear primero la rama `fix/altos-auditoria`
+> (trae #7 idioma + #8 merges consolidados en 2 Code nodes de enriquecimiento) o rebasar sobre ella;
+> Stage 3/4 construyen encima de esos nodos. Ver handoff §"Mejoras pendientes" #7/#8.
+
+### ✅ Stage 0 — Capturar (docs · descriptivo-first · cero riesgo runtime) — HECHO 2026-06-16
+- ✅ **ADR-010** escrito ([../adr/ADR-010-scoring-semantico-y-etapa-calidad.md](../adr/ADR-010-scoring-semantico-y-etapa-calidad.md)):
+  scoring semántico con LLM + etapa CALIDAD (revisa el scoring de ADR-009), con el trade-off registrado.
+- ✅ **Manifests sincronizados** a las 8 etapas canónicas: `workflow-short-form-content/workflow.yaml`
+  reescrito (stages canónicas, `client_config` + `filters`, `registered: yes`) y creado
+  `workflow-archivado/workflow.yaml` (faltaba). **Validador en verde** (933 checks, 0 errores) →
+  resuelve handoff #1.
+- ✅ context.md ya refleja los términos (Heat-score redefinido + Relevancia tópica/Utilidad/Criterios).
+
+### Stage 1 — Cockpit: criterios de relevancia (Carril A · prerequisito chico)
+- Campo **`criterios_relevancia`** (texto largo) en la tabla `Proyectos` (y opcional en `Voces`).
+- Actualizar el contrato [core/contracts/airtable-cockpit.md](../../core/contracts/airtable-cockpit.md).
+- Sembrar criterios para el proyecto piloto ("IA y Productividad").
+- **Hecho cuando:** el equipo puede editar criterios en Airtable y el motor los lee en `Armar plan`.
+
+### Stage 2 — FILTRAR/SCOREAR: heat-score limpio + pre-trim (motor)
+- Sacar el **substring `tema`** del nodo `Heat-score v1`; dejar el score métrico como **prescore**
+  limpio (views/likes/eng percentil + selección + flag_viral marca).
+- Nodo nuevo **Pre-trim (Haiku)**: batch sobre caption+hashtags + tópico del Proyecto. Lenient,
+  recall. Tira lo obviamente off-topic antes de transcribir. Fail-open.
+- **Hecho cuando:** re-import + Execute → candidatos fluyen, la basura obvia ya no se transcribe,
+  el orden por métricas se mantiene sano.
+
+### Stage 3 — CALIDAD: el gate / jurado (motor · el corazón)
+- Nodo nuevo **Gate de relevancia (Haiku)** sobre el transcript: juzga relevancia/calidad contra
+  `criterios_relevancia` del Proyecto → `{relevante, score 0-1, razon}`. Estricto, precision.
+- **Composite final:** combinar el `score` de Haiku con el prescore métrico → heat-score nuevo.
+  Drop de los `relevante:false`. **Fail-open** ante fallo de Haiku.
+- **Micro-fix de idioma (token-free): YA HECHO** en `fix/altos-auditoria` (#7 — `lang` de Supadata
+  como fuente primaria, fallback sobre el transcript). Este stage solo lo hereda al mergear.
+- **Hecho cuando:** una corrida deja pasar solo lo relevante y el orden refleja relevancia ⊕ métricas;
+  un fallo simulado de Haiku no vacía la entrega.
+
+### Stage 4 — Limpieza estructural (expresar las 8 etapas)
+- Hacer que el workflow mapee limpio a PLAN §2.4 (COLECTAR adaptadores · NORMALIZAR · FILTRAR/SCOREAR ·
+  ENRIQUECER · GENERAR · **CALIDAD** · ENTREGAR · NOTIFICAR).
+- Merges-by-position ya eliminados por `fix/altos-auditoria` (#8) — verificar que siguen fuera.
+- Dejar los adaptadores de descubrimiento (referentes / términos) prolijos para reuso futuro (ADR-007,
+  sin generalizar de más — YAGNI).
+- **Hecho cuando:** el workflow expresa las etapas sin alineación frágil; manifest coincide con la
+  realidad.
+
+### Stage 5 — Validación + calibración
+- Corrida de fuego: confirmar que el viral-pero-irrelevante **desaparece** (muestrear contra la corrida
+  V1 previa).
+- Calibrar: **ancho del embudo** (cuánto transcribir de más), **pesos del composite** (Haiku vs
+  métricas), y el **rubric** del jurado, con data real.
+- **Hecho cuando:** Majo/Jero validan la calidad de los candidatos sobre data real.
+
+## Abierto a propósito (no bloquea; se cierra con data en Stage 5)
+- El **rubric exacto** del pre-trim y del gate (qué reglas, qué tan estricto).
+- Cuánto pesa **Haiku vs métricas** en el composite.
+- Si la **Voz** entra en los criterios o queda solo el Proyecto.
+- Ancho del embudo de transcripción (top_n × factor).
+
+## Relación con la auditoría del handoff
+Este refactor toca o supersede varios items de handoff §"Mejoras pendientes":
+- **#1** (manifest/validador) → Stage 0.
+- **#7** (idioma) y **#8** (mergeByPosition) → ya en `fix/altos-auditoria`, precondición de Stage 3-4.
+- **#13, #15-#19** (modelo de búsqueda y tuning) → quedan enmarcados acá; #16/#17/#15 (más fuentes de
+  descubrimiento) son extensiones de COLECTAR para después, no parte del corazón de este refactor.

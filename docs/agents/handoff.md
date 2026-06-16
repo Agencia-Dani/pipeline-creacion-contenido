@@ -21,6 +21,17 @@
 
 ## Estado en una línea
 
+**2026-06-16 (noche) — V1 corrió y pobló Candidatos; abierto el refactor de relevancia (Mani).** El
+re-import (post-fix timestamp IG) funcionó end-to-end. Gap detectado: el ranking deja pasar
+viral-pero-irrelevante (substring de keyword, sin juicio de contenido). Sesión de grilling
+(`/grill-with-docs`) → decisiones lockeadas + **plan por stages** en
+[refactor-relevancia.md](./refactor-relevancia.md). Núcleo: doble gate Haiku (pre-trim recall en
+FILTRAR/SCOREAR + jurado precision en CALIDAD) + heat-score composite (semántico ⊕ métricas, sin
+substring). **Stage 0 ✅** (ADR-010 escrito + ambos manifests sincronizados a las 8 etapas →
+validador en verde, resuelve #1). Próximo: Stage 1 (campo `criterios_relevancia` en Airtable). El
+micro-fix de idioma (#7) y la limpieza de merges (#8) ya están en `fix/altos-auditoria` →
+precondición de los stages intrusivos.
+
 **2026-06-16 (tarde) — Bloqueante #6 resuelto: Apify migrado a community node (Mani).** Los dos
 nodos Apify (`run-sync-get-dataset-items`, tope 300s) → `@apify/n8n-nodes-apify.apify` op
 **"Run actor and get dataset"** (espera al run, sin tope de 5 min) en `workflow.json`. Mismos
@@ -116,14 +127,11 @@ hasta definir nicho)**.
 
 **🔴 Crítico (correctitud / rompe en prod):**
 
-1. **El validador del proyecto está en rojo (13 errores).** `node core/scripts/validate.mjs` falla
-   (además requería `npm install` en `core/scripts`, que no estaba hecho). El protocolo dice que
-   escanea secretos "en cada corrida" → hoy no protege de nada. Causas: (a) `workflow-archivado/`
-   **no tiene `workflow.yaml`** (carril C fuera del contrato); (b) el manifest de `short-form-content`
-   usa stages inventados (`config/scorear/dedup/transcribir/traducir/registrar`) en vez de las 8
-   canónicas, le falta `inputs.client_config` e `inputs.filters`, y `registered: supabase` es inválido
-   (debe ser `pending|yes`). → Decidir: arreglar manifests al contrato, o actualizar el contrato al
-   motor real.
+1. **✅ RESUELTO (2026-06-16, Stage 0 del refactor).** Validador en verde (933 checks, 0 errores).
+   Se arreglaron los manifests al contrato: (a) creado `workflow-archivado/workflow.yaml`; (b)
+   `short-form-content/workflow.yaml` reescrito a las 8 etapas canónicas + `client_config` + `filters`
+   + `registered: yes`. *(Original: 13 errores — archivado sin manifest, short-form-content con stages
+   inventados, sin `client_config`/`filters`, `registered: supabase` inválido.)*
 2. **El archivado NO es idempotente si falla el borrado de Airtable.** Orden: `outputs → Sheet →
    borrar Airtable`. `Borrar de Airtable` no es continue-on-fail; si el delete falla DESPUÉS del
    append, los records quedan en Airtable y la corrida siguiente los re-toma. Como `outputs.external_id`
@@ -225,6 +233,26 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 (noche) — Refactor de relevancia: grilling + Stage 0 *(Mani + Claude)*
+
+- **Contexto:** V1 corrió end-to-end y pobló Candidatos (re-import tras el fix del timestamp IG, que
+  asumía epoch cuando Apify manda ISO). Mani detectó el gap real: el ranking deja pasar
+  viral-pero-irrelevante porque el heat-score juzga tópico por **substring** de keyword, sin mirar el
+  contenido. Sesión `/grill-with-docs` completa.
+- **Decidido (lockeado, ver [refactor-relevancia.md](./refactor-relevancia.md) + ADR-010):**
+  descubrimiento = 2 ejes (referentes + términos); relevancia por **doble gate Haiku** (pre-trim
+  amplio/recall en FILTRAR/SCOREAR + jurado estricto/precision en CALIDAD, que llena el hueco ❌);
+  heat-score nuevo = **composite** semántico ⊕ métricas (sale el substring); criterios editables por
+  el equipo en Airtable; gates **fail-open**; un solo workflow expresando las 8 etapas (ADR-006 +
+  invariante #7).
+- **Hecho (Stage 0, commiteado):** ADR-010 escrito · `context.md` afinado (Heat-score + Relevancia
+  tópica/Utilidad/Criterios de relevancia) · **ambos manifests sincronizados a las 8 etapas
+  canónicas** (creado el de archivado; reescrito el del motor) → **validador en verde** (resuelve #1
+  de esta lista) · plan por stages escrito para continuar en sesiones distintas.
+- **Qué sigue:** Stage 1 = campo `criterios_relevancia` en Airtable (Carril A, chico). Stages 2-4
+  (intrusivos) van con builder Node + validación por re-import; **precondición: mergear primero
+  `fix/altos-auditoria`** (trae #7 idioma + #8 merges, sobre los que construyen).
 
 ### 2026-06-16 — Altos #6(parcial)/#7/#8/#3 en rama `fix/altos-auditoria` *(Claude)*
 

@@ -30,8 +30,20 @@ Un video ya transcrito y traducido al español, esperando que el equipo lo calif
 La unidad que el equipo cura.
 
 **Heat-score**:
-El número con que el motor ordena los candidatos de caliente a frío. Pondera views/likes/engagement
-(percentil dentro de la corrida) por boosts de tema, idioma y señal de selección histórica.
+El número con que el motor ordena los candidatos de caliente a frío. Combina la relevancia/calidad
+del contenido (juicio semántico contra los criterios del Proyecto) con su desempeño objetivo
+(views/likes/engagement, percentil dentro de la corrida) y la señal de selección histórica.
+
+**Relevancia tópica**:
+Qué tan genuinamente el video trata la temática del Proyecto, más allá de que mencione la keyword o
+use el hashtag de adorno. Garantizarla es trabajo de la máquina.
+
+**Utilidad**:
+Qué tanto aporta el contenido del video en sí, frente a lo viral-vacío (gancho sin sustancia).
+
+**Criterios de relevancia**:
+Las reglas, editables por el equipo en Airtable, contra las que el motor juzga si un video sirve
+para un Proyecto (y opcionalmente una Voz). Alimentan la evaluación semántica.
 
 **flag_viral**:
 La marca de una cuenta muy grande (~700K+ seguidores). Marca "high-end", **no** excluye ni altera

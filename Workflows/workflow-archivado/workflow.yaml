@@ -1,0 +1,57 @@
+# Manifest — cumple core/contracts/workflow-manifest.md (v1)
+#
+# Carril C (C2). Cierra el loop de curación: toma los Candidatos ya calificados por el equipo en
+# Airtable, los manda al histórico permanente (Supabase + Google Sheet) y los borra de Airtable
+# para no reventar el plan free. Detalle y decisiones de diseño en README.md.
+contract_version: 1
+
+id: archivado
+name: "Archivado de curación — calificados → histórico"
+description: >
+  Corre diario por cron: lee los Candidatos que Majo/Jero ya calificaron en Airtable, los registra
+  en el histórico permanente (Supabase outputs + Google Sheet "Histórico") y los borra de Airtable
+  para respetar el límite del plan free. Es el complemento del motor de reels.
+engine: n8n
+status: draft                     # validado en vivo (C3 ✅); cron sin activar (D1 del ROADMAP)
+owner: dev3
+
+triggers:
+  - type: cron
+    schedule: "0 9 * * *"         # diario 9:00 AM
+    timezone: America/Bogota
+  - type: manual                  # "Execute Workflow" en n8n
+
+inputs:
+  client_config: "clients/{cliente}/archivado.yaml"   # MVP: 1 instancia editada en el nodo Config
+  config_node: "Nodo 'Config': airtable_base_id, supabase_url, instance_id, google_sheet_id, nombre_pestana_sheet."
+  filters: []                     # no scorea ni parametriza por corrida: es mantenimiento
+  credentials:
+    - airtable_token              # credencial n8n 'Airtable PAT' (airtableTokenApi)
+    - supabase_service_role       # credencial n8n 'Supabase Registro' (supabaseApi)
+    - google_sheets_oauth         # credencial n8n Google Sheets OAuth2 (única dependencia de Google)
+
+stages:                           # las 8 etapas canónicas; este es un wf de mantenimiento → casi todo n/a
+  colectar: "Lee de Airtable los Candidatos con calificacion puesta (filterByFormula NOT calificacion vacío) — la cola de archivado."
+  normalizar: "Resuelve los links proyecto/voz (id→nombre) leyendo Proyectos/Voces; arma las filas del histórico."
+  filtrar_scorear: n/a
+  enriquecer: n/a
+  generar: n/a
+  calidad: n/a
+  entregar: "Inserta en Supabase outputs (histórico + señal de aprendizaje, schema 003/004) + append al Sheet Histórico + borra el record de Airtable. Supabase es sumidero (continue-on-fail); el Sheet NO es continue-on-fail (si falla, corta antes de borrar → no se pierde curación)."
+  notificar: n/a
+
+outputs:
+  - type: guion_reel              # el script ya calificado, materializado en el histórico
+    destination_native: google_sheets   # Sheet "Histórico" (la base descargable del equipo)
+    registered: yes               # registro central = Supabase outputs (alimenta v_historico/v_selecciones/v_senal)
+
+runbook:
+  setup: "Importar workflow.json en n8n → completar nodo Config (base_id, supabase_url, instance_id, google_sheet_id, pestaña 'Historico') → mapear credenciales (Airtable PAT, Supabase Registro, Google Sheets OAuth2). Requiere 004_historico_script_texto.sql aplicado."
+  start: "Activar el cron diario en n8n (validar timezone)."
+  stop: "Desactivar el workflow en n8n."
+  test: "Calificar 1 Candidato en Airtable → Execute Workflow → verificar fila en el Sheet con su script, candidato borrado de Airtable, y v_selecciones_por_dia responde."
+  docs:
+    - README.md
+    - ../../docs/agents/handoff.md
+
+cost_per_run: "~$0 — Airtable + Supabase + Google Sheets API en cuota free del MVP."
