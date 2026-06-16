@@ -12,7 +12,7 @@
 > tarea exige tocar `core/` fuera de lo previsto, se para y se discute.
 >
 > **El estado vivo (quién tiene qué task, avance, log de sesiones) vive en
-> [HANDOFF.md](./HANDOFF.md)** — actualizalo al tomar un task y al cerrar cada sesión; los `[x]`
+> [HANDOFF.md](./docs/agents/handoff.md)** — actualizalo al tomar un task y al cerrar cada sesión; los `[x]`
 > de este checklist se marcan al completar.
 
 ---

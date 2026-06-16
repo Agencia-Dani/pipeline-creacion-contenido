@@ -108,7 +108,7 @@ El repo se mantiene a propósito con **pocos documentos, cada uno con un dueño 
 | Documento | Qué responde | Cuándo leerlo |
 |---|---|---|
 | **[README.md](./README.md)** (este) | ¿Qué es esto y por qué existe? | Al entrar al repo |
-| **[HANDOFF.md](./HANDOFF.md)** | ¿En qué va el trabajo y qué task tomo? Tablero vivo + log de avance entre devs | **Antes de cada sesión de trabajo** |
+| **[handoff.md](./docs/agents/handoff.md)** | ¿En qué va el trabajo y qué task tomo? Tablero vivo + log de avance entre devs | **Antes de cada sesión de trabajo** |
 | **[ROADMAP.md](./ROADMAP.md)** | ¿Qué pidió el jefe (el norte) y cómo se ejecuta cada task? Milestones + checklist del MVP de reels | El manual del MVP |
 | **[PLAN.md](./PLAN.md)** | ¿Cómo está diseñado el sistema? Arquitectura, invariantes (§2.5), decisiones, costos, fases post-MVP | Antes de tocar `core/` o decidir algo estructural |
 | **[docs/adr/](./docs/adr/README.md)** | ¿Por qué se decidió así? Una decisión por archivo, con alternativas descartadas | Antes de revertir o re-discutir una decisión |

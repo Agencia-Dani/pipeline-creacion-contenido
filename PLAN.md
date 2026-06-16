@@ -99,9 +99,10 @@ la regla de dueños únicos está en §2.5.
 pipeline-creacion-contenido/
 ├── README.md                  ← visión + mapa de documentos
 ├── ROADMAP.md                 ← ejecución del MVP de reels (norte + checklist)
-├── HANDOFF.md                 ← estado vivo: tablero de tasks + log entre devs
 ├── PLAN.md                    ← este documento (diseño + fases)
+├── CLAUDE.md                  ← constitución para agentes (feedback loops + skills + punteros)
 ├── docs/
+│   ├── agents/                ← handoff.md (estado vivo) + context.md (glosario de dominio)
 │   ├── adr/                   ← ADR-001..009 (decisiones con su porqué)
 │   ├── transcripciones/       ← fuentes de decisiones (conversaciones con el jefe)
 │   └── one-pager-reels-mvp.md ← la visión del MVP en una página (no técnica)
@@ -261,7 +262,7 @@ manifest al estado real del motor tras el rework (D2 del ROADMAP).
 La rebanada fina end-to-end con la dirección ADR-009: cockpit Airtable + motor n8n
 (dedup/heat/transcribe-traduce) + registro Supabase + histórico en Sheets. Todo el detalle
 (carriles, tasks, validación, criterio de hecho) está en el ROADMAP y el avance en
-[HANDOFF](./HANDOFF.md) — no se duplica acá.
+[handoff](./docs/agents/handoff.md) — no se duplica acá.
 
 ### F3 — Puesta en marcha del workflow de Substack + conexión al registro
 La prueba de fuego del contrato: el extremo opuesto se monta de cero y entra al mismo registro.

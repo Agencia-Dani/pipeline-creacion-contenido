@@ -5,7 +5,7 @@
 > permanente (Supabase + Google Sheet) y los **borra de Airtable** para no reventar el plan free
 > (1.000 records). Es el complemento del motor B3 (`../workflow-short-form-content/`).
 >
-> Estado real del MVP: [ROADMAP §3 carril C](../../ROADMAP.md) · [HANDOFF.md](../../HANDOFF.md).
+> Estado real del MVP: [ROADMAP §3 carril C](../../ROADMAP.md) · [handoff.md](../../docs/agents/handoff.md).
 
 ## Qué hace (flujo)
 
