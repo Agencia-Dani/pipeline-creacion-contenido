@@ -4,6 +4,38 @@ Central única de los workflows de n8n de creación de contenido de la agencia (
 Hoy: el MVP de reels (motor de detección/transcripción + cockpit Airtable + histórico). El núcleo
 está hecho para que sumar un flujo o un cliente sea clonar y configurar, no construir de cero.
 
+## Mapa de docs
+
+Dónde vive cada cosa, para revisar, cambiar o no perderse. El **cómo usar** las 4 docs de trabajo está
+en §Agent skills; acá solo se ubican.
+
+**Norte y producto (qué/por qué)**
+- [README.md](README.md) — visión del sistema central (puerta de entrada).
+- [ROADMAP.md](ROADMAP.md) — norte + checklist del MVP. **Gana sobre cualquier otro doc** (ROADMAP §1).
+- [PLAN.md](PLAN.md) — arquitectura, invariantes (§2.5), fases, tabla-resumen de ADRs (§3.1).
+- [docs/one-pager-reels-mvp.md](docs/one-pager-reels-mvp.md) — one-pager no técnico para el jefe.
+
+**Estado y dominio (para trabajar)**
+- [docs/agents/handoff.md](docs/agents/handoff.md) — estado vivo del repo (leelo al empezar la sesión).
+- [docs/agents/context.md](docs/agents/context.md) — glosario de dominio (lenguaje ubicuo).
+- [docs/agents/dev-doc.md](docs/agents/dev-doc.md) — los 2 workflows nodo por nodo + mapa de datos.
+- [docs/agents/refactor-relevancia.md](docs/agents/refactor-relevancia.md) — plan por stages del refactor de relevancia (origen del scoring actual).
+
+**Decisiones**
+- [docs/adr/](docs/adr/) — ADRs 001–012, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+
+**Contratos del núcleo (`core/`, solo cambia con ADR)**
+- [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
+- [core/contracts/airtable-cockpit.md](core/contracts/airtable-cockpit.md) — modelo de datos del cockpit (las 6 tablas Airtable).
+- [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–006; se aplican en el SQL Editor).
+
+**Operación / equipo de redes**
+- [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
+
+**Por workflow**
+- [Workflows/workflow-short-form-content/CLAUDE.md](Workflows/workflow-short-form-content/CLAUDE.md) — el motor de reels (qué es, orden). Fuente de verdad: su `workflow.json`.
+
 ## Agent skills
 
 Este repo está preparado para ingeniería con agentes. Leé esto antes de trabajar:
@@ -17,7 +49,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los dos workflows (orden de ejecución, qué tabla Airtable lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..009).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..012).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del
