@@ -21,6 +21,21 @@
 
 ## Estado en una línea
 
+**2026-06-17 (cierre 5) — V-run de ESTE repo VALIDADA + fix del no-transcript (Mani).** Se levantó el 🔴
+de cierre 4: la **V-run corrió sobre el motor de este repo** (Supabase `runs` 61b1b5d5, `ok`, embudo
+`151 colectados → 10 filtrados → 9 candidatos`) → **decisión #1 (validar primero) HECHA**. Análisis del output
+con credenciales vivas (PAT + service_role): el **gate funciona** — dropeó `chris_stocks_` ("rescate animal con
+ChatGPT" tangencial), justo el viral-off-topic que el refactor venía a matar; el composite re-rankea bien; el
+script sale literal en español. **Hallazgo:** los **3 candidatos sin script esquivaban el gate** (sin texto salían
+del lote → pasaban ciegos sin juzgar); uno (`tradingsharks` "Anthropic lanza Claude Fable 5") era hype que el
+criterio rechaza. **FIX hecha en código (nueva decisión, ver log):** el nodo `Gate de relevancia` ahora **juzga el
+caption como fallback** cuando no hay transcript; los relevantes-sin-script se **mantienen flageados**
+`[SIN TRANSCRIPT: juzgado por caption, revisar manual]`, los irrelevantes ahora **sí se dropean**. Smoke test 5/5
++ validador 927/0. **Timeout de IG revisado:** NO es timeout (el community node espera al run de Apify, sin tope);
+IG sale flaco por referente-only + ventana 7d + competencia métrica contra TikTok → la palanca real es el
+descubrimiento simétrico. **🔴 SIN COMMIT (la fix está en el working tree) + falta V-run de re-validación. Rotar
+PAT Airtable + service_role Supabase (expuestos hoy).** De las 6 decisiones: #1 ✅; quedan **#2-#6**.
+
 **2026-06-16 (cierre 4) — Objetivos del MVP afilados + grill-me de cumplimiento (Mani).** Sesión de
 alineación (sin tocar código): se destiló el norte (ROADMAP §1) a **11 objetivos verificables (O1–O11)**,
 sumando **O11 = equipo-redes-friendly** (Majo/Jero operan casi solos, no-code). `/grill-me` objetivo por
@@ -118,27 +133,26 @@ hasta definir nicho)**.
 
 ## ⏳ Pendiente inmediato (lo último que pidió Mani)
 
-> **Después de la V-run cheap que Mani va a correr ahora** (motor de ESTE repo, config: `ig_results=3`,
-> `tt_results=5`, `dias_recencia=7` en el Proyecto, `top_n=3`, keys en los 4 Code nodes — ver detalle abajo):
-> **analizar el output juntos** — revisar qué dejó en Candidatos (Airtable) y en `runs`/`outputs` (Supabase),
-> ver si el gate dropeó bien, si el script salió literal en español, si el ranking tiene sentido, y **decidir
-> si hay que cambiar algo o si va en orden** antes de pasar a ejecutar las decisiones de código. Es el primer
-> paso de la próxima interacción. Muestra chica (ranking ruidoso esperado) → el foco es "corre y no rompe",
-> no calibrar pesos todavía.
+> **Cerrar lo de hoy antes de seguir:** (1) **commitear la fix del gate** (working tree, sin commit) +
+> re-importar el motor en n8n y correr una **V-run de re-validación** para ver el gate juzgando captions de
+> verdad (esperado: `tradingsharks`/`thatgrindset` dropeados, `jefdicastech` flageado `[SIN TRANSCRIPT...]`);
+> (2) **🔴 rotar el PAT de Airtable + la service_role de Supabase** (expuestos en el chat de hoy).
 
-## Próxima sesión (fresh) — ejecutar las 6 decisiones + V-run real + seguir el grill
+## Próxima sesión (fresh) — ejecutar #2-#6 + cierre de hoy
 
-> **Estado (cierre 4):** los **objetivos del MVP ya están destilados** a 11 criterios verificables
-> (O1–O11; rúbrica en el log de cierre 4, O11 = equipo-redes-friendly). El `/grill-me` de cumplimiento
-> resolvió los forks principales → **6 decisiones lockeadas, NINGUNA ejecutada todavía**. La V-run que
-> corrió Mani fue sobre un **workflow viejo** → el motor de este repo **sigue sin validar end-to-end**.
-> Pendiente seguir el grill objetivo-por-objetivo sobre los O que faltan cubrir.
+> **Estado (cierre 5):** la **V-run de ESTE repo está VALIDADA** (run `ok`, embudo `151→10→9`, gate dropea
+> el viral-off-topic). **Decisión #1 (validar primero) HECHA** → ya se puede tocar estructura. La fix del
+> **no-transcript** está en código (sin commit, sin V-run de re-validación). Quedan **5 de las 6 decisiones
+> (#2-#6)** + los pendientes de doc. Orden sugerido: **#6 idempotencia** (chica, antes de cualquier V-run que
+> ejercite archivado) → **#2 tabla Ajustes + #3 piso duro** (juntas, comparten Config/Airtable, #2 toca `core/`
+> → ADR) → **#5 idioma** (se cuelga de Ajustes) → **dev-doc** (en paralelo) → **#4 simétrico + señal bi-eje**
+> (los grandes, post-V-run). Skills: `/tdd` o builder Node para Ajustes/piso duro; `/diagnose` si la V-run rompe.
 
-**Las 6 decisiones a ejecutar (detalle en el log de cierre 4 + en las §gaps respectivas):**
+**Las decisiones lockeadas (#1 ✅ hecha en cierre 5; detalle en el log de cierre 4 + §gaps):**
 
-1. **Validar primero, barato (postura).** Re-importar el motor de ESTE repo y correr una V-run cheap
-   (knobs Q2: `ig_results=3`, `tt_results=5`, `dias_recencia=7`, `top_n=3-5`) → confirmar O1/O4/O5
-   end-to-end antes de cualquier cambio estructural. **Es el bloqueante real.**
+1. **✅ Validar primero, barato (HECHA, cierre 5).** Corrió el motor de ESTE repo end-to-end (run 61b1b5d5,
+   `ok`); el output se analizó y el gate valida. El bloqueante quedó levantado. *(Knobs vivos del run: Config
+   `ig_results_limit=8`, `tt_results_limit=30`, `dias_recencia=7`, `top_n` del Proyecto = 10.)*
 2. **Tabla Ajustes en Airtable (#19/O11).** Knobs de scoring (`peso_*`, `boost_idioma`, `umbral_viral`,
    `peso_relevancia`, `top_n`, `min_views`, `min_likes`) a una tabla clave→valor que el motor lee como
    lee Proyectos/Keywords. → **ADR nuevo** + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`.
@@ -241,6 +255,12 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
 
 **🔴 Crítico (correctitud / rompe en prod):**
 
+0. **🔶 RESUELTO EN CÓDIGO (2026-06-17, cierre 5) — falta V-run + commit. No-transcript esquivaba el gate.**
+   Cuando Supadata no transcribe (`script=''`), el `Gate de relevancia` sacaba el item del lote
+   (`.filter(x => x.texto)`) → pasaba **sin juzgar** a Candidatos (incluido contenido que el criterio rechaza,
+   ej. el reel de hype "Anthropic lanza Claude Fable 5"). **Fix:** el gate juzga el **caption como fallback**;
+   relevantes-sin-script se mantienen flageados `[SIN TRANSCRIPT: juzgado por caption, revisar manual]`,
+   irrelevantes se dropean. Smoke 5/5 + validador 927/0. **Pendiente:** re-importar + V-run + commit.
 1. **✅ RESUELTO (2026-06-16, Stage 0 del refactor).** Validador en verde (933 checks, 0 errores).
    Se arreglaron los manifests al contrato: (a) creado `workflow-archivado/workflow.yaml`; (b)
    `short-form-content/workflow.yaml` reescrito a las 8 etapas canónicas + `client_config` + `filters`
@@ -372,6 +392,37 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     **→ ADR nuevo + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`** (toca `core/`).
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-17 (cierre 5) — V-run de ESTE repo validada + fix del no-transcript *(Mani + Claude)*
+
+- **Validación end-to-end (decisión #1 HECHA).** La V-run corrió sobre el **motor de este repo** (no el viejo de
+  cierre 4): Supabase `runs` 61b1b5d5, `estado: ok`, 9 min, `metricas {colectados:151, filtrados:10, outputs:9}`.
+  El embudo real es `151 → (Pre-trim + Heat-score métrico, top_n=10) → 10 → (Gate) → 9`.
+- **Análisis del output con credenciales vivas** (PAT Airtable + service_role Supabase — **a rotar**). Se leyó
+  Airtable `Candidatos` (9) y Supabase `runs`/`outputs`/`processed_items` por API. Hallazgos:
+  - **El gate funciona.** Comparado con el run viejo (4ad9d4cf, sin gate, top métrico = "Bionic Girlfriend",
+    "fruit brainrot", heat >1.8), el run nuevo NO tiene esa basura. El gate dropeó **1 de 10**: `chris_stocks_`
+    ("Feeding 500k rescue animals" con ChatGPT tangencial, IG, heat métrico 0.84) → drop **correcto** (viral pero
+    off-topic). El composite re-rankea bien (verificado a mano: `0.7·sHaiku + 0.3·percentil`). Script literal en es.
+  - **🐛 Hoyo del no-transcript (raíz de "3 sin script"):** Supadata no transcribió 3 videos → `script=''` →
+    el Gate los **sacaba del lote** (`.filter(x => x.texto)`) → pasaban **sin juzgar** (`relevancia_score=null`).
+    Uno (`tradingsharks` "Anthropic lanza Claude Fable 5") es hype que el criterio rechaza, y solo sobrevivió por
+    no tener transcript. El fail-open tenía la dirección equivocada.
+- **FIX (decidida con Mani — opción "mantener flageado"):** el nodo `Gate de relevancia` ahora **juzga el caption
+  (`descripcion`) como fallback** cuando no hay script; los relevantes-sin-script se **mantienen** con
+  `relevancia_razon` prefijada `[SIN TRANSCRIPT: juzgado por caption, revisar manual]` y los irrelevantes se
+  **dropean** (antes pasaban ciegos). Editado por script (no a mano, por el escaping del JSON). **Smoke test 5/5**
+  (4 casos reales del run) + **validador 927/0**. **SIN COMMIT** (working tree) y **sin V-run de re-validación**.
+- **Timeout de IG (pregunta de Mani):** NO es timeout. Los nodos Apify son el community node
+  `@apify/n8n-nodes-apify` op "Run actor and get dataset" → **espera al run, sin tope** (eso resolvió #6); no tienen
+  campo `timeout`, el workflow no tiene `executionTimeout`, y el run cerró `ok` en 9 min. IG sale flaco por
+  **referente-only** (`searchType:user`, 3 referentes) + ventana **7 días** + `ig_results_limit=8` + **competencia
+  métrica** contra TikTok (`resultsPerPage:30` × 9 hashtags) en el `top_n=10` combinado. La palanca real = el
+  **descubrimiento simétrico** (IG-por-hashtag). Knobs (no-código) si urge: subir `ig_results_limit`, ampliar
+  `dias_recencia`, más referentes IG. Para confirmar volumen crudo de IG: contar el output de `Normalizar IG` o el
+  dataset del actor en Apify.
+- **Qué sigue:** cerrar lo de hoy (commit del gate + V-run de re-validación + rotar credenciales), después
+  **#2-#6**. Orden y skills en §"Próxima sesión".
 
 ### 2026-06-16 (cierre 4) — Objetivos del MVP afilados + grill-me de cumplimiento *(Mani + Claude)*
 
