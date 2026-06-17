@@ -25,28 +25,22 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 | `descripcion` | texto largo | qué cubre el proyecto |
 | `criterios_relevancia` | texto largo | **qué hace relevante a un video para este proyecto** — lo edita el equipo, lo lee el motor para juzgar relevancia (no solo virales). Ver ADR-010 + [refactor-relevancia](../../docs/agents/refactor-relevancia.md) |
 | `voz_default` | link → `Voces` | con qué voz se generan sus guiones |
-| `min_likes` / `min_views` | número | pisos *blandos* del heat-score (no cortan, ponderan) |
 | `dias_recencia` | número | ventana de fetch (backfill=180, diario=1–2) |
 | `top_n` | número | cuántos candidatos genera por corrida |
 | `activo` | checkbox | si entra en las corridas |
 
 ### 2. `Voces` — el eje organizativo (para quién se selecciona)
 Separado del proyecto a propósito. **Nota ADR-009:** el MVP no genera en voz (scripts literales),
-así que los campos de generación (`few_shot`, `frase_credencial`, `cta`, `tratamiento`,
-`registro`) quedan **en pausa** — no se borran: son la costura de la evolución "guiones en voz
-propia". Hoy la voz organiza la selección ("5 videos para tal voz") y el histórico.
+así que los campos de generación (`few_shot`, `frase_credencial`, `cta`, `tratamiento`, `registro`,
+`pais_acento`) **se quitaron del cockpit** para no meter ruido mientras no haya generación. Son la
+costura de la evolución "guiones en voz propia": se re-agregan (vía ADR) cuando esa fase llegue. Hoy
+la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina el gate de relevancia.
 
 | Campo | Tipo | Para qué |
 |---|---|---|
 | `nombre` | texto (primario) | "Cora", "Alma", "30X institucional"… |
 | `descripcion` | texto largo | quién es / autoridad |
 | `criterios_relevancia` | texto largo | **qué le sirve a este cliente puntual** (fit de persona/audiencia) — afina el gate de relevancia por encima del tema del Proyecto. Opcional; el Proyecto filtra el tema, la Voz el cliente (ADR-010) |
-| `frase_credencial` | texto | la frase de apertura |
-| `few_shot` | texto largo | 2–4 guiones reales que anclan la voz (se enriquece con los aprobados) |
-| `tratamiento` | single select | tú / usted |
-| `registro` | single select | coloquial / formal |
-| `cta` | texto | el CTA fijo |
-| `pais_acento` | texto | "Colombia"… |
 
 ### 3. `Keywords` — banco de palabras clave (acumula)
 | Campo | Tipo | Para qué |
@@ -72,20 +66,21 @@ propia". Hoy la voz organiza la selección ("5 videos para tal voz") y el histó
 | `titulo` | texto (primario) | título/contexto del video fuente |
 | `script` | texto largo | **la transcripción del video, en español** (traducida si el original no lo está — literal, ADR-009) |
 | `idioma` | single select | idioma del original: es / en / pt / it / fr / otro |
-| `link_doc` | url | el Google Doc del script (lo crea el motor) |
+| `thumbnail` | attachment | portada del video (la llena el motor con la `coverUrl` de Apify) — el equipo escanea sin clickear afuera |
 | `proyecto` | link → `Proyectos` | |
 | `voz` | link → `Voces` | para qué voz se selecciona |
 | `referente` | texto | handle del video fuente |
 | `url_referente` | url | link al video original |
 | `views` / `likes` / `seguidores` / `engagement` | número | métricas del fuente |
-| `heat_score` | número | el ranking caliente→frío (lo calcula el motor; pondera idioma y señal de selección) |
+| `heat_score` | número | el ranking compuesto (relevancia ⊕ métricas — ADR-010); caliente→frío |
+| `relevancia_score` | número (0-1) | el juicio semántico **limpio** del gate Haiku, separado del heat compuesto |
+| `relevancia_razon` | texto largo | **por qué** el gate dejó pasar el video — ayuda al equipo a curar rápido |
 | `viral_por_tamano` | checkbox | el fuente venía de cuenta >700K |
-| `categoria` | single select | tipo de contenido |
 | **`calificacion`** | single select | 🔥 / 👍 / 👎 — **lo pone el equipo** |
 | **`estado`** | single select | nuevo / aprobado / descartado / publicado |
 | `fecha_calificacion` | last modified time (solo del campo `calificacion`) | **cuándo** se calificó — alimenta el tracking de selecciones |
 | `notas_equipo` | texto largo | feedback del equipo |
-| `fecha` | dateTime | cuándo se generó |
+| `fecha` | created time | cuándo llegó el candidato (campo nativo de Airtable, manual: la API no crea computados) |
 
 **Vista "🔥 Seleccionados" (el re-rank que pidió el jefe):** una vista de esta misma tabla con
 filtro `estado = aprobado` + orden `heat_score` descendente — el mapa de calor "se rehace" solo
@@ -99,9 +94,10 @@ con lo elegido, sin código. Se crea a mano al armar la base (las vistas no sale
    `criterios_relevancia`. Batch (1 page por tabla) para no gastar API calls. Los `criterios` viajan
    en el plan de corrida (nodo `Armar plan`) y alimentan el gate de relevancia (Haiku) — ADR-010.
 2. **Transcribe y traduce** cada item que pasa el heat-score (Supadata transcribe; Claude detecta
-   idioma y traduce al español solo si hace falta — literal, sin reescribir), **crea el Google
-   Doc** del script, y **escribe** los candidatos (estado `nuevo`, con `idioma` y `link_doc`)
-   en batch (10 records/call).
+   idioma y traduce al español solo si hace falta — literal, sin reescribir), pasa por el **gate de
+   relevancia** (Haiku) que produce `relevancia_score`/`relevancia_razon`, y **escribe** los
+   candidatos (estado `nuevo`, con `idioma`, `thumbnail` y la razón) en batch (10 records/call).
+   El script vive como **texto** (sin Google Doc — ADR-009); el "link" es la URL del video original.
 3. El equipo **califica** (`calificacion` + `estado`; `fecha_calificacion` se llena sola). El
    **workflow de archivado** (cron diario) lleva los calificados a Supabase (`outputs` con
    `calificado_en` + metadata), hace **append al Sheet "Histórico"** (exportable a Excel) y los

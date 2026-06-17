@@ -92,11 +92,7 @@ Una Voz = un personaje o marca para la que curan contenido (ej: "Cora", "30X ins
 |---|---|
 | `nombre` | el nombre de la voz. Ej: "Cora" |
 | `descripcion` | quién es / de qué tiene autoridad |
-| `pais_acento` | el país, ej: "Colombia" |
-
-> **Lo demás déjenlo vacío.** Las columnas `frase_credencial`, `few_shot`, `cta`, `tratamiento`
-> y `registro` son para una mejora futura (que la máquina escriba guiones en la voz del personaje).
-> **Hoy no se usan.** No las borren ni se preocupen por ellas.
+| `criterios_relevancia` | qué le sirve a este cliente puntual (opcional; afina el filtro de relevancia por encima del tema del Proyecto) |
 
 ### 5.2 `Proyectos` — el tema que se busca
 
@@ -107,10 +103,10 @@ mezclan con los de otro.
 |---|---|
 | `nombre` | el tema. Ej: "Comunicación" |
 | `descripcion` | qué cubre el tema |
+| `criterios_relevancia` | **qué hace relevante a un video para este tema** (y qué NO). Lo lee la máquina para juzgar relevancia, no solo viralidad. Mientras más claro, mejor curan |
 | `voz_default` | la Voz que crearon en 5.1 (se elige de una lista) |
 | `dias_recencia` | qué tan atrás buscar, en días. **180** la primera vez (para traer harto); **1 o 2** para el día a día |
 | `top_n` | cuántos videos quieren que traiga por corrida (ej: 10) |
-| `min_likes` / `min_views` | pisos *blandos*: no descartan videos, solo empujan hacia arriba a los que los superan. Si dudan, déjenlos en 0 |
 | `activo` | ✅ marcado para que el proyecto entre en las búsquedas. Sin marcar = pausado |
 
 ### 5.3 `Keywords` — las palabras con que se busca en TikTok
@@ -151,13 +147,14 @@ saber qué significa cada columna que van a ver:
 | `titulo` | título/contexto del video fuente | máquina |
 | `script` | la transcripción del video en español (literal, ver sección 8) | máquina |
 | `idioma` | idioma del original: es / en / pt / it / fr / otro | máquina |
-| `link_doc` | el Google Doc con el script | máquina |
+| `thumbnail` | la portada del video (para escanear sin abrir el link) | máquina |
 | `url_referente` | link al video original | máquina |
 | `referente` | la cuenta de donde salió | máquina |
 | `views` `likes` `seguidores` `engagement` | métricas del video fuente | máquina |
 | `heat_score` | el número de orden caliente→frío (sección 7) | máquina |
+| `relevancia_score` | qué tan relevante lo juzgó la máquina (0 a 1), aparte de lo viral | máquina |
+| `relevancia_razon` | **por qué** la máquina lo dejó pasar — léanlo para curar más rápido | máquina |
 | `viral_por_tamano` | ✅ si venía de una cuenta muy grande (+700K) | máquina |
-| `categoria` | tipo de contenido: Tutorial / Caso de uso / Noticia / Tip / Reflexion | máquina |
 | **`calificacion`** | 🔥 / 👍 / 👎 | **ustedes** |
 | **`estado`** | nuevo / aprobado / descartado / publicado | **ustedes** |
 | `notas_equipo` | su feedback sobre el video | **ustedes** (opcional) |

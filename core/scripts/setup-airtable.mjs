@@ -36,21 +36,16 @@ const long = (name) => ({ name, type: "multilineText" });
 const url = (name) => ({ name, type: "url" });
 const num = (name, precision = 0) => ({ name, type: "number", options: { precision } });
 const check = (name) => ({ name, type: "checkbox", options: { color: "greenBright", icon: "check" } });
+const attach = (name) => ({ name, type: "multipleAttachments" });
 const sel = (name, ...opts) => ({ name, type: "singleSelect", options: { choices: opts.map((o) => ({ name: o })) } });
-const date = (name) => ({
-  name, type: "dateTime",
-  options: { dateFormat: { name: "iso" }, timeFormat: { name: "24hour" }, timeZone: "America/Bogota" },
-});
 
 // ── las 5 tablas (campos NO-link al crear; los links se agregan después) ──
 const tables = [
   { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto.",
-    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), num("min_likes"), num("min_views"),
+    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"),
              num("dias_recencia"), num("top_n"), check("activo")] },
-  { name: "Voces", description: "Eje de generación (cómo suena). Separado del proyecto.",
-    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), txt("frase_credencial"), long("few_shot"),
-             sel("tratamiento", "tú", "usted"), sel("registro", "coloquial", "formal"),
-             txt("cta"), txt("pais_acento")] },
+  { name: "Voces", description: "Eje organizativo (para quién se selecciona). Separado del proyecto.",
+    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia")] },
   { name: "Keywords", description: "Banco de palabras clave por proyecto (acumula).",
     fields: [txt("termino"), check("activo")] },
   { name: "Referentes", description: "Banco de perfiles referentes (fuente propia).",
@@ -58,12 +53,13 @@ const tables = [
              check("flag_viral"), check("activo"), long("notas")] },
   { name: "Candidatos", description: "Scripts (transcripción/traducción literal — ADR-009) a calificar por el equipo.",
     fields: [txt("titulo"), long("script"), sel("idioma", "es", "en", "pt", "it", "fr", "otro"),
-             url("link_doc"), txt("referente"), url("url_referente"),
-             num("views"), num("likes"), num("seguidores"), num("engagement", 1), num("heat_score", 1),
-             check("viral_por_tamano"), sel("categoria", "Tutorial", "Caso de uso", "Noticia", "Tip", "Reflexion"),
+             attach("thumbnail"), txt("referente"), url("url_referente"),
+             num("views"), num("likes"), num("seguidores"), num("engagement", 1),
+             num("heat_score", 1), num("relevancia_score", 2), long("relevancia_razon"),
+             check("viral_por_tamano"),
              sel("calificacion", "🔥", "👍", "👎"),
              sel("estado", "nuevo", "aprobado", "descartado", "publicado"),
-             long("notas_equipo"), date("fecha")] },
+             long("notas_equipo")] },
 ];
 
 const run = async () => {
@@ -107,6 +103,8 @@ const run = async () => {
   console.log("   → Dale acceso de editor a Majo y Jero (Share → hasta 5 en el plan free).");
   console.log("   → Cargá los datos semilla: Proyectos, Voces, Keywords y Referentes iniciales");
   console.log("     (incluí referentes en EN/PT/IT/FR — prioridad del jefe, ADR-009).");
+  console.log("   → Creá a mano en Candidatos el campo 'fecha' tipo 'Created time' (cuándo llegó");
+  console.log("     el candidato — la API no crea campos computados).");
   console.log("   → Creá a mano la vista '🔥 Seleccionados' en Candidatos: filtro estado=aprobado,");
   console.log("     orden heat_score desc (el re-rank de seleccionados).");
 };

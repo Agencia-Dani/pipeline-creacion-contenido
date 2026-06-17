@@ -1,69 +1,68 @@
-# CLAUDE.md
+# CLAUDE.md — motor de reels
 
-Guía para trabajar en este repo. El estado real y los contratos viven en
-[ROADMAP.md](../../ROADMAP.md) + [workflow.yaml](./workflow.yaml). **El [README.md](./README.md)
-todavía describe el template VIEJO (en voz → Sheets) y está pendiente de reescribir.**
+Guía para trabajar en este workflow. El estado de producto vive en [ROADMAP.md](../../ROADMAP.md),
+el contrato en [workflow.yaml](./workflow.yaml), el uso en [README.md](./README.md), y el porqué en
+[ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-en-scoring.md) +
+[ADR-010](../../docs/adr/ADR-010-scoring-semantico-y-etapa-calidad.md).
 
-## Qué es (post-rework B3 — ADR-009, 2026-06-14)
+## Qué es
 
-Un único workflow de **n8n** (`workflow.json`) con dos entradas — cron semanal + Execute manual —
-que es el **motor de reels** del MVP: lee la config del equipo en **Airtable** (Proyectos, Voces,
-Keywords, Referentes) → scrapea Reels IG + TikTok (Apify) → normaliza y une → ordena con el
-**heat-score v1** (percentil de views/likes/eng × boosts de tema/idioma/selección) → **dedup**
-contra `processed_items` (Supabase) → top_n por proyecto → transcribe (Supadata) → **traduce
-literal al español con Claude Haiku SOLO si el original no está en español** (si ya está en
-español, el script es la transcripción tal cual) → entrega **candidatos a Airtable** (tabla
-Candidatos, estado `nuevo`) + registra la corrida en **Supabase** (sumidero, continue-on-fail).
-**El motor no usa ninguna credencial de Google.**
+Un único workflow de **n8n** (`workflow.json`, 30 nodos, 2 entradas: cron semanal + Execute manual)
+que es el **motor de reels** del MVP. Lee la config del equipo en **Airtable** (Proyectos, Voces,
+Keywords, Referentes) → descubre reels IG + TikTok (Apify) → prescore métrico (`Heat-score v1`) →
+transcribe (Supadata) → **traduce literal al español con Claude Haiku solo si no está en español** →
+**gate de relevancia** (Haiku estricto contra `criterios_relevancia`, compone el `heat_score`) →
+entrega **candidatos a Airtable** (estado `nuevo`) + registra la corrida en **Supabase**
+(continue-on-fail). **El motor no usa ninguna credencial de Google.** Ver el flujo de 8 etapas y el
+mapa de descubrimiento en el README.
 
-El equipo de redes (Majo, Jero) **solo toca Airtable**: arma la búsqueda (input), ve el mapa de
-calor (vista 🔥), califica/selecciona scripts. El script se guarda como **campo de texto** (sin
-Google Doc — ver ADR-009 nota 2026-06-14); el "link" es la URL del video original.
+El equipo de redes (Majo, Jero) **solo toca Airtable**: arma la búsqueda (Keywords + Referentes), ve
+el mapa de calor (vista 🔥), y califica/selecciona scripts. El script es **texto** (sin Google Doc —
+ADR-009); el "link" es la URL del video original.
 
-> **Construido por script, no a mano.** El rework se generó con un builder Node que carga el JSON,
-> arma nodos por nombre y reescribe con `JSON.stringify`. Para cambios estructurales seguí ese
-> patrón (no edites a mano las expresiones grandes `={{ ... }}`).
-
-Único cliente/voz por copia sigue siendo el modelo; la multi-instancia real es F5.
-
-## Archivos
-
-- `workflow.json` — el workflow de n8n, importable (`Workflows → Import from File`). Único entregable real.
-- `README.md` — uso + checklist de los placeholders.
-- `CLAUDE.md` — este archivo.
-
-No hay build, tests ni dependencias: es JSON de configuración.
-
-## Convención de placeholders
-
-Todo lo que un cliente debe completar está marcado `<<NOMBRE_EN_MAYUSCULAS>>`. Para listarlos:
-
-```sh
-node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log([...new Set(s.match(/<<[A-ZÁÉÍÓÚÑ][^>]*>>/g))].sort().join('\n'))"
-```
-
-(El regex exige mayúscula inicial porque el código del nodo *Parámetros de corrida* contiene el
-literal `'<<'` — con `<<[^>]+>>` a secas salen falsos positivos.)
-
-Las **categorías** (`<<CATEGORIA_1>>`…`<<CATEGORIA_5>>`) aparecen en DOS nodos y deben coincidir: el prompt de Claude (*Claude — Agente escritor voz cliente*) y el parser (*Parsear respuesta Claude → columnas Sheet*, `const CATS`).
-
-## Cómo editar el workflow
-
-El archivo es JSON de n8n válido. **No edites a mano la string gigante del nodo de Claude** (el `jsonBody` es una expresión n8n `={{ {...} }}` con JS y escapes anidados). Para cambios no triviales, cargá el JSON en Node, mutá `node.parameters.*` por nombre de nodo, y reescribilo con `JSON.stringify(w, null, 2)`. Buscá nodos con `w.nodes.find(n => n.name === '...')`.
-
-Después de editar, validá:
-1. Que el JSON parsea y `w.connections` sigue con keys.
-2. Que la expresión del nodo Claude evalúa como JS: extraé el interior de `={{ … }}` y corré `new Function('$json','return ('+inner+')')(stub)`.
+> **Construido por builder Node, no a mano.** Para cambios estructurales: cargá el JSON, mutá
+> `node.parameters.*` buscando por nombre (`w.nodes.find(n => n.name === '...')`), reescribí con
+> `JSON.stringify(w, null, 2)` / `json.dump(..., ensure_ascii=False, indent=2)`. No edites a mano las
+> expresiones grandes `={{ ... }}` ni los `jsCode`.
 
 ## Detalles que importan
 
-- **Modelo Claude:** `claude-sonnet-4-6` (en el `jsonBody` del nodo Claude). Para más calidad a más costo: `claude-opus-4-8`. Antes de tocar nada de la API de Anthropic, consultá el skill `claude-api`.
-- **Prompt caching:** el `system` del nodo Claude es un array con `cache_control` (ephemeral). El bloque de voz/few-shot es idéntico en los 25 ítems → se cachea. El TTL de 5 min se sostiene porque los `Wait` de 13s entre ítems son << 5 min. No metas nada variable (timestamps, IDs) en el `system` o se rompe el caché.
-- **`pinData` debe quedar vacío** (`{}`). Tenía 1.8 MB de data de prueba del cliente original; reintroducir pins hace que los nodos devuelvan data fija en vez de scrapear.
-- **Loop + Wait:** el `Loop Over Items` procesa de a uno con `Wait` de 13s para respetar rate limits de Claude. Si subís el volumen, ajustá ahí.
-- **Columnas del Sheet:** el parser escribe encabezados exactos (ver README). La pestaña destino debe tenerlos igual.
-- **Credenciales:** API keys de Apify/Anthropic/Supadata son placeholders (`<APIFY_TOKEN>`, etc.) en las URLs/headers; Google Sheets y Gmail usan credenciales OAuth de n8n (a re-mapear al importar).
+- **Claude = Haiku traductor + jurado**, no escritor. `claude-haiku-4-5`, `anthropic-version:
+  2023-06-01`, en **3 Code nodes** (`Pre-trim relevancia`, `Gate de relevancia`, `Traducir`) vía
+  `this.helpers.httpRequest`. La key es el placeholder `<ANTHROPIC_API_KEY>` (3 ocurrencias). Antes de
+  tocar la API de Anthropic, consultá el skill `claude-api`.
+- **Apify por community node** `@apify/n8n-nodes-apify.apify` (op "Run actor and get dataset", sin tope
+  de 5 min). NO `httpRequest` sync. Credencial `apifyApi`.
+- **Orden de ejecución:** `Abrir run en el registro` va **en serie** entre `Config` y `Leer Proyectos`
+  (no en paralelo), porque `Preparar outputs Supabase` lo referencia por nombre y n8n ejecuta las ramas
+  en orden de conexión. Si lo ponés en paralelo, corre **después** del pipeline y la referencia rompe
+  ("hasn't been executed").
+- **Gates fail-open:** si Haiku/Supadata fallan, el item pasa (invariante #1). No conviertas un fallo
+  externo en dependencia de ejecución.
+- **`heat_score` es composite** (ADR-010): `peso_relevancia·score_haiku + (1-peso)·percentil(prescore
+  métrico)`. El gate también guarda `relevancia_score`/`relevancia_razon` (se suben a Airtable). El
+  substring de tema **no existe** (salió en el refactor de relevancia).
+- **Passthrough de campos:** los Code nodes intermedios hacen `Object.assign({}, d, {...})` → un campo
+  agregado en `Normalizar` (ej. `thumbnail_url`) sobrevive hasta `Armar candidato`, que **reconstruye**
+  el objeto (ahí hay que listarlo explícito).
+- **`pinData` debe quedar `{}`** (data fija mata el scrape real).
+
+## Convención de placeholders
+
+Lo que se completa al importar: API keys `<ANTHROPIC_API_KEY>` / `<SUPADATA_API_KEY>` (en los Code
+nodes), e IDs `<<AIRTABLE_BASE_ID>>` / `<<SUPABASE_URL>>` / `<<INSTANCE_ID>>` (en el nodo `Config`).
+Listarlos:
+
+```sh
+node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log([...new Set(s.match(/<<?[A-ZÁÉÍÓÚÑ][^>]*>>?/g))].sort().join('\n'))"
+```
+
+## Validar
+
+`cd core/scripts && npm run validate` (contrato del manifest + escaneo de secretos). No hay build ni
+tests: el motor corre **en n8n**, se valida por **re-import + Execute**. Tras editar, confirmá que el
+JSON parsea, `w.connections` sigue con keys, y los `jsCode` parsean (`new Function(...)`).
 
 ## Git
 
-Repo personal; los commits van directo a `main`. Mensajes de commit en español, concisos.
+Commits en español, concisos, directo a `main`.

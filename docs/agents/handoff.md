@@ -21,6 +21,22 @@
 
 ## Estado en una línea
 
+**2026-06-16 (cierre 3) — Bugfix de orden + refactor front-to-back (grilling) en `main` (Mani).**
+La V-run real expuso un **bug de ejecución**: `Abrir run en el registro` colgaba en paralelo de
+`Config` → n8n corría el pipeline entero antes que esa rama → `Preparar outputs Supabase` rompía con
+"node hasn't been executed". **Fix:** `Abrir run` ahora va **en serie** (Config → Abrir run → Leer
+Proyectos). Después, sesión `/grill-me` punta a punta → decisiones lockeadas y **ejecutadas esta
+pasada:** (a) Candidatos expone `relevancia_score` + `relevancia_razon` (el gate los calculaba y los
+tiraba) + `thumbnail` (portada de Apify como attachment); (b) **#12** resuelto (`external_id` en
+outputs Supabase → el índice parcial corta los duplicados de los re-runs); (c) **limpieza de campos
+muertos** (`link_doc`, `categoria`, `min_likes`/`min_views`, y los de generación de `Voces`) en
+`setup-airtable.mjs` + contrato + manifest, y **3 campos nuevos agregados a la base viva por API**;
+(d) **#10 resuelto:** README + CLAUDE.md del workflow reescritos al motor real. Validador en verde
+(927). **Diferido a post-V-run:** descubrimiento simétrico (4 Apify, los actores actuales ya cubren
+ambos ejes). **Diferido a pre-cron:** #4 paginación, #5 tope dedup. **Manual de Mani en la base viva:**
+borrar los 4 campos muertos + los de Voces (la API no borra campos) y `fecha → Created time`.
+**🔴 ROTAR el PAT de Airtable** (re-expuesto en chat esta sesión).
+
 **2026-06-16 (cierre 2) — Stage 4 del refactor cerrado en `main` (Mani).** Limpieza estructural:
 el motor mapea 1:1 a las 8 etapas de PLAN §2.4 (verificado nodo a nodo: 30 nodos, 0 rotas, 0 huérfanos),
 único `merge` es **append** (0 mergeByPosition), adaptadores de descubrimiento prolijos (mismo
@@ -82,6 +98,28 @@ estructural abierta para el equipo: Airtable vs Supabase / alcance del registro 
 Airtable (campo `fecha_calificacion` + vista 🔥), accesos a Majo/Jero, **semillas (A9, en pausa
 hasta definir nicho)**.
 
+## Próxima sesión (fresh) — objetivos + grill-me sobre cumplimiento
+
+> **Pedido de Mani (cierre 3):** arrancar definiendo **los objetivos del MVP con claridad** (el norte
+> del jefe — ROADMAP §1, refrescado este cierre a la realidad ADR-009/010), y **después un `/grill-me`
+> que cuestione si el workflow actual cumple esos objetivos** punta a punta. El repo quedó coherente
+> entre PLAN / ROADMAP / README / CLAUDE / contrato / onboarding para poder continuar sin arranque en
+> frío. Preguntas abiertas que deja Mani para esa sesión:
+
+1. **Pisos `min_likes`/`min_views` como optimización de tokens (Q5).** Hoy se quitaron (estaban muertos:
+   el heat nunca los ponderaba). **Pero reabrir:** un piso **duro** post-scrape / **pre-enriquecimiento**
+   (antes de Supadata + Claude) cortaría videos "muertos" y ahorraría **Supadata + Anthropic** (el costo
+   per-item real). **No ahorra Apify** (los actores bajan los N posts más recientes sin filtro de
+   engagement server-side). Decidir en el grill si se re-agrega como piso real (no como el campo blando
+   mentiroso de antes) o si el pre-trim Haiku + `top_n` ya cubren ese recorte.
+2. **Knobs para corridas de prueba baratas (Q2 — referencia, no bloquea).** Lo que baja **Apify**:
+   `ig_results_limit` (def 8 → **3**), `tt_results_limit` (def 30 → **5**), y `dias_recencia` del
+   Proyecto (180 → **7**, recorta la ventana de fetch de IG). Lo que baja **Supadata/Claude**: `top_n`
+   (15 → **3-5**, limita cuántos se transcriben/traducen/gatean). Con eso una corrida end-to-end real
+   sale por poquísimo.
+3. **Descubrimiento simétrico** (4 Apify, ya diseñado) — ver §"🔵 Producto / DIRECCIÓN". Es el cambio
+   grande de COLECTAR; entra **después de validar la V-run** del refactor de relevancia.
+
 ## Tablero de tasks
 
 | ID | Task (detalle en ROADMAP §3) | Depende de | Estado | Dev |
@@ -100,7 +138,8 @@ hasta definir nicho)**.
 | C2 | Workflow de archivado — desplegado, configurado y probado en n8n | A10 + B1 + C1 | ✅ | **Dev 3** (2026-06-16) |
 | C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ✅ | **Dev 3** (2026-06-16 — corrida exitosa) |
 | V1–V6 | Corridas de validación (backfill, literalidad, curación, re-rank, dedup, resiliencia) | B3 + C2 | ⬜ | los 3 |
-| D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | V1–V6 | ⬜ | los 3 |
+| D0 | **Limpieza pre-producción (entregar limpio):** borrar la data de prueba — Candidatos de Airtable, filas de Supabase (`outputs`/`runs`/`processed_items`), y **reemplazar las semillas provisionales** (Proyecto "IA y Productividad", Voz provisional, 9 keywords, 3 referentes) por la config real del cliente. Último paso antes de activar crons. | V1–V6 | ⬜ | los 3 |
+| D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | D0 | ⬜ | los 3 |
 
 > Paralelismo real: **A** (Alejo) y **B** (Mani) y **C** (Dev 3) corren en paralelo. Ahora que
 > A10 está entregado, el camino crítico es **B4 → V1–V6**.
@@ -138,8 +177,8 @@ hasta definir nicho)**.
      **Airtable `Candidatos.script`** (área de trabajo temporal donde el equipo cura). Al calificarse,
      el archivado (cron diario) copia `script` a **Supabase `outputs.contenido_o_link`** + columna
      **`SCRIPT`** del Google Sheet "Histórico" (los dos sumideros permanentes) y **borra el record de
-     Airtable**. ⚠️ `link_doc` quedó **vestigial** (`Preparar batch Airtable` no lo setea): falta
-     limpiar las menciones a "Google Doc del script" en `airtable-cockpit.md` (L75, L103) y ADR-009.
+     Airtable**. ✅ `link_doc` **eliminado del cockpit** (script/contrato/manifest, cierre 3); falta
+     borrarlo a mano en la base viva (la API no borra campos). ADR-009 ya nota que el script es texto.
 3. **`deploy.mjs` quedó obsoleto** para este motor (resolvía placeholders en voz/categorías). El MVP
    es 1 instancia editada a mano en el nodo Config. Rewrite multi-cliente = F5.
 
@@ -210,13 +249,15 @@ hasta definir nicho)**.
    falla en silencio ~1 vez/semana hasta re-autorizar. Sumado a los créditos gratuitos de GCP ($300) que
    se agotan, el carril C tiene dos relojes corriendo. Publicar la app OAuth / mover a la cuenta GCP
    permanente ANTES de activar el cron.
-10. **`Workflows/workflow-short-form-content/CLAUDE.md` está desactualizado.** Describe el template VIEJO
-    (Claude **Sonnet** escritor, `Loop Over Items`+`Wait` 13s, prompt caching, categorías, salida a
-    Sheets) — nada de eso existe en el `workflow.json` actual (Haiku traductor, sin loop, sin caching, sin
-    Sheets). Trampa para el próximo dev. El README también está marcado como viejo.
+10. **✅ RESUELTO (2026-06-16 cierre 3).** README + CLAUDE.md del workflow **reescritos al motor real**
+    (Haiku traductor/jurado, doble gate, Apify community node, sin Sheets/categorías/loop, orden de
+    ejecución). *(Original: describían el template VIEJO — Sonnet escritor, Loop+Wait, prompt caching,
+    categorías, Sheets — nada de eso existe. Trampa para el próximo dev.)*
 11. **`core/scripts/deploy.mjs` es código muerto** (HANDOFF §3 lo declara obsoleto). Borrar o marcar claro.
-12. **`outputs.external_id` siempre NULL en el motor** (`Preparar outputs Supabase` no lo setea) → el índice
-    de idempotencia no protege re-ejecuciones manuales del motor (inserta duplicados).
+12. **✅ RESUELTO (2026-06-16 cierre 3).** `Preparar outputs Supabase` ahora setea `external_id` → el
+    índice parcial `outputs_external_id_key` hace de backstop (en re-runs el POST 409ea, continue-on-fail,
+    sin fila duplicada). *(Original: `external_id` NULL → el índice no aplicaba → cada re-run manual
+    duplicaba en `outputs`.)*
 13. **Percentiles del heat-score sobre muestras chicas** (IG ~8×3 + TT 30) → ranking ruidoso; `flag_viral`
     por seguidores (>700k) es proxy grueso. Modelo v1 conocido; documentar que es poco estable sin volumen.
 14. **Metadata residual del template original** (`instanceId`, `tags`) quedó en el `workflow.json` del motor
@@ -234,16 +275,18 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
   *(Las keywords tienen un uso secundario en el heat-score: el "boost de tema" matchea la descripción,
   pero solo ordena, no filtra.)*
 
-> **🎯 DIRECCIÓN (Mani, 2026-06-16) — descubrimiento simétrico: ambos ejes en ambas plataformas.** Hoy
-> es asimétrico (IG solo por referentes, TikTok solo por keywords). El objetivo: que **referentes Y
-> keywords apliquen a IG Y a TikTok**. Diseño propuesto: **2 nodos Apify por plataforma** (4 en total),
-> uno por eje → IG-referentes (ya existe) + IG-keywords/hashtag (nuevo) + TikTok-keywords/hashtag (ya
-> existe) + TikTok-referentes/perfil (nuevo); cada par converge a su `Normalizar` y luego al `Merge
-> scrapes` (que ya es `append`, escala sin tocar la lógica aguas abajo). Esto **subsume #15 + #17**:
-> #17 = el nodo IG-por-hashtag, #15 = el nodo TikTok-por-perfil. Necesita 2 actores Apify nuevos (IG
-> hashtag scraper + TikTok profile scraper) y revisar presupuesto Apify (más actors = más corridas).
-> Post-MVP / post-Stage 5; no bloquea la V-run actual. (Ver #16: las keywords multi-palabra afectan a
-> ambas ramas de hashtag.)
+> **🎯 DIRECCIÓN (Mani, 2026-06-16; lockeada en el grilling cierre 3) — descubrimiento simétrico: ambos
+> ejes en ambas plataformas.** Hoy es asimétrico (IG solo por referentes, TikTok solo por keywords). El
+> objetivo: que **referentes Y keywords apliquen a IG Y a TikTok**. Diseño: **4 llamadas Apify** (2 por
+> plataforma) → IG-referentes (existe) + IG-hashtag (nuevo) + TikTok-hashtag (existe) + TikTok-perfil
+> (nuevo); cada par converge a su `Normalizar` → `Merge scrapes` (ya `append`). **Hallazgo del grilling:
+> NO hacen falta actores nuevos** — `apify~instagram-scraper` soporta `searchType:hashtag` y
+> `clockworks~free-tiktok-scraper` acepta `profiles`. Costo real = más corridas Apify (revisar
+> presupuesto), no más actores. **Decidido:** IG-hashtag **descubre cuentas nuevas** (el doble gate
+> filtra el ruido); keywords multi-palabra **colapsan a un hashtag** (`liderazgo efectivo →
+> #liderazgoefectivo`). Subsume **#15 (TT-perfil) + #16 (multi-palabra) + #17 (IG-hashtag)**.
+> **Diferido a post-V-run** (no apilar un cambio intrusivo de COLECTAR sobre el gate sin validar); no
+> bloquea la V-run actual. Las TT-referentes hay que sembrarlas (hoy las 3 son IG).
 
 15. **Scrapear Referentes de TikTok por perfil.** Hoy las cuentas con `plataforma=tiktok` se ignoran (el
     código las junta en `tt_handles` pero no las usa). Requiere un actor de perfil de TikTok en Apify.
@@ -272,6 +315,44 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 (cierre 3) — Bugfix de orden en la V-run + refactor front-to-back *(Mani + Claude)*
+
+- **Bug de ejecución (V-run real):** el primer Execute del motor reworkeado rompió en `Preparar outputs
+  Supabase` con *"Node 'Abrir run en el registro' hasn't been executed"*. Causa: `Abrir run` colgaba en
+  **paralelo** de `Config` como dead-end; n8n ejecuta las ramas en orden de conexión y `Leer Proyectos`
+  iba primera → corría el pipeline entero (hasta `Preparar outputs`) **antes** de tocar `Abrir run` → la
+  referencia `$('Abrir run…')` tiraba. (El error cosmético "Cannot assign to read only property 'name'"
+  es un bug de n8n encima del real.) **Fix:** `Abrir run` pasa a **serie** entre `Config` y `Leer
+  Proyectos`; como es `continueRegularOutput`, si Supabase falla igual pasa el item y el pipeline sigue
+  (y trae `return=representation`, así `run_id` se puebla). Documentado en el CLAUDE.md del workflow.
+- **Grilling `/grill-me` punta a punta** → decisiones lockeadas (todas ejecutadas salvo lo diferido):
+  - **COLECTAR (post-V-run):** descubrimiento **simétrico**. Hallazgo clave: **no hacen falta actores
+    nuevos** — `apify~instagram-scraper` soporta `searchType:hashtag` (IG-por-keyword) y
+    `clockworks~free-tiktok-scraper` acepta `profiles` (TT-por-perfil). Diseño: 4 llamadas Apify (2 por
+    plataforma) → cada una a su `Normalizar` → `Merge scrapes` (ya append). IG-hashtag **descubre cuentas
+    nuevas** (el gate filtra el ruido). Keywords multi-palabra **colapsan a un hashtag**
+    (`liderazgo efectivo → #liderazgoefectivo`). Subsume #15 + #17 + #16. Costo real = más corridas Apify.
+  - **CALIDAD:** la Voz sigue como eje **opcional** del gate (Proyecto ⊕ Voz; vacía = solo Proyecto).
+  - **ENTREGAR (hecho):** Candidatos ahora expone `relevancia_score` (juicio semántico limpio) +
+    `relevancia_razon` (por qué pasó) — el gate los calculaba y los descartaba — y `thumbnail`
+    (portada de Apify como attachment, para que el equipo escanee sin clickear afuera).
+  - **Integridad Airtable (hecho en script/contrato/manifest):** fuera `link_doc` (ADR-009),
+    `categoria` (el motor no clasifica), `min_likes`/`min_views` (el heat nunca los ponderaba — el
+    contrato mentía), y los campos de generación de `Voces` (`few_shot`/`frase_credencial`/`cta`/
+    `tratamiento`/`registro`/`pais_acento`, pausados por ADR-009). `fecha` → "Created time" nativo.
+  - **Correctitud:** **#12** resuelto (`external_id` en `Preparar outputs Supabase` → el índice parcial
+    `outputs_external_id_key` hace de backstop: en re-runs el POST 409ea, que es continue-on-fail, sin
+    duplicado). #4 paginación + #5 tope dedup → **diferidos a pre-cron** (no muerden al volumen del piloto).
+  - **Docs (#10) resuelto:** README + CLAUDE.md del workflow **reescritos al motor real** (Haiku
+    traductor/jurado, doble gate, sin Sheets, sin categorías, Apify community node, orden de ejecución).
+- **Aplicado a la base viva (por API, aditivo):** 3 campos creados en `Candidatos` (`relevancia_score`
+  number/2, `relevancia_razon` long, `thumbnail` attachment). **Manual de Mani** (la API de Airtable no
+  borra ni crea campos computados): borrar `link_doc`/`categoria`/`min_likes`/`min_views` + los de Voces,
+  y crear `fecha` tipo "Created time".
+- **Validación:** validador en verde (927; bajó de 933 por los campos quitados del manifest) · JSON +
+  `jsCode` parsean (30 nodos) · smoke de los reemplazos (6 patches, 1 match c/u). **Falta la V-run** con
+  los campos nuevos en vivo. **🔴 Rotar el PAT de Airtable** (re-expuesto en chat).
 
 ### 2026-06-16 (cierre 2) — Refactor de relevancia: Stage 4 (limpieza estructural) *(Mani + Claude)*
 

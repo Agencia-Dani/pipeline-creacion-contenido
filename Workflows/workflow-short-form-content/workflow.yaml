@@ -39,8 +39,6 @@ inputs:
   filters:
     - { key: top_n,            type: number, scope: client, desc: "Candidatos por proyecto a Airtable (Proyectos.top_n)" }
     - { key: dias_recencia,    type: number, scope: client, desc: "Ventana de fetch por proyecto (backfill grande la 1ª vez)" }
-    - { key: min_likes,        type: number, scope: client, desc: "Piso blando informativo (el heat es percentil)" }
-    - { key: min_views,        type: number, scope: client, desc: "Piso blando informativo" }
     - { key: peso_views,       type: number, scope: client, default: 0.4 }
     - { key: peso_likes,       type: number, scope: client, default: 0.4 }
     - { key: peso_eng,         type: number, scope: client, default: 0.2 }

@@ -301,7 +301,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "\nconst item = $input.item.json;\nconst seguidores = item.ownerFollowersCount || item.ownerFollowerCount || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.ownerBio || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: (function(){ var d = new Date(item.timestamp); return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]; })()\n} };\n"
+        "jsCode": "\nconst item = $input.item.json;\nconst seguidores = item.ownerFollowersCount || item.ownerFollowerCount || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.ownerBio || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  thumbnail_url: item.displayUrl || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: (function(){ var d = new Date(item.timestamp); return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]; })()\n} };\n"
       },
       "id": "normalizar-ig",
       "name": "Normalizar IG",
@@ -315,7 +315,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "\nconst item = $input.item.json;\nconst am = item.authorMeta || {};\nconst seguidores = am.fans || 0;\nreturn { json: {\n  plataforma: 'tiktok',\n  external_id: String(item.id || ''),\n  username: am.name || '',\n  nombre: am.nickName || '',\n  seguidores,\n  bio: am.signature || '',\n  descripcion: item.text || item.desc || '',\n  likes: item.diggCount || 0,\n  comentarios: item.commentCount || 0,\n  reproducciones: item.playCount || 0,\n  url: item.webVideoUrl || '',\n  video_url: item.webVideoUrl || '',\n  hashtags: (item.hashtags || []).map(function (h) { return h.name || h; }).join(', '),\n  duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n  engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : ''\n} };\n"
+        "jsCode": "\nconst item = $input.item.json;\nconst am = item.authorMeta || {};\nconst seguidores = am.fans || 0;\nreturn { json: {\n  plataforma: 'tiktok',\n  external_id: String(item.id || ''),\n  username: am.name || '',\n  nombre: am.nickName || '',\n  seguidores,\n  bio: am.signature || '',\n  descripcion: item.text || item.desc || '',\n  likes: item.diggCount || 0,\n  comentarios: item.commentCount || 0,\n  reproducciones: item.playCount || 0,\n  url: item.webVideoUrl || '',\n  video_url: item.webVideoUrl || '',\n  thumbnail_url: (item.videoMeta && item.videoMeta.coverUrl) || '',\n  hashtags: (item.hashtags || []).map(function (h) { return h.name || h; }).join(', '),\n  duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n  engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : ''\n} };\n"
       },
       "id": "normalizar-tt",
       "name": "Normalizar TT",
@@ -476,7 +476,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || '')\n  } });\n}\nreturn out;\n"
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || ''\n  } });\n}\nreturn out;\n"
       },
       "id": "armar-candidato",
       "name": "Armar candidato",
@@ -489,7 +489,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
+        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
       },
       "id": "preparar-batch-airtable",
       "name": "Preparar batch Airtable",
@@ -538,7 +538,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\nconst outputs = $input.all().map(i => {\n  const d = i.json;\n  return {\n    run_id, tipo: 'guion_reel', titulo: d.titulo || '(sin titulo)',\n    contenido_o_link: d.script || '', estado: 'draft',\n    source_items: [{ platform: d.plataforma || '', url: d.url_referente || '' }],\n    metadata: {\n      proyecto: d.proyecto_nombre || '', voz: d.voz_nombre || '', referente: d.referente || '',\n      url_referente: d.url_referente || '', idioma: d.idioma || '',\n      views: d.views || 0, likes: d.likes || 0, seguidores: d.seguidores || 0,\n      engagement: d.engagement || 0, heat_score: d.heat_score || 0, link_doc: ''\n    }\n  };\n});\nreturn [{ json: { run_id, n: outputs.length, outputs } }];\n"
+        "jsCode": "\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\nconst outputs = $input.all().map(i => {\n  const d = i.json;\n  return {\n    run_id, external_id: d.external_id || null, tipo: 'guion_reel', titulo: d.titulo || '(sin titulo)',\n    contenido_o_link: d.script || '', estado: 'draft',\n    source_items: [{ platform: d.plataforma || '', url: d.url_referente || '' }],\n    metadata: {\n      proyecto: d.proyecto_nombre || '', voz: d.voz_nombre || '', referente: d.referente || '',\n      url_referente: d.url_referente || '', idioma: d.idioma || '',\n      views: d.views || 0, likes: d.likes || 0, seguidores: d.seguidores || 0,\n      engagement: d.engagement || 0, heat_score: d.heat_score || 0, link_doc: ''\n    }\n  };\n});\nreturn [{ json: { run_id, n: outputs.length, outputs } }];\n"
       },
       "id": "preparar-outputs-supabase",
       "name": "Preparar outputs Supabase",
@@ -751,12 +751,18 @@
       "main": [
         [
           {
-            "node": "Leer Proyectos",
+            "node": "Abrir run en el registro",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Abrir run en el registro": {
+      "main": [
+        [
           {
-            "node": "Abrir run en el registro",
+            "node": "Leer Proyectos",
             "type": "main",
             "index": 0
           }
