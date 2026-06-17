@@ -37,6 +37,11 @@ referente⊕tema con max; campo `tema` creado en la base viva). **Motor: 30→34
 (DDL, no va por PostgREST); V-run de re-validación en n8n (gate fix + 4 nodos nuevos); sembrar
 Referentes TikTok (el eje TT-perfil queda vacío hoy); ROTAR el PAT Airtable + service_role (expuestos
 hoy).**
+> **Personalización del equipo (pedido de Mani, misma sesión):** 3 controles no-code más — *Resultados
+> Instagram/TikTok por corrida* (volumen/costo, a Ajustes), **toggles de eje por Proyecto** (4 checkboxes
+> "Buscar en IG/TikTok por cuentas/palabras clave"; ninguno marcado = los 4 corren), y *Relevancia mínima*
+> (umbral del Gate). **Nombres en Airtable en español claro** (sin jerga): `Armar plan` mapea la clave
+> amigable → key interna (`AJUSTE_MAP`). Base viva actualizada (12 claves Ajustes + 4 checkboxes).
 
 **2026-06-17 (cierre 5) — V-run de ESTE repo VALIDADA + fix del no-transcript (Mani).** Se levantó el 🔴
 de cierre 4: la **V-run corrió sobre el motor de este repo** (Supabase `runs` 61b1b5d5, `ok`, embudo
