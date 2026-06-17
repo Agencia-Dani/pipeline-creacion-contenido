@@ -21,6 +21,23 @@
 
 ## Estado en una línea
 
+**2026-06-17 (cierre 6) — Las 6 decisiones lockeadas EJECUTADAS en código (Mani + Claude).** Sesión
+larga de build. **#1** ya estaba (V-run cierre 5). Hechas esta pasada: **#6 idempotencia** del archivado
+(migración `005`: índice `outputs.external_id` parcial→completo — verificado en vivo que el parcial daba
+`42P10`; POST con `on_conflict=external_id`+`ignore-duplicates`; delete con reintento 3×); **#2 tabla
+Ajustes** (ADR-011: knobs del scoring clave→valor en Airtable, `Leer Ajustes`→`Armar plan`→`cfg=Config⊕
+Ajustes` en Heat-score y Gate; tabla creada+sembrada en la base viva, 9 defaults); **#3 piso duro**
+`min_views`/`min_likes` pre-`top_n` (default 0); **#5 idioma** (guessLang detecta scripts no-latinos +
+de/nl, lo desconocido→`ot` recibe boost; binario se queda); **#4 descubrimiento SIMÉTRICO** (4 Apify:
+referentes+keywords en IG **y** TikTok; `Asignar` matchea por cuenta y por hashtag en ambas; keywords
+multi-palabra colapsan; subsume #15/#16/#17); **señal bi-eje O7** (ADR-012: `tema` matcheado viaja
+motor→`Candidatos.tema`→archivado→`outputs.metadata`; `v_senal_tema` migración `006`; Heat-score combina
+referente⊕tema con max; campo `tema` creado en la base viva). **Motor: 30→34 nodos. Validador 963/0.**
+6 commits a `main`. **🔴 PENDIENTE MANUAL (Mani): aplicar `005`+`006` en el SQL Editor de Supabase
+(DDL, no va por PostgREST); V-run de re-validación en n8n (gate fix + 4 nodos nuevos); sembrar
+Referentes TikTok (el eje TT-perfil queda vacío hoy); ROTAR el PAT Airtable + service_role (expuestos
+hoy).**
+
 **2026-06-17 (cierre 5) — V-run de ESTE repo VALIDADA + fix del no-transcript (Mani).** Se levantó el 🔴
 de cierre 4: la **V-run corrió sobre el motor de este repo** (Supabase `runs` 61b1b5d5, `ok`, embudo
 `151 colectados → 10 filtrados → 9 candidatos`) → **decisión #1 (validar primero) HECHA**. Análisis del output
@@ -131,48 +148,44 @@ estructural abierta para el equipo: Airtable vs Supabase / alcance del registro 
 Airtable (campo `fecha_calificacion` + vista 🔥), accesos a Majo/Jero, **semillas (A9, en pausa
 hasta definir nicho)**.
 
-## ⏳ Pendiente inmediato (lo último que pidió Mani)
+## ⏳ Pendiente inmediato (manual de Mani, cierre 6)
 
-> **Cerrar lo de hoy antes de seguir:** (1) **commitear la fix del gate** (working tree, sin commit) +
-> re-importar el motor en n8n y correr una **V-run de re-validación** para ver el gate juzgando captions de
-> verdad (esperado: `tradingsharks`/`thatgrindset` dropeados, `jefdicastech` flageado `[SIN TRANSCRIPT...]`);
-> (2) **🔴 rotar el PAT de Airtable + la service_role de Supabase** (expuestos en el chat de hoy).
+> Las 6 decisiones están en código y commiteadas. Para que corran en vivo falta lo **manual** (no lo
+> puedo hacer yo):
+> 1. **Aplicar `005_idempotencia_outputs.sql` + `006_senal_tema_bieje.sql`** en el SQL Editor de
+>    Supabase (es DDL: `drop/create index` y `create view` → no va por PostgREST/service_role).
+> 2. **Re-importar el motor en n8n** (34 nodos; asignar credencial `apifyApi` a los 2 Apify nuevos —
+>    *IG Hashtag* y *TikTok Perfil* — y la key `<ANTHROPIC_API_KEY>`/`<SUPADATA_API_KEY>` en los Code
+>    nodes) + el archivado, y correr la **V-run de re-validación** (gate-fix + Ajustes + simétrico).
+> 3. **Sembrar Referentes de TikTok** (hoy las 3 cuentas son IG → el eje *TikTok Perfil* sale vacío).
+> 4. **🔴 ROTAR el PAT de Airtable + la service_role de Supabase** (expuestos en el chat de hoy).
 
-## Próxima sesión (fresh) — ejecutar #2-#6 + cierre de hoy
+## Próxima sesión — calibrar + cerrar pre-producción
 
-> **Estado (cierre 5):** la **V-run de ESTE repo está VALIDADA** (run `ok`, embudo `151→10→9`, gate dropea
-> el viral-off-topic). **Decisión #1 (validar primero) HECHA** → ya se puede tocar estructura. La fix del
-> **no-transcript** está en código (sin commit, sin V-run de re-validación). Quedan **5 de las 6 decisiones
-> (#2-#6)** + los pendientes de doc. Orden sugerido: **#6 idempotencia** (chica, antes de cualquier V-run que
-> ejercite archivado) → **#2 tabla Ajustes + #3 piso duro** (juntas, comparten Config/Airtable, #2 toca `core/`
-> → ADR) → **#5 idioma** (se cuelga de Ajustes) → **dev-doc** (en paralelo) → **#4 simétrico + señal bi-eje**
-> (los grandes, post-V-run). Skills: `/tdd` o builder Node para Ajustes/piso duro; `/diagnose` si la V-run rompe.
+> **Estado (cierre 6):** las **6 decisiones lockeadas están EJECUTADAS** (ver §"Estado en una línea").
+> El motor pasó a 34 nodos, descubrimiento simétrico, knobs en Airtable, señal bi-eje. Validador 963/0.
+> Lo que sigue tras la V-run de re-validación: **calibrar** pesos/rubric con data real; resolver los
+> **pendientes pre-cron** (§Mejoras: #4 paginación, #5 tope dedup, #9 OAuth Sheets) y la **dev-doc
+> nodo-por-nodo**; después **D0 limpieza pre-producción → D1–D3 activación**.
 
-**Las decisiones lockeadas (#1 ✅ hecha en cierre 5; detalle en el log de cierre 4 + §gaps):**
+**Las 6 decisiones lockeadas — TODAS HECHAS (cierre 6; #1 en cierre 5):**
 
-1. **✅ Validar primero, barato (HECHA, cierre 5).** Corrió el motor de ESTE repo end-to-end (run 61b1b5d5,
-   `ok`); el output se analizó y el gate valida. El bloqueante quedó levantado. *(Knobs vivos del run: Config
-   `ig_results_limit=8`, `tt_results_limit=30`, `dias_recencia=7`, `top_n` del Proyecto = 10.)*
-2. **Tabla Ajustes en Airtable (#19/O11).** Knobs de scoring (`peso_*`, `boost_idioma`, `umbral_viral`,
-   `peso_relevancia`, `top_n`, `min_views`, `min_likes`) a una tabla clave→valor que el motor lee como
-   lee Proyectos/Keywords. → **ADR nuevo** + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`.
-3. **Piso duro pre-enriquecimiento (Q1).** `min_views`/`min_likes` como filtro REAL dentro de `Heat-score`
-   **antes del `top_n`**, **default 0** (respeta "nada corta", ROADMAP §1), editable por el equipo vía Ajustes.
-4. **Señal de aprendizaje bi-eje (O7).** Hoy `v_senal_seleccion` solo acredita por `referente` → ciego en
-   TikTok-por-hashtag. Se monta sobre el **descubrimiento simétrico**; al aterrizar, extender la vista para
-   acreditar también por keyword/tema. → **ADR nuevo** (schema). MVP: IG-referente-only, documentado.
-5. **Ampliar detección de idioma (#18/O2).** Boost binario se queda (cualquier no-español se premia);
-   ampliar el `DICT`/usar librería para que más idiomas reciban boost (hoy caen a `es`). `boost_idioma` a
-   Ajustes; la detección queda dev-only. Nota: el boost corre sobre el caption **pre-transcripción**.
-6. **Idempotencia del archivado (#2) ANTES de V3.** `Prefer: resolution=ignore-duplicates` en el POST de
-   `outputs` + delete de Airtable con reintento. La V3 ejercita el archivado → si no, duplica filas.
+1. **✅ Validar primero (cierre 5).** Motor de ESTE repo corrió end-to-end (run 61b1b5d5, `ok`).
+2. **✅ Tabla Ajustes (#19/O11) — ADR-011.** Knobs del scoring clave→valor en Airtable; `Leer Ajustes`
+   → `Armar plan` → `cfg = Config ⊕ Ajustes` en Heat-score y Gate. Tabla creada+sembrada en la base viva.
+3. **✅ Piso duro (Q1).** `min_views`/`min_likes` en `Heat-score` antes del `top_n`, default 0, vía Ajustes.
+4. **✅ Señal bi-eje (O7) — ADR-012.** `tema` matcheado motor→`Candidatos.tema`→archivado→`outputs.metadata`;
+   `v_senal_tema` (006); Heat-score combina referente⊕tema (max). Inerte hasta tener historial.
+5. **✅ Idioma (#18/O2).** `guessLang` ampliado (scripts no-latinos + de/nl, desconocido→`ot`→boost);
+   binario se queda; `boost_idioma` ya vive en Ajustes; detección dev-only.
+6. **✅ Idempotencia del archivado (#2) — migración 005.** Índice `outputs.external_id` parcial→completo
+   (verificado en vivo: el parcial daba `42P10`); POST con `on_conflict`+`ignore-duplicates`; delete 3×.
 
-**Pendiente nuevo (prio ALTA, NO bloquea):** **dev-doc nodo-por-nodo** del workflow (qué hace cada uno de
-los 30 nodos + orden de ejecución), la conexión con Airtable, y el esquema de la base (cada tabla y campo,
-qué lo escribe/lee). Para que el próximo dev no lea el JSON crudo. Es O11 en su versión dev.
+**Bonus de la misma sesión:** **#4 descubrimiento SIMÉTRICO** (4 Apify: referentes+keywords en IG **y**
+TikTok; subsume #15/#16/#17) — ya **construido**, no diferido. Las TT-referentes hay que sembrarlas.
 
-**Descubrimiento simétrico** (4 Apify, ya diseñado) — ver §"🔵 Producto / DIRECCIÓN". Sigue **diferido a
-post-V-run**; es la precondición de O7 bi-eje (decisión 4).
+**Pendiente nuevo (prio ALTA, NO bloquea):** **dev-doc nodo-por-nodo** del workflow (los 34 nodos + orden
+de ejecución), la conexión con Airtable, y el esquema de la base (cada tabla/campo, qué lo escribe/lee).
 
 **7ª decisión (cierre 4, post-handoff inicial):** **O1 — el cron del motor queda SEMANAL** (lunes 8am, lo
 que ya trae el nodo y menciona el CLAUDE.md). Más barato y no estresa la cuota free de Airtable. **Corregir
@@ -266,7 +279,11 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
    `short-form-content/workflow.yaml` reescrito a las 8 etapas canónicas + `client_config` + `filters`
    + `registered: yes`. *(Original: 13 errores — archivado sin manifest, short-form-content con stages
    inventados, sin `client_config`/`filters`, `registered: supabase` inválido.)*
-2. **El archivado NO es idempotente si falla el borrado de Airtable.** Orden: `outputs → Sheet →
+2. **✅ RESUELTO (2026-06-17, cierre 6).** Migración `005`: índice `outputs.external_id` parcial→completo
+   (verificado en vivo que el parcial daba `42P10` en `on_conflict`); el POST de `outputs` ahora usa
+   `on_conflict=external_id` + `Prefer: resolution=ignore-duplicates`, y `Borrar de Airtable` reintenta
+   3× (2s). Re-correr ya no duplica el Sheet ni pierde candidatos. *(Aplicar `005` en SQL Editor — manual.)*
+   *(Original abajo.)* **El archivado NO es idempotente si falla el borrado de Airtable.** Orden: `outputs → Sheet →
    borrar Airtable`. `Borrar de Airtable` no es continue-on-fail; si el delete falla DESPUÉS del
    append, los records quedan en Airtable y la corrida siguiente los re-toma. Como `outputs.external_id`
    tiene índice UNIQUE (`outputs_external_id_key`, schema 001) y el POST no usa `on_conflict`, el batch
@@ -354,8 +371,10 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
 > presupuesto), no más actores. **Decidido:** IG-hashtag **descubre cuentas nuevas** (el doble gate
 > filtra el ruido); keywords multi-palabra **colapsan a un hashtag** (`liderazgo efectivo →
 > #liderazgoefectivo`). Subsume **#15 (TT-perfil) + #16 (multi-palabra) + #17 (IG-hashtag)**.
-> **Diferido a post-V-run** (no apilar un cambio intrusivo de COLECTAR sobre el gate sin validar); no
-> bloquea la V-run actual. Las TT-referentes hay que sembrarlas (hoy las 3 son IG).
+> **✅ CONSTRUIDO (2026-06-17, cierre 6).** 4 Apify (IG Reels/IG Hashtag/TikTok/TikTok Perfil), cada par
+> a su `Normalizar` → `Merge scrapes`; `Asignar` matchea por cuenta y por hashtag en ambas plataformas;
+> keywords multi-palabra colapsan. Subsume #15/#16/#17. **Falta sembrar Referentes TikTok** (hoy las 3
+> son IG → el eje TikTok-perfil sale vacío) + V-run de validación.
 
 15. **Scrapear Referentes de TikTok por perfil.** Hoy las cuentas con `plataforma=tiktok` se ignoran (el
     código las junta en `tt_handles` pero no las usa). Requiere un actor de perfil de TikTok en Apify.
