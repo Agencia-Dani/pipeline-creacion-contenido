@@ -21,6 +21,22 @@
 
 ## Estado en una línea
 
+**2026-06-17 (cierre 7) — Docs + verificación + cierre de manuales del cierre 6 (Mani + Claude).** Sesión
+sin código de motor. **Fase 2 del handoff:** corregido `33→34 nodos` (CLAUDE.md del motor + PLAN.md) y
+anotada la **#20** (las `draft` del motor en `outputs` no se cierran nunca — doble semántica de `external_id`,
+dev-doc §7). **Ajustes (ADR-011) verificado punta a punta en código:** 12 claves Airtable ↔ `AJUSTE_MAP` 12/12,
+0 huérfanos; `_nrm` normaliza acentos/mayúsculas (TikTok, interacción); `cfg=Config⊕ajustes` consumido por
+Heat-score (8 knobs), Gate (`peso_relevancia`/`min_relevancia`) y los 4 Apify (`ig/tt_results_limit`); fail-open.
+Correcto por construcción, **falta correr en vivo**. **🔴 manuales:** **`005`+`006` APLICADAS y verificadas**
+(en vivo: `v_senal_tema` pasó de 404 a 200; índice `outputs_external_id_key` quedó completo, sin `WHERE`).
+Quedan: re-import + V-run (#2, en curso), sembrar Referentes TikTok (#3, lo hace redes), rotar credenciales
+(#4, en producción). **Onboarding del equipo de redes:** el doc **ya existía** ([docs/onboarding-equipo-redes.md](../onboarding-equipo-redes.md))
+→ se comparte como Google Doc + acceso al Airtable. Quedó **stale tras el cierre 6** (dice "5 tablas", falta la
+**Ajustes**; describe el descubrimiento asimétrico, no el simétrico nuevo) → actualizar **después de la V-run**.
+**Diagnóstico de la base viva** (vía PAT/service_role): 1 proyecto provisional, 1 voz, 9 keywords, **3 referentes
+IG / 0 TikTok**, 9 candidatos de prueba, 24 `outputs`. **D0 sigue pendiente:** limpiar la data de prueba + sembrar
+la config real cuando el equipo entregue el brief. Validador 972/0.
+
 **2026-06-17 (cierre 6) — Las 6 decisiones lockeadas EJECUTADAS en código (Mani + Claude).** Sesión
 larga de build. **#1** ya estaba (V-run cierre 5). Hechas esta pasada: **#6 idempotencia** del archivado
 (migración `005`: índice `outputs.external_id` parcial→completo — verificado en vivo que el parcial daba
@@ -157,8 +173,8 @@ hasta definir nicho)**.
 
 > Las 6 decisiones están en código y commiteadas. Para que corran en vivo falta lo **manual** (no lo
 > puedo hacer yo):
-> 1. **Aplicar `005_idempotencia_outputs.sql` + `006_senal_tema_bieje.sql`** en el SQL Editor de
->    Supabase (es DDL: `drop/create index` y `create view` → no va por PostgREST/service_role).
+> 1. ~~**Aplicar `005` + `006`**~~ → ✅ **HECHO y verificado (cierre 7).** `v_senal_tema` responde 200;
+>    el índice `outputs_external_id_key` quedó completo (sin `WHERE`).
 > 2. **Re-importar el motor en n8n** (34 nodos; asignar credencial `apifyApi` a los 2 Apify nuevos —
 >    *IG Hashtag* y *TikTok Perfil* — y la key `<ANTHROPIC_API_KEY>`/`<SUPADATA_API_KEY>` en los Code
 >    nodes) + el archivado, y correr la **V-run de re-validación** (gate-fix + Ajustes + simétrico).
@@ -353,6 +369,13 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
     por seguidores (>700k) es proxy grueso. Modelo v1 conocido; documentar que es poco estable sin volumen.
 14. **Metadata residual del template original** (`instanceId`, `tags`) quedó en el `workflow.json` del motor
     (líneas ~1283-1306). No es secreto, pero ensucia el diff.
+20. **Dos filas por video en `outputs`; las `draft` del motor nunca se cierran.** `external_id` tiene **dos
+    semánticas** (ver [dev-doc §7](./dev-doc.md)): el **motor** escribe una fila `draft` con `external_id`=id del
+    video (shortcode IG / id TikTok); el **archivado** escribe la fila calificada con `external_id`=id del record
+    de Airtable (`rec…`). No colisionan (namespaces distintos) y las vistas de histórico/señal filtran
+    `calificado_en is not null` → solo ven las del archivado. Pero las `draft` del motor **se acumulan sin
+    cerrarse nunca**. Decidir si esa acumulación es traza deseada ("todo lo generado") o necesita cleanup/marcado.
+    No bloquea.
 
 **🔵 Producto / alcance (modelo de búsqueda y tuning — post-MVP):**
 
@@ -416,6 +439,42 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     **→ ADR nuevo + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`** (toca `core/`).
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-17 (cierre 7) — Docs + verificación de Ajustes + cierre de manuales *(Mani + Claude)*
+
+- **Fase 2 del handoff (anotaciones pendientes):** corregido `33→34 nodos` en
+  [CLAUDE.md del motor](../../Workflows/workflow-short-form-content/CLAUDE.md) y [PLAN.md](../../PLAN.md)
+  (el conteo real son 34). Agregada la **#20** a §Mejoras: las `draft` que el motor escribe en `outputs`
+  **nunca se cierran** (la doble semántica de `external_id` deja 2 filas por video — dev-doc §7). Los 🔴
+  manuales y los ✅ de §Mejoras se dejaron como están (varios "resueltos" son parciales; el registro tachado
+  sirve de arco problema→fix).
+- **Ajustes (ADR-011) verificado punta a punta — pedido de Mani.** Contra la base viva + el `workflow.json`:
+  tabla `Ajustes` con **12 filas** (claves+valores = defaults); `Leer Ajustes` → `Armar plan` normaliza cada
+  `clave` con `_nrm` (lower + strip acentos) y la mapea con `AJUSTE_MAP` → **12/12 match, 0 huérfanos**
+  (incluidos los casos peludos: "TikTok", "interacción", "mínimo"). El plan expone `ajustes`; Heat-score y Gate
+  hacen `cfg = Object.assign({}, Config, ajustes)` → los ajustes **pisan** los defaults, **fail-open** (clave
+  faltante/vacía/mal escrita → cae al literal del código). Consumo confirmado de los 12 knobs: 8 en Heat-score,
+  2 en Gate (`peso_relevancia`/`min_relevancia`), 2 (`ig/tt_results_limit`) en los 4 Apify. **Ningún knob muerto.**
+  Correcto en código; **falta probarlo en una corrida real** (depende del re-import + V-run).
+- **🔴 manuales del cierre 6 — cerrado el #1.** Mani aplicó `005`+`006` en el SQL Editor; **verificado en vivo:**
+  `v_senal_tema` pasó de **404 → 200** (existe, vacía — correcto, sin calificados aún) y el índice
+  `outputs_external_id_key` quedó **completo** (`CREATE UNIQUE INDEX ... (external_id)` sin `WHERE`) → el
+  `on_conflict` del archivado ya no dará `42P10`. Quedan: **#2** re-import + V-run (en curso, camino crítico),
+  **#3** Referentes TikTok (lo carga el equipo de redes en Airtable), **#4** rotar credenciales (en producción).
+- **Onboarding del equipo de redes:** se va a compartir como **Google Doc** + acceso al Airtable para que el
+  equipo junte la config real. El doc **ya existía** ([docs/onboarding-equipo-redes.md](../onboarding-equipo-redes.md));
+  detectado que quedó **stale tras el cierre 6**: dice "5 tablas" (ya son 6, falta la **Ajustes**) y describe el
+  descubrimiento **asimétrico** (IG=cuentas / TikTok=hashtags) como tope, cuando el cierre 6 construyó el
+  **simétrico** (sin validar en vivo aún). **Decisión: actualizarlo DESPUÉS de la V-run** (no antes, para no
+  prometerle al equipo algo no probado). *(Claude creó por error un duplicado `onboarding-redes.md` sin chequear
+  que ya había uno → descartado en el acto.)*
+- **Diagnóstico de la base viva** (PAT + service_role — **a rotar**): 1 proyecto provisional ("IA y Productividad"),
+  1 voz provisional, 9 keywords, **3 referentes IG / 0 TikTok**, 9 candidatos de prueba; 24 filas en `outputs` y
+  varias runs de archivado colgadas en `en_curso` (síntoma del OAuth de Sheets, #9). **D0 sigue pendiente.**
+- **Validación:** validador en verde (**972 checks, 0 errores**) + escaneo de secretos OK
+  (las credenciales que pasó Mani por chat **no** se escribieron a disco; se usaron como env vars inline).
+- **Qué sigue:** Mani re-importa el motor y corre la **V-run de re-validación** → revisar el output como en el
+  cierre 5. En paralelo, el equipo entrega el brief → **D0** (limpiar prueba + sembrar config real, incl. TikTok).
 
 ### 2026-06-17 (cierre 5) — V-run de ESTE repo validada + fix del no-transcript *(Mani + Claude)*
 
