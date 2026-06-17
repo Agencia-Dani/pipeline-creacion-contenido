@@ -18,7 +18,7 @@ Lo que existe hoy en el repo:
 | Pieza | Qué es | Estado |
 |---|---|---|
 | `README.md` | Visión del sistema central | ✅ Escrito |
-| `Workflows/workflow-short-form-content/` | **Máquina**: workflow n8n (21 nodos, JSON importable). Cron semanal + formulario bajo demanda → Apify (IG+TikTok) → filtro parametrizado top-N → Supadata transcribe → Claude escribe guiones en voz del cliente → Google Sheets (guion + métricas) + email con filtros. *El rework ADR-009 (ROADMAP, carril B) cambia generación y destinos.* | ✅ Funcional como plantilla · ❌ **no hosteado** · placeholders `<<...>>` por cliente |
+| `Workflows/workflow-short-form-content/` | **Máquina**: motor de reels n8n (30 nodos, JSON importable; ADR-009 + ADR-010). Cron semanal + Execute manual → lee la config del equipo en Airtable → Apify (IG+TikTok) → pre-trim Haiku + heat-score métrico + dedup → Supadata transcribe + Claude Haiku traduce literal → Gate Haiku (CALIDAD) → candidatos a Airtable + registro Supabase. Sin Google en el motor. | ✅ Corrió manual (V1) · ❌ **cron sin activar** · placeholders `<<...>>` por cliente |
 | `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) · ❌ **hoy inactivo** — se re-monta en F3 |
 
 > **Estado operativo (2026-06-11):** ninguno de los dos workflows está sirviendo hoy. La puesta
@@ -128,13 +128,13 @@ de contenido se mapea contra estas 8 etapas en su manifest (las que no aplican s
 | Etapa | Responsabilidad | En reels (MVP — ADR-009) | En substack hoy |
 |---|---|---|---|
 | 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok (cuentas/keywords desde el cockpit Airtable) | Bot recorre fuentes validadas |
-| 2. NORMALIZAR | Todo item cae al schema común `content_item` | Nodos "Normalizar IG1/TT1" | Implícito en el playbook |
-| 3. FILTRAR / SCOREAR | Params de la corrida + criterios del cliente → selección | Heat-score v1: likes+views+engagement × tema/idioma/selección (fórmula: ROADMAP §1) + dedup contra `processed_items` | Pregunta filtro + scoring 5 criterios |
-| 4. ENRIQUECER | Transcribir, extraer, research profundo | Supadata Whisper + traducción literal al español (Claude, solo si hace falta) | Research profundo del brief |
-| 5. GENERAR | **Perfil de output** del workflow (formato + voz si aplica) | Perfil "script literal": Doc linkeado con la transcripción en español (voz propia en pausa — ADR-009) | Bot → borrador / nugget |
-| 6. CALIDAD | Checklist antes de entregar | ❌ no tiene (hueco conocido) | Checklist de 5 preguntas |
+| 2. NORMALIZAR | Todo item cae al schema común `content_item` | Nodos "Normalizar IG/TT" (mismas keys desde cada API) | Implícito en el playbook |
+| 3. FILTRAR / SCOREAR | Params de la corrida + criterios del cliente → selección | Pre-trim Haiku laxo (descarta off-topic obvio del caption, recall) + heat-score v1 métrico: likes+views+engagement × idioma/selección (fórmula: ROADMAP §1) + dedup contra `processed_items`. El substring `tema` salió (ADR-010) | Pregunta filtro + scoring 5 criterios |
+| 4. ENRIQUECER | Transcribir, extraer, research profundo | Supadata Whisper + traducción literal al español (Claude Haiku, solo si hace falta), en 2 Code nodes | Research profundo del brief |
+| 5. GENERAR | **Perfil de output** del workflow (formato + voz si aplica) | Perfil "script literal": el script es la transcripción/traducción en español tal cual, campo de texto (sin Doc, voz propia en pausa — ADR-009) | Bot → borrador / nugget |
+| 6. CALIDAD | Checklist antes de entregar | Gate de relevancia (Haiku) sobre el transcript: jurado estricto vs `criterios_relevancia` → heat-score composite (semántico ⊕ métricas), dropea irrelevantes (ADR-010) | Checklist de 5 preguntas |
 | 7. ENTREGAR | Destino nativo + registro central | Airtable `Candidatos` + registro Supabase; seleccionados → Sheet Histórico | Notion |
-| 8. NOTIFICAR | Resumen / alerta | Email resumen (Gmail, heredado del template) | Telegram |
+| 8. NOTIFICAR | Resumen / alerta | n/a (el equipo vive en Airtable; sin email en el MVP) | Telegram |
 
 Interfaces estándar entre etapas (se definen en F1, viven en `core/contracts/`):
 

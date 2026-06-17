@@ -21,6 +21,17 @@
 
 ## Estado en una línea
 
+**2026-06-16 (cierre 2) — Stage 4 del refactor cerrado en `main` (Mani).** Limpieza estructural:
+el motor mapea 1:1 a las 8 etapas de PLAN §2.4 (verificado nodo a nodo: 30 nodos, 0 rotas, 0 huérfanos),
+único `merge` es **append** (0 mergeByPosition), adaptadores de descubrimiento prolijos (mismo
+`content_item` desde IG/TT — patrón ADR-007). **Docs sincronizadas a la realidad:** PLAN §2.4 (CALIDAD
+deja de ser hueco ❌, sale `tema`, GENERAR = texto sin Doc, NOTIFICAR n/a) y §2.3 (30 nodos, ADR-009+010).
+**Verificado en la base viva (PAT):** `criterios_relevancia` existe en `Proyectos`+`Voces`, piloto
+sembrado → **cierra el manual de Stage 1**; la Voz provisional tiene el criterio vacío (opcional, sembrar
+en Stage 5). Falta **Stage 5 = V-run + calibración** (llenar 3×`<ANTHROPIC_API_KEY>` + 1×`<SUPADATA_API_KEY>`
+en n8n). **🔴 ROTAR el PAT de Airtable** (expuesto de nuevo en chat esta sesión). Deuda aparte: README/CLAUDE.md
+del workflow siguen en el template viejo (#10).
+
 **2026-06-16 (cierre) — Refactor de relevancia Stages 1-3 en `main` (Mani).** Doble gate Haiku
 operativo en código: **pre-trim** laxo (recall) sobre el caption antes de transcribir + **Gate**
 jurado estricto (precision) sobre el transcript; el `heat_score` ahora es **composite**
@@ -243,6 +254,29 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 (cierre 2) — Refactor de relevancia: Stage 4 (limpieza estructural) *(Mani + Claude)*
+
+- **Verificación estructural (no hubo que tocar el `workflow.json`):** el flujo ya mapeaba limpio a las
+  8 etapas de PLAN §2.4 — trazado nodo a nodo (COLECTAR→…→CALIDAD→ENTREGAR, NOTIFICAR n/a). **30 nodos,
+  0 conexiones rotas, 0 huérfanos.** Único `merge` = **Merge scrapes** (`append`, une IG+TT sin índice);
+  `mergeByPosition` = 0 (los eliminó Stage 3 Paso 1). Adaptadores de descubrimiento prolijos: `Armar plan`
+  emite `ig_urls` (referentes) + `tt_hashtags` (términos) y `Normalizar IG`/`Normalizar TT` producen el
+  **mismo `content_item`** (idénticas keys) → patrón enchufable ADR-007, sin generalizar de más. El
+  `tt_handles` junta-y-no-usa es el gap #15 (pre-existente, flageado, no se toca por YAGNI).
+- **Docs a la realidad (lo único que cambió):** PLAN §2.4 (tabla canónica) — CALIDAD deja de ser hueco
+  ❌ (Gate Haiku), sale el substring `tema` de FILTRAR, GENERAR = script de texto sin Doc, NOTIFICAR =
+  n/a; PLAN §2.3 (mapa del repo) — 30 nodos, motor ADR-009+010, sin Google. El manifest `workflow.yaml`
+  ya coincidía desde Stage 0-3.
+- **Stage 1 manual cerrado (verificado por PAT, read-only):** `criterios_relevancia` (*Long text*) existe
+  en `Proyectos` **y** `Voces` de la base viva (`Reels Cockpit`); el piloto "IA y Productividad" tiene su
+  criterio sembrado. La Voz provisional tiene el criterio **vacío** (opcional por diseño — sembrar en
+  Stage 5 al calibrar el fit de cliente).
+- **Validación:** validador en verde (933) + escaneo confirmó **0 secretos** (PAT/baseId) en el repo.
+- **Qué sigue:** **Stage 5** = V-run + calibración (re-importar en n8n, llenar 3×`<ANTHROPIC_API_KEY>` +
+  1×`<SUPADATA_API_KEY>`, correr, confirmar que el viral-irrelevante desaparece, calibrar
+  `peso_relevancia`/pesos/rubric/ancho del embudo). **🔴 ROTAR el PAT de Airtable** (re-expuesto en chat).
+  Deuda aparte: README/CLAUDE.md del workflow al template viejo (#10).
 
 ### 2026-06-16 (cierre) — Refactor de relevancia: Stages 1-3 *(Mani + Claude)*
 

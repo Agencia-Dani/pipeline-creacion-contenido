@@ -57,11 +57,11 @@
 - ✅ Motor lo lee: `Armar plan` mete `criterios` (proyecto) y `voz_criterios` (voz) en cada
   `projects[id]` del plan de corrida (el gate de Stage 3 los consume vía `proyecto_id`). Validador en
   verde, jsCode parsea.
-- ⬜ **Manual (Carril A, necesita PAT):** (a) crear el campo en la base viva (re-correr
-  `setup-airtable.mjs` agrega solo el campo nuevo, o crearlo a mano: tipo *Long text*); (b) sembrar
-  `criterios_relevancia` del piloto "IA y Productividad". Borrador de semilla en el handoff.
-- **Hecho cuando:** el equipo puede editar criterios en Airtable y el motor los lee en `Armar plan`.
-  *(Código ✅; falta el paso manual en Airtable.)*
+- ✅ **Manual (Carril A) — verificado en la base viva 2026-06-16:** el campo `criterios_relevancia`
+  (*Long text*) existe en `Proyectos` **y** `Voces`; el piloto "IA y Productividad" tiene su criterio
+  sembrado. **Pendiente menor:** la Voz provisional tiene el criterio **vacío** (es opcional — el gate
+  combina Proyecto ⊕ Voz; con la Voz vacía manda solo el Proyecto). Sembrarla cuando se calibre (Stage 5).
+- **Hecho cuando:** el equipo puede editar criterios en Airtable y el motor los lee en `Armar plan`. ✅
 
 ### 🔧 Stage 2 — FILTRAR/SCOREAR: heat-score limpio + pre-trim (motor)
 - ✅ Substring `tema` fuera de `Heat-score v1`: el prescore queda métrico limpio
@@ -101,14 +101,25 @@ nodes**: `Transcribir (Supadata)` + `Traducir (Claude Haiku)` (vía `this.helper
 - **Hecho cuando:** una corrida deja pasar solo lo relevante y el orden refleja relevancia ⊕ métricas;
   un fallo simulado de Haiku no vacía la entrega. *(Código ✅; pendiente la corrida en vivo.)*
 
-### Stage 4 — Limpieza estructural (expresar las 8 etapas)
-- Hacer que el workflow mapee limpio a PLAN §2.4 (COLECTAR adaptadores · NORMALIZAR · FILTRAR/SCOREAR ·
-  ENRIQUECER · GENERAR · **CALIDAD** · ENTREGAR · NOTIFICAR).
-- Merges-by-position ya eliminados (reconstruidos en Stage 3 Paso 1, #8) — verificar que siguen fuera.
-- Dejar los adaptadores de descubrimiento (referentes / términos) prolijos para reuso futuro (ADR-007,
-  sin generalizar de más — YAGNI).
+### ✅ Stage 4 — Limpieza estructural (expresar las 8 etapas) — HECHO 2026-06-16
+- ✅ El flujo mapea 1:1 a PLAN §2.4 (verificado nodo a nodo): COLECTAR (Config→leer Airtable→Armar
+  plan→Apify IG/TT) · NORMALIZAR (Normalizar IG/TT→Merge append→Asignar proyecto+voz) · FILTRAR/SCOREAR
+  (Pre-trim→señal/procesados→Heat-score) · ENRIQUECER (Transcribir→Traducir) · GENERAR (perfil script
+  literal, sin nodo) · **CALIDAD** (Gate de relevancia) · ENTREGAR (Armar candidato→Airtable+registro) ·
+  NOTIFICAR n/a. 30 nodos, **0 conexiones rotas, 0 huérfanos**.
+- ✅ Merges-by-position fuera: el único `merge` es **Merge scrapes** (mode `append`, une IG+TT sin
+  alinear por índice); `grep mergeByPosition` = 0.
+- ✅ Adaptadores de descubrimiento prolijos: `Armar plan` emite los 2 ejes (`ig_urls` por referente,
+  `tt_hashtags` por término) y `Normalizar IG`/`Normalizar TT` producen **el mismo `content_item`**
+  (idénticas keys) desde el shape crudo de cada API → patrón enchufable ADR-007, sin generalizar de más.
+  *(El `tt_handles` que se junta y no se usa es el gap #15 — referentes TikTok por perfil; pre-existente
+  y flageado, no se toca por YAGNI.)*
+- ✅ **Docs a la realidad:** PLAN §2.4 sincronizada (CALIDAD deja de ser hueco ❌; sale el substring
+  `tema`; GENERAR = script de texto sin Doc; NOTIFICAR = n/a) y el mapa del repo en PLAN §2.3
+  (30 nodos, motor ADR-009+010, sin Google). El manifest `workflow.yaml` ya coincidía (Stage 0-3).
 - **Hecho cuando:** el workflow expresa las etapas sin alineación frágil; manifest coincide con la
-  realidad.
+  realidad. ✅ *(Deuda separada, NO de este stage: README/CLAUDE.md del workflow siguen describiendo el
+  template viejo — handoff #10.)*
 
 ### Stage 5 — Validación + calibración
 - Corrida de fuego: confirmar que el viral-pero-irrelevante **desaparece** (muestrear contra la corrida
