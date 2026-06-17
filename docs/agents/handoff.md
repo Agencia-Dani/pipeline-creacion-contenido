@@ -133,6 +133,13 @@ hasta definir nicho)**.
    Decisión de Mani 2026-06-14: nada de un Google Doc por script (llenaría el Drive). El script vive
    como **campo de texto** en Airtable y en Supabase `outputs.contenido_o_link`; el "link" es la URL
    del video original. → El motor **no usa ninguna credencial de Google**.
+   - **📍 Ciclo de vida del script traducido (traza punta a punta):** motor `Traducir (Claude Haiku)`
+     → campo `script` (traducción literal al español, o el transcript si ya estaba en español) →
+     **Airtable `Candidatos.script`** (área de trabajo temporal donde el equipo cura). Al calificarse,
+     el archivado (cron diario) copia `script` a **Supabase `outputs.contenido_o_link`** + columna
+     **`SCRIPT`** del Google Sheet "Histórico" (los dos sumideros permanentes) y **borra el record de
+     Airtable**. ⚠️ `link_doc` quedó **vestigial** (`Preparar batch Airtable` no lo setea): falta
+     limpiar las menciones a "Google Doc del script" en `airtable-cockpit.md` (L75, L103) y ADR-009.
 3. **`deploy.mjs` quedó obsoleto** para este motor (resolvía placeholders en voz/categorías). El MVP
    es 1 instancia editada a mano en el nodo Config. Rewrite multi-cliente = F5.
 
@@ -226,6 +233,17 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
   el video con **al menos una** keyword, no todas. Un TikTok sin esos hashtags es invisible al motor.
   *(Las keywords tienen un uso secundario en el heat-score: el "boost de tema" matchea la descripción,
   pero solo ordena, no filtra.)*
+
+> **🎯 DIRECCIÓN (Mani, 2026-06-16) — descubrimiento simétrico: ambos ejes en ambas plataformas.** Hoy
+> es asimétrico (IG solo por referentes, TikTok solo por keywords). El objetivo: que **referentes Y
+> keywords apliquen a IG Y a TikTok**. Diseño propuesto: **2 nodos Apify por plataforma** (4 en total),
+> uno por eje → IG-referentes (ya existe) + IG-keywords/hashtag (nuevo) + TikTok-keywords/hashtag (ya
+> existe) + TikTok-referentes/perfil (nuevo); cada par converge a su `Normalizar` y luego al `Merge
+> scrapes` (que ya es `append`, escala sin tocar la lógica aguas abajo). Esto **subsume #15 + #17**:
+> #17 = el nodo IG-por-hashtag, #15 = el nodo TikTok-por-perfil. Necesita 2 actores Apify nuevos (IG
+> hashtag scraper + TikTok profile scraper) y revisar presupuesto Apify (más actors = más corridas).
+> Post-MVP / post-Stage 5; no bloquea la V-run actual. (Ver #16: las keywords multi-palabra afectan a
+> ambas ramas de hashtag.)
 
 15. **Scrapear Referentes de TikTok por perfil.** Hoy las cuentas con `plataforma=tiktok` se ignoran (el
     código las junta en `tt_handles` pero no las usa). Requiere un actor de perfil de TikTok en Apify.
