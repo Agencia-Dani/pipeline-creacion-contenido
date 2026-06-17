@@ -13,11 +13,13 @@
 - **Decisión:**
   1. **Una tabla `Ajustes` (clave→valor) en Airtable** con los knobs del scoring. El motor la lee
      cada corrida (nodo `Leer Ajustes`), igual que lee Proyectos/Keywords/Referentes.
-  2. **Merge transparente sobre Config:** las `clave` son **los mismos nombres** que los campos del
-     nodo `Config`. En `Heat-score v1` y `Gate de relevancia` el config efectivo es
-     `Object.assign({}, Config, ajustes)` → un knob en Ajustes **sobrescribe** el default; lo que no
-     esté en Ajustes cae al default de Config. Config deja de ser editable-por-el-equipo y pasa a ser
-     **el piso de defaults** (+ los IDs e knobs operativos dev-only).
+  2. **Claves amigables + merge sobre Config:** las `clave` están en **español claro** para el equipo
+     (ej. "Peso de vistas", "Resultados Instagram por corrida"); `Armar plan` las traduce a la key
+     interna vía `AJUSTE_MAP` y arma el objeto `ajustes` con keys internas. En `Heat-score v1` y `Gate
+     de relevancia` el config efectivo es `Object.assign({}, Config, ajustes)` → un knob en Ajustes
+     **sobrescribe** el default; lo que no esté (o una clave fuera del mapa) cae al default de Config.
+     Config pasa a ser **el piso de defaults** (solo IDs dev-only quedan ahí). *(Decisión 2026-06-17:
+     las claves son amigables, no técnicas — a pedido de Mani, el equipo de redes no debe ver jerga.)*
   3. **Fail-open:** `Leer Ajustes` es `continueOnFail` + `alwaysOutputData`. Si Airtable no responde
      o la tabla está vacía, el motor corre con los defaults de Config (invariante #1, PLAN §2.5). No
      se convierte un knob no-code en dependencia de ejecución.

@@ -43,7 +43,9 @@ const sel = (name, ...opts) => ({ name, type: "singleSelect", options: { choices
 const tables = [
   { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto.",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"),
-             num("dias_recencia"), num("top_n"), check("activo")] },
+             num("dias_recencia"), num("top_n"), check("activo"),
+             check("Buscar en Instagram por cuentas"), check("Buscar en Instagram por palabras clave"),
+             check("Buscar en TikTok por palabras clave"), check("Buscar en TikTok por cuentas")] },
   { name: "Voces", description: "Eje organizativo (para quién se selecciona). Separado del proyecto.",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia")] },
   { name: "Keywords", description: "Banco de palabras clave por proyecto (acumula).",
@@ -64,18 +66,22 @@ const tables = [
     fields: [txt("clave"), num("valor", 2), long("descripcion")] },
 ];
 
-// Semillas de Ajustes: defaults del motor (nombres = keys del nodo Config → merge transparente).
-// El motor cae a estos mismos valores si la tabla está vacía; sembrarlos hace los knobs visibles al equipo.
+// Semillas de Ajustes: los knobs que el equipo edita en español claro. El motor (nodo "Armar plan")
+// mapea cada `clave` amigable → su key interna (AJUSTE_MAP) y la aplica sobre los defaults de Config.
+// Si renombrás una clave acá, actualizá también AJUSTE_MAP en el workflow.
 const ajustesSeed = [
-  { clave: "peso_views",      valor: 0.4,    descripcion: "Peso de las views en el prescore métrico (0..1)." },
-  { clave: "peso_likes",      valor: 0.4,    descripcion: "Peso de los likes en el prescore métrico (0..1)." },
-  { clave: "peso_eng",        valor: 0.2,    descripcion: "Peso del engagement_rate en el prescore métrico (0..1)." },
-  { clave: "peso_relevancia", valor: 0.7,    descripcion: "Peso del juicio semántico (Haiku) en el heat_score final vs. el percentil métrico (0..1)." },
-  { clave: "boost_idioma",    valor: 0.3,    descripcion: "Boost al prescore de contenido NO-español (premia idiomas extranjeros — ADR-009)." },
-  { clave: "umbral_viral",    valor: 700000, descripcion: "Seguidores a partir de los cuales se marca viral_por_tamano (proxy, no filtra)." },
-  { clave: "top_n_fallback",  valor: 25,     descripcion: "Cuántos candidatos por proyecto cuando el Proyecto no define top_n propio." },
-  { clave: "min_views",       valor: 0,      descripcion: "Piso duro: descarta antes del top_n los reels con menos views. 0 = nada corta." },
-  { clave: "min_likes",       valor: 0,      descripcion: "Piso duro: descarta antes del top_n los reels con menos likes. 0 = nada corta." },
+  { clave: "Peso de vistas",                  valor: 0.4,    descripcion: "Cuánto pesan las vistas en el orden por métricas (0 a 1)." },
+  { clave: "Peso de likes",                   valor: 0.4,    descripcion: "Cuánto pesan los likes en el orden por métricas (0 a 1)." },
+  { clave: "Peso de interacción",             valor: 0.2,    descripcion: "Cuánto pesa la interacción (likes+comentarios / seguidores) en el orden (0 a 1)." },
+  { clave: "Peso de relevancia",              valor: 0.7,    descripcion: "Cuánto pesa el juicio de relevancia (IA) vs. las métricas en el orden final (0 a 1)." },
+  { clave: "Bonus idioma extranjero",         valor: 0.3,    descripcion: "Empujón extra a los videos que NO están en español." },
+  { clave: "Seguidores para marcar viral",    valor: 700000, descripcion: "A partir de cuántos seguidores se marca el video como viral (solo marca, no descarta)." },
+  { clave: "Candidatos por proyecto",         valor: 25,     descripcion: "Cuántos candidatos trae un proyecto cuando no fijó su propio número." },
+  { clave: "Mínimo de vistas",                valor: 0,      descripcion: "Descarta los videos con menos vistas que esto. 0 = no descarta nada." },
+  { clave: "Mínimo de likes",                 valor: 0,      descripcion: "Descarta los videos con menos likes que esto. 0 = no descarta nada." },
+  { clave: "Resultados Instagram por corrida", valor: 8,     descripcion: "Cuántos videos baja cada búsqueda de Instagram (más = más costo)." },
+  { clave: "Resultados TikTok por corrida",   valor: 30,     descripcion: "Cuántos videos baja cada búsqueda de TikTok (más = más costo)." },
+  { clave: "Relevancia mínima",               valor: 0,      descripcion: "Descarta candidatos con relevancia por debajo de esto (0 a 1). 0 = no descarta nada." },
 ];
 
 const run = async () => {

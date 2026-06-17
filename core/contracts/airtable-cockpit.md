@@ -28,6 +28,7 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 | `dias_recencia` | número | ventana de fetch (backfill=180, diario=1–2) |
 | `top_n` | número | cuántos candidatos genera por corrida |
 | `activo` | checkbox | si entra en las corridas |
+| `Buscar en Instagram por cuentas` / `Buscar en Instagram por palabras clave` / `Buscar en TikTok por palabras clave` / `Buscar en TikTok por cuentas` | checkbox | **ejes de descubrimiento** del proyecto. Si **ninguno** está marcado → corren los 4 (default retrocompatible); marcá solo los que quieras para acotar. Evita gastar Apify en ejes vacíos |
 
 ### 2. `Voces` — el eje organizativo (para quién se selecciona)
 Separado del proyecto a propósito. **Nota ADR-009:** el MVP no genera en voz (scripts literales),
@@ -88,24 +89,25 @@ filtro `estado = aprobado` + orden `heat_score` descendente — el mapa de calor
 con lo elegido, sin código. Se crea a mano al armar la base (las vistas no salen por API).
 
 ### 6. `Ajustes` — los knobs del scoring (clave→valor, ADR-011)
-Donde el equipo afina cómo rankea el motor **sin tocar n8n**. Una fila por knob. El motor los lee
-cada corrida y **caen sobre los defaults del nodo Config** (mismos nombres → merge transparente):
-si la tabla está vacía o un knob falta, usa el default. La lectura es **fail-open** (si Airtable no
-responde, corre con defaults).
+Donde el equipo afina cómo rankea el motor **sin tocar n8n**, en **español claro**. Una fila por knob;
+el equipo edita el `valor`. El motor (`Armar plan`) **traduce cada `clave` amigable a su parámetro
+interno** (mapa `AJUSTE_MAP`) y la aplica **sobre los defaults del nodo Config**: si la tabla está
+vacía, un knob falta, o la `clave` no está en el mapa, usa el default. Lectura **fail-open**.
 
 | Campo | Tipo | Para qué |
 |---|---|---|
-| `clave` | texto (primario) | el nombre del knob (igual al del nodo Config) |
+| `clave` | texto (primario) | el nombre del knob, en español (debe coincidir con `AJUSTE_MAP`) |
 | `valor` | número (precisión 2) | el valor que sobrescribe el default |
 | `descripcion` | texto largo | qué hace el knob (para el equipo) |
 
-**Knobs (semilla por defecto):** `peso_views` 0.4 · `peso_likes` 0.4 · `peso_eng` 0.2 (pesos del
-prescore métrico) · `peso_relevancia` 0.7 (semántico vs. métrico en el heat compuesto) ·
-`boost_idioma` 0.3 (premia no-español) · `umbral_viral` 700000 (marca viral, no filtra) ·
-`top_n_fallback` 25 (candidatos/proyecto si el Proyecto no define `top_n`) · `min_views` 0 /
-`min_likes` 0 (**piso duro** pre-`top_n`: descarta por debajo; 0 = nada corta — respeta "nada corta"
-de ROADMAP §1). Los **operativos** (`ig_results_limit`, `tt_results_limit`, IDs) quedan en Config
-(dev-only). Detección de idioma: dev-only (en el código), no es un knob de Ajustes.
+**Knobs (semilla por defecto):** `Peso de vistas` 0.4 · `Peso de likes` 0.4 · `Peso de interacción`
+0.2 (pesos del prescore métrico) · `Peso de relevancia` 0.7 (IA vs. métricas en el orden final) ·
+`Bonus idioma extranjero` 0.3 (premia no-español) · `Seguidores para marcar viral` 700000 (marca, no
+filtra) · `Candidatos por proyecto` 25 (si el Proyecto no fija `top_n`) · `Mínimo de vistas` 0 /
+`Mínimo de likes` 0 (**piso duro** pre-`top_n`; 0 = nada corta) · `Resultados Instagram por corrida` 8
+/ `Resultados TikTok por corrida` 30 (**volumen/costo** por llamada Apify) · `Relevancia mínima` 0
+(**umbral** del gate; 0 = nada corta). En Config quedan solo los **IDs**
+(`airtable_base_id`/`supabase_url`/`instance_id`, dev-only). Detección de idioma: dev-only.
 
 ---
 

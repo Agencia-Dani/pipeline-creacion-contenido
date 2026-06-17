@@ -61,13 +61,17 @@ no traen nada, fail-open).
 
 ## Knobs
 
-Los del **scoring viven en la tabla `Ajustes`** de Airtable (clave→valor, ADR-011) → el equipo los
-edita sin tocar n8n: `peso_views`/`peso_likes`/`peso_eng` (prescore métrico) · `peso_relevancia` (0.7,
-Haiku vs métricas en el composite) · `boost_idioma` (premia no-español) · `umbral_viral` (700k) ·
-`top_n_fallback` · `min_views`/`min_likes` (**piso duro** pre-`top_n`, default 0 = nada corta). El motor
-los lee (`Leer Ajustes`) y **caen sobre los defaults del nodo `Config`** (tabla vacía/caída = defaults,
-fail-open). En `Config` quedan los **operativos dev-only**: `ig_results_limit`/`tt_results_limit` e IDs.
-`criterios_relevancia` (relevancia) los edita el equipo en `Proyectos`/`Voces`.
+Los del **scoring y el volumen viven en la tabla `Ajustes`** de Airtable (clave→valor, ADR-011), en
+**español claro** → el equipo los edita sin tocar n8n: *Peso de vistas/likes/interacción* (prescore
+métrico) · *Peso de relevancia* (0.7, IA vs métricas en el orden) · *Bonus idioma extranjero* ·
+*Seguidores para marcar viral* (700k) · *Candidatos por proyecto* · *Mínimo de vistas/likes* (**piso
+duro** pre-`top_n`) · *Resultados Instagram/TikTok por corrida* (**volumen/costo** Apify) ·
+*Relevancia mínima* (**umbral** del gate). Default = "nada corta". El motor (`Armar plan`) **mapea
+cada clave amigable → su parámetro interno** (`AJUSTE_MAP`) y la aplica **sobre los defaults del nodo
+`Config`** (tabla vacía/caída = defaults, fail-open). En `Config` quedan solo los **IDs** (dev-only).
+La **personalización del descubrimiento** por proyecto vive en `Proyectos` (checkboxes *Buscar en
+Instagram/TikTok por cuentas/palabras clave*) y en `Keywords`/`Referentes`; `criterios_relevancia` en
+`Proyectos`/`Voces`.
 
 ---
 
