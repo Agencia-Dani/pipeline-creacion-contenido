@@ -116,6 +116,16 @@ estructural abierta para el equipo: Airtable vs Supabase / alcance del registro 
 Airtable (campo `fecha_calificacion` + vista 🔥), accesos a Majo/Jero, **semillas (A9, en pausa
 hasta definir nicho)**.
 
+## ⏳ Pendiente inmediato (lo último que pidió Mani)
+
+> **Después de la V-run cheap que Mani va a correr ahora** (motor de ESTE repo, config: `ig_results=3`,
+> `tt_results=5`, `dias_recencia=7` en el Proyecto, `top_n=3`, keys en los 4 Code nodes — ver detalle abajo):
+> **analizar el output juntos** — revisar qué dejó en Candidatos (Airtable) y en `runs`/`outputs` (Supabase),
+> ver si el gate dropeó bien, si el script salió literal en español, si el ranking tiene sentido, y **decidir
+> si hay que cambiar algo o si va en orden** antes de pasar a ejecutar las decisiones de código. Es el primer
+> paso de la próxima interacción. Muestra chica (ranking ruidoso esperado) → el foco es "corre y no rompe",
+> no calibrar pesos todavía.
+
 ## Próxima sesión (fresh) — ejecutar las 6 decisiones + V-run real + seguir el grill
 
 > **Estado (cierre 4):** los **objetivos del MVP ya están destilados** a 11 criterios verificables
