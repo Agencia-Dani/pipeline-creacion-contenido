@@ -53,7 +53,7 @@ const tables = [
              check("flag_viral"), check("activo"), long("notas")] },
   { name: "Candidatos", description: "Scripts (transcripción/traducción literal — ADR-009) a calificar por el equipo.",
     fields: [txt("titulo"), long("script"), sel("idioma", "es", "en", "pt", "it", "fr", "otro"),
-             attach("thumbnail"), txt("referente"), url("url_referente"),
+             attach("thumbnail"), txt("referente"), txt("tema"), url("url_referente"),
              num("views"), num("likes"), num("seguidores"), num("engagement", 1),
              num("heat_score", 1), num("relevancia_score", 2), long("relevancia_razon"),
              check("viral_por_tamano"),

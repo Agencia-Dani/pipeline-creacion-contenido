@@ -69,7 +69,8 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `thumbnail` | attachment | portada del video (la llena el motor con la `coverUrl` de Apify) — el equipo escanea sin clickear afuera |
 | `proyecto` | link → `Proyectos` | |
 | `voz` | link → `Voces` | para qué voz se selecciona |
-| `referente` | texto | handle del video fuente |
+| `referente` | texto | handle del video fuente (lo llena el motor: el `username` del poster) |
+| `tema` | texto | el **keyword/hashtag** que matcheó el candidato (vacío si entró por referente) — alimenta la señal de aprendizaje por tema (ADR-012); lo llena el motor |
 | `url_referente` | url | link al video original |
 | `views` / `likes` / `seguidores` / `engagement` | número | métricas del fuente |
 | `heat_score` | número | el ranking compuesto (relevancia ⊕ métricas — ADR-010); caliente→frío |
@@ -124,9 +125,10 @@ de ROADMAP §1). Los **operativos** (`ig_results_limit`, `tt_results_limit`, IDs
    **workflow de archivado** (cron diario) lleva los calificados a Supabase (`outputs` con
    `calificado_en` + metadata), hace **append al Sheet "Histórico"** (exportable a Excel) y los
    **borra de Airtable** → así no se pasa de 1.000 registros.
-4. Las selecciones acumuladas (`v_senal_seleccion`: tasa de selección por referente/idioma)
-   alimentan el heat-score de la próxima corrida → **el sistema aprende qué priorizar**.
-   *(El few-shot por voz de ADR-008 queda en pausa — ADR-009.)*
+4. Las selecciones acumuladas alimentan el heat-score de la próxima corrida → **el sistema aprende
+   qué priorizar**, en **dos ejes** (ADR-012): por **referente** (`v_senal_seleccion`) y por
+   **keyword/tema** (`v_senal_tema`, vía `Candidatos.tema`). *(El few-shot por voz de ADR-008 queda en
+   pausa — ADR-009.)*
 
 ## Reglas para no salir del plan free
 

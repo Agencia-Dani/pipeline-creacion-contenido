@@ -342,7 +342,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst plan = $('Armar plan de corrida').first().json;\nconst projects = plan.projects, ig_owner = plan.ig_owner_to_proj || {}, tt_owner = plan.tt_owner_to_proj || {}, kw = plan.kw_to_proj || {};\nconst activeIds = plan.active_project_ids || [];\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  if (!d.url) continue;\n  let proyId = null;\n  const u = String(d.username || '').toLowerCase().replace(/^@/, '');\n  // 1) por referente (cuenta sembrada) — IG por cuenta, TikTok por perfil\n  if ((d.plataforma || '') === 'instagram' && ig_owner[u]) proyId = ig_owner[u];\n  else if ((d.plataforma || '') === 'tiktok' && tt_owner[u]) proyId = tt_owner[u];\n  // 2) por keyword (hashtag del caption) — ambas plataformas\n  if (!proyId) {\n    const tags = String(d.hashtags || '').toLowerCase().split(',').map(s => s.trim().replace(/^#/, '').replace(/\\s+/g, '')).filter(Boolean);\n    for (const t of tags) { if (kw[t]) { proyId = kw[t][0]; break; } }\n  }\n  // 3) fallback: proyecto único activo\n  if (!proyId && activeIds.length === 1) proyId = activeIds[0];\n  if (!proyId || !projects[proyId]) continue;\n  const p = projects[proyId];\n  // guardia de recencia (capa 2): descarta lo más viejo que dias_recencia del proyecto.\n  // 0 = sin límite. Si no hay fecha, se conserva (no se puede juzgar la edad).\n  if (p.dias_recencia > 0 && d.fecha_publicacion) {\n    const ts = Date.parse(d.fecha_publicacion);\n    if (Number.isFinite(ts) && (Date.now() - ts) > p.dias_recencia * 86400000) continue;\n  }\n  out.push({ json: Object.assign({}, d, {\n    proyecto_id: proyId, proyecto_nombre: p.nombre, voz_id: p.voz_id, voz_nombre: p.voz_nombre,\n    _top_n: p.top_n, _dias: p.dias_recencia, _keywords: p.keywords\n  }) });\n}\nreturn out;\n"
+        "jsCode": "\nconst plan = $('Armar plan de corrida').first().json;\nconst projects = plan.projects, ig_owner = plan.ig_owner_to_proj || {}, tt_owner = plan.tt_owner_to_proj || {}, kw = plan.kw_to_proj || {};\nconst activeIds = plan.active_project_ids || [];\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  if (!d.url) continue;\n  let proyId = null, tema = '';\n  const u = String(d.username || '').toLowerCase().replace(/^@/, '');\n  // 1) por referente (cuenta sembrada) — IG por cuenta, TikTok por perfil\n  if ((d.plataforma || '') === 'instagram' && ig_owner[u]) proyId = ig_owner[u];\n  else if ((d.plataforma || '') === 'tiktok' && tt_owner[u]) proyId = tt_owner[u];\n  // 2) por keyword (hashtag del caption) — ambas plataformas\n  if (!proyId) {\n    const tags = String(d.hashtags || '').toLowerCase().split(',').map(s => s.trim().replace(/^#/, '').replace(/\\s+/g, '')).filter(Boolean);\n    for (const t of tags) { if (kw[t]) { proyId = kw[t][0]; tema = t; break; } }\n  }\n  // 3) fallback: proyecto único activo\n  if (!proyId && activeIds.length === 1) proyId = activeIds[0];\n  if (!proyId || !projects[proyId]) continue;\n  const p = projects[proyId];\n  // guardia de recencia (capa 2): descarta lo más viejo que dias_recencia del proyecto.\n  // 0 = sin límite. Si no hay fecha, se conserva (no se puede juzgar la edad).\n  if (p.dias_recencia > 0 && d.fecha_publicacion) {\n    const ts = Date.parse(d.fecha_publicacion);\n    if (Number.isFinite(ts) && (Date.now() - ts) > p.dias_recencia * 86400000) continue;\n  }\n  out.push({ json: Object.assign({}, d, {\n    proyecto_id: proyId, proyecto_nombre: p.nombre, voz_id: p.voz_id, voz_nombre: p.voz_nombre,\n    _top_n: p.top_n, _dias: p.dias_recencia, _keywords: p.keywords, _tema: tema\n  }) });\n}\nreturn out;\n"
       },
       "id": "asignar-proyecto-voz",
       "name": "Asignar proyecto+voz",
@@ -421,7 +421,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const sel = signal[(d.username || '') + '|' + idioma] || 0;\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  const topn = Number((arr[0] && arr[0]._top_n) || cfg.top_n_fallback || 25);\n  fresh.slice(0, topn).forEach(d => out.push({ json: d }));\n}\nreturn out;\n"
+        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\nconst signalTema = {};\nrows('Leer señal tema').forEach(r => { if (r && r.tema) signalTema[String(r.tema)] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const selRef = signal[(d.username || '') + '|' + idioma] || 0;\n    const selTema = signalTema[String(d._tema || '')] || 0;\n    const sel = Math.max(selRef, selTema); // bi-eje (O7): referente o keyword/tema\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  const topn = Number((arr[0] && arr[0]._top_n) || cfg.top_n_fallback || 25);\n  fresh.slice(0, topn).forEach(d => out.push({ json: d }));\n}\nreturn out;\n"
       },
       "id": "heat-score-v1",
       "name": "Heat-score v1",
@@ -476,7 +476,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || ''\n  } });\n}\nreturn out;\n"
+        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || '', tema: d._tema || ''\n  } });\n}\nreturn out;\n"
       },
       "id": "armar-candidato",
       "name": "Armar candidato",
@@ -489,7 +489,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
+        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined, tema: d.tema || undefined, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
       },
       "id": "preparar-batch-airtable",
       "name": "Preparar batch Airtable",
@@ -785,6 +785,32 @@
       ],
       "onError": "continueRegularOutput",
       "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_tema?select=tema,tasa_seleccion' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "leer-senal-tema",
+      "name": "Leer señal tema",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3780,
+        580
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -973,7 +999,7 @@
       "main": [
         [
           {
-            "node": "Leer procesados",
+            "node": "Leer señal tema",
             "type": "main",
             "index": 0
           }
@@ -1138,6 +1164,17 @@
         [
           {
             "node": "Normalizar TT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer señal tema": {
+      "main": [
+        [
+          {
+            "node": "Leer procesados",
             "type": "main",
             "index": 0
           }
