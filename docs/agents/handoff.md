@@ -21,6 +21,16 @@
 
 ## Estado en una línea
 
+**2026-06-16 (cierre) — Refactor de relevancia Stages 1-3 en `main` (Mani).** Doble gate Haiku
+operativo en código: **pre-trim** laxo (recall) sobre el caption antes de transcribir + **Gate**
+jurado estricto (precision) sobre el transcript; el `heat_score` ahora es **composite**
+(semántico ⊕ métrico, knob `peso_relevancia` 0.7). Campo `criterios_relevancia` editable por el equipo
+en **Proyectos + Voces** (piloto sembrado). El enriquecimiento se **reconstruyó en 2 Code nodes**
+(`Transcribir`/`Traducir`) → mata #7/#8 (la rama `fix/altos-auditoria` se había perdido). Cadena:
+`Heat-score → Transcribir → Traducir → Gate → Armar candidato` (30 nodos). Valida (933) + smoke tests;
+**falta V-run** (llenar 3×`<ANTHROPIC_API_KEY>` + 1×`<SUPADATA_API_KEY>` en n8n; **rotar el PAT de
+Airtable**). Sigue en otra sesión: **Stage 4** (limpieza, casi hecha) + **Stage 5** (calibrar pesos/rubric).
+
 **2026-06-16 (noche) — V1 corrió y pobló Candidatos; abierto el refactor de relevancia (Mani).** El
 re-import (post-fix timestamp IG) funcionó end-to-end. Gap detectado: el ranking deja pasar
 viral-pero-irrelevante (substring de keyword, sin juicio de contenido). Sesión de grilling
@@ -166,15 +176,15 @@ hasta definir nicho)**.
    es el fix obligatorio.)*
 7. **Detección de idioma por conteo de stopwords (`guessLang`), default `'es'`.** Frágil: un video EN con
    pocas stopwords cae a `'es'` → se salta la traducción → el equipo recibe el script en inglés. Además el
-   idioma alimenta un boost del heat-score. Usar el `lang` de Supadata como fuente primaria. *(✅ abordado en
-   rama `fix/altos-auditoria` — `lang` de Supadata como fuente primaria; fallback adivina sobre el transcript,
-   no la descripción. Pendiente V-run.)*
+   idioma alimenta un boost del heat-score. Usar el `lang` de Supadata como fuente primaria. *(✅ RESUELTO
+   2026-06-16 — reconstruido sobre `main` en el Code node `Transcribir (Supadata)`: `lang` de Supadata
+   primario, fallback que adivina sobre el transcript. La rama `fix/altos-auditoria` se perdió. Pendiente V-run.)*
 8. **`Merge transcripción`/`Merge traducción` por posición (`mergeByPosition`).** Recombina por índice; si
    Supadata reordena o cambia el conteo de items, pega la transcripción al metadato equivocado. Hoy se
    sostiene por `batchSize:1`+`neverError`, pero es alineación implícita peligrosa → merge por `external_id`.
-   *(✅ abordado en rama `fix/altos-auditoria` — enriquecimiento consolidado en 2 Code nodes
-   (`this.helpers.httpRequest`); se eliminaron ambos Merge por posición y el `external_id` queda atado al
-   item. Pendiente V-run.)*
+   *(✅ RESUELTO 2026-06-16 — reconstruido sobre `main`: enriquecimiento consolidado en 2 Code nodes
+   (`Transcribir`/`Traducir`, `this.helpers.httpRequest`); ambos Merge por posición eliminados, el
+   `external_id` queda atado al item. Pendiente V-run.)*
 
 **🟡 Medio (deuda / operativo):**
 
@@ -233,6 +243,35 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 (cierre) — Refactor de relevancia: Stages 1-3 *(Mani + Claude)*
+
+- **Stage 1 (cockpit):** campo `criterios_relevancia` (texto largo) en `Proyectos` **y `Voces`**
+  (`setup-airtable.mjs` + contrato `airtable-cockpit.md`); **creado en la base viva por API** en ambas
+  tablas y **sembrado el piloto** "IA y Productividad". `Armar plan` lo lee (`criterios` del Proyecto +
+  `voz_criterios` de la Voz del `voz_default`) y lo pasa en el plan. Decisión: **Proyecto = tema, Voz =
+  cliente**; el gate combina ambos.
+- **Stage 2 (filtrar/scorear):** nodo **Pre-trim relevancia** (Code + Haiku) cuela off-topic obvio sobre
+  el caption **antes de transcribir** (laxo, fail-open, no descarta sin criterios). Sale el substring
+  `tema` del `Heat-score v1` → prescore métrico limpio; `boost_tema` fuera de Config y del manifest.
+- **Stage 3 (CALIDAD, el corazón) en 2 pasos** (la rama `fix/altos-auditoria` se perdió → se decidió
+  reconstruir #7/#8 y montar el gate encima):
+  - **Paso 1:** 9 nodos de enriquecimiento → **2 Code nodes** (`Transcribir (Supadata)`/`Traducir
+    (Claude Haiku)`, `this.helpers.httpRequest`). `external_id` atado al item (#8), `lang` de Supadata
+    primario con fallback sobre el transcript (#7), fail-open. Mata los merge-by-position.
+  - **Paso 2:** nodo **Gate de relevancia** (Haiku estricto) sobre el transcript → dropea irrelevantes;
+    `heat_score` = **composite** `peso_relevancia·semántico + (1-peso)·percentil(prescore)`. Knob
+    `peso_relevancia` (0.7) en Config. Guarda `prescore_metrico`/`relevancia_score`/`relevancia_razon`
+    en el item (la `razon` aún no se sube a Airtable → posible campo de cockpit futuro).
+- **Validación:** validador en verde (933) en cada stage + **smoke tests de la lógica** de los 4 Code
+  nodes nuevos (cuela/dropea, composite correcto, fail-open, passthrough es, sin-criterios pasa todo).
+  Cadena final: `Heat-score → Transcribir → Traducir → Gate → Armar candidato` (30 nodos, 0 rotas, sin
+  huérfanos). **CALIDAD dejó de ser hueco** en el manifest. Construido con builder Node (no a mano).
+- **Qué sigue (otra sesión):** **Stage 4** (limpieza estructural — casi hecha: los merges ya salieron,
+  falta dejar prolijos los adaptadores de descubrimiento) + **Stage 5** = la **V-run**: re-importar en
+  n8n, **llenar 3×`<ANTHROPIC_API_KEY>` + 1×`<SUPADATA_API_KEY>`** (ahora son strings en Code nodes, no
+  headers de HTTP node), correr, confirmar que el viral-irrelevante desaparece, y **calibrar**
+  `peso_relevancia`/pesos/rubric/ancho del embudo con data real. **Rotar el PAT de Airtable** (expuesto).
 
 ### 2026-06-16 (noche) — Refactor de relevancia: grilling + Stage 0 *(Mani + Claude)*
 

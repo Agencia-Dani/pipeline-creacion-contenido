@@ -78,20 +78,33 @@
 - **Hecho cuando:** re-import + Execute → candidatos fluyen, la basura obvia ya no se transcribe,
   el orden por métricas se mantiene sano. *(Código ✅; pendiente la corrida en vivo.)*
 
-### Stage 3 — CALIDAD: el gate / jurado (motor · el corazón)
-- Nodo nuevo **Gate de relevancia (Haiku)** sobre el transcript: juzga relevancia/calidad contra
-  `criterios_relevancia` del Proyecto → `{relevante, score 0-1, razon}`. Estricto, precision.
-- **Composite final:** combinar el `score` de Haiku con el prescore métrico → heat-score nuevo.
-  Drop de los `relevante:false`. **Fail-open** ante fallo de Haiku.
-- **Micro-fix de idioma (token-free): YA HECHO** en `fix/altos-auditoria` (#7 — `lang` de Supadata
-  como fuente primaria, fallback sobre el transcript). Este stage solo lo hereda al mergear.
+### 🔧 Stage 3 — CALIDAD: el gate / jurado (motor · el corazón)
+> La rama `fix/altos-auditoria` se perdió (worktree borrado, sin ref). Se decidió **reconstruir #7/#8
+> primero** y montar el gate encima. Hecho en 2 pasos.
+
+**Paso 1 — enriquecimiento reconstruido (#7/#8):** los 9 nodos frágiles (Supadata HTTP + 2 Merge por
+posición + 2 Parsear + IF + Script-desde-transcripción + Claude HTTP + Merge candidatos) → **2 Code
+nodes**: `Transcribir (Supadata)` + `Traducir (Claude Haiku)` (vía `this.helpers.httpRequest`).
+`external_id` atado al item (mata #8); `lang` de Supadata primario con fallback sobre el **transcript**
+(mata #7); traduce literal solo si no es español; **fail-open** en ambos. Smoke test OK.
+
+**Paso 2 — el gate:**
+- ✅ Nodo nuevo **Gate de relevancia (Haiku)** sobre el transcript (entre `Traducir` y `Armar
+  candidato`): jurado **estricto** (precision) contra `criterios` del Proyecto ⊕ Voz →
+  `{relevante, score 0-1, razon}`. Dropea los `relevante:false`.
+- ✅ **Composite:** `heat_score = peso_relevancia·score_haiku + (1-peso_relevancia)·percentil(prescore
+  métrico)`. Knob `peso_relevancia` (default 0.7) en Config. Guarda `prescore_metrico`,
+  `relevancia_score`, `relevancia_razon` en el item (razón aún no se sube a Airtable — campo futuro).
+- ✅ **Fail-open**: sin criterios o si Haiku falla, pasa todo y ordena por el prescore métrico.
+- ✅ Validado: contrato en verde (933) + smoke test (dropea irrelevante, composite correcto, fail-open,
+  sin-criterios pasa todo). **Falta la V-run** en n8n (3 ocurrencias de `<ANTHROPIC_API_KEY>` a llenar).
 - **Hecho cuando:** una corrida deja pasar solo lo relevante y el orden refleja relevancia ⊕ métricas;
-  un fallo simulado de Haiku no vacía la entrega.
+  un fallo simulado de Haiku no vacía la entrega. *(Código ✅; pendiente la corrida en vivo.)*
 
 ### Stage 4 — Limpieza estructural (expresar las 8 etapas)
 - Hacer que el workflow mapee limpio a PLAN §2.4 (COLECTAR adaptadores · NORMALIZAR · FILTRAR/SCOREAR ·
   ENRIQUECER · GENERAR · **CALIDAD** · ENTREGAR · NOTIFICAR).
-- Merges-by-position ya eliminados por `fix/altos-auditoria` (#8) — verificar que siguen fuera.
+- Merges-by-position ya eliminados (reconstruidos en Stage 3 Paso 1, #8) — verificar que siguen fuera.
 - Dejar los adaptadores de descubrimiento (referentes / términos) prolijos para reuso futuro (ADR-007,
   sin generalizar de más — YAGNI).
 - **Hecho cuando:** el workflow expresa las etapas sin alineación frágil; manifest coincide con la

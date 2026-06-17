@@ -88,6 +88,12 @@
               "type": "number"
             },
             {
+              "id": "c_relev",
+              "name": "peso_relevancia",
+              "value": 0.7,
+              "type": "number"
+            },
+            {
               "id": "c10",
               "name": "boost_idioma",
               "value": 0.3,
@@ -428,206 +434,45 @@
     },
     {
       "parameters": {
-        "url": "=https://api.supadata.ai/v1/transcript?url={{ encodeURIComponent($json.video_url || $json.url) }}&text=true&mode=auto",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "<SUPADATA_API_KEY>"
-            }
-          ]
-        },
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 2000
-            }
-          },
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          },
-          "timeout": 90000
-        }
+        "jsCode": "\n// Transcribir (Supadata) — reemplaza Supadata HTTP + Merge(pos) + Parsear transcripción.\n// external_id queda atado al item (mata #8). lang de Supadata primario; fallback adivina\n// sobre el TRANSCRIPT, no la descripción (mata #7). Fail-open: si falla, transcripcion vacía.\nconst KEY = '<SUPADATA_API_KEY>';\nconst SLEEP_MS = 1500; // throttle (antes batchInterval 2000 con batchSize 1)\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ',' la ',' que ',' de ',' para ',' con ',' una ',' como ',' pero ',' esto '],\n  en: [' the ',' and ',' you ',' for ',' with ',' this ',' that ',' your ',' are ',' what '],\n  pt: [' uma ',' voce ',' nao ',' isso ',' mais ',' como ',' entao ',' muito '],\n  it: [' il ',' che ',' per ',' una ',' questo ',' come ',' sono ',' non ',' molto '],\n  fr: [' les ',' une ',' pour ',' avec ',' vous ',' est ',' pas ',' comme ',' mais ']\n};\nconst guessLang = (txt) => {\n  const t = ' ' + norm(txt) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(p => { if (t.indexOf(p) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  return bestN === 0 ? '' : best;\n};\nconst out = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const d = items[i].json;\n  const url = d.video_url || d.url || '';\n  let txt = '', lang = '';\n  if (url) {\n    try {\n      const resp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: 'https://api.supadata.ai/v1/transcript?url=' + encodeURIComponent(url) + '&text=true&mode=auto',\n        headers: { 'x-api-key': KEY }, json: true, timeout: 90000\n      });\n      txt = (typeof resp.content === 'string' && resp.content) || (typeof resp.text === 'string' && resp.text) || '';\n      lang = String(resp.lang || resp.language || '').toLowerCase().slice(0, 2);\n    } catch (e) { /* fail-open: sin transcript */ }\n    if (i < items.length - 1) await sleep(SLEEP_MS);\n  }\n  txt = String(txt || '').trim().substring(0, 6000);\n  const idioma = lang || guessLang(txt) || d.idioma_guess || 'es';\n  out.push({ json: Object.assign({}, d, { transcripcion: txt, idioma_detectado: idioma }) });\n}\nreturn out;\n"
       },
-      "id": "supadata-transcribir",
-      "name": "Supadata — transcribir",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "transcribir-supadata",
+      "name": "Transcribir (Supadata)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         4480,
         400
       ],
-      "onError": "continueRegularOutput",
-      "alwaysOutputData": true
+      "notes": "Supadata vía this.helpers.httpRequest. external_id atado al item (mata #8 merge-by-position). lang de Supadata primario, fallback sobre el transcript (mata #7). Fail-open."
     },
     {
       "parameters": {
-        "mode": "combine",
-        "combinationMode": "mergeByPosition",
-        "options": {}
+        "jsCode": "\n// Traducir (Claude Haiku) — reemplaza IF + Script-desde-transcripción + Claude HTTP + Merge(pos) + Parsear.\n// Traduce literal al español SOLO si el original no está en español. external_id atado al item (#8).\n// Fail-open: si la traducción falla o devuelve vacío, el script queda como el transcript original.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst SLEEP_MS = 1000; // throttle (antes batchInterval 1000)\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\nconst SYS = 'Sos un traductor literal. Traduci el texto al espanol neutro de forma fiel y literal: sin reescribir, sin resumir, sin embellecer, sin agregar ni quitar nada; conserva el sentido y el orden. Devolve UNICAMENTE el texto traducido, sin comillas ni comentarios.';\nconst out = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const d = items[i].json;\n  const transcript = String(d.transcripcion || '');\n  const idioma = d.idioma_detectado || d.idioma_guess || 'es';\n  let script = transcript;\n  if (transcript && idioma !== 'es') {\n    try {\n      const resp = await this.helpers.httpRequest({\n        method: 'POST',\n        url: 'https://api.anthropic.com/v1/messages',\n        headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n        body: { model: 'claude-haiku-4-5', max_tokens: 2000, system: SYS, messages: [{ role: 'user', content: transcript.substring(0, 6000) }] },\n        json: true, timeout: 60000\n      });\n      let tr = '';\n      try { tr = (resp.content && resp.content[0] && resp.content[0].text) || ''; } catch (e) {}\n      tr = String(tr || '').trim();\n      if (tr) script = tr;\n    } catch (e) { /* fail-open: script = transcript */ }\n    if (i < items.length - 1) await sleep(SLEEP_MS);\n  }\n  out.push({ json: Object.assign({}, d, { script: script, idioma: idioma }) });\n}\nreturn out;\n"
       },
-      "id": "merge-transcripcion",
-      "name": "Merge transcripción",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
+      "id": "traducir-claude-haiku",
+      "name": "Traducir (Claude Haiku)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         4760,
         400
-      ]
+      ],
+      "notes": "Haiku 4.5 traductor literal vía this.helpers.httpRequest, SOLO si el original no está en español. external_id atado al item. Fail-open: script = transcript si falla."
     },
     {
       "parameters": {
-        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  let txt = (typeof d.content === 'string' && d.content) || (typeof d.text === 'string' && d.text) || d.transcripcion || '';\n  txt = String(txt || '').trim();\n  let lang = String(d.lang || d.language || '').toLowerCase().slice(0, 2);\n  if (!lang) lang = d.idioma_guess || 'es';\n  out.push({ json: Object.assign({}, d, { transcripcion: txt.substring(0, 6000), idioma_detectado: lang }) });\n}\nreturn out;\n"
+        "jsCode": "\n// Gate de relevancia (Haiku) — jurado ESTRICTO sobre el transcript (precision). Llena CALIDAD (PLAN §2.4).\n// Juzga relevancia/calidad contra criterios_relevancia (Proyecto ⊕ Voz) → {relevante, score, razon}.\n// Dropea los relevante:false. Composite: heat = PESO·score_haiku + (1-PESO)·percentil(prescore métrico).\n// Fail-open: sin criterios o si Haiku falla, pasa todo y ordena por el prescore métrico.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst cfg = $('Config').first().json;\nconst PESO = Number(cfg.peso_relevancia != null ? cfg.peso_relevancia : 0.7);\nconst projects = ($('Armar plan de corrida').first().json || {}).projects || {};\nconst SLEEP_MS = 1000;\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst items = $input.all().map(i => i.json);\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\n\nconst out = [];\nlet first = true;\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const p = projects[pid] || {};\n  const criterios = [p.criterios, p.voz_criterios].filter(Boolean).join('\\n').trim();\n  const juicio = {}; // external_id → { relevante, score, razon }\n  if (criterios) {\n    const lote = arr.map(d => ({ id: String(d.external_id || ''), texto: String(d.script || '').replace(/\\s+/g, ' ').trim().slice(0, 1500) })).filter(x => x.id && x.texto);\n    if (lote.length) {\n      if (!first) await sleep(SLEEP_MS); first = false;\n      const sys = 'Sos un jurado ESTRICTO de relevancia y calidad. Te doy el tema de un proyecto, sus criterios, y una lista de videos (id + transcript). Para cada uno decidi si es RELEVANTE y UTIL segun los criterios. Precision: ante la duda, marca relevante:false. Devolve UNICAMENTE un JSON {\"juicio\":[{\"id\":\"...\",\"relevante\":true,\"score\":0.0,\"razon\":\"breve\"}]}. score 0..1 = que tan bien cumple los criterios.';\n      const usr = 'TEMA: ' + (p.nombre || '') + '\\nCRITERIOS:\\n' + criterios + '\\n\\nVIDEOS:\\n' + JSON.stringify(lote);\n      try {\n        const resp = await this.helpers.httpRequest({\n          method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n          headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n          body: { model: 'claude-haiku-4-5', max_tokens: 4000, system: sys, messages: [{ role: 'user', content: usr }] },\n          json: true, timeout: 60000\n        });\n        let txt = '';\n        try { txt = (resp.content && resp.content[0] && resp.content[0].text) || ''; } catch (e) {}\n        const m = String(txt).match(/\\{[\\s\\S]*\\}/);\n        if (m) { const parsed = JSON.parse(m[0]); (parsed.juicio || []).forEach(j => { juicio[String(j.id)] = j; }); }\n      } catch (e) { /* fail-open: juicio vacío → todos pasan, ordena por métrica */ }\n    }\n  }\n  const kept = arr.filter(d => { const j = juicio[String(d.external_id)]; return !(j && j.relevante === false); });\n  const prescores = kept.map(d => Number(d.heat_score || 0));\n  kept.forEach(d => {\n    const j = juicio[String(d.external_id)];\n    const sHaiku = j && typeof j.score === 'number' ? Math.max(0, Math.min(1, j.score)) : null;\n    const metricPct = pct(prescores, Number(d.heat_score || 0));\n    const composite = sHaiku != null ? (PESO * sHaiku + (1 - PESO) * metricPct) : metricPct;\n    out.push({ json: Object.assign({}, d, {\n      prescore_metrico: Number(d.heat_score || 0),\n      relevancia_score: sHaiku,\n      relevancia_razon: (j && j.razon) || '',\n      heat_score: Math.round(composite * 10000) / 10000\n    }) });\n  });\n}\nreturn out;\n"
       },
-      "id": "parsear-transcripci-n",
-      "name": "Parsear transcripción",
+      "id": "gate-relevancia",
+      "name": "Gate de relevancia",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         5040,
         400
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "typeValidation": "loose"
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "id": "cond-es",
-              "leftValue": "={{ $json.idioma_detectado }}",
-              "rightValue": "es",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "if-espanol",
-      "name": "IF — ya está en español",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        5320,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "\nreturn $input.all().map(i => ({ json: Object.assign({}, i.json, { script: i.json.transcripcion, idioma: i.json.idioma_detectado }) }));\n"
-      },
-      "id": "script-desde-transcripci-n",
-      "name": "Script desde transcripción",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5600,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "<ANTHROPIC_API_KEY>"
-            },
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { \"model\": \"claude-haiku-4-5\", \"max_tokens\": 2000, \"system\": \"Sos un traductor literal. Traduci el texto al espanol neutro de forma fiel y literal: sin reescribir, sin resumir, sin embellecer, sin agregar ni quitar nada; conserva el sentido y el orden. Devolve UNICAMENTE el texto traducido, sin comillas ni comentarios.\", \"messages\": [{ \"role\": \"user\", \"content\": String($json.transcripcion || \"\").substring(0, 6000) }] } }}",
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 1000
-            }
-          },
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          },
-          "timeout": 60000
-        }
-      },
-      "id": "claude-haiku-traducir",
-      "name": "Claude Haiku — traducir",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        5880,
-        400
       ],
-      "onError": "continueRegularOutput",
-      "alwaysOutputData": true,
-      "notes": "Haiku 4.5 (claude-haiku-4-5) como traductor literal. Sin thinking/effort. Solo se llama si el original NO está en español."
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "combinationMode": "mergeByPosition",
-        "options": {}
-      },
-      "id": "merge-traduccion",
-      "name": "Merge traducción",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
-      "position": [
-        6160,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  let tr = '';\n  try { tr = (d.content && Array.isArray(d.content) && d.content[0] && d.content[0].text) || ''; } catch (e) {}\n  tr = String(tr || '').trim();\n  out.push({ json: Object.assign({}, d, { script: tr || d.transcripcion || '', idioma: d.idioma_detectado || d.idioma_guess || '' }) });\n}\nreturn out;\n"
-      },
-      "id": "parsear-traducci-n",
-      "name": "Parsear traducción",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        6440,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "append",
-        "options": {}
-      },
-      "id": "merge-candidatos",
-      "name": "Merge candidatos",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
-      "position": [
-        6720,
-        400
-      ]
+      "notes": "Jurado ESTRICTO Haiku sobre el transcript (etapa CALIDAD, ADR-010). Dropea irrelevantes; heat_score = composite semántico⊕métrico (peso_relevancia). Fail-open. Stage 3."
     },
     {
       "parameters": {
@@ -1070,128 +915,12 @@
       "main": [
         [
           {
-            "node": "Supadata — transcribir",
+            "node": "Transcribir (Supadata)",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Merge transcripción",
-            "type": "main",
-            "index": 1
           },
           {
             "node": "Preparar procesados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supadata — transcribir": {
-      "main": [
-        [
-          {
-            "node": "Merge transcripción",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge transcripción": {
-      "main": [
-        [
-          {
-            "node": "Parsear transcripción",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parsear transcripción": {
-      "main": [
-        [
-          {
-            "node": "IF — ya está en español",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF — ya está en español": {
-      "main": [
-        [
-          {
-            "node": "Script desde transcripción",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Claude Haiku — traducir",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Merge traducción",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Claude Haiku — traducir": {
-      "main": [
-        [
-          {
-            "node": "Merge traducción",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge traducción": {
-      "main": [
-        [
-          {
-            "node": "Parsear traducción",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Script desde transcripción": {
-      "main": [
-        [
-          {
-            "node": "Merge candidatos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parsear traducción": {
-      "main": [
-        [
-          {
-            "node": "Merge candidatos",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge candidatos": {
-      "main": [
-        [
-          {
-            "node": "Armar candidato",
             "type": "main",
             "index": 0
           }
@@ -1263,6 +992,39 @@
         [
           {
             "node": "Leer señal selección",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribir (Supadata)": {
+      "main": [
+        [
+          {
+            "node": "Traducir (Claude Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Traducir (Claude Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Gate de relevancia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate de relevancia": {
+      "main": [
+        [
+          {
+            "node": "Armar candidato",
             "type": "main",
             "index": 0
           }
