@@ -48,15 +48,17 @@ decidiendo. Lo que califican desaparece de pendientes y queda archivado.
 
 ## 4. Airtable por dentro: las tablas
 
-Hay 5 tablas. Piénsenlas en dos grupos.
+Hay 6 tablas. Piénsenlas en dos grupos.
 
 ### Las que casi no tocan (la configuración de la búsqueda)
 
 - **Proyectos** — cada tema que se busca (ej: "Comunicación", "Ventas"). Adentro se define cuántos
-  videos traer y qué tan atrás buscar.
+  videos traer, qué tan atrás buscar y por dónde buscar.
 - **Voces** — para quién se selecciona (un personaje o marca). Sirve para organizar y agrupar.
-- **Keywords** — las palabras con que se busca en **TikTok**. Cada palabra funciona como un hashtag.
-- **Referentes** — las **cuentas de Instagram** que se siguen. De ahí salen los reels de IG.
+- **Keywords** — las palabras/hashtags con que se busca por tema (en Instagram **y** TikTok).
+- **Referentes** — las **cuentas** (de Instagram **y** TikTok) que se siguen. De ahí salen sus videos.
+- **Ajustes** — las "perillas" de cómo la máquina ordena (cuánto pesa cada métrica, etc.). **Ya vienen
+  con valores razonables; no hace falta tocarlas.** Más en 5.6.
 
 > Estas las arman una vez y las van ajustando. **No hace falta tocarlas para el trabajo del día.**
 
@@ -103,16 +105,26 @@ mezclan con los de otro.
 |---|---|
 | `nombre` | el tema. Ej: "Comunicación" |
 | `descripcion` | qué cubre el tema |
-| `criterios_relevancia` | **qué hace relevante a un video para este tema** (y qué NO). Lo lee la máquina para juzgar relevancia, no solo viralidad. Mientras más claro, mejor curan |
+| `criterios_relevancia` | **qué hace relevante a un video para este tema, y qué NO.** Es el campo más importante: la máquina lo lee para juzgar si un video sirve de verdad o es viral-vacío. Mientras más concreto, menos basura les llega (ver ejemplo abajo) |
 | `voz_default` | la Voz que crearon en 5.1 (se elige de una lista) |
-| `dias_recencia` | qué tan atrás buscar, en días. **180** la primera vez (para traer harto); **1 o 2** para el día a día |
-| `top_n` | cuántos videos quieren que traiga por corrida (ej: 10) |
+| `dias_recencia` | qué tan atrás buscar, en días. **30 a 90** la primera vez (para traer harto); **7** para el día a día |
+| `top_n` | cuántos videos quieren que traiga por corrida (ej: 15 a 25) |
 | `activo` | ✅ marcado para que el proyecto entre en las búsquedas. Sin marcar = pausado |
+| `Buscar en Instagram por cuentas` · `… por palabras clave` · `Buscar en TikTok por cuentas` · `… por palabras clave` | los 4 **canales de búsqueda** del proyecto (checkboxes). Si **no marcan ninguno**, se usan los 4. Marquen solo los que quieran para acotar (y no gastar de más) |
 
-### 5.3 `Keywords` — las palabras con que se busca en TikTok
+> **Cómo escribir buenos `criterios_relevancia` (esto define la calidad de lo que les llega).** Digan
+> qué sirve y qué no, concreto:
+> - ❌ Vago: *"videos de liderazgo"*.
+> - ✅ Útil: *"Sirve: tácticas concretas de feedback, manejo de equipos, casos reales con un
+>   aprendizaje accionable. No sirve: frases motivacionales sin sustancia, 'mindset' genérico,
+>   clickbait, o videos que solo mencionan 'líder' de adorno."*
+>
+> Vale la pena que el jefe valide este texto por proyecto.
 
-Cada palabra funciona como un hashtag de TikTok. **Una sola palabra por fila** (`liderazgo` rinde
-más que `liderazgo efectivo`).
+### 5.3 `Keywords` — las palabras/hashtags con que se busca por tema
+
+Cada palabra funciona como un hashtag (en TikTok **y** en Instagram). **Una sola palabra por fila**
+(`liderazgo` rinde más que `liderazgo efectivo`).
 
 | Columna | Qué escriben |
 |---|---|
@@ -134,8 +146,8 @@ Cada fila es una cuenta de la que la máquina trae videos.
 
 > **No llenen `seguidores` ni `flag_viral`.** Esas las completa la máquina sola cuando visita la
 > cuenta. `flag_viral` solo **marca** las cuentas muy grandes (+700K); no las excluye.
-> **Ojo (pendiente):** en TikTok seguir una cuenta puntual todavía no funciona del todo — TikTok
-> hoy se maneja sobre todo por Keywords (ver sección 8). Para Referentes, prioricen Instagram.
+> **Carguen cuentas de las dos plataformas:** la máquina ahora sigue cuentas tanto de Instagram como
+> de TikTok. Hoy solo hay cargadas de Instagram, así que **hacen falta las de TikTok.**
 
 ### 5.5 `Candidatos` — NO se llena a mano
 
@@ -160,6 +172,14 @@ saber qué significa cada columna que van a ver:
 | `notas_equipo` | su feedback sobre el video | **ustedes** (opcional) |
 | `fecha_calificacion` | cuándo lo calificaron | se llena sola |
 | `fecha` | cuándo lo generó la máquina | máquina |
+
+### 5.6 `Ajustes` — las perillas de cómo ordena (casi nunca se toca)
+
+La máquina ya viene con valores por defecto razonables acá. **No hace falta tocar nada para arrancar.**
+Es una tabla de "clave = valor" en español claro (ej: "Peso de relevancia", "Candidatos por proyecto",
+"Bonus idioma extranjero"). Si en algún momento quieren cambiar cómo ordena o cuánto premia algo,
+**avísennos la primera vez** para no descalibrarla. Tranquilas: si borran o escriben mal una fila, la
+máquina usa el valor por defecto, no se rompe.
 
 ---
 
@@ -209,15 +229,17 @@ la prioridad del negocio es traer lo que **no** circula en español.
 
 ## 8. Cómo encuentra los videos (y cómo pedir más de algo)
 
-Instagram y TikTok funcionan distinto, y esto es importante para cuando quieran ajustar:
+La máquina busca por **dos vías, en las dos plataformas** (Instagram y TikTok):
 
-- **Instagram → por cuenta.** Trae los reels de las cuentas que estén en **Referentes**. Si quieren
-  más o mejor Instagram: **agreguen Referentes de Instagram.**
-- **TikTok → por hashtag.** Busca con las palabras de **Keywords** (cada una es un hashtag). Si
-  quieren más o mejor TikTok: **agreguen o afinen Keywords.** Conviene cargarlas como hashtags de
-  **una sola palabra** (`liderazgo` funciona mejor que `liderazgo efectivo`).
+- **Por cuenta** — trae los videos de las cuentas que estén en **Referentes**. Si quieren más o mejor
+  cobertura por cuenta: **agreguen Referentes** (de Instagram y/o TikTok).
+- **Por palabra/hashtag** — busca con las de **Keywords**. Si quieren más o mejor cobertura por tema:
+  **agreguen o afinen Keywords.** Cárguenlas como hashtags de **una sola palabra** (`liderazgo` rinde
+  más que `liderazgo efectivo`).
 
-Resumen: **TikTok se maneja con Keywords, Instagram se maneja con Referentes.**
+Cada proyecto elige qué vías usar con los 4 checkboxes (ver 5.2). Si no marcan ninguno, usa las cuatro.
+
+Resumen: **Referentes = búsqueda por cuenta · Keywords = búsqueda por tema · las dos corren en IG y TikTok.**
 
 ---
 
@@ -225,15 +247,12 @@ Resumen: **TikTok se maneja con Keywords, Instagram se maneja con Referentes.**
 
 Honestidad por adelantado, para que no se sorprendan:
 
-- **En TikTok no se pueden seguir cuentas específicas, solo hashtags.** Si quieren seguir a una
-  cuenta puntual de TikTok, hoy no se puede (está en la lista de mejoras).
-- **En Instagram solo llega lo de las cuentas que ya siguen.** El sistema no "descubre" cuentas
-  nuevas de IG por tema; trae lo de los Referentes que carguen.
 - **El empujón por idioma es parejo para todos los idiomas no-español.** No premia más el inglés que
-  el portugués, por ejemplo. Y reconoce español, inglés, portugués, italiano y francés; otros
-  idiomas (alemán, japonés…) no los detecta todavía.
+  el portugués, por ejemplo: todos los no-español reciben el mismo empujón.
 - **La traducción es literal, no adaptada.** El script es el video tal cual, traducido. La adaptación
   a la voz/marca la hacen ustedes.
+- **El orden es menos estable con poco volumen.** Con pocas corridas el heat score puede ser ruidoso;
+  se afina a medida que entra más data y ustedes califican.
 
 Ninguna de estas rompe el uso diario. Son cosas en la lista para mejorar más adelante.
 
