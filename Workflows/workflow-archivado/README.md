@@ -34,15 +34,19 @@ Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail
   *Continue On Fail*. Si Supabase no responde, el Sheet igual se escribe y Airtable igual se limpia.
 - **El Sheet NO es continue-on-fail a propósito**: si el append falla, el workflow **corta antes de
   borrar de Airtable** → no se pierde la curación del equipo; reintenta al otro día.
-- **Idempotencia por borrado**: en operación normal un record se procesa una vez porque se borra de
-  Airtable al final. El índice único parcial `outputs.external_id` (001) es el backstop contra
-  doble-insert en un reintento tras falla parcial. *(No se usa upsert `on_conflict`: el índice es
-  parcial — `where external_id is not null` — y PostgREST no lo soporta limpio.)*
+- **Idempotencia por upsert + borrado**: en operación normal un record se procesa una vez porque se
+  borra de Airtable al final. Si el delete falla (transitorio), `Borrar de Airtable` **reintenta**
+  (3 intentos, 2 s) antes de dar error; si igual queda atrás, la corrida siguiente lo re-toma **sin
+  duplicar** en `outputs` porque el POST usa upsert (`on_conflict=external_id` +
+  `Prefer: resolution=ignore-duplicates`) contra el índice único de `external_id`. *(El índice se
+  volvió completo en `005_idempotencia_outputs.sql`: el parcial original — `where external_id is not
+  null` — no servía como arbiter de ON CONFLICT en PostgREST.)*
 
 ## Requisitos previos
 
-1. **`004_historico_script_texto.sql` aplicado** en Supabase (la vista expone el **texto** del
-   script, no `link_doc`). Correr en orden tras 001–003.
+1. **`004_historico_script_texto.sql` + `005_idempotencia_outputs.sql` aplicados** en Supabase (004:
+   la vista expone el **texto** del script, no `link_doc`; 005: índice de `outputs.external_id`
+   completo → habilita el upsert idempotente del archivado). Correr en orden tras 001–003.
 2. **Sheet "Histórico" creado** (C1) con la pestaña y las 13 columnas exactas (encabezados, fila 1):
    `FECHA CALIFICACION · PROYECTO · VOZ · TITULO · URL ORIGINAL · SCRIPT · IDIOMA · VIEWS · LIKES ·
    SEGUIDORES · HEAT SCORE · CALIFICACION · ESTADO`. El append mapea por nombre de encabezado

@@ -169,14 +169,14 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs?on_conflict=external_id' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
+            { "name": "Prefer", "value": "resolution=ignore-duplicates,return=minimal" }
           ]
         },
         "sendBody": true,
@@ -253,6 +253,9 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [3120, 200],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
       "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
     },
     {
