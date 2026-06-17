@@ -34,8 +34,12 @@ Quedan: re-import + V-run (#2, en curso), sembrar Referentes TikTok (#3, lo hace
 → se comparte como Google Doc + acceso al Airtable. Quedó **stale tras el cierre 6** (dice "5 tablas", falta la
 **Ajustes**; describe el descubrimiento asimétrico, no el simétrico nuevo) → actualizar **después de la V-run**.
 **Diagnóstico de la base viva** (vía PAT/service_role): 1 proyecto provisional, 1 voz, 9 keywords, **3 referentes
-IG / 0 TikTok**, 9 candidatos de prueba, 24 `outputs`. **D0 sigue pendiente:** limpiar la data de prueba + sembrar
-la config real cuando el equipo entregue el brief. Validador 972/0.
+IG / 0 TikTok**, 9 candidatos de prueba, 24 `outputs`. **D0 — limpieza HECHA (cierre 7):** Airtable (Candidatos +
+config provisional) y Supabase (`outputs`/`runs`/`processed_items`) **a 0**; se conservaron `Ajustes` (12 knobs),
+el esquema/vistas y la identidad (`instances`/`clients`). Falta la otra mitad de D0: **sembrar la config real**
+cuando el equipo entregue el brief. **Integridad:** sin tokens auth en el árbol ni en la historia (validador 972/0,
+escaneo OK); única observación menor → 2 identificadores (base ID + project ref Supabase) quedaron en commits viejos
+vía `temp/` (ya gitignored), bajo riesgo y neutralizado al rotar credenciales.
 
 **2026-06-17 (cierre 6) — Las 6 decisiones lockeadas EJECUTADAS en código (Mani + Claude).** Sesión
 larga de build. **#1** ya estaba (V-run cierre 5). Hechas esta pasada: **#6 idempotencia** del archivado
@@ -233,7 +237,7 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
 | C2 | Workflow de archivado — desplegado, configurado y probado en n8n | A10 + B1 + C1 | ✅ | **Dev 3** (2026-06-16) |
 | C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ✅ | **Dev 3** (2026-06-16 — corrida exitosa) |
 | V1–V6 | Corridas de validación (backfill, literalidad, curación, re-rank, dedup, resiliencia) | B3 + C2 | ⬜ | los 3 |
-| D0 | **Limpieza pre-producción (entregar limpio):** borrar la data de prueba — Candidatos de Airtable, filas de Supabase (`outputs`/`runs`/`processed_items`), y **reemplazar las semillas provisionales** (Proyecto "IA y Productividad", Voz provisional, 9 keywords, 3 referentes) por la config real del cliente. Último paso antes de activar crons. | V1–V6 | ⬜ | los 3 |
+| D0 | **Limpieza pre-producción (entregar limpio):** ✅ **limpieza HECHA (cierre 7)** — Candidatos de Airtable + config provisional (Proyecto/Voz/9 keywords/3 referentes) + `outputs`/`runs`/`processed_items` de Supabase **a 0** (conservados: `Ajustes`, esquema/vistas, `instances`/`clients`). **Falta:** sembrar la **config real** del cliente cuando llegue el brief. Último paso antes de activar crons. | V1–V6 | 🔧 | los 3 |
 | D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | D0 | ⬜ | los 3 |
 
 > Paralelismo real: **A** (Alejo) y **B** (Mani) y **C** (Dev 3) corren en paralelo. Ahora que
@@ -470,11 +474,24 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
   que ya había uno → descartado en el acto.)*
 - **Diagnóstico de la base viva** (PAT + service_role — **a rotar**): 1 proyecto provisional ("IA y Productividad"),
   1 voz provisional, 9 keywords, **3 referentes IG / 0 TikTok**, 9 candidatos de prueba; 24 filas en `outputs` y
-  varias runs de archivado colgadas en `en_curso` (síntoma del OAuth de Sheets, #9). **D0 sigue pendiente.**
-- **Validación:** validador en verde (**972 checks, 0 errores**) + escaneo de secretos OK
-  (las credenciales que pasó Mani por chat **no** se escribieron a disco; se usaron como env vars inline).
-- **Qué sigue:** Mani re-importa el motor y corre la **V-run de re-validación** → revisar el output como en el
-  cierre 5. En paralelo, el equipo entrega el brief → **D0** (limpiar prueba + sembrar config real, incl. TikTok).
+  varias runs de archivado colgadas en `en_curso` (síntoma del OAuth de Sheets, #9).
+- **D0 — limpieza ejecutada (Mani lo pidió tras compartir el cockpit).** Vía API: Supabase `outputs` 24→0,
+  `processed_items` 40→0, `runs` 7→0 (orden FK; `processed_items` vacío = el primer run real no saltea por dedup);
+  Airtable `Candidatos` 9→0, `Keywords` 9→0, `Referentes` 3→0, `Proyectos` 1→0, `Voces` 1→0. **Conservados a
+  propósito:** `Ajustes` (12 knobs), estructura/campos/vista 🔥, y la identidad Supabase (`instances`/`clients`/
+  `workflows`). Solo se borraron **registros**, nunca esquema. Cockpit en blanco para que el equipo cargue la config
+  real siguiendo el onboarding. Falta la **siembra real** (segunda mitad de D0).
+- **Pasada de integridad (para que el equipo tome esto sin sorpresas):** validador 972/0; `git grep` de los valores
+  exactos en TODO el historial → **ningún token auth** (PAT/service_role) en ningún commit ni en el árbol. Única
+  observación: el base ID de Airtable y el project-ref de Supabase (identificadores, no secretos auth) quedaron en
+  2 commits viejos (`2224446`, `64023e4`) dentro de `temp/...json` antes de que `temp/` se gitignoreara. **Bajo
+  riesgo** (sin tokens no abren nada) y **neutralizado al rotar credenciales**. Si se quiere higiene total = reescribir
+  historia (`git filter-repo`/BFG) — **operación coordinada con el equipo, NO unilateral** (repo compartido).
+- **Validación:** validador en verde (**972 checks, 0 errores**) + escaneo de secretos OK (las credenciales que pasó
+  Mani por chat **no** se escribieron a disco; se usaron como env vars inline en `/tmp`, borrado tras correr).
+- **Qué sigue:** **rotar PAT + service_role**; Mani re-importa el motor y corre la **V-run de re-validación** (ahora
+  sobre data limpia) → revisar output como en el cierre 5; el equipo entrega el brief → **sembrar la config real**
+  (segunda mitad de D0, incl. Referentes TikTok).
 
 ### 2026-06-17 (cierre 5) — V-run de ESTE repo validada + fix del no-transcript *(Mani + Claude)*
 
