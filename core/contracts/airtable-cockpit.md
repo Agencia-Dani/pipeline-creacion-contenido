@@ -23,6 +23,7 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 |---|---|---|
 | `nombre` | texto (primario) | "Comunicación", "Ventas"… |
 | `descripcion` | texto largo | qué cubre el proyecto |
+| `criterios_relevancia` | texto largo | **qué hace relevante a un video para este proyecto** — lo edita el equipo, lo lee el motor para juzgar relevancia (no solo virales). Ver ADR-010 + [refactor-relevancia](../../docs/agents/refactor-relevancia.md) |
 | `voz_default` | link → `Voces` | con qué voz se generan sus guiones |
 | `min_likes` / `min_views` | número | pisos *blandos* del heat-score (no cortan, ponderan) |
 | `dias_recencia` | número | ventana de fetch (backfill=180, diario=1–2) |
@@ -39,6 +40,7 @@ propia". Hoy la voz organiza la selección ("5 videos para tal voz") y el histó
 |---|---|---|
 | `nombre` | texto (primario) | "Cora", "Alma", "30X institucional"… |
 | `descripcion` | texto largo | quién es / autoridad |
+| `criterios_relevancia` | texto largo | **qué le sirve a este cliente puntual** (fit de persona/audiencia) — afina el gate de relevancia por encima del tema del Proyecto. Opcional; el Proyecto filtra el tema, la Voz el cliente (ADR-010) |
 | `frase_credencial` | texto | la frase de apertura |
 | `few_shot` | texto largo | 2–4 guiones reales que anclan la voz (se enriquece con los aprobados) |
 | `tratamiento` | single select | tú / usted |
@@ -93,8 +95,9 @@ con lo elegido, sin código. Se crea a mano al armar la base (las vistas no sale
 
 ## Cómo lo usa el motor (n8n)
 
-1. **Lee** (inicio de corrida): Proyectos activos + sus Keywords/Referentes/Voz/filtros. Batch
-   (1 page por tabla) para no gastar API calls.
+1. **Lee** (inicio de corrida): Proyectos activos + sus Keywords/Referentes/Voz/filtros +
+   `criterios_relevancia`. Batch (1 page por tabla) para no gastar API calls. Los `criterios` viajan
+   en el plan de corrida (nodo `Armar plan`) y alimentan el gate de relevancia (Haiku) — ADR-010.
 2. **Transcribe y traduce** cada item que pasa el heat-score (Supadata transcribe; Claude detecta
    idioma y traduce al español solo si hace falta — literal, sin reescribir), **crea el Google
    Doc** del script, y **escribe** los candidatos (estado `nuevo`, con `idioma` y `link_doc`)

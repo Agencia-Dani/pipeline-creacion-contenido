@@ -48,19 +48,35 @@
   resuelve handoff #1.
 - ✅ context.md ya refleja los términos (Heat-score redefinido + Relevancia tópica/Utilidad/Criterios).
 
-### Stage 1 — Cockpit: criterios de relevancia (Carril A · prerequisito chico)
-- Campo **`criterios_relevancia`** (texto largo) en la tabla `Proyectos` (y opcional en `Voces`).
-- Actualizar el contrato [core/contracts/airtable-cockpit.md](../../core/contracts/airtable-cockpit.md).
-- Sembrar criterios para el proyecto piloto ("IA y Productividad").
+### 🔧 Stage 1 — Cockpit: criterios de relevancia (Carril A · prerequisito chico)
+- ✅ Campo **`criterios_relevancia`** (texto largo) agregado a `Proyectos` **y `Voces`** en
+  `setup-airtable.mjs`. Pregunta abierta resuelta a favor de incluir la Voz: **Proyecto = relevancia de
+  tema, Voz = fit del cliente/persona**; el gate de Stage 3 los combina, los pesos se calibran en Stage 5.
+- ✅ Contrato [core/contracts/airtable-cockpit.md](../../core/contracts/airtable-cockpit.md) actualizado
+  (campo en `Proyectos` + `Voces` + nota en "Cómo lo usa el motor").
+- ✅ Motor lo lee: `Armar plan` mete `criterios` (proyecto) y `voz_criterios` (voz) en cada
+  `projects[id]` del plan de corrida (el gate de Stage 3 los consume vía `proyecto_id`). Validador en
+  verde, jsCode parsea.
+- ⬜ **Manual (Carril A, necesita PAT):** (a) crear el campo en la base viva (re-correr
+  `setup-airtable.mjs` agrega solo el campo nuevo, o crearlo a mano: tipo *Long text*); (b) sembrar
+  `criterios_relevancia` del piloto "IA y Productividad". Borrador de semilla en el handoff.
 - **Hecho cuando:** el equipo puede editar criterios en Airtable y el motor los lee en `Armar plan`.
+  *(Código ✅; falta el paso manual en Airtable.)*
 
-### Stage 2 — FILTRAR/SCOREAR: heat-score limpio + pre-trim (motor)
-- Sacar el **substring `tema`** del nodo `Heat-score v1`; dejar el score métrico como **prescore**
-  limpio (views/likes/eng percentil + selección + flag_viral marca).
-- Nodo nuevo **Pre-trim (Haiku)**: batch sobre caption+hashtags + tópico del Proyecto. Lenient,
-  recall. Tira lo obviamente off-topic antes de transcribir. Fail-open.
+### 🔧 Stage 2 — FILTRAR/SCOREAR: heat-score limpio + pre-trim (motor)
+- ✅ Substring `tema` fuera de `Heat-score v1`: el prescore queda métrico limpio
+  (views/likes/eng percentil ×(1+idioma)×(1+selección) + `flag_viral` marca). `boost_tema` quitado
+  de Config y del manifest (filters).
+- ✅ Nodo nuevo **Pre-trim relevancia** (Code + `this.helpers.httpRequest`): agrupa por proyecto,
+  manda caption+hashtags a Haiku con los `criterios` (Proyecto ⊕ Voz), descarta el off-topic obvio
+  **antes de transcribir**. Laxo (recall), **fail-open**, y si el proyecto no tiene criterios no
+  descarta nada. Va entre `Asignar proyecto+voz` y el heat-score; el heat-score lee del pre-trim.
+- ✅ API key como placeholder `<ANTHROPIC_API_KEY>` en el Code node (mismo token que el traductor →
+  2 ocurrencias a llenar en n8n).
+- ✅ Validado: contrato en verde + smoke test de la lógica (cuela off-topic, fail-open, sin-criterios
+  pasa todo, heat-score puntúa sin tema). **Falta la V-run** (re-import + Execute en n8n — norma del repo).
 - **Hecho cuando:** re-import + Execute → candidatos fluyen, la basura obvia ya no se transcribe,
-  el orden por métricas se mantiene sano.
+  el orden por métricas se mantiene sano. *(Código ✅; pendiente la corrida en vivo.)*
 
 ### Stage 3 — CALIDAD: el gate / jurado (motor · el corazón)
 - Nodo nuevo **Gate de relevancia (Haiku)** sobre el transcript: juzga relevancia/calidad contra

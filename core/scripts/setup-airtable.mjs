@@ -45,10 +45,10 @@ const date = (name) => ({
 // ── las 5 tablas (campos NO-link al crear; los links se agregan después) ──
 const tables = [
   { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto.",
-    fields: [txt("nombre"), long("descripcion"), num("min_likes"), num("min_views"),
+    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), num("min_likes"), num("min_views"),
              num("dias_recencia"), num("top_n"), check("activo")] },
   { name: "Voces", description: "Eje de generación (cómo suena). Separado del proyecto.",
-    fields: [txt("nombre"), long("descripcion"), txt("frase_credencial"), long("few_shot"),
+    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), txt("frase_credencial"), long("few_shot"),
              sel("tratamiento", "tú", "usted"), sel("registro", "coloquial", "formal"),
              txt("cta"), txt("pais_acento")] },
   { name: "Keywords", description: "Banco de palabras clave por proyecto (acumula).",

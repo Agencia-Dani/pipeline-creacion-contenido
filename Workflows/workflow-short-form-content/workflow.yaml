@@ -44,14 +44,14 @@ inputs:
     - { key: peso_views,       type: number, scope: client, default: 0.4 }
     - { key: peso_likes,       type: number, scope: client, default: 0.4 }
     - { key: peso_eng,         type: number, scope: client, default: 0.2 }
-    - { key: boost_tema,       type: number, scope: client, default: 0.5, desc: "Sale con ADR-010 (lo reemplaza el juicio semántico)" }
+    # boost_tema salió en Stage 2 (ADR-010): lo reemplaza el juicio semántico de Haiku (pre-trim + gate).
     - { key: boost_idioma,     type: number, scope: client, default: 0.3 }
     - { key: umbral_viral,     type: number, scope: client, default: 700000 }
     - { key: ig_results_limit, type: number, scope: client, default: 8 }
     - { key: tt_results_limit, type: number, scope: client, default: 30 }
   credentials:                    # SOLO NOMBRES — los valores viven en n8n / gestor, JAMÁS en git
     - apify_token                 # placeholder <APIFY_TOKEN> / credencial apifyApi en los 2 nodos Apify
-    - anthropic_api_key           # placeholder <ANTHROPIC_API_KEY> en el nodo Claude Haiku
+    - anthropic_api_key           # placeholder <ANTHROPIC_API_KEY> en 2 nodos: Pre-trim relevancia (Code) y Claude Haiku traductor
     - supadata_api_key            # placeholder <SUPADATA_API_KEY> en el nodo Supadata
     - airtable_token              # credencial n8n 'Airtable PAT' (airtableTokenApi)
     - supabase_service_role       # credencial n8n 'Supabase Registro' (supabaseApi)
@@ -60,7 +60,7 @@ inputs:
 stages:                           # las 8 etapas canónicas de PLAN §2.4 (sin vacíos; n/a si no aplica)
   colectar: "Lee la config del equipo en Airtable (Proyectos/Voces/Keywords/Referentes), arma el plan, y scrapea con Apify: IG Reels (directUrls de referentes, onlyPostsNewerThan) + TikTok (hashtags de keywords)."
   normalizar: "Normalizar IG/TT → formato común content_item (+ external_id) → Merge (append) → Asignar proyecto+voz (capa 2 de recencia: descarta lo más viejo que dias_recencia)."
-  filtrar_scorear: "Heat-score v1 = 0.4·norm(views)+0.4·norm(likes)+0.2·norm(eng) ×(1+tema)×(1+idioma)×(1+selección) + dedup contra processed_items (Supabase); flag_viral marca, no corta; top_n por proyecto."
+  filtrar_scorear: "Pre-trim (Haiku LAXO sobre el caption): descarta off-topic obvio antes de transcribir usando criterios_relevancia del Proyecto/Voz (recall, fail-open). Heat-score v1 = prescore métrico 0.4·norm(views)+0.4·norm(likes)+0.2·norm(eng) ×(1+idioma)×(1+selección) + dedup contra processed_items (Supabase); flag_viral marca, no corta; top_n por proyecto. (El substring `tema` salió — ADR-010.)"
   enriquecer: "Supadata transcribe (batch); idioma del response. Claude Haiku traduce literal al español SOLO si el original no está en español (sin reescribir)."
   generar: "Perfil 'script literal' (ADR-009): el script es la transcripción/traducción tal cual, sin reescritura ni voz."
   calidad: n/a                    # hueco conocido → lo llena el gate Haiku del refactor (ADR-010, Stage 3)
