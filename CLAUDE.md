@@ -14,6 +14,9 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Context** ([docs/agents/context.md](docs/agents/context.md)) — el glosario de dominio (lenguaje
   ubicuo). Leelo antes de nombrar variables/funciones/archivos y antes de discutir el dominio.
   Se afina con `/grill-with-docs`.
+- **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
+  los dos workflows (orden de ejecución, qué tabla Airtable lee/escribe cada nodo, esquema Supabase y
+  trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
 - **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..009).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
