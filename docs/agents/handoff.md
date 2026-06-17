@@ -21,6 +21,24 @@
 
 ## Estado en una línea
 
+**2026-06-16 (cierre 4) — Objetivos del MVP afilados + grill-me de cumplimiento (Mani).** Sesión de
+alineación (sin tocar código): se destiló el norte (ROADMAP §1) a **11 objetivos verificables (O1–O11)**,
+sumando **O11 = equipo-redes-friendly** (Majo/Jero operan casi solos, no-code). `/grill-me` objetivo por
+objetivo sobre el motor real (30 nodos verificados en código) → **6 decisiones lockeadas, ninguna ejecutada
+aún:** (1) postura **validar primero, barato** (la V-run corre el motor tal cual); (2) **#19/O11: tabla
+Ajustes (clave→valor) en Airtable** para los knobs de scoring → no-code (ADR + contrato del cockpit); (3)
+**piso duro `min_views`/`min_likes` pre-enriquecimiento** dentro de `Heat-score` antes del `top_n`, **default
+0** (respeta "nada corta"), editable por el equipo vía Ajustes; (4) **O7: el aprendizaje se monta sobre el
+descubrimiento simétrico** + extender `v_senal_seleccion` a keyword/tema (ADR), MVP IG-referente-only; (5)
+**#18/O2: ampliar la detección de idioma** (DICT/librería), boost binario se queda, `boost_idioma` a Ajustes;
+(6) **#2 idempotencia del archivado: fix ANTES de V3** (`resolution=ignore-duplicates` + delete con reintento).
+Hallazgos del código: el boost de idioma corre sobre el caption **pre-transcripción** (Supadata-lang no
+disponible ahí); la señal O7 solo acredita IG (en TikTok-por-hashtag el poster no es referente sembrado).
+**🔴 La V-run que corrió Mani fue sobre un workflow VIEJO → el motor de ESTE repo sigue sin validar
+end-to-end** (O1/O7 en rojo de validación). **Pendiente nuevo (prio ALTA): dev-doc nodo-por-nodo** del
+workflow + conexión Airtable + esquema de la base (cada tabla/campo, qué lo escribe/lee). **Por escribir:
+2 ADRs** (tabla Ajustes · señal bi-eje). Próximo: ejecutar las 6 decisiones + seguir el grill-me restante.
+
 **2026-06-16 (cierre 3) — Bugfix de orden + refactor front-to-back (grilling) en `main` (Mani).**
 La V-run real expuso un **bug de ejecución**: `Abrir run en el registro` colgaba en paralelo de
 `Config` → n8n corría el pipeline entero antes que esa rama → `Preparar outputs Supabase` rompía con
@@ -98,27 +116,46 @@ estructural abierta para el equipo: Airtable vs Supabase / alcance del registro 
 Airtable (campo `fecha_calificacion` + vista 🔥), accesos a Majo/Jero, **semillas (A9, en pausa
 hasta definir nicho)**.
 
-## Próxima sesión (fresh) — objetivos + grill-me sobre cumplimiento
+## Próxima sesión (fresh) — ejecutar las 6 decisiones + V-run real + seguir el grill
 
-> **Pedido de Mani (cierre 3):** arrancar definiendo **los objetivos del MVP con claridad** (el norte
-> del jefe — ROADMAP §1, refrescado este cierre a la realidad ADR-009/010), y **después un `/grill-me`
-> que cuestione si el workflow actual cumple esos objetivos** punta a punta. El repo quedó coherente
-> entre PLAN / ROADMAP / README / CLAUDE / contrato / onboarding para poder continuar sin arranque en
-> frío. Preguntas abiertas que deja Mani para esa sesión:
+> **Estado (cierre 4):** los **objetivos del MVP ya están destilados** a 11 criterios verificables
+> (O1–O11; rúbrica en el log de cierre 4, O11 = equipo-redes-friendly). El `/grill-me` de cumplimiento
+> resolvió los forks principales → **6 decisiones lockeadas, NINGUNA ejecutada todavía**. La V-run que
+> corrió Mani fue sobre un **workflow viejo** → el motor de este repo **sigue sin validar end-to-end**.
+> Pendiente seguir el grill objetivo-por-objetivo sobre los O que faltan cubrir.
 
-1. **Pisos `min_likes`/`min_views` como optimización de tokens (Q5).** Hoy se quitaron (estaban muertos:
-   el heat nunca los ponderaba). **Pero reabrir:** un piso **duro** post-scrape / **pre-enriquecimiento**
-   (antes de Supadata + Claude) cortaría videos "muertos" y ahorraría **Supadata + Anthropic** (el costo
-   per-item real). **No ahorra Apify** (los actores bajan los N posts más recientes sin filtro de
-   engagement server-side). Decidir en el grill si se re-agrega como piso real (no como el campo blando
-   mentiroso de antes) o si el pre-trim Haiku + `top_n` ya cubren ese recorte.
-2. **Knobs para corridas de prueba baratas (Q2 — referencia, no bloquea).** Lo que baja **Apify**:
-   `ig_results_limit` (def 8 → **3**), `tt_results_limit` (def 30 → **5**), y `dias_recencia` del
-   Proyecto (180 → **7**, recorta la ventana de fetch de IG). Lo que baja **Supadata/Claude**: `top_n`
-   (15 → **3-5**, limita cuántos se transcriben/traducen/gatean). Con eso una corrida end-to-end real
-   sale por poquísimo.
-3. **Descubrimiento simétrico** (4 Apify, ya diseñado) — ver §"🔵 Producto / DIRECCIÓN". Es el cambio
-   grande de COLECTAR; entra **después de validar la V-run** del refactor de relevancia.
+**Las 6 decisiones a ejecutar (detalle en el log de cierre 4 + en las §gaps respectivas):**
+
+1. **Validar primero, barato (postura).** Re-importar el motor de ESTE repo y correr una V-run cheap
+   (knobs Q2: `ig_results=3`, `tt_results=5`, `dias_recencia=7`, `top_n=3-5`) → confirmar O1/O4/O5
+   end-to-end antes de cualquier cambio estructural. **Es el bloqueante real.**
+2. **Tabla Ajustes en Airtable (#19/O11).** Knobs de scoring (`peso_*`, `boost_idioma`, `umbral_viral`,
+   `peso_relevancia`, `top_n`, `min_views`, `min_likes`) a una tabla clave→valor que el motor lee como
+   lee Proyectos/Keywords. → **ADR nuevo** + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`.
+3. **Piso duro pre-enriquecimiento (Q1).** `min_views`/`min_likes` como filtro REAL dentro de `Heat-score`
+   **antes del `top_n`**, **default 0** (respeta "nada corta", ROADMAP §1), editable por el equipo vía Ajustes.
+4. **Señal de aprendizaje bi-eje (O7).** Hoy `v_senal_seleccion` solo acredita por `referente` → ciego en
+   TikTok-por-hashtag. Se monta sobre el **descubrimiento simétrico**; al aterrizar, extender la vista para
+   acreditar también por keyword/tema. → **ADR nuevo** (schema). MVP: IG-referente-only, documentado.
+5. **Ampliar detección de idioma (#18/O2).** Boost binario se queda (cualquier no-español se premia);
+   ampliar el `DICT`/usar librería para que más idiomas reciban boost (hoy caen a `es`). `boost_idioma` a
+   Ajustes; la detección queda dev-only. Nota: el boost corre sobre el caption **pre-transcripción**.
+6. **Idempotencia del archivado (#2) ANTES de V3.** `Prefer: resolution=ignore-duplicates` en el POST de
+   `outputs` + delete de Airtable con reintento. La V3 ejercita el archivado → si no, duplica filas.
+
+**Pendiente nuevo (prio ALTA, NO bloquea):** **dev-doc nodo-por-nodo** del workflow (qué hace cada uno de
+los 30 nodos + orden de ejecución), la conexión con Airtable, y el esquema de la base (cada tabla y campo,
+qué lo escribe/lee). Para que el próximo dev no lea el JSON crudo. Es O11 en su versión dev.
+
+**Descubrimiento simétrico** (4 Apify, ya diseñado) — ver §"🔵 Producto / DIRECCIÓN". Sigue **diferido a
+post-V-run**; es la precondición de O7 bi-eje (decisión 4).
+
+**7ª decisión (cierre 4, post-handoff inicial):** **O1 — el cron del motor queda SEMANAL** (lunes 8am, lo
+que ya trae el nodo y menciona el CLAUDE.md). Más barato y no estresa la cuota free de Airtable. **Corregir
+ROADMAP §D1 y §B3** que dicen "diario/cada-2-días" (quedaron desalineados). **O5 verificado en código:** el
+prompt de `Traducir` fuerza literalidad (sin reescribir/resumir/embellecer), usa `idioma_detectado` de
+Supadata y es fail-open → riesgo de embellecimiento del ROADMAP §6 está mitigado a nivel prompt (igual
+confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000 chars (sobra para reels).
 
 ## Tablero de tasks
 
@@ -207,6 +244,8 @@ hasta definir nicho)**.
    duplicada en el Sheet** y los candidatos nuevos del mismo batch **nunca llegan a `outputs`** (se
    pierden del histórico y de la señal de aprendizaje). Fix: `Prefer: resolution=ignore-duplicates` en
    el POST de outputs (igual que `processed_items`) y/o delete con reintento.
+   **🔒 Decidido (cierre 4): fix ANTES de V3** (la V3 ejercita el archivado → si no, la propia validación
+   duplica filas). Sale del bucket "pre-cron" para adelantarse.
 3. **La dedup NO ahorra costo de Apify (contradice el HANDOFF §Decisiones 1a).** El scrape (Apify) corre
    ANTES del dedup (`Apify → … → Leer procesados → Heat-score filtra`). Apify se paga en cada corrida;
    el dedup solo ahorra Supadata + Claude. La justificación de mantener Supabase está sobredimensionada.
@@ -305,6 +344,11 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
       Un video en otro idioma (alemán, japonés…) cae a `es` por defecto y **no recibe boost**. Mejora:
       ampliar el `DICT` o detectar con librería/LLM. *(Premiar más fuerte lo no-español sí se puede ya,
       sin tocar código: subir `boost_idioma` en el nodo `Config`.)*
+    - **🔒 Decidido (cierre 4):** **boost binario se queda** (cualquier no-español se premia, que es lo que
+      pidió el jefe — O2); **ampliar la detección** (DICT/librería) para que más idiomas reciban boost en vez
+      de caer a `es`. La detección queda **dev-only**; `boost_idioma` viaja a la tabla Ajustes (ver #19).
+      **Límite estructural:** el boost corre sobre el caption **pre-transcripción** → Supadata-`lang` (#7) NO
+      está disponible ahí; la detección del boost es caption-based por diseño. Pesos por idioma → post-MVP §5.
 19. **No hay forma de que el equipo de redes ajuste los parámetros del scoring.** Hoy los knobs
     (`peso_views`/`peso_likes`/`peso_eng`, `boost_tema`, `boost_idioma`, `umbral_viral`, `top_n_fallback`
     y la lista de idiomas) viven en el motor: los pesos/boosts en el nodo `Config`, pero la lista de
@@ -313,8 +357,39 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     `Config` para que todos los knobs vivan en **un solo lugar obvio**; (b) idealmente, mover esos
     ajustes a una tabla **Ajustes** en Airtable (no-code, consistente con el resto del diseño) para que
     el equipo los toque sin depender de un dev. Mientras tanto, documentar dónde está cada knob.
+    **🔒 Decidido (cierre 4): opción (b) — tabla Ajustes en Airtable.** El motor lee los knobs de una tabla
+    clave→valor (incluidos los nuevos `min_views`/`min_likes` del piso duro, ver Q1). Núcleo de O11.
+    **→ ADR nuevo + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`** (toca `core/`).
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-16 (cierre 4) — Objetivos del MVP afilados + grill-me de cumplimiento *(Mani + Claude)*
+
+- **Sesión de alineación, sin tocar código.** Se destiló el norte (ROADMAP §1 + realidad ADR-009/010) a
+  **11 objetivos verificables (O1–O11)**, con O11 = **equipo-redes-friendly** (Majo/Jero operan casi solos,
+  no-code) agregado a pedido de Mani. La rúbrica O1–O11 es el contrato de "cumple / no cumple" del motor.
+- **Verificación contra el código real** (no la prosa): se leyeron los 30 nodos y los Code nodes clave
+  (`Heat-score v1`, `Gate de relevancia`). **Hallazgos:**
+  - El **boost de idioma corre sobre el caption ANTES de transcribir** (`guessLang(descripcion+bio)`), así
+    que el `lang` de Supadata (#7) no está disponible en ese punto — la detección del boost es caption-based
+    por diseño. Hay dos "idioma": el del boost (caption) y el de entrega (Supadata, en `Transcribir`).
+  - La **señal O7 solo acredita IG**: `Heat-score` indexa `signal[username|idioma]` y `v_senal_seleccion`
+    agrupa por `referente`. En TikTok-por-hashtag el `username` es quien posteó, casi nunca un referente
+    sembrado → `sel=0`. El aprendizaje es ciego en TikTok hasta el descubrimiento simétrico.
+  - **O9 confirmado:** `fresh.filter(!seen)` corta DESPUÉS del scrape → el dedup ahorra Supadata+Claude, no Apify.
+- **`/grill-me` objetivo por objetivo → 6 decisiones lockeadas** (ver §"Próxima sesión" para el detalle
+  ejecutable): postura validar-primero-barato · tabla Ajustes (#19/O11) · piso duro pre-enriquecimiento default
+  0 (Q1) · señal bi-eje montada sobre el simétrico (O7) · ampliar detección de idioma binaria (#18/O2) ·
+  idempotencia archivado antes de V3 (#2). **Ninguna ejecutada todavía** — son el trabajo de la próxima sesión.
+- **🔴 La V-run que corrió Mani fue sobre un workflow VIEJO**, no el de este repo → el motor actual **sigue
+  sin validar end-to-end** (O1/O7 en rojo de validación). Primer paso de la próxima sesión: re-importar ESTE
+  motor y correr la V-run cheap.
+- **Pendiente nuevo (prio ALTA):** dev-doc nodo-por-nodo del workflow + conexión Airtable + esquema de la base
+  (cada tabla/campo). **Por escribir: 2 ADRs** (tabla Ajustes · señal bi-eje de aprendizaje).
+- **Validación:** no aplica (cero cambios de código). Solo se editó este handoff.
+- **Qué sigue:** ejecutar las 6 decisiones (empezando por la V-run real de validación) y **continuar el
+  grill-me** sobre los objetivos que aún no se cubrieron rama por rama. Skills sugeridos: `/tdd` o builder Node
+  para la tabla Ajustes + el piso duro; `/diagnose` si la V-run real rompe.
 
 ### 2026-06-16 (cierre 3) — Bugfix de orden en la V-run + refactor front-to-back *(Mani + Claude)*
 
