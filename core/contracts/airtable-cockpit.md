@@ -14,7 +14,7 @@
 
 ---
 
-## Las 5 tablas
+## Las 6 tablas
 
 ### 1. `Proyectos` — la unidad de búsqueda (qué se busca)
 Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunicación, Ventas, Liderazgo.
@@ -86,13 +86,35 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 filtro `estado = aprobado` + orden `heat_score` descendente — el mapa de calor "se rehace" solo
 con lo elegido, sin código. Se crea a mano al armar la base (las vistas no salen por API).
 
+### 6. `Ajustes` — los knobs del scoring (clave→valor, ADR-011)
+Donde el equipo afina cómo rankea el motor **sin tocar n8n**. Una fila por knob. El motor los lee
+cada corrida y **caen sobre los defaults del nodo Config** (mismos nombres → merge transparente):
+si la tabla está vacía o un knob falta, usa el default. La lectura es **fail-open** (si Airtable no
+responde, corre con defaults).
+
+| Campo | Tipo | Para qué |
+|---|---|---|
+| `clave` | texto (primario) | el nombre del knob (igual al del nodo Config) |
+| `valor` | número (precisión 2) | el valor que sobrescribe el default |
+| `descripcion` | texto largo | qué hace el knob (para el equipo) |
+
+**Knobs (semilla por defecto):** `peso_views` 0.4 · `peso_likes` 0.4 · `peso_eng` 0.2 (pesos del
+prescore métrico) · `peso_relevancia` 0.7 (semántico vs. métrico en el heat compuesto) ·
+`boost_idioma` 0.3 (premia no-español) · `umbral_viral` 700000 (marca viral, no filtra) ·
+`top_n_fallback` 25 (candidatos/proyecto si el Proyecto no define `top_n`) · `min_views` 0 /
+`min_likes` 0 (**piso duro** pre-`top_n`: descarta por debajo; 0 = nada corta — respeta "nada corta"
+de ROADMAP §1). Los **operativos** (`ig_results_limit`, `tt_results_limit`, IDs) quedan en Config
+(dev-only). Detección de idioma: dev-only (en el código), no es un knob de Ajustes.
+
 ---
 
 ## Cómo lo usa el motor (n8n)
 
 1. **Lee** (inicio de corrida): Proyectos activos + sus Keywords/Referentes/Voz/filtros +
-   `criterios_relevancia`. Batch (1 page por tabla) para no gastar API calls. Los `criterios` viajan
-   en el plan de corrida (nodo `Armar plan`) y alimentan el gate de relevancia (Haiku) — ADR-010.
+   `criterios_relevancia`, **y la tabla `Ajustes`** (nodo `Leer Ajustes`). Batch (1 page por tabla)
+   para no gastar API calls. Los `criterios` y los `ajustes` viajan en el plan de corrida (nodo
+   `Armar plan`); los criterios alimentan el gate de relevancia (Haiku, ADR-010) y los ajustes caen
+   sobre los defaults de Config en `Heat-score v1` y `Gate de relevancia`.
 2. **Transcribe y traduce** cada item que pasa el heat-score (Supadata transcribe; Claude detecta
    idioma y traduce al español solo si hace falta — literal, sin reescribir), pasa por el **gate de
    relevancia** (Haiku) que produce `relevancia_score`/`relevancia_razon`, y **escribe** los
@@ -126,5 +148,6 @@ export AIRTABLE_WORKSPACE_ID='wsp...'     # del URL del workspace en airtable.co
 node core/scripts/setup-airtable.mjs      # crea la base y devuelve el baseId
 ```
 
-Devuelve el `baseId` (`app...`) → va a la credencial de Airtable en n8n. Alternativa sin compartir
-token: crear las 5 tablas a mano siguiendo esta misma especificación.
+Devuelve el `baseId` (`app...`) → va a la credencial de Airtable en n8n, y siembra los defaults de
+`Ajustes`. Alternativa sin compartir token: crear las 6 tablas a mano siguiendo esta misma
+especificación.

@@ -15,6 +15,8 @@
 | [ADR-007](./ADR-007-convergencia-gradual-motor-unico.md) | Convergencia gradual a motor de research único | Aceptada (como dirección) |
 | [ADR-008](./ADR-008-airtable-cockpit-equipo-redes.md) | Airtable como cockpit del equipo de redes (revisa D4) | Aceptada |
 | [ADR-009](./ADR-009-scripts-literales-y-aprendizaje-en-scoring.md) | Scripts literales (transcribir/traducir) y aprendizaje en el scoring (revisa ADR-008) | Aceptada |
+| [ADR-010](./ADR-010-scoring-semantico-y-etapa-calidad.md) | Scoring semántico con LLM + etapa CALIDAD (revisa ADR-009) | Aceptada |
+| [ADR-011](./ADR-011-tabla-ajustes-knobs-no-code.md) | Tabla `Ajustes`: knobs del scoring editables por el equipo sin código | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

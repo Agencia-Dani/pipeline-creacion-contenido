@@ -60,6 +60,22 @@ const tables = [
              sel("calificacion", "🔥", "👍", "👎"),
              sel("estado", "nuevo", "aprobado", "descartado", "publicado"),
              long("notas_equipo")] },
+  { name: "Ajustes", description: "Knobs del scoring (clave→valor) que el equipo edita sin tocar n8n — ADR-011. El motor los lee y caen sobre los defaults de Config; tabla vacía = motor con defaults.",
+    fields: [txt("clave"), num("valor", 2), long("descripcion")] },
+];
+
+// Semillas de Ajustes: defaults del motor (nombres = keys del nodo Config → merge transparente).
+// El motor cae a estos mismos valores si la tabla está vacía; sembrarlos hace los knobs visibles al equipo.
+const ajustesSeed = [
+  { clave: "peso_views",      valor: 0.4,    descripcion: "Peso de las views en el prescore métrico (0..1)." },
+  { clave: "peso_likes",      valor: 0.4,    descripcion: "Peso de los likes en el prescore métrico (0..1)." },
+  { clave: "peso_eng",        valor: 0.2,    descripcion: "Peso del engagement_rate en el prescore métrico (0..1)." },
+  { clave: "peso_relevancia", valor: 0.7,    descripcion: "Peso del juicio semántico (Haiku) en el heat_score final vs. el percentil métrico (0..1)." },
+  { clave: "boost_idioma",    valor: 0.3,    descripcion: "Boost al prescore de contenido NO-español (premia idiomas extranjeros — ADR-009)." },
+  { clave: "umbral_viral",    valor: 700000, descripcion: "Seguidores a partir de los cuales se marca viral_por_tamano (proxy, no filtra)." },
+  { clave: "top_n_fallback",  valor: 25,     descripcion: "Cuántos candidatos por proyecto cuando el Proyecto no define top_n propio." },
+  { clave: "min_views",       valor: 0,      descripcion: "Piso duro: descarta antes del top_n los reels con menos views. 0 = nada corta." },
+  { clave: "min_likes",       valor: 0,      descripcion: "Piso duro: descarta antes del top_n los reels con menos likes. 0 = nada corta." },
 ];
 
 const run = async () => {
@@ -97,6 +113,15 @@ const run = async () => {
     console.warn("⚠ No se pudo crear 'fecha_calificacion' por API — crealo a mano en Candidatos:");
     console.warn("  tipo 'Last modified time' → track solo el campo 'calificacion'. (" + e.message + ")");
   }
+
+  // ── semillas de Ajustes (API de datos, no meta) ──
+  console.log("→ Sembrando defaults en Ajustes…");
+  const res = await fetch(`https://api.airtable.com/v0/${baseId}/Ajustes`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${PAT}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ records: ajustesSeed.map((fields) => ({ fields })), typecast: true }),
+  });
+  if (!res.ok) console.warn("⚠ No se pudo sembrar Ajustes: " + (await res.text()));
 
   console.log(`\n✅ Cockpit creado.\n   baseId: ${baseId}`);
   console.log("   → Pegá ese baseId en la credencial de Airtable de n8n.");
