@@ -19,8 +19,9 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 
 1. **COLECTAR** — `Config` → abre el run en el registro (Supabase) → lee Airtable (Proyectos, Voces,
-   Keywords, Referentes activos) → `Armar plan de corrida` arma los 2 ejes de descubrimiento → 2
-   nodos **Apify** (IG Reels por cuenta-referente, TikTok por hashtag-keyword).
+   Keywords, Referentes, **Ajustes**) → `Armar plan de corrida` arma los 2 ejes de descubrimiento → **4
+   nodos Apify** (IG por cuenta-referente + IG por hashtag-keyword + TikTok por hashtag-keyword +
+   TikTok por perfil-referente): **ambos ejes en ambas plataformas**.
 2. **NORMALIZAR** — `Normalizar IG`/`Normalizar TT` mapean el shape crudo de cada API al mismo
    `content_item` (incluida la portada del video) → `Merge scrapes` (append) → `Asignar proyecto+voz`.
 3. **FILTRAR / SCOREAR** — `Pre-trim relevancia` (Haiku laxo sobre el caption, cuela off-topic antes
@@ -41,24 +42,32 @@ Todos los gates son **fail-open**: si Haiku o Supadata fallan, el item pasa (no 
 
 ## Descubrimiento (cómo busca, por eje y plataforma)
 
+**Descubrimiento simétrico** — los dos ejes (referentes + keywords) aplican a **ambas plataformas**,
+con una llamada Apify por celda (4 en total):
+
 | | Por referente (cuenta) | Por keyword (hashtag) |
 |---|---|---|
-| **Instagram** | ✅ baja los reels recientes de cada `Referente` IG | ⏳ post-V-run (IG-por-hashtag, descubre cuentas nuevas) |
-| **TikTok** | ⏳ post-V-run (TT-por-perfil) | ✅ busca cada `Keyword` como hashtag (OR) |
+| **Instagram** | ✅ `Apify — IG Reels`: reels recientes de cada `Referente` IG (`directUrls`) | ✅ `Apify — IG Hashtag`: cada `Keyword` como `explore/tags/` → **descubre cuentas nuevas** (el gate filtra el ruido) |
+| **TikTok** | ✅ `Apify — TikTok Perfil`: cada `Referente` TikTok (`profiles`) | ✅ `Apify — TikTok`: cada `Keyword` como hashtag (OR) |
 
-El objetivo es **simétrico** (ambos ejes en ambas plataformas, 4 llamadas Apify); las dos celdas ⏳
-se construyen tras la V-run que valida el refactor de relevancia. Hoy: IG solo por referentes, TikTok
-solo por keywords. Las keywords se cargan **como se hashtaggean** (una palabra; multi-palabra colapsa
-a `#palabrapalabra`).
+Cada par converge a su `Normalizar` (mismo `content_item`) → `Merge scrapes` (append). La asignación a
+proyecto (`Asignar proyecto+voz`) es simétrica: matchea **por cuenta** (referente sembrado) y, si no,
+**por hashtag del caption** (keyword), en ambas plataformas. Las keywords se cargan como se hashtaggean
+(una palabra; **multi-palabra colapsa** a `#palabrapalabra`, lo hace el motor). Para activar las celdas
+de referente hay que **sembrar `Referentes`** de cada plataforma (las llamadas con lista vacía
+no traen nada, fail-open).
 
 ---
 
-## Knobs (nodo `Config`)
+## Knobs
 
-`ig_results_limit` / `tt_results_limit` (volúmenes Apify) · `peso_views`/`peso_likes`/`peso_eng`
-(prescore métrico) · `peso_relevancia` (0.7 — Haiku vs métricas en el composite) · `boost_idioma`
-(premia no-español) · `umbral_viral` (700k) · `top_n_fallback`. Los pesos exactos se calibran con data
-real (Stage 5). `criterios_relevancia` los edita el equipo en Airtable, no acá.
+Los del **scoring viven en la tabla `Ajustes`** de Airtable (clave→valor, ADR-011) → el equipo los
+edita sin tocar n8n: `peso_views`/`peso_likes`/`peso_eng` (prescore métrico) · `peso_relevancia` (0.7,
+Haiku vs métricas en el composite) · `boost_idioma` (premia no-español) · `umbral_viral` (700k) ·
+`top_n_fallback` · `min_views`/`min_likes` (**piso duro** pre-`top_n`, default 0 = nada corta). El motor
+los lee (`Leer Ajustes`) y **caen sobre los defaults del nodo `Config`** (tabla vacía/caída = defaults,
+fail-open). En `Config` quedan los **operativos dev-only**: `ig_results_limit`/`tt_results_limit` e IDs.
+`criterios_relevancia` (relevancia) los edita el equipo en `Proyectos`/`Voces`.
 
 ---
 

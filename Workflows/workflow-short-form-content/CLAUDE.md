@@ -7,7 +7,7 @@ el contrato en [workflow.yaml](./workflow.yaml), el uso en [README.md](./README.
 
 ## Qué es
 
-Un único workflow de **n8n** (`workflow.json`, 30 nodos, 2 entradas: cron semanal + Execute manual)
+Un único workflow de **n8n** (`workflow.json`, 33 nodos, 2 entradas: cron semanal + Execute manual)
 que es el **motor de reels** del MVP. Lee la config del equipo en **Airtable** (Proyectos, Voces,
 Keywords, Referentes) → descubre reels IG + TikTok (Apify) → prescore métrico (`Heat-score v1`) →
 transcribe (Supadata) → **traduce literal al español con Claude Haiku solo si no está en español** →
