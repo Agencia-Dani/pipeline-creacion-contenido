@@ -207,6 +207,16 @@ hasta definir nicho)**.
 >    entre corridas. Para verificar el embudo limpio: vaciar Candidatos, correr 1 vez con 1 proyecto activo
 >    (top_n=2) → esperar 2.
 >
+> **Pendientes abiertos al cierre de la sesión del cierre 9 (test run con `processed_items` vacío):**
+> 6. **🐛 Bug `seguidores=0` en IG (§Mejoras #22).** Aplicar el fix de 1 línea en `Normalizar IG` + re-import.
+>    Hoy hunde el ranking de los reels de IG (engagement_rate=0, flag_viral=false).
+> 7. **Revisar el embudo completo de Apify.** Falta capturar los conteos por nodo en una corrida limpia
+>    (`Apify IG Reels`/`IG Hashtag`/`TikTok`/`TikTok Perfil` → `Normalizar IG`/`TT` → `Merge scrapes` →
+>    `Asignar` → `Heat-score`) para ver dónde se cae el volumen y decidir palancas (`ig/tt_results_limit`,
+>    ventana `dias_recencia`, # de referentes). **Ya confirmado en el cierre 9:** el `resultsType:'reels'`
+>    trae reels reales y on-topic (item de bayavoce: `type:Video`, `productType:clips`, `videoUrl`, 82s); el
+>    "IG no aporta" de antes era **dedup** (no el actor ni el filtro). Falta el resto de los conteos.
+>
 > Cuando el gate puntúe y el embudo sea estable: **calibrar** pesos/rubric con data real; resolver
 > **pendientes pre-cron** (#4 paginación, #5 tope dedup, #9 OAuth Sheets); después **D1–D3**.
 
@@ -400,6 +410,16 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
     cerrarse nunca**. Decidir si esa acumulación es traza deseada ("todo lo generado") o necesita cleanup/marcado.
     No bloquea.
 
+22. **🐛 `seguidores = 0` en todos los items de IG (bug pre-existente, encontrado cierre 9).** `Normalizar IG`
+    lee los seguidores de `item.ownerFollowersCount`, pero el actor `apify/instagram-scraper` los devuelve en
+    **`item.followersCount`** (y `item.metaData.followersCount`). Ese campo no existe en el output → `seguidores=0`
+    en todo IG (confirmado en `processed_items` y en el item de muestra de bayavoce: `followersCount: 360200`).
+    **Consecuencias:** `engagement_rate` cae al fallback `'0'` (divide por seguidores) y `flag_viral` (`>700k`)
+    nunca se cumple en IG → los reels de IG salen **sub-rankeados** en el `Heat-score` (pesa `peso_eng`) frente a
+    TikTok, que sí trae sus métricas. **Fix (1 línea en `Normalizar IG`):**
+    `const seguidores = item.followersCount || item.ownerFollowersCount || (item.metaData && item.metaData.followersCount) || 0;`
+    Cubrir también la rama IG Hashtag (con `addParentData` el campo puede variar). Requiere re-import. No bloquea.
+
 **🔵 Producto / alcance (modelo de búsqueda y tuning — post-MVP):**
 
 Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verificado en `workflow.json` (nodo
@@ -494,8 +514,23 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
   - **Config real sembrada** (supera el "pendiente" del cierre 7): 3 proyectos (activo: *Comunicación de
     parejas*, top_n 2; *empresas* y *líderes* inactivos), 7 referentes IG / **0 TikTok**, 4 keywords EN, 12
     Ajustes en defaults. `outputs`: **29 drafts** acumulados (#20). 1 run colgado `en_curso` (#9 OAuth Sheets).
-- **Qué sigue:** Mani re-importa el motor (con la key Anthropic llena) y corre; verificar que el Gate puntúe;
-  sembrar criterios de proyecto + referentes TikTok; confirmar reels-only en vivo. **Rotar PAT + service_role.**
+- **Corrida de prueba (misma sesión, ya con la config nueva):** Mani sembró los `criterios_relevancia` de los
+  3 proyectos + movió la keyword "Corporate" a *empresas* + corrió. **Confirmado en vivo:**
+  - **El Gate ya puntúa** (`relevancia_score: 0.65` en el candidato, con razón en español) → la key Anthropic
+    quedó bien, el refactor de relevancia está **vivo**. (Antes salía null = inerte.)
+  - **El `resultsType:'reels'` trae reels reales y on-topic** (item de bayavoce, referente IG: `type:Video`,
+    `productType:clips`, `videoUrl`, 82s, caption de comunicación en pareja). Reels-fix validado en vivo.
+  - **El "IG no aporta" era dedup**, no el actor ni el filtro: los reels de los referentes ya estaban en
+    `processed_items` de pruebas viejas. **Se vació `processed_items` (33→0)** para el test limpio.
+  - Salió **1 candidato** (TikTok, `emmastoomuch`, no-referente) — vino por el **fallback de proyecto único**
+    (1 solo proyecto activo → todo lo no-matcheado cae en *parejas*), no por referente. `top_n=2` es techo, no
+    objetivo: salió 1 porque el embudo solo produjo 1, no por el top_n.
+  - El run quedó `en_curso` en Supabase = es el **archivado** colgado por OAuth Sheets (#9), no el motor (Mani
+    confirmó que "Cerrar run" del motor sí completó).
+  - **2 pendientes nuevos → §Próxima sesión #6 y #7:** bug `seguidores=0` en IG (§Mejoras #22) + capturar el
+    embudo completo de Apify por conteos de nodo.
+- **Qué sigue:** aplicar el fix de `seguidores` (#22) + re-import; capturar los conteos del embudo Apify;
+  sembrar referentes TikTok; calibrar con data real. **Rotar PAT + service_role.**
 
 ### 2026-06-17 (cierre 8) — Primera corrida con config real + diagnóstico de timeout *(Mani + Claude)*
 
