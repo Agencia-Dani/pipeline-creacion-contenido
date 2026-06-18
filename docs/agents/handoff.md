@@ -21,6 +21,8 @@
 
 ## Estado en una línea
 
+**2026-06-17 (cierre 8) — Primera corrida con config real + diagnóstico de timeout *(Dev3).*** `N8N_RUNNERS_TASK_TIMEOUT=900` activado en InstaPods (`/etc/systemd/system/n8n.service`); creado "Motor de Reels - Prueba" como sandbox. Corrida: top_n=2, 2 proyectos activos ("Comunicación de parejas" + "Comunicación en empresas"). **El workflow llegó a Airtable sin timeout** — la variable resolvió el corte técnico. **Hallazgos de la corrida:** (a) **8 outputs en vez de 4** (top_n=2 × 2 proyectos = 4 esperados) — causa desconocida, investigar; (b) **Instagram: sin transcripciones** — Apify trajo posts de foto (no videos/reels) y contenido posiblemente irrelevante para los proyectos activos; (c) **TikTok: transcripción OK** — incluido un video musical sin voz (Supadata transcribió la letra = fail-open correcto). Logs de debug en Transcribir (Supadata) ya estaban en el `workflow.json` (commit anterior) pero **no son visibles en la UI de esta versión de n8n** (la pestaña "Logs" del Code node requiere versión más reciente). **Deuda técnica documentada:** Opción 3 — **SplitInBatches** (ver §Mejoras #21): solución estructural al timeout del Code node; diseño aprobado esta sesión, pendiente de implementar cuando el volumen escale. `N8N_RUNNERS_TASK_TIMEOUT=900` es temporal. **Próximo:** investigar 8 vs 4 outputs; revisar config Apify IG (¿filtrando reels?); evaluar relevancia del contenido traído.
+
 **2026-06-17 (cierre 7) — Docs + verificación + cierre de manuales del cierre 6 (Mani + Claude).** Sesión
 sin código de motor. **Fase 2 del handoff:** corregido `33→34 nodos` (CLAUDE.md del motor + PLAN.md) y
 anotada la **#20** (las `draft` del motor en `outputs` no se cierran nunca — doble semántica de `external_id`,
@@ -185,13 +187,21 @@ hasta definir nicho)**.
 > 3. **Sembrar Referentes de TikTok** (hoy las 3 cuentas son IG → el eje *TikTok Perfil* sale vacío).
 > 4. **🔴 ROTAR el PAT de Airtable + la service_role de Supabase** (expuestos en el chat de hoy).
 
-## Próxima sesión — calibrar + cerrar pre-producción
+## Próxima sesión — corregir config real + estabilizar corridas
 
-> **Estado (cierre 6):** las **6 decisiones lockeadas están EJECUTADAS** (ver §"Estado en una línea").
-> El motor pasó a 34 nodos, descubrimiento simétrico, knobs en Airtable, señal bi-eje. Validador 963/0.
-> Lo que sigue tras la V-run de re-validación: **calibrar** pesos/rubric con data real; resolver los
-> **pendientes pre-cron** (§Mejoras: #4 paginación, #5 tope dedup, #9 OAuth Sheets) y la **dev-doc
-> nodo-por-nodo**; después **D0 limpieza pre-producción → D1–D3 activación**.
+> **Estado (cierre 8):** el workflow llegó a Airtable sin timeout. La primera corrida con config real
+> dejó tres bugs abiertos, en orden de prioridad:
+> 1. **8 outputs en vez de 4** (top_n=2 × 2 proyectos). Investigar si `top_n` no está operando por proyecto
+>    o si la asignación proyecto+voz está juntando items de ambos proyectos en el `top_n` global.
+> 2. **Instagram: Apify trae fotos, no reels.** Revisar `resultsType` del actor (`posts` vs `reels`) y si
+>    hay que agregar un filtro de tipo de media. Además el contenido no parece cercano a los proyectos
+>    activos — evaluar si los referentes IG actuales son los correctos para "Comunicación de parejas" y
+>    "Comunicación en empresas".
+> 3. **Transcripciones IG vacías.** Probablemente consecuencia del punto anterior (fotos no tienen audio).
+>    Confirmar una vez que Apify traiga reels reales.
+>
+> Cuando los bugs estén resueltos y el embudo sea estable: **calibrar** pesos/rubric con data real;
+> resolver **pendientes pre-cron** (#4 paginación, #5 tope dedup, #9 OAuth Sheets); después **D1–D3**.
 
 **Las 6 decisiones lockeadas — TODAS HECHAS (cierre 6; #1 en cierre 5):**
 
@@ -373,6 +383,8 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
     por seguidores (>700k) es proxy grueso. Modelo v1 conocido; documentar que es poco estable sin volumen.
 14. **Metadata residual del template original** (`instanceId`, `tags`) quedó en el `workflow.json` del motor
     (líneas ~1283-1306). No es secreto, pero ensucia el diff.
+21. **[Deuda técnica] Timeout estructural del Code node `Transcribir (Supadata)`.** `N8N_RUNNERS_TASK_TIMEOUT=900` es el workaround temporal (activado en InstaPods, cierre 8). El problema de fondo: el Code node hace un for-loop secuencial de todos los items — con volumen crece lineal y eventualmente supera cualquier timeout. **Opción 3 — SplitInBatches (diseño aprobado 2026-06-17, no implementado):** reemplazar el loop con 4 nodos: `SplitInBatches(batchSize=1)` → `HTTP Request Supadata` → `Code parsear respuesta` → `Wait 1.5s` → (loop) → `Traducir`. El timer de n8n se resetea por item, eliminando el techo duro independientemente del volumen. Conexiones: `Heat-score v1` → `SplitInBatches` (output 0 → cuerpo del loop; output 1 → `Traducir`). El nodo `Transcribir (Supadata)` se elimina. Detalle completo de topología en el chat del cierre 8. **Implementar cuando el volumen escale** (con top_n=2 actual no es urgente). No bloquea.
+
 20. **Dos filas por video en `outputs`; las `draft` del motor nunca se cierran.** `external_id` tiene **dos
     semánticas** (ver [dev-doc §7](./dev-doc.md)): el **motor** escribe una fila `draft` con `external_id`=id del
     video (shortcode IG / id TikTok); el **archivado** escribe la fila calificada con `external_id`=id del record
@@ -443,6 +455,41 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     **→ ADR nuevo + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`** (toca `core/`).
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-17 (cierre 8) — Primera corrida con config real + diagnóstico de timeout *(Mani + Claude)*
+
+- **`N8N_RUNNERS_TASK_TIMEOUT=900` activado en InstaPods.** Agregado a `/etc/systemd/system/n8n.service`;
+  daemon recargado (`systemctl daemon-reload`) y servicio reiniciado. La variable está activa. Eleva el techo
+  del task runner de n8n que mataba el Code node de Transcribir antes de terminar el loop secuencial.
+- **Workflow "Motor de Reels - Prueba" creado** como sandbox en n8n para testear modificaciones sin tocar
+  el workflow principal. El workflow de producción queda intacto.
+- **Logs de debug en Transcribir (Supadata).** Los `console.log` de timing ya estaban en el `workflow.json`
+  del repo (commit `debug: logs de timing en Transcribir (Supadata)` de sesión anterior). Confirmado que el
+  código está correcto pero **la UI de esta versión de n8n no muestra la pestaña "Logs" del Code node**
+  (feature de versiones más recientes). Para leerlos: acceder a los logs del proceso n8n en el servidor.
+- **Corrida de prueba: top_n=2, 2 proyectos activos.** Config real: "Comunicación de parejas" + "Comunicación
+  en empresas". El workflow llegó a Airtable completo — `N8N_RUNNERS_TASK_TIMEOUT=900` resolvió el corte
+  técnico. Hallazgos:
+  - **🐛 8 outputs en vez de 4.** Esperado: top_n=2 × 2 proyectos = 4. Salieron 8. Causa desconocida.
+    Hipótesis: el `top_n` puede estar operando sobre el pool combinado de ambos proyectos en vez de por separado,
+    o el `Asignar proyecto+voz` está asignando items al proyecto equivocado, o el `Heat-score` no está
+    separando bien por `proyecto_id`. **Investigar.**
+  - **🐛 Instagram: sin transcripciones; Apify trae fotos.** Apify trajo posts de foto (no reels/videos) y
+    contenido que no parece cercano a los proyectos activos. Supadata no puede transcribir fotos → transcripción
+    vacía en todos los IG. Posibles causas: (a) `resultsType: 'posts'` en el actor trae todos los tipos de
+    media sin filtrar por video; (b) los referentes IG sembrados no son cuentas relevantes para los proyectos.
+    **Revisar configuración del actor Apify IG y los referentes sembrados.**
+  - **✅ TikTok: transcripción OK.** Supadata transcribió correctamente los videos de TikTok. Un video era
+    musical sin voz — Supadata transcribió la letra de la canción. Comportamiento correcto del fail-open (el
+    Gate de relevancia lo filtraría si no cumple criterios).
+- **Estado del problema de timeout.** `N8N_RUNNERS_TASK_TIMEOUT=900` es temporal: con más proyectos/items el
+  techo vuelve a ser un límite. Documentada como **deuda técnica #21** la **Opción 3 — SplitInBatches**:
+  reemplazar el for-loop del nodo `Transcribir (Supadata)` con un nodo `SplitInBatches(batchSize=1)` que itera
+  externamente — el timer se resetea por item, elimina el techo duro. 4 nodos nuevos, 1 eliminado. Diseño
+  completo (topología antes/después, conexiones, manejo del sleep) aprobado en el chat. **Implementar cuando
+  el volumen escale**, no urgente hoy.
+- **Qué sigue:** investigar los 8 vs 4 outputs; revisar config Apify IG (tipo de media + relevancia de los
+  referentes sembrados); cuando el embudo sea estable, calibrar pesos/rubric con data real.
 
 ### 2026-06-17 (cierre 7) — Docs + verificación de Ajustes + cierre de manuales *(Mani + Claude)*
 
