@@ -21,6 +21,8 @@
 
 ## Estado en una línea
 
+**2026-06-18 (cierre 10) — Revisión del embudo Apify con los 4 outputs reales + estado vivo (Mani + Claude).** Fix **#22 (seguidores IG) aplicado en código** (`item.followersCount || item.ownerFollowersCount || metaData.followersCount`, validador 972/0, **falta re-import**). Revisión de `outputs/*.json` (4 nodos, run del 17-06; folder temporal de la sesión): **(1) IG Reels sano** — `followersCount`+`biography` 8/8, todos `type:Video`; **pero los 8 reels son de un solo referente (@bayavoce)** pese a 7 referentes IG activos → `Resultados Instagram=8` (ig_results_limit) se lo come una cuenta y deja a las otras 6 sin cupo (parte del "IG no aporta"). **(2) IG Hashtag = eje muerto:** sigue en `resultsType:'posts'` → trae 8 `Image`/`Sidecar` → el guard de video de `Normalizar IG` **descarta los 8** (0 aportan al embudo). Peor: los items de hashtag **no traen** `followersCount`/`videoViewCount`/`videoDuration` (solo `ownerUsername/FullName/Id`) → aunque fueran reels, `seguidores=0` y `reproducciones=0` **por shape del actor**, no por bug. **(3) `bio` = mismo bug que seguidores:** `Normalizar IG` lee `item.ownerBio` (no existe) → `bio=''` siempre; real = `item.biography` / `metaData.biography`; alimenta `guessLang` en Heat-score (impacto bajo). **(4) TikTok sano** (30 items, todos los campos de `Normalizar TT` presentes; 1 sin `text`/caption, 1 en polaco que pasó el gate). **(5) TikTok Perfil = `[{}]`** (0 referentes TT) → inocuo: lo dropea `Asignar` por `!d.url`. **Estado vivo (Airtable+Supabase por curl inline, a rotar):** ✅ **el Gate YA puntúa** (`relevancia_score=0.65` en el único candidato vivo) → **se levanta el #1 crítico del cierre 9** (era null por key Anthropic vacía); ✅ **`criterios_relevancia` sembrado en los 3 proyectos** (~420c c/u, antes vacíos) → solo "Comunicación de parejas" activo (top_n=2); `processed_items` **vaciado por Mani** (era el dedup lo que hundía el volumen de la pasada anterior, no el actor ni el filtro); **3 `runs` colgados `en_curso`** (fin/metricas null → zombies). **Por aplicar tras OK de Mani:** `bio` (1 línea, mismo origen que seguidores) + **decisión sobre IG Hashtag** (probar `resultsType:'reels'` sobre `explore/tags/` o retirar el eje, ver #23) + revisar `ig_results_limit` por-cuenta (#24). Referentes TikTok siguen pendientes (equipo).
+
 **2026-06-18 (cierre 9) — Fix reels-only en IG + auditoría del estado vivo (Mani + Claude).** Sesión sin re-import aún. **Reels-only (pedido de Mani):** dos cambios en `workflow.json` — (a) `Apify — IG Reels` `resultsType: 'posts'→'reels'` (reels en origen para el eje de perfil; no se paga Apify por scrapear fotos); (b) guard en `Normalizar IG` (`if (item.type && item.type !== 'Video') return null`) que descarta fotos/carruseles en **ambas** ramas IG (perfil + hashtag). Validador 972/0. *No hace falta `instagram-reel-scraper`: es solo-perfil (no cubre el nodo IG Hashtag) y rompería el `Normalizar IG` compartido; el mismo actor con `resultsType:'reels'` ya da reels al origen.* Pendiente menor: probar si la rama IG Hashtag respeta `'reels'` sobre URLs `explore/tags/` (hoy queda en `'posts'`+guard). **Auditoría del estado vivo (PAT+service_role, a rotar):** corrige dos cosas del cierre 8 — **(1) el "8 vs 4" NO es bug de `top_n`:** las `runs` muestran `{outputs:4}` (= 2 proyectos × top_n 2, correcto) y `{outputs:2}`; los 8 candidatos en Airtable son **acumulación de varias corridas** (Candidatos no se purga hasta que el equipo califica). **(2) Hallazgo nuevo y más grave: `relevancia_score=null` en los 8 candidatos** → el Gate de relevancia **no puntúa** (probable `<ANTHROPIC_API_KEY>` sin llenar en el sandbox, o Haiku fallando → fail-open). El refactor de relevancia está **inerte**. Además **`criterios_relevancia` vacío en los 3 proyectos** (solo la Voz "Milena Morales" tiene criterios). **Config real ya sembrada** (supera el "config pendiente" del cierre 7): 3 proyectos (1 activo: *Comunicación de parejas*; *empresas* y *líderes* inactivos), 7 referentes IG / **0 TikTok**, 4 keywords EN (Relationships/Communication/Leadership/Corporate), 12 Ajustes en defaults. **29 drafts en `outputs`** (acumulan, #20) + 1 run colgado `en_curso` (#9 OAuth Sheets). **Próximo:** Mani re-importa + corre; verificar que el Gate puntúe (key Anthropic), sembrar criterios de proyecto + referentes TikTok.
 
 **2026-06-17 (cierre 8) — Primera corrida con config real + diagnóstico de timeout *(Dev3).*** `N8N_RUNNERS_TASK_TIMEOUT=900` activado en InstaPods (`/etc/systemd/system/n8n.service`); creado "Motor de Reels - Prueba" como sandbox. Corrida: top_n=2, 2 proyectos activos ("Comunicación de parejas" + "Comunicación en empresas"). **El workflow llegó a Airtable sin timeout** — la variable resolvió el corte técnico. **Hallazgos de la corrida:** (a) **8 outputs en vez de 4** (top_n=2 × 2 proyectos = 4 esperados) — causa desconocida, investigar; (b) **Instagram: sin transcripciones** — Apify trajo posts de foto (no videos/reels) y contenido posiblemente irrelevante para los proyectos activos; (c) **TikTok: transcripción OK** — incluido un video musical sin voz (Supadata transcribió la letra = fail-open correcto). Logs de debug en Transcribir (Supadata) ya estaban en el `workflow.json` (commit anterior) pero **no son visibles en la UI de esta versión de n8n** (la pestaña "Logs" del Code node requiere versión más reciente). **Deuda técnica documentada:** Opción 3 — **SplitInBatches** (ver §Mejoras #21): solución estructural al timeout del Code node; diseño aprobado esta sesión, pendiente de implementar cuando el volumen escale. `N8N_RUNNERS_TASK_TIMEOUT=900` es temporal. **Próximo:** investigar 8 vs 4 outputs; revisar config Apify IG (¿filtrando reels?); evaluar relevancia del contenido traído.
@@ -191,31 +193,36 @@ hasta definir nicho)**.
 
 ## Próxima sesión — corregir config real + estabilizar corridas
 
-> **Estado (cierre 9):** revisado el output real de la base. Lo que queda, en orden de prioridad:
-> 1. **🔴 El Gate de relevancia no puntúa (`relevancia_score=null` en los 8 candidatos).** Es el más
->    importante: sin esto el motor entrega viral-sin-juicio (justo lo que el refactor vino a matar).
->    **Verificar que `<ANTHROPIC_API_KEY>` esté llena** en el workflow que se corre (el sandbox "Motor de
->    Reels - Prueba" probablemente la tiene vacía) y que Haiku responde; si la key está y sigue null,
->    diagnosticar el `Gate de relevancia` (parseo del JSON de Haiku). Mismo chequeo para `Pre-trim`.
-> 2. **🟠 Sembrar `criterios_relevancia` a nivel proyecto.** Hoy los 3 proyectos lo tienen vacío; solo la
->    Voz "Milena Morales" tiene criterios. El gate corre sobre los de la Voz, pero falta la rúbrica de
->    tema por proyecto (lo carga el equipo en Airtable).
+> **Estado (cierre 10):** revisados los 4 outputs Apify + el estado vivo. Lo que queda, en orden de prioridad:
+> 1. **✅ RESUELTO (cierre 10) — el Gate YA puntúa** (`relevancia_score=0.65` en el candidato vivo; era null por
+>    `<ANTHROPIC_API_KEY>` vacía en el sandbox). Confirmar que se mantiene en la próxima corrida con la key llena.
+> 2. **✅ RESUELTO (cierre 10) — `criterios_relevancia` sembrado en los 3 proyectos** (~420c c/u). El gate ya tiene
+>    rúbrica de tema por proyecto, no solo la Voz.
 > 3. **✅ Reels-only — RESUELTO en código (cierre 9), falta re-import.** `IG Reels` a `resultsType:'reels'`
 >    + guard de video en `Normalizar IG`. Confirmar en la corrida que no llegan fotos y que IG transcribe.
-> 4. **Sembrar Referentes TikTok** (hoy 0 → el eje TikTok-perfil sale vacío).
-> 5. **El "8 vs 4" NO es bug de top_n** (las runs dan `{outputs:4}` correcto): es acumulación en Candidatos
->    entre corridas. Para verificar el embudo limpio: vaciar Candidatos, correr 1 vez con 1 proyecto activo
->    (top_n=2) → esperar 2.
+>    **OJO:** la rama **IG Hashtag NO** quedó cubierta — sigue trayendo fotos y aporta 0 (§Mejoras #23).
+> 4. **Sembrar Referentes TikTok** (hoy 0 → `Apify — TikTok Perfil` devuelve `[{}]`, eje vacío).
+> 5. **✅ `bio` (#22) + IG Hashtag→`reels` (#23) aplicados en código (cierre 10).** Falta re-import. `ig_results_limit`
+>    (#24) es un knob de Airtable (ver config recomendada abajo).
 >
-> **Pendientes abiertos al cierre de la sesión del cierre 9 (test run con `processed_items` vacío):**
-> 6. **🐛 Bug `seguidores=0` en IG (§Mejoras #22).** Aplicar el fix de 1 línea en `Normalizar IG` + re-import.
->    Hoy hunde el ranking de los reels de IG (engagement_rate=0, flag_viral=false).
-> 7. **Revisar el embudo completo de Apify.** Falta capturar los conteos por nodo en una corrida limpia
->    (`Apify IG Reels`/`IG Hashtag`/`TikTok`/`TikTok Perfil` → `Normalizar IG`/`TT` → `Merge scrapes` →
->    `Asignar` → `Heat-score`) para ver dónde se cae el volumen y decidir palancas (`ig/tt_results_limit`,
->    ventana `dias_recencia`, # de referentes). **Ya confirmado en el cierre 9:** el `resultsType:'reels'`
->    trae reels reales y on-topic (item de bayavoce: `type:Video`, `productType:clips`, `videoUrl`, 82s); el
->    "IG no aporta" de antes era **dedup** (no el actor ni el filtro). Falta el resto de los conteos.
+> **Config recomendada para el próximo run "real" (cierre 10).** Los 3 fixes de IG están en código (validador 1008/0);
+> el resto se ajusta en Airtable sin re-import (el motor lee Ajustes/Proyectos en runtime):
+> - **Ajustes:** `Resultados Instagram por corrida` **8 → ~35** (es tope **global**, no por cuenta: con 8 una sola
+>   cuenta consume todo el cupo de los 7 referentes; ~5/referente. **Ojo:** el mismo knob alimenta también IG
+>   Hashtag → sube el costo de las dos ramas IG). `Resultados TikTok` 30 (ok, o 50). `Mínimo de vistas/likes` y
+>   `Relevancia mínima` en **0** (que el gate puntúe pero no corte, para leer el ranking completo). Pesos/boost: **no tocar** (calibración va después).
+> - **Proyectos:** `top_n` de *parejas* **2 → 5–8** (2 es valor de test; el equipo necesita cola de curación real).
+>   `dias_recencia` 75 (ok) o 30 si se quiere solo reciente. `activo` = lo que sea producción (si el cliente real es
+>   solo *parejas*, 1 activo **es** lo real).
+> - **Pre-run obligatorio (lo que rompió antes):** (1) re-importar el `workflow.json` (3 fixes); (2) **keys llenas
+>   en el workflow que se corre, no el sandbox** — `<ANTHROPIC_API_KEY>` (Pre-trim/Gate/Traducir) + `<SUPADATA_API_KEY>`
+>   (esto fue lo que dejó el gate en null); (3) credencial `apifyApi` en los 4 nodos; (4) **Candidatos a 0** (embudo
+>   limpio); `processed_items` ya vacío. (5) Sembrar 2-3 referentes TikTok si se quiere ejercitar el eje TT-perfil.
+>
+> **Embudo Apify — ya medido (cierre 10, `outputs/*.json` del run 17-06):** IG Reels 8 (✅ sano, pero los 8 de una
+> sola cuenta, #24) · IG Hashtag 8→**0** (fotos, guard las descarta — ya cambiado a `reels`, falta verificar) · TikTok
+> 30 (✅ sano) · TikTok Perfil 0 (sin referentes). `processed_items` vaciado por Mani (el dedup era lo que hundía el
+> volumen, no el actor). Falta correr **limpio** para ver el embudo punta a punta sin acumulación.
 >
 > Cuando el gate puntúe y el embudo sea estable: **calibrar** pesos/rubric con data real; resolver
 > **pendientes pre-cron** (#4 paginación, #5 tope dedup, #9 OAuth Sheets); después **D1–D3**.
@@ -410,15 +417,33 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
     cerrarse nunca**. Decidir si esa acumulación es traza deseada ("todo lo generado") o necesita cleanup/marcado.
     No bloquea.
 
-22. **🐛 `seguidores = 0` en todos los items de IG (bug pre-existente, encontrado cierre 9).** `Normalizar IG`
-    lee los seguidores de `item.ownerFollowersCount`, pero el actor `apify/instagram-scraper` los devuelve en
-    **`item.followersCount`** (y `item.metaData.followersCount`). Ese campo no existe en el output → `seguidores=0`
-    en todo IG (confirmado en `processed_items` y en el item de muestra de bayavoce: `followersCount: 360200`).
-    **Consecuencias:** `engagement_rate` cae al fallback `'0'` (divide por seguidores) y `flag_viral` (`>700k`)
-    nunca se cumple en IG → los reels de IG salen **sub-rankeados** en el `Heat-score` (pesa `peso_eng`) frente a
-    TikTok, que sí trae sus métricas. **Fix (1 línea en `Normalizar IG`):**
+22. **✅ FIX EN CÓDIGO (cierre 10) — `seguidores = 0` en IG (bug pre-existente, cierre 9). Falta re-import.**
+    `Normalizar IG` leía `item.ownerFollowersCount`, pero `apify/instagram-scraper` (eje perfil) los devuelve en
+    **`item.followersCount`** (y `item.metaData.followersCount`) — confirmado en `outputs/apify-igreels.json` 8/8
+    (bayavoce: `followersCount: 360200`). **Consecuencias (resueltas para IG Reels):** `engagement_rate` caía al
+    fallback `'0'` y `viral_por_tamano` (`>700k`) nunca se cumplía → reels sub-rankeados vs TikTok. **Fix aplicado:**
     `const seguidores = item.followersCount || item.ownerFollowersCount || (item.metaData && item.metaData.followersCount) || 0;`
-    Cubrir también la rama IG Hashtag (con `addParentData` el campo puede variar). Requiere re-import. No bloquea.
+    (validador 972/0). **⚠️ La rama IG Hashtag NO se arregla con esto:** sus items no traen ningún campo de
+    seguidores (ni `metaData`) — ver #23. **`bio` tiene el mismo bug y queda pendiente:** `Normalizar IG` lee
+    `item.ownerBio` (no existe) → `bio=''` siempre; real `item.biography`/`metaData.biography`; alimenta `guessLang`.
+    **✅ `bio` también aplicado (cierre 10):** `bio: item.biography || item.ownerBio || (item.metaData && item.metaData.biography) || '',`.
+    Ambos fixes en código (validador 1008/0), **falta re-import**.
+
+23. **🔶 IG Hashtag = eje muerto → cambiado a `reels` en código (cierre 10), falta verificar en vivo.** El nodo
+    `Apify — IG Hashtag` traía `resultsType:'posts'` → **fotos/carruseles** (`Image`/`Sidecar`, 0 videos en
+    `outputs/apify-ighashtags.json`) → el guard de video de `Normalizar IG` los descartaba los 8 → aporte **0**.
+    **Decisión de Mani (opción A): cambiado a `resultsType:'reels'`** (validador 1008/0). **⚠️ Falta verificar en la
+    próxima corrida** que (1) el actor respete `'reels'` sobre URLs `explore/tags/` (devuelva videos, no fotos) y
+    (2) qué métricas trae: en modo `'posts'` los items de hashtag venían **sin** `followersCount`/`videoViewCount`/
+    `videoDuration`/`metaData` (solo `ownerUsername/FullName/Id`) → si en modo `'reels'` siguen sin métricas, esos
+    items rankean ciegos (`seguidores=0`, `reproducciones=0`, solo likes+comments) y habría que decidir si vale la
+    pena el eje (opción B: retirar IG-hashtag, dejar IG solo-perfil). No bloquea.
+
+24. **🟠 `ig_results_limit` se lo come un solo referente (encontrado cierre 10).** Con `Resultados Instagram por
+    corrida = 8` y 7 referentes IG activos, `outputs/apify-igreels.json` trajo **8 reels todos de @bayavoce** → las otras
+    6 cuentas quedaron sin cupo. Es parte estructural del "IG no aporta". Verificar cómo aplica el actor `resultsLimit`
+    (¿global vs por `directUrl`?) y subir el límite o repartir por cuenta. Sumado a la ventana `dias_recencia=75`
+    (cortó ~3 de los 8 reels, viejos de 2025), el eje IG-perfil entrega poquísimo. No bloquea.
 
 **🔵 Producto / alcance (modelo de búsqueda y tuning — post-MVP):**
 
