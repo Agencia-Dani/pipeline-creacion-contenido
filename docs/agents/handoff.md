@@ -219,6 +219,22 @@ hasta definir nicho)**.
 >   (esto fue lo que dejó el gate en null); (3) credencial `apifyApi` en los 4 nodos; (4) **Candidatos a 0** (embudo
 >   limpio); `processed_items` ya vacío. (5) Sembrar 2-3 referentes TikTok si se quiere ejercitar el eje TT-perfil.
 >
+> **🔍 REVISAR el output del nuevo run (post re-import + config nueva) — nodos clave, en orden, y qué validar:**
+> 1. **`Apify — IG Reels`** → ¿los reels vienen de **varios referentes** (no solo @bayavoce)? Valida que subir
+>    `ig_results_limit` repartió el cupo (#24). Todos `type:'Video'`.
+> 2. **`Apify — IG Hashtag`** → **la pregunta abierta del cierre 10 (#23):** ¿ahora trae **Videos** (no `Image`/`Sidecar`)
+>    con `resultsType:'reels'`? y **¿qué métricas trae?** Mirar si los items tienen `followersCount`/`videoViewCount`/
+>    `videoDuration` (en modo `'posts'` NO venían). Si siguen sin métricas → el eje rankea ciego → decidir opción B (retirar).
+> 3. **`Apify — TikTok Perfil`** → ¿sigue `[{}]` o trae data? (solo si se sembraron referentes TikTok).
+> 4. **`Normalizar IG`** → confirmar los fixes: **`seguidores` ≠ 0** (#22) y **`bio` poblado** en items de perfil; **0 fotos**
+>    (guard de video). Ojo: los de hashtag pueden traer `seguidores=0` aunque sean reels (ver punto 2).
+> 5. **`Asignar proyecto+voz`** → cuántos sobreviven el match de proyecto + la guarda de recencia (`dias_recencia`).
+> 6. **`Pre-trim relevancia`** → cuántos descarta Haiku (¿descarta de más / de menos? laxo por diseño). Fail-open.
+> 7. **`Gate de relevancia`** → **`relevancia_score` no-null** (que el gate siga puntuando) + razones coherentes; cuántos dropea.
+> 8. **`Heat-score v1`** → ranking final, `idioma_guess`, `viral_por_tamano` (ahora con `seguidores` reales en IG), `top_n` aplicado.
+> 9. **Embudo end-to-end** → `runs.metricas` en Supabase (`{colectados, filtrados, outputs}`) + conteo en Candidatos (Airtable).
+>    Comparar contra lo esperado (top_n × proyectos activos) y contra el embudo medido del run 17-06.
+>
 > **Embudo Apify — ya medido (cierre 10, `outputs/*.json` del run 17-06):** IG Reels 8 (✅ sano, pero los 8 de una
 > sola cuenta, #24) · IG Hashtag 8→**0** (fotos, guard las descarta — ya cambiado a `reels`, falta verificar) · TikTok
 > 30 (✅ sano) · TikTok Perfil 0 (sin referentes). `processed_items` vaciado por Mani (el dedup era lo que hundía el
