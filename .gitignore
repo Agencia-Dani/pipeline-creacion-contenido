@@ -3,4 +3,3 @@ node_modules/
 .env
 Workflows/**/dist/
 temp/
-outputs/
