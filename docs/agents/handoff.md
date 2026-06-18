@@ -21,6 +21,8 @@
 
 ## Estado en una línea
 
+**2026-06-18 (cierre 9) — Fix reels-only en IG + auditoría del estado vivo (Mani + Claude).** Sesión sin re-import aún. **Reels-only (pedido de Mani):** dos cambios en `workflow.json` — (a) `Apify — IG Reels` `resultsType: 'posts'→'reels'` (reels en origen para el eje de perfil; no se paga Apify por scrapear fotos); (b) guard en `Normalizar IG` (`if (item.type && item.type !== 'Video') return null`) que descarta fotos/carruseles en **ambas** ramas IG (perfil + hashtag). Validador 972/0. *No hace falta `instagram-reel-scraper`: es solo-perfil (no cubre el nodo IG Hashtag) y rompería el `Normalizar IG` compartido; el mismo actor con `resultsType:'reels'` ya da reels al origen.* Pendiente menor: probar si la rama IG Hashtag respeta `'reels'` sobre URLs `explore/tags/` (hoy queda en `'posts'`+guard). **Auditoría del estado vivo (PAT+service_role, a rotar):** corrige dos cosas del cierre 8 — **(1) el "8 vs 4" NO es bug de `top_n`:** las `runs` muestran `{outputs:4}` (= 2 proyectos × top_n 2, correcto) y `{outputs:2}`; los 8 candidatos en Airtable son **acumulación de varias corridas** (Candidatos no se purga hasta que el equipo califica). **(2) Hallazgo nuevo y más grave: `relevancia_score=null` en los 8 candidatos** → el Gate de relevancia **no puntúa** (probable `<ANTHROPIC_API_KEY>` sin llenar en el sandbox, o Haiku fallando → fail-open). El refactor de relevancia está **inerte**. Además **`criterios_relevancia` vacío en los 3 proyectos** (solo la Voz "Milena Morales" tiene criterios). **Config real ya sembrada** (supera el "config pendiente" del cierre 7): 3 proyectos (1 activo: *Comunicación de parejas*; *empresas* y *líderes* inactivos), 7 referentes IG / **0 TikTok**, 4 keywords EN (Relationships/Communication/Leadership/Corporate), 12 Ajustes en defaults. **29 drafts en `outputs`** (acumulan, #20) + 1 run colgado `en_curso` (#9 OAuth Sheets). **Próximo:** Mani re-importa + corre; verificar que el Gate puntúe (key Anthropic), sembrar criterios de proyecto + referentes TikTok.
+
 **2026-06-17 (cierre 8) — Primera corrida con config real + diagnóstico de timeout *(Dev3).*** `N8N_RUNNERS_TASK_TIMEOUT=900` activado en InstaPods (`/etc/systemd/system/n8n.service`); creado "Motor de Reels - Prueba" como sandbox. Corrida: top_n=2, 2 proyectos activos ("Comunicación de parejas" + "Comunicación en empresas"). **El workflow llegó a Airtable sin timeout** — la variable resolvió el corte técnico. **Hallazgos de la corrida:** (a) **8 outputs en vez de 4** (top_n=2 × 2 proyectos = 4 esperados) — causa desconocida, investigar; (b) **Instagram: sin transcripciones** — Apify trajo posts de foto (no videos/reels) y contenido posiblemente irrelevante para los proyectos activos; (c) **TikTok: transcripción OK** — incluido un video musical sin voz (Supadata transcribió la letra = fail-open correcto). Logs de debug en Transcribir (Supadata) ya estaban en el `workflow.json` (commit anterior) pero **no son visibles en la UI de esta versión de n8n** (la pestaña "Logs" del Code node requiere versión más reciente). **Deuda técnica documentada:** Opción 3 — **SplitInBatches** (ver §Mejoras #21): solución estructural al timeout del Code node; diseño aprobado esta sesión, pendiente de implementar cuando el volumen escale. `N8N_RUNNERS_TASK_TIMEOUT=900` es temporal. **Próximo:** investigar 8 vs 4 outputs; revisar config Apify IG (¿filtrando reels?); evaluar relevancia del contenido traído.
 
 **2026-06-17 (cierre 7) — Docs + verificación + cierre de manuales del cierre 6 (Mani + Claude).** Sesión
@@ -189,19 +191,24 @@ hasta definir nicho)**.
 
 ## Próxima sesión — corregir config real + estabilizar corridas
 
-> **Estado (cierre 8):** el workflow llegó a Airtable sin timeout. La primera corrida con config real
-> dejó tres bugs abiertos, en orden de prioridad:
-> 1. **8 outputs en vez de 4** (top_n=2 × 2 proyectos). Investigar si `top_n` no está operando por proyecto
->    o si la asignación proyecto+voz está juntando items de ambos proyectos en el `top_n` global.
-> 2. **Instagram: Apify trae fotos, no reels.** Revisar `resultsType` del actor (`posts` vs `reels`) y si
->    hay que agregar un filtro de tipo de media. Además el contenido no parece cercano a los proyectos
->    activos — evaluar si los referentes IG actuales son los correctos para "Comunicación de parejas" y
->    "Comunicación en empresas".
-> 3. **Transcripciones IG vacías.** Probablemente consecuencia del punto anterior (fotos no tienen audio).
->    Confirmar una vez que Apify traiga reels reales.
+> **Estado (cierre 9):** revisado el output real de la base. Lo que queda, en orden de prioridad:
+> 1. **🔴 El Gate de relevancia no puntúa (`relevancia_score=null` en los 8 candidatos).** Es el más
+>    importante: sin esto el motor entrega viral-sin-juicio (justo lo que el refactor vino a matar).
+>    **Verificar que `<ANTHROPIC_API_KEY>` esté llena** en el workflow que se corre (el sandbox "Motor de
+>    Reels - Prueba" probablemente la tiene vacía) y que Haiku responde; si la key está y sigue null,
+>    diagnosticar el `Gate de relevancia` (parseo del JSON de Haiku). Mismo chequeo para `Pre-trim`.
+> 2. **🟠 Sembrar `criterios_relevancia` a nivel proyecto.** Hoy los 3 proyectos lo tienen vacío; solo la
+>    Voz "Milena Morales" tiene criterios. El gate corre sobre los de la Voz, pero falta la rúbrica de
+>    tema por proyecto (lo carga el equipo en Airtable).
+> 3. **✅ Reels-only — RESUELTO en código (cierre 9), falta re-import.** `IG Reels` a `resultsType:'reels'`
+>    + guard de video en `Normalizar IG`. Confirmar en la corrida que no llegan fotos y que IG transcribe.
+> 4. **Sembrar Referentes TikTok** (hoy 0 → el eje TikTok-perfil sale vacío).
+> 5. **El "8 vs 4" NO es bug de top_n** (las runs dan `{outputs:4}` correcto): es acumulación en Candidatos
+>    entre corridas. Para verificar el embudo limpio: vaciar Candidatos, correr 1 vez con 1 proyecto activo
+>    (top_n=2) → esperar 2.
 >
-> Cuando los bugs estén resueltos y el embudo sea estable: **calibrar** pesos/rubric con data real;
-> resolver **pendientes pre-cron** (#4 paginación, #5 tope dedup, #9 OAuth Sheets); después **D1–D3**.
+> Cuando el gate puntúe y el embudo sea estable: **calibrar** pesos/rubric con data real; resolver
+> **pendientes pre-cron** (#4 paginación, #5 tope dedup, #9 OAuth Sheets); después **D1–D3**.
 
 **Las 6 decisiones lockeadas — TODAS HECHAS (cierre 6; #1 en cierre 5):**
 
@@ -247,7 +254,7 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
 | C2 | Workflow de archivado — desplegado, configurado y probado en n8n | A10 + B1 + C1 | ✅ | **Dev 3** (2026-06-16) |
 | C3 | Verificar tracking (`v_selecciones_por_dia` responde) | C2 | ✅ | **Dev 3** (2026-06-16 — corrida exitosa) |
 | V1–V6 | Corridas de validación (backfill, literalidad, curación, re-rank, dedup, resiliencia) | B3 + C2 | ⬜ | los 3 |
-| D0 | **Limpieza pre-producción (entregar limpio):** ✅ **limpieza HECHA (cierre 7)** — Candidatos de Airtable + config provisional (Proyecto/Voz/9 keywords/3 referentes) + `outputs`/`runs`/`processed_items` de Supabase **a 0** (conservados: `Ajustes`, esquema/vistas, `instances`/`clients`). **Falta:** sembrar la **config real** del cliente cuando llegue el brief. Último paso antes de activar crons. | V1–V6 | 🔧 | los 3 |
+| D0 | **Limpieza pre-producción (entregar limpio):** ✅ **limpieza HECHA (cierre 7)** — Candidatos de Airtable + config provisional (Proyecto/Voz/9 keywords/3 referentes) + `outputs`/`runs`/`processed_items` de Supabase **a 0** (conservados: `Ajustes`, esquema/vistas, `instances`/`clients`). **Config real YA sembrada (verificado cierre 9):** 3 proyectos (1 activo: *Comunicación de parejas*), 1 Voz ("Milena Morales", con criterios), 7 referentes IG / 0 TikTok, 4 keywords EN. **Falta:** criterios de relevancia por proyecto (hoy vacíos) + referentes TikTok. Último paso antes de activar crons. | V1–V6 | 🔧 | los 3 |
 | D1–D3 | Activación: TZ validada + crons + manifest `active` + demo a Majo/Jero | D0 | ⬜ | los 3 |
 
 > Paralelismo real: **A** (Alejo) y **B** (Mani) y **C** (Dev 3) corren en paralelo. Ahora que
@@ -455,6 +462,40 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     **→ ADR nuevo + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`** (toca `core/`).
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-18 (cierre 9) — Fix reels-only + auditoría del estado vivo *(Mani + Claude)*
+
+- **Problema (Mani):** IG traía posts normales (fotos/carruseles) que no se pueden transcribir; solo
+  TikTok traía videos. Objetivo: que el motor traiga **únicamente reels, 0 fotos**.
+- **Fix en `workflow.json` (2 cambios, por script — convención del motor):**
+  - `Apify — IG Reels` (eje perfil): `resultsType: 'posts' → 'reels'`. El mismo `apify/instagram-scraper`
+    soporta `'reels'` → trae reels al origen, sin gastar Apify en fotos que después se descartan.
+  - `Normalizar IG` (compartido por las 2 ramas IG): guard `if (item.type && item.type !== 'Video') return null`
+    → descarta fotos/carruseles en perfil **y** hashtag. Garantiza el "0 fotos" aunque el actor traiga otros tipos.
+  - Validador **972/0**, JSON + jsCode parsean. **SIN re-import aún** (corre en n8n).
+- **Jerarquía de criterios explícita en el prompt (pedido de Mani).** `Pre-trim` y `Gate` pegaban
+  Proyecto+Voz planos (mismo peso). Ahora etiquetan: `CRITERIOS DE TEMA (principal)` = criterio del
+  Proyecto, `AJUSTE DE VOZ (complementa, no manda)` = criterio de la Voz; el `sys` aclara "el TEMA manda".
+  Sin criterio de Proyecto (como hoy) sigue cayendo solo la Voz (fail-open intacto). Validador 972/0.
+- **Sobre `instagram-reel-scraper` (sugerido por Mani):** descartado. Su input es solo perfil/username/URL
+  (no descubre por hashtag → no cubre el nodo *IG Hashtag*), y su schema distinto rompería el `Normalizar IG`
+  compartido. `resultsType:'reels'` en el actor actual logra lo mismo sin sumar dependencia. Pendiente menor:
+  verificar si la rama *IG Hashtag* respeta `'reels'` sobre URLs `explore/tags/` (hoy queda `'posts'`+guard).
+- **Auditoría del estado vivo** (PAT + service_role por curl, **inline, nunca a disco** — a rotar):
+  - **El "8 vs 4" del cierre 8 NO es bug de `top_n`.** `runs` reales: `{outputs:4, filtrados:4, colectados:25}`
+    (= 2 proyectos activos × top_n 2, correcto) y `{outputs:2,...}`. Los 8 candidatos en Airtable son
+    **acumulación entre corridas** (Candidatos no se purga hasta que el equipo califica → el archivado borra).
+    Verificación limpia: vaciar Candidatos + correr 1 vez.
+  - **🔴 Hallazgo nuevo: `relevancia_score=null` en los 8 candidatos** → el `Gate de relevancia` no puntúa.
+    Probable `<ANTHROPIC_API_KEY>` vacía en el workflow corrido (sandbox "Motor de Reels - Prueba") o Haiku
+    fallando → fail-open. **El refactor de relevancia está inerte en producción.** A verificar antes del run.
+  - **`criterios_relevancia` vacío en los 3 proyectos**; solo la Voz "Milena Morales" tiene criterios. El gate
+    corre sobre la Voz, pero falta la rúbrica de tema por proyecto.
+  - **Config real sembrada** (supera el "pendiente" del cierre 7): 3 proyectos (activo: *Comunicación de
+    parejas*, top_n 2; *empresas* y *líderes* inactivos), 7 referentes IG / **0 TikTok**, 4 keywords EN, 12
+    Ajustes en defaults. `outputs`: **29 drafts** acumulados (#20). 1 run colgado `en_curso` (#9 OAuth Sheets).
+- **Qué sigue:** Mani re-importa el motor (con la key Anthropic llena) y corre; verificar que el Gate puntúe;
+  sembrar criterios de proyecto + referentes TikTok; confirmar reels-only en vivo. **Rotar PAT + service_role.**
 
 ### 2026-06-17 (cierre 8) — Primera corrida con config real + diagnóstico de timeout *(Mani + Claude)*
 
