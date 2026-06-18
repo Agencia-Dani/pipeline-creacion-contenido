@@ -331,6 +331,34 @@
         "mode": "append",
         "options": {}
       },
+      "id": "merge-ig",
+      "name": "Merge IG",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2240,
+        510
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "merge-tt",
+      "name": "Merge TT",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2520,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
       "id": "merge-scrapes",
       "name": "Merge scrapes",
       "type": "n8n-nodes-base.merge",
@@ -933,7 +961,7 @@
       "main": [
         [
           {
-            "node": "Normalizar IG",
+            "node": "Merge IG",
             "type": "main",
             "index": 0
           }
@@ -944,7 +972,7 @@
       "main": [
         [
           {
-            "node": "Normalizar TT",
+            "node": "Merge TT",
             "type": "main",
             "index": 0
           }
@@ -1152,9 +1180,9 @@
       "main": [
         [
           {
-            "node": "Normalizar IG",
+            "node": "Merge IG",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -1163,9 +1191,9 @@
       "main": [
         [
           {
-            "node": "Normalizar TT",
+            "node": "Merge TT",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -1175,6 +1203,28 @@
         [
           {
             "node": "Leer procesados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge IG": {
+      "main": [
+        [
+          {
+            "node": "Normalizar IG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge TT": {
+      "main": [
+        [
+          {
+            "node": "Normalizar TT",
             "type": "main",
             "index": 0
           }
