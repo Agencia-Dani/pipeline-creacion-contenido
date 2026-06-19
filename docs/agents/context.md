@@ -12,8 +12,9 @@ frases: qué **es** un término, no qué hace. Solo términos propios del domini
 ## Language
 
 **Proyecto**:
-Una temática aislada de búsqueda (ej: Comunicación, Ventas). Los resultados no se cruzan entre
-proyectos.
+Una temática aislada de búsqueda (ej: Comunicación, Ventas). Cada proyecto rankea y cura su propio
+embudo. Un mismo video puede aparecer en más de un proyecto solo cuando comparten el referente o la
+keyword que lo trajo, y solo si pasa el juicio de relevancia de cada uno (ADR-013).
 
 **Voz**:
 El personaje o marca para quien se cura contenido. Organiza la selección y el histórico; en el MVP
@@ -27,7 +28,8 @@ Una palabra de búsqueda que funciona como hashtag de TikTok. Acumula por proyec
 
 **Candidato**:
 Un video ya transcrito y traducido al español, esperando que el equipo lo califique en Airtable.
-La unidad que el equipo cura.
+La unidad que el equipo cura es la dupla **(video, proyecto)**: un mismo video relevante para dos
+proyectos es dos candidatos, cada uno con su voz, su heat-score y su juicio de relevancia (ADR-013).
 
 **Heat-score**:
 El número con que el motor ordena los candidatos de caliente a frío. Combina la relevancia/calidad

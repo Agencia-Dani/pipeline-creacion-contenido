@@ -18,6 +18,7 @@
 | [ADR-010](./ADR-010-scoring-semantico-y-etapa-calidad.md) | Scoring semántico con LLM + etapa CALIDAD (revisa ADR-009) | Aceptada |
 | [ADR-011](./ADR-011-tabla-ajustes-knobs-no-code.md) | Tabla `Ajustes`: knobs del scoring editables por el equipo sin código | Aceptada |
 | [ADR-012](./ADR-012-senal-de-aprendizaje-bi-eje.md) | Señal de aprendizaje bi-eje (por referente Y por keyword/tema) | Aceptada |
+| [ADR-013](./ADR-013-atribucion-multiproyecto-fan-out.md) | Atribución multi-proyecto: fan-out de un video a cada proyecto que lo reclama (grado 1, MVP) | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

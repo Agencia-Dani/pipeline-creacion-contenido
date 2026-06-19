@@ -121,7 +121,7 @@ Notas de orden que muerden si las ignorás:
 | 28 | Preparar batch Airtable | code | Arma `records[]` de Airtable (`fields` + links `proyecto`/`voz` + `thumbnail` attachment), en **batches de 10**, `typecast:true`, `estado:'nuevo'`. |
 | 29 | POST Airtable Candidatos | http POST | `POST Candidatos`. **stop-on-fail** (si Airtable rechaza, la corrida falla — es la entrega real). |
 | 30 | Preparar outputs Supabase | code | Arma `outputs[]` (`run_id`, `external_id`=**id del video**, `tipo:'guion_reel'`, `titulo`, `contenido_o_link`=script, `estado:'draft'`, `source_items`, `metadata`). Lee `Abrir run` para el `run_id`. |
-| 31 | Reportar outputs al registro | http POST | `POST outputs`, `Prefer: return=minimal` (sin `on_conflict` → en re-run el `external_id` duplicado da 409, pero es continue-on-fail). |
+| 31 | Reportar outputs al registro | http POST | `POST outputs?on_conflict=external_id`, `Prefer: resolution=ignore-duplicates,return=minimal` → **idempotente** (re-run o `external_id` duplicado entre proyectos por fan-out no revienta el batch). Mismo patrón que el nodo 11 del archivado. continue-on-fail. |
 | 32 | Cerrar run en el registro | http PATCH | `PATCH runs?id=eq.<id>` con `fin`, `estado:'ok'`, `metricas:{colectados, filtrados, outputs}`. continue-on-fail. |
 | 33 | Preparar procesados | code | Arma el batch `processed_items` (`instance_id`, `platform`, `external_id`, `url`, `seguidores`, `flag_viral`, `idioma`) de **todo lo que salió de Heat-score** (el top_n transcrito). |
 | 34 | POST processed_items | http POST | `POST processed_items`, `Prefer: resolution=ignore-duplicates`. continue-on-fail. |
