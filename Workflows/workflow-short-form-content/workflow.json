@@ -261,12 +261,25 @@
       ]
     },
     {
+      "id": "split-ig-referentes",
+      "name": "Split IG referentes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        260
+      ],
+      "parameters": {
+        "jsCode": "\n// #24: un item por referente IG -> el Apify IG Reels corre 1 vez por cuenta,\n// cada llamada con su propio cupo (resultsLimit deja de ser global). Reparte equitativo.\nconst urls = ($('Armar plan de corrida').first().json.ig_urls) || [];\nreturn urls.map(u => ({ json: { ig_url: u } }));\n"
+      }
+    },
+    {
       "parameters": {
         "authentication": "apifyApi",
         "resource": "Actors",
         "operation": "Run actor and get dataset",
         "actorId": "apify~instagram-scraper",
-        "customBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var a=p.ajustes||{}; var d=Number(p.max_dias_recencia||0); var b={ directUrls: p.ig_urls, resultsType: 'reels', resultsLimit: (a.ig_results_limit!=null?a.ig_results_limit:$('Config').first().json.ig_results_limit), searchType: 'user', searchLimit: 1, addParentData: true }; if(d>0) b.onlyPostsNewerThan = d + ' days'; return b; })() }}"
+        "customBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var a=p.ajustes||{}; var d=Number(p.max_dias_recencia||0); var b={ directUrls: [$json.ig_url], resultsType: 'reels', resultsLimit: (a.ig_results_limit!=null?a.ig_results_limit:$('Config').first().json.ig_results_limit), searchType: 'user', searchLimit: 1, addParentData: true }; if(d>0) b.onlyPostsNewerThan = d + ' days'; return b; })() }}"
       },
       "id": "apify-ig-reels",
       "name": "Apify — IG Reels",
@@ -301,7 +314,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "\nconst item = $input.item.json;\n// Solo reels/videos: IG trae fotos y carruseles que no se pueden transcribir; descartar lo que no sea video.\nif (item.type && item.type !== 'Video') { return null; }\nconst seguidores = item.followersCount || item.ownerFollowersCount || (item.metaData && item.metaData.followersCount) || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.biography || item.ownerBio || (item.metaData && item.metaData.biography) || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  thumbnail_url: item.displayUrl || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: (function(){ var d = new Date(item.timestamp); return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]; })()\n} };\n"
+        "jsCode": "\nconst item = $input.item.json;\n// Solo reels/videos: IG trae fotos y carruseles que no se pueden transcribir; descartar lo que no sea video.\nif (item.type && item.type !== 'Video') { return null; }\nconst seguidores = item.followersCount || item.ownerFollowersCount || (item.metaData && item.metaData.followersCount) || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.biography || item.ownerBio || (item.metaData && item.metaData.biography) || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || item.videoPlayCount || item.igPlayCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  thumbnail_url: item.displayUrl || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: (function(){ var d = new Date(item.timestamp); return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]; })()\n} };\n"
       },
       "id": "normalizar-ig",
       "name": "Normalizar IG",
@@ -315,7 +328,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "\nconst item = $input.item.json;\nconst am = item.authorMeta || {};\nconst seguidores = am.fans || 0;\nreturn { json: {\n  plataforma: 'tiktok',\n  external_id: String(item.id || ''),\n  username: am.name || '',\n  nombre: am.nickName || '',\n  seguidores,\n  bio: am.signature || '',\n  descripcion: item.text || item.desc || '',\n  likes: item.diggCount || 0,\n  comentarios: item.commentCount || 0,\n  reproducciones: item.playCount || 0,\n  url: item.webVideoUrl || '',\n  video_url: item.webVideoUrl || '',\n  thumbnail_url: (item.videoMeta && item.videoMeta.coverUrl) || '',\n  hashtags: (item.hashtags || []).map(function (h) { return h.name || h; }).join(', '),\n  duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n  engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : ''\n} };\n"
+        "jsCode": "\nconst item = $input.item.json;\nconst am = item.authorMeta || {};\nconst seguidores = am.fans || 0;\nreturn { json: {\n  plataforma: 'tiktok',\n  idioma_nativo: (item.textLanguage && item.textLanguage !== 'un') ? String(item.textLanguage).toLowerCase().slice(0, 2) : '',\n  external_id: String(item.id || ''),\n  username: am.name || '',\n  nombre: am.nickName || '',\n  seguidores,\n  bio: am.signature || '',\n  descripcion: item.text || item.desc || '',\n  likes: item.diggCount || 0,\n  comentarios: item.commentCount || 0,\n  reproducciones: item.playCount || 0,\n  url: item.webVideoUrl || '',\n  video_url: item.webVideoUrl || '',\n  thumbnail_url: (item.videoMeta && item.videoMeta.coverUrl) || '',\n  hashtags: (item.hashtags || []).map(function (h) { return h.name || h; }).join(', '),\n  duracion_video: item.videoMeta ? (item.videoMeta.duration || 0) : 0,\n  engagement_rate: seguidores > 0 ? (((item.diggCount || 0) + (item.commentCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: item.createTimeISO ? item.createTimeISO.split('T')[0] : ''\n} };\n"
       },
       "id": "normalizar-tt",
       "name": "Normalizar TT",
@@ -449,7 +462,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\nconst signalTema = {};\nrows('Leer señal tema').forEach(r => { if (r && r.tema) signalTema[String(r.tema)] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const selRef = signal[(d.username || '') + '|' + idioma] || 0;\n    const selTema = signalTema[String(d._tema || '')] || 0;\n    const sel = Math.max(selRef, selTema); // bi-eje (O7): referente o keyword/tema\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  const topn = Number((arr[0] && arr[0]._top_n) || cfg.top_n_fallback || 25);\n  fresh.slice(0, topn).forEach(d => out.push({ json: d }));\n}\nreturn out;\n"
+        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\nconst signalTema = {};\nrows('Leer señal tema').forEach(r => { if (r && r.tema) signalTema[String(r.tema)] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = d.idioma_nativo || guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const selRef = signal[(d.username || '') + '|' + idioma] || 0;\n    const selTema = signalTema[String(d._tema || '')] || 0;\n    const sel = Math.max(selRef, selTema); // bi-eje (O7): referente o keyword/tema\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  const topn = Number((arr[0] && arr[0]._top_n) || cfg.top_n_fallback || 25);\n  fresh.slice(0, topn).forEach(d => out.push({ json: d }));\n}\nreturn out;\n"
       },
       "id": "heat-score-v1",
       "name": "Heat-score v1",
@@ -935,11 +948,6 @@
       "main": [
         [
           {
-            "node": "Apify — IG Reels",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Apify — IG Hashtag",
             "type": "main",
             "index": 0
@@ -951,6 +959,11 @@
           },
           {
             "node": "Apify — TikTok Perfil",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split IG referentes",
             "type": "main",
             "index": 0
           }
@@ -1225,6 +1238,17 @@
         [
           {
             "node": "Normalizar TT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split IG referentes": {
+      "main": [
+        [
+          {
+            "node": "Apify — IG Reels",
             "type": "main",
             "index": 0
           }
