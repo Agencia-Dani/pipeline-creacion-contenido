@@ -553,6 +553,55 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     clave→valor (incluidos los nuevos `min_views`/`min_likes` del piso duro, ver Q1). Núcleo de O11.
     **→ ADR nuevo + update del contrato `airtable-cockpit.md` + `setup-airtable.mjs`** (toca `core/`).
 
+**🟣 Del checkup con el jefe + equipo de redes (18-jun) — pendientes nuevos:**
+
+> 10 puntos que salieron en la reunión (Andrés + Majo + Jero). Varios son **externos al repo** (Airtable /
+> dashboard / curación de datos): se anotan igual porque son el **gate de lanzamiento** real. Cada uno con
+> dónde se revisa en el plan. Decisión transversal de Dani: **nadie usa la herramienta hasta que la interface
+> esté lista** (#32).
+
+25. **Hashtags más útiles — scraping más semántico/ajustable.** El hashtag literal trae ruido
+    (`communication` → videos de autismo). Hoy `Armar plan` mapea cada keyword a un hashtag literal y Apify
+    busca por ese tag. Falta criterio más semántico y ajustable por el equipo. 📍 **Plan:** Bloque A (ingesta
+    Apify) + §Producto/alcance (modelo de búsqueda); emparentado con #16 (multi-palabra) y #26. **Límite:**
+    depende de lo que el actor de Apify permita filtrar en origen (puede que el grueso del filtro tenga que vivir
+    en el pre-trim, ver #26).
+26. **Hashtags con fuerza semántica en pre-trim + gate.** Que la relevancia se juzgue contra el script/caption
+    del video (contexto, sinónimos), no contra el hashtag literal ni por match exacto. Impacta directo el
+    `relevancia_score` de Claude. 📍 **Plan:** Bloque C (Pre-trim relevancia + Gate de relevancia) +
+    [refactor-relevancia.md](./refactor-relevancia.md). Es extensión del doble gate ya construido: el
+    `criterios_relevancia` por proyecto debería incorporar el intent del hashtag/keyword.
+27. **ML del modelo — que aprenda de patrones de éxito, no solo lea aprobados.** Ya parcial: al inicio el motor
+    lee la señal de seleccionados como referencia. Falta que **analice activamente los patrones** de los videos
+    exitosos y ajuste el scoring. 📍 **Plan:** O7 / señal de aprendizaje (ADR-012, `v_senal_seleccion`/
+    `v_senal_tema`, el factor `sel` del Heat-score). Hoy la señal es una tasa de selección lineal por
+    referente/tema; "analizar patrones" es el salto post-MVP del learning loop.
+28. **Idioma: prioridad fuerte a lo extranjero sobre el español (aclarado por Mani).** No es filtro duro ni
+    solo-inglés: dar **mucha más prioridad a cualquier idioma no-español** que al español. 📍 **Plan:** Bloque C /
+    #18 (idioma) — el mecanismo **ya existe** (`boost_idioma` binario en Heat-score: es=0, cualquier no-es=+boost,
+    default 0.3). Para "mucha prioridad" basta **subir `boost_idioma` en Ajustes** (no-code); si el boost binario
+    se queda corto se evalúa amplificarlo (multiplicador mayor / boost por idioma, ver #18). **Sin filtro duro de
+    español.**
+29. **Verificar proyecto y voz en TODO script saliente.** Crítico para correr varios proyectos/voces en
+    paralelo: cada script que sale del pipeline debe llevar **proyecto y voz correctos** en metadata. 📍 **Plan:**
+    Bloque D (cross-check) + ADR-012 (traza tema/proyecto/voz: `Asignar proyecto+voz` → `Armar candidato` →
+    `Candidatos` → archivado → `outputs.metadata`). Verificable en código + en el cross-check D1/D3. Hoy solo
+    parejas está activo → el riesgo aparece al activar múltiples proyectos.
+30. **[EXTERNO al repo — Airtable] Dashboard visual para Majo/Jero.** Vista amigable sin tocar el backend.
+    📍 **Plan:** operación/equipo de redes ([onboarding-equipo-redes.md](../onboarding-equipo-redes.md)) +
+    contrato [airtable-cockpit.md](../../core/contracts/airtable-cockpit.md) (sin romper el modelo) + D1. Paraguas
+    con #31 y #32.
+31. **[EXTERNO al repo — Airtable] Vista por voz/avatar + bloquear pestaña Ajustes.** (a) Filtro para ver solo
+    candidatos de un proyecto/avatar (pedido directo de Majo). (b) Bloquear la pestaña Ajustes (pesos, mínimos,
+    relevancia mínima, candidatos por proyecto, resultados Apify): configurable pero peligrosa si la tocan sin
+    saber. 📍 **Plan:** contrato airtable-cockpit.md + onboarding + O11. Permisos/vistas de Airtable, no código.
+    Atado a multi-proyecto (#29).
+32. **[EXTERNO al repo — gate de lanzamiento] Interface user-friendly antes de lanzar.** Majo/Jero no tocan la
+    herramienta hasta que esté lista. Es el **gate real de lanzamiento**. 📍 **Plan:** O11 + D1 (activación).
+    Paraguas de #30/#31.
+33. **[FUTURO, no MVP] Perfilador de avatar.** Herramienta que perfile al avatar del cliente y sugiera
+    referentes con más autonomía (pedido de Jero). 📍 **Plan:** backlog post-MVP, fuera del alcance actual.
+
 ## Log de avance (más reciente arriba)
 
 ### 2026-06-18 (cierre 9) — Fix reels-only + auditoría del estado vivo *(Mani + Claude)*
