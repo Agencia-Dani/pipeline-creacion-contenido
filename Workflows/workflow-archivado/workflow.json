@@ -307,7 +307,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { fin: $now.toISO(), estado: 'ok', costo_estimado: 0, metricas: { archivados: $('Armar filas archivado').all().length } } }}",
+        "jsonBody": "={{ { fin: $now.toISO(), estado: 'ok', costo_estimado: 0, metricas: { archivados: $('Leer Candidatos calificados').all().flatMap(it => (it.json && it.json.records) || []).length } } }}",
         "options": { "timeout": 20000 }
       },
       "id": "cerrar-run",
