@@ -1,0 +1,81 @@
+[
+  {
+    "projects": {
+      "recC45pycBkYsTL0f": {
+        "id": "recC45pycBkYsTL0f",
+        "nombre": "Comunicación de parejas",
+        "voz_id": "recek0DxMjprPiodc",
+        "voz_nombre": "Milena Morales",
+        "min_likes": 0,
+        "min_views": 0,
+        "dias_recencia": 75,
+        "top_n": 10,
+        "criterios": "Videos con consejos prácticos para mejorar la comunicación en pareja: expresar necesidades, resolver conflictos, escuchar, poner límites, reconectar. RELEVANTE: aporta una técnica, ejemplo o reflexión aplicable a la relación de pareja. NO RELEVANTE: relaciones en general sin foco en comunicación, motivacional vacío, conquista/citas, comunicación laboral o de liderazgo. Útil = accionable y específico, no una obviedad.",
+        "voz_criterios": "Comunicación, Comunicación corporativa y comunicación de parejas",
+        "keywords": [
+          "Relationships",
+          "Communication"
+        ],
+        "ig_handles": [
+          "jefferson_fisher",
+          "howtoconvince",
+          "bayavoce"
+        ],
+        "tt_handles": [],
+        "tg_ig_ref": true,
+        "tg_ig_kw": true,
+        "tg_tt_kw": true,
+        "tg_tt_ref": true
+      }
+    },
+    "ig_urls": [
+      "https://www.instagram.com/jefferson_fisher/",
+      "https://www.instagram.com/howtoconvince/",
+      "https://www.instagram.com/bayavoce/"
+    ],
+    "tt_profiles": [],
+    "ig_hashtags": [],
+    "tt_hashtags": [
+      "relationships",
+      "communication"
+    ],
+    "ig_owner_to_proj": {
+      "jefferson_fisher": [
+        "recC45pycBkYsTL0f"
+      ],
+      "howtoconvince": [
+        "recC45pycBkYsTL0f"
+      ],
+      "bayavoce": [
+        "recC45pycBkYsTL0f"
+      ]
+    },
+    "tt_owner_to_proj": {},
+    "kw_to_proj": {
+      "relationships": [
+        "recC45pycBkYsTL0f"
+      ],
+      "communication": [
+        "recC45pycBkYsTL0f"
+      ]
+    },
+    "active_project_ids": [
+      "recC45pycBkYsTL0f"
+    ],
+    "max_dias_recencia": 75,
+    "ajustes": {
+      "peso_relevancia": 0.7,
+      "tt_results_limit": 40,
+      "boost_idioma": 1,
+      "ig_results_limit": 40,
+      "peso_likes": 0.4,
+      "min_likes": 0,
+      "peso_views": 0.4,
+      "min_relevancia": 0,
+      "min_views": 0,
+      "umbral_viral": 700000,
+      "top_n_fallback": 25,
+      "peso_eng": 0.2
+    }
+  }
+]
