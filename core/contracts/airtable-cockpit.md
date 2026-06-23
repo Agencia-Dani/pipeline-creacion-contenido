@@ -56,8 +56,6 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `handle` | texto (primario) | @cuenta |
 | `plataforma` | single select | instagram / tiktok |
 | `proyecto` | link → `Proyectos` | a qué proyecto alimenta |
-| `seguidores` | número | lo llena el motor al verlo |
-| `flag_viral` | checkbox | true si seguidores > ~700K (lo marca el motor / una automatización de Airtable) — **marca, no excluye** |
 | `activo` | checkbox | si se rastrea |
 | `notas` | texto largo | por qué se agregó |
 
