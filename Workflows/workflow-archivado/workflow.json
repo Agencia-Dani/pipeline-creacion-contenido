@@ -76,7 +76,7 @@
         "queryParameters": {
           "parameters": [ { "name": "pageSize", "value": "100" } ]
         },
-        "options": { "timeout": 20000 }
+        "options": { "timeout": 20000, "pagination": { "pagination": { "parameters": { "parameters": [ { "type": "qs", "name": "offset", "value": "={{ $response.body.offset }}" } ] }, "paginationMode": "updateAParameterInEachRequest", "nextURL": "", "paginationCompleteWhen": "other", "completeExpression": "={{ !$response.body.offset }}", "limitPagesFetched": false } } }
       },
       "id": "leer-proyectos",
       "name": "Leer Proyectos",
@@ -94,7 +94,7 @@
         "queryParameters": {
           "parameters": [ { "name": "pageSize", "value": "100" } ]
         },
-        "options": { "timeout": 20000 }
+        "options": { "timeout": 20000, "pagination": { "pagination": { "parameters": { "parameters": [ { "type": "qs", "name": "offset", "value": "={{ $response.body.offset }}" } ] }, "paginationMode": "updateAParameterInEachRequest", "nextURL": "", "paginationCompleteWhen": "other", "completeExpression": "={{ !$response.body.offset }}", "limitPagesFetched": false } } }
       },
       "id": "leer-voces",
       "name": "Leer Voces",
@@ -115,7 +115,7 @@
             { "name": "pageSize", "value": "100" }
           ]
         },
-        "options": { "timeout": 20000 }
+        "options": { "timeout": 20000, "pagination": { "pagination": { "parameters": { "parameters": [ { "type": "qs", "name": "offset", "value": "={{ $response.body.offset }}" } ] }, "paginationMode": "updateAParameterInEachRequest", "nextURL": "", "paginationCompleteWhen": "other", "completeExpression": "={{ !$response.body.offset }}", "limitPagesFetched": false } } }
       },
       "id": "leer-candidatos",
       "name": "Leer Candidatos calificados",
@@ -148,7 +148,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst base = $('Leer Candidatos calificados').first().json;\nconst recs = base.records || [];\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst projMap = {};\n($('Leer Proyectos').first().json.records || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || ''; });\nconst vozMap = {};\n($('Leer Voces').first().json.records || []).forEach(r => { vozMap[r.id] = (r.fields || {}).nombre || ''; });\n\nconst ESTADOS = { aprobado: 'aprobado', publicado: 'publicado', descartado: 'descartado' };\n\nreturn recs.map(r => {\n  const f = r.fields || {};\n  const estado = ESTADOS[String(f.estado || '').toLowerCase()] || 'descartado';\n  const proyecto = Array.isArray(f.proyecto) ? (projMap[f.proyecto[0]] || '') : '';\n  const voz = Array.isArray(f.voz) ? (vozMap[f.voz[0]] || '') : '';\n  const calificado_en = f.fecha_calificacion || new Date().toISOString();\n  const output = {\n    run_id,\n    tipo: 'guion_reel',\n    titulo: f.titulo || '(sin titulo)',\n    contenido_o_link: f.script || '',\n    estado,\n    calificado_en,\n    external_id: r.id,\n    source_items: [{ platform: '', url: f.url_referente || '' }],\n    metadata: {\n      proyecto, voz, referente: f.referente || '', tema: f.tema || '', url_referente: f.url_referente || '',\n      idioma: f.idioma || '', views: f.views || 0, likes: f.likes || 0,\n      seguidores: f.seguidores || 0, engagement: f.engagement || 0,\n      heat_score: f.heat_score || 0, calificacion: f.calificacion || '', link_doc: f.link_doc || ''\n    }\n  };\n  const sheet = {\n    'FECHA CALIFICACION': calificado_en, 'PROYECTO': proyecto, 'VOZ': voz,\n    'TITULO': f.titulo || '', 'URL ORIGINAL': f.url_referente || '', 'SCRIPT': f.script || '',\n    'IDIOMA': f.idioma || '', 'VIEWS': f.views || 0, 'LIKES': f.likes || 0,\n    'SEGUIDORES': f.seguidores || 0, 'HEAT SCORE': f.heat_score || 0,\n    'CALIFICACION': f.calificacion || '', 'ESTADO': estado\n  };\n  return { json: { record_id: r.id, output, sheet } };\n});\n"
+        "jsCode": "\nconst recs = $('Leer Candidatos calificados').all().flatMap((it) => (it.json && it.json.records) || []);\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst projMap = {};\n$('Leer Proyectos').all().flatMap((it) => (it.json && it.json.records) || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || ''; });\nconst vozMap = {};\n$('Leer Voces').all().flatMap((it) => (it.json && it.json.records) || []).forEach(r => { vozMap[r.id] = (r.fields || {}).nombre || ''; });\n\nconst ESTADOS = { aprobado: 'aprobado', publicado: 'publicado', descartado: 'descartado' };\n\nreturn recs.map(r => {\n  const f = r.fields || {};\n  const estado = ESTADOS[String(f.estado || '').toLowerCase()] || 'descartado';\n  const proyecto = Array.isArray(f.proyecto) ? (projMap[f.proyecto[0]] || '') : '';\n  const voz = Array.isArray(f.voz) ? (vozMap[f.voz[0]] || '') : '';\n  const calificado_en = f.fecha_calificacion || new Date().toISOString();\n  const output = {\n    run_id,\n    tipo: 'guion_reel',\n    titulo: f.titulo || '(sin titulo)',\n    contenido_o_link: f.script || '',\n    estado,\n    calificado_en,\n    external_id: r.id,\n    source_items: [{ platform: '', url: f.url_referente || '' }],\n    metadata: {\n      proyecto, voz, referente: f.referente || '', tema: f.tema || '', url_referente: f.url_referente || '',\n      idioma: f.idioma || '', views: f.views || 0, likes: f.likes || 0,\n      seguidores: f.seguidores || 0, engagement: f.engagement || 0,\n      heat_score: f.heat_score || 0, calificacion: f.calificacion || '', link_doc: f.link_doc || ''\n    }\n  };\n  const sheet = {\n    'FECHA CALIFICACION': calificado_en, 'PROYECTO': proyecto, 'VOZ': voz,\n    'TITULO': f.titulo || '', 'URL ORIGINAL': f.url_referente || '', 'SCRIPT': f.script || '',\n    'IDIOMA': f.idioma || '', 'VIEWS': f.views || 0, 'LIKES': f.likes || 0,\n    'SEGUIDORES': f.seguidores || 0, 'HEAT SCORE': f.heat_score || 0,\n    'CALIFICACION': f.calificacion || '', 'ESTADO': estado\n  };\n  return { json: { record_id: r.id, output, sheet } };\n});\n"
       },
       "id": "armar-filas",
       "name": "Armar filas archivado",

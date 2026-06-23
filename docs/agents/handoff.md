@@ -21,6 +21,8 @@
 
 ## Estado en una línea
 
+**2026-06-23 (cierre 15) — 4 mejoras pre-cron de código aplicadas: #4 paginación, #5 dedup acotado, instrumentación de descartes, F2 IG-hashtag apagado (Mani + Claude).** Sesión de código en **ambos** workflows. **Sin commit aún** (working tree); validador **1098/0**; **NO corrió en vivo — falta re-import + Execute** (Mani verifica ahí; la paginación de n8n no se puede probar localmente). Diffs quirúrgicos: motor 81+/9-, archivado 8 líneas (el archivado se editó por replace de texto crudo para no reexpandir su formato compacto). **(1) #4 Paginación Airtable** — `options.pagination` (modo `updateAParameterInEachRequest`, query `offset`={{`$response.body.offset`}}, completa cuando `!offset`) en las 4 lecturas del motor (`Leer Proyectos/Voces/Keywords/Referentes`) y las 3 del archivado (`Leer Proyectos/Voces/Candidatos calificados`). Los consumidores agregan **todas las páginas**: motor `recs` helper → `$(n).all().flatMap(it => it.json.records||[])`; archivado `Armar filas` igual para Candidatos/Proyectos/Voces. Robusto a 1-item-por-página **o** item único (flatMap cubre ambos). El `IF — hay calificados` del archivado no necesita cambio: `Armar filas` es Code run-once-for-all → corre 1× aunque pasen varias páginas. **Resuelve el truncado silencioso a 100 records.** **(2) #5 Dedup acotado** — `Leer procesados` ya no trae `limit=20000`; la URL arma `external_id=in.(<ids de la corrida>)` desde `$('Pre-trim relevancia').all()` (corre antes). Mismo resultado de dedup, query chica → no re-paga Supadata/Claude al escalar `processed_items`. IDs (shortcodes IG / numéricos TT) no necesitan comillas en PostgREST. **(3) Instrumentación de descartes** — `console.log` en Pre-trim (`[Pre-trim] descartados off-topic: n/total -> ids`) y Gate (`[Gate] DESCARTE pid=… id=… score=… motivo=irrelevante|score<min|sin-juicio :: razon`). Visible vía `journalctl -u n8n` (no la pestaña Logs, que esta versión no muestra — mismo patrón que `Transcribir`). Además el embudo entero entra a `runs.metricas`: ahora `colectados/asignados/pretrim/filtrados/gate/outputs` (antes solo colectados/filtrados/outputs) → visible en Supabase sin tocar logs. **Habilita calibrar pesos/rubric viendo qué se tira.** **(4) F2 IG-hashtag apagado** — en `Armar plan` se quitó `if (p.tg_ig_kw) ig_hashtags.push(kk)` (queda comentario): `ig_hashtags` siempre vacío → el Apify IG Hashtag recibe 0 URLs y no trae nada; **TikTok-hashtag intacto**. Reversible (re-agregar la línea) y soft (el toggle por-proyecto sigue existiendo, solo se ignora). **Pendiente:** commit + re-import + Execute para verificar en vivo (paginación, dedup acotado, métricas del embudo, IG-hashtag en 0). **Mani pidió plan mode para atacar el handoff completo y dejar motor + archivado en versión final de producción** (ver §Próxima sesión + §Mejoras). Credenciales Airtable/Supabase **siguen a ROTAR**.
+
 **2026-06-19 (cierre 14) — F3 resuelto (era bug de código), fan-out multi-proyecto (ADR-013) + D3 cerrado (Mani + Claude).** Sesión de código de motor. Commit `76ea422` en `main` (validador 1098/0). **El motor NO corrió en vivo: falta re-import + Execute en n8n.** **F3 RESUELTO ✅ — la causa NO era datos ni Apify, era un bug de `Armar plan de corrida`.** Pista de Mani: las 2 cuentas con 0 reels (@jefferson_fisher, @howtoconvince) tienen contenido reciente y están ligadas a **varios** proyectos; @bayavoce a uno solo (el activo). Causa raíz: `Leer Proyectos` filtra `activo` → el dict `projects` solo tiene el proyecto activo; los loops de referentes/keywords tomaban `f.proyecto[0]` (el **primer** proyecto ligado) → si ese primero está inactivo, `projects[proy]` es `undefined` → `return` → **el referente nunca se mandaba a Apify**. jefferson lista líderes (inactivo) primero, howtoconvince lista empresas (inactivo) primero → ambos descartados; bayavoce lista parejas (activo) → único que pasaba. **Fix 1:** ambos loops iteran **todos** los proyectos ligados y suman a cada activo. Resuelve F3 para cualquier config. **Fan-out multi-proyecto (ADR-013, decisión de grilling):** Mani pidió que el motor sirva para cualquier combinación de Proyectos/Voces/Keywords activos manteniendo coherencia. La estructura ya escala (todo keyed por `proyecto_id`); el punto frágil era cuando 2+ proyectos activos reclaman el mismo video (referente o keyword compartida) — `ig/tt_owner_to_proj` escalar (gana el último) y `kw[t][0]` (gana el primero). **Decisión: fan-out grado 1 (MVP, sin tocar schema).** Un video se evalúa contra **cada proyecto activo que lo reclama**, con su voz y juicio; la unidad de curación pasa a ser **(video, proyecto)** → puede salir como 2 Candidatos. El gate limita el duplicado solo (solo duplica lo que pasa los 2 gates). El dedup sigue **global por `external_id`** (caveat aceptado: el video se ofrece 1× al descubrirlo, no re-surge; histórico guarda 1 fila → aprendizaje por-proyecto más grueso, refinable post-MVP = grado 2, migración 007). **3 nodos:** `Armar plan` (owner maps escalar→array), `Asignar proyecto+voz` (emite 1 item por proyecto que reclama; referente reclama con tema='', keyword con su término; `pid in claims` preserva prioridad referente), `Pre-trim relevancia` (descarte por `(proyecto, external_id)` — si no, el drop de un proyecto mataba la copia del otro). Glosario actualizado (Proyecto + Candidato contradecían la decisión). **D3 RESUELTO ✅** — nodo 31 (`Reportar outputs`) ahora `POST outputs?on_conflict=external_id` + `Prefer: resolution=ignore-duplicates,return=minimal` (mismo patrón que el archivado nodo 11). Con fan-out los `external_id` repetidos entre proyectos son normales → sin este fix el batch rebotaría 409 seguido. dev-doc:124 actualizado. **Verificar en el re-import:** (1) `apify-igreels` trae owners de los 3 handles de parejas, no solo @bayavoce; (2) con 2 proyectos que comparten referente, un video cross-relevante sale como 2 Candidatos (distinto proyecto/voz); (3) archivado ya no rebota 409. Keys (`<ANTHROPIC_API_KEY>`, `<SUPADATA_API_KEY>`, `apifyApi`) llenas en el workflow que se corra, no en el sandbox. **Sigue abierto (ver §Próxima sesión):** F2 (decidir IG-hashtag), TODO Airtable (campos muertos), referentes TikTok sin sembrar, instrumentar descartes gate/pretrim, pre-cron (#4/#5/#9), grado 2 de fan-out (post-MVP). Credenciales Airtable/Supabase **a ROTAR**.
 
 **2026-06-18 (cierre 13) — Run post-F1 verificado: embudo coherente, F1/F4/F5 en verde (Mani + Claude).** Mani re-importó + corrió con el fix de los `Merge` y dejó los outputs frescos del run en `outputs/` (una sola ejecución, 22:35–22:40). Revisión punta-a-punta sobre los JSON. **F1 RESUELTO ✅** — las 2 ramas concatenan: `normalizar-ig`=70 (40 reels + 30 hashtag) y `normalizar-tt`=41 (40 + 1 perfil basura); el Normalizador corre 1×. **F4 RESUELTO ✅ (el más caro)** — TikTok atraviesa todo por primera vez: **17 asignados → 11 pretrim → 4 heatscore → 1 candidato final**, y **@nadirainwonderland es el #1** (heat 0.825, rel 0.75, transcript 849c). 15 creadores TikTok distintos en `asignar`, todos por descubrimiento hashtag/keyword (0 referentes TT sembrados) → el eje **TikTok-keyword es la estrella**. **F5 RESUELTO ✅** — el Gate emite 4 items con scores reales (0.7–0.85), no `[{}]`. **El refactor de relevancia trabaja como se diseñó:** el Gate tiró los 2 TikTok de más views del run (@emmastoomuch 3.5M / heat 1.99 y @mayaaa_speaks 2.7M / heat 1.96) → viral-off-topic muerto. **#7 TikTok nativo aplicó** (`idioma_nativo` ya en `normalizar-tt`; @nadira cayó a `guessLang`=ot porque el actor mandó `textLanguage` vacío en ese item). `viral_por_tamano` marcó solo a @sabrina.zohar (1.7M) y el Gate igual la dropeó por relevancia. **Sigue abierto:** **(F3, 🟠 re-diagnosticado)** IG referentes — los 40 reels son **todos @bayavoce**. **#24 era teoría vieja:** existe un nodo `Split IG referentes` que corre el Apify IG Reels **1× por referente**, así que `ig_results_limit` es **por-referente, NO cap global**. La causa real: de los **3** referentes IG ligados a "parejas" (@bayavoce, @jefferson_fisher, @howtoconvince), **solo @bayavoce devolvió reels**; los otros 2 dieron 0 (¿sin reels en 75d? ¿privados? ¿handle mal? ¿actor falló?). **= lead #1 próxima sesión.** **(F2, 🟠 cambió de cara)** IG-hashtag = peso muerto pero **ahora lo mata el pretrim semántico**, no el ranking ciego: los 30 items (`seguidores=0`, captions hi/pl/en) llegan a `asignar` y el pretrim los elimina a los 30 → 0 finalistas, gasta Apify. Contraste con TikTok-hashtag (métricas completas, inglés, on-topic) → **decisión clave abierta: retirar/apagar eje IG-hashtag, conservar TikTok-hashtag** (ver abajo). **Gaps de auditoría:** Gate/pretrim **no logea descartes**; **2 escalas de heat** conviven (heatscore métrico 1.5–2.0 vs armar-candidato composite 0.6–0.83). **Bloque D HECHO:** **D1 ✅** 4 Candidatos en Airtable calzan exacto (rel/heat/razón/links/thumbnail; `Candidatos` no tiene campo `plataforma` → no se guarda). **D2 ✅** run `31e3d2be` cerró `ok`, sin zombie, `metricas` calza (colectados 111 = 70+41, filtrados 10, outputs 4). **D3 🔴 BUG NUEVO:** el write de `outputs` del **motor no es idempotente** — nodo 31 (`Reportar outputs`) hace `POST` **sin `on_conflict`** (dev-doc:124); como 3 de los 4 ext_ids ya existían (bayavoce del run previo), el **batch entero rebotó 409** → continue-on-fail → **no entró nada, ni el TikTok nuevo** (run igual cerró `ok`). Empeora con el tiempo. Fix = mismo patrón que el archivado (nodo 11, migración 005): `on_conflict=external_id` + `resolution=ignore-duplicates`. `processed_items`=10 (6 IG+4 TT) coherente. **Actores Apify (notas):** los 2 actores aceptan arrays; instagram-scraper IG-Hashtag ya pasa todos los hashtags juntos; TikTok hashtags = **OR/unión** (1 video califica por ≥1 hashtag); IG Reels va de-a-1 **por el Split**, no por límite del actor. **Próxima sesión:** (1) F3 — por qué 2 de 3 referentes IG dan 0; (2) decidir IG-hashtag; (3) fix idempotencia nodo 31; (4) revisión general de Airtable (borrar campos muertos, ver TODO). Credenciales Airtable/Supabase en mano (**a ROTAR**). Sin código de motor esta sesión; outputs siguen untracked.
@@ -187,6 +189,92 @@ estructural abierta para el equipo: Airtable vs Supabase / alcance del registro 
 Airtable (campo `fecha_calificacion` + vista 🔥), accesos a Majo/Jero, **semillas (A9, en pausa
 hasta definir nicho)**.
 
+## 🗺️ PLAN A PRODUCCIÓN (cierre 15) — implementar desde 0
+
+> **Aprobado por Mani (2026-06-23). Este es el plan vivo para llevar motor + archivado a su versión
+> final de producción.** Empezar acá la próxima sesión. Copia espejo en `~/.claude/plans/` (efímera);
+> **esta es la fuente durable.** Alcance = **núcleo**: los 2 pipelines validados en vivo (V1–V6) + en
+> cron (D1–D3). Calibración fina e interface Airtable quedan fuera (ver §Diferido al final del plan).
+> El grueso es **manual en n8n/Airtable/cloud + corridas en vivo** (las hace Mani; Claude no accede a
+> n8n), intercalado con tramos de código de Claude.
+>
+> **Decisiones de Mani que enmarcan el plan:** alcance = núcleo; hacer las limpiezas de código/docs
+> seguras AHORA (Fase 0) para re-importar un artefacto final; **`outputs` de Supabase debe ser el
+> histórico canónico que alimente el Sheet correctamente** (reencuadre de #20 — ver Fase 0.3).
+
+### Fase 0 — Artefacto final (Claude, código + docs) → commit
+
+1. **#14 — limpiar metadata residual del template** en `Workflows/workflow-short-form-content/workflow.json`
+   (`instanceId`, bloque `tags` "Content Strategy/Scraping/AI Automation", ~líneas 1273–1306). Cosmético.
+   Vía script builder (no a mano), validar parse + `npm run validate`.
+2. **#11 — `core/scripts/deploy.mjs` legacy.** Marcar deprecado con cabecera clara (resolvía placeholders
+   de voz/categorías que ya no existen; el MVP es 1 instancia en el nodo Config). **No borrar** (semilla de
+   multi-cliente F5). Ajustar la referencia en `CLAUDE.md` §Feedback loops si queda engañosa.
+3. **#20 / Supabase = histórico canónico** *(toca `core/` → necesita OK explícito de Mani + ADR-014).* Hoy
+   el **motor** escribe filas `draft` a `outputs` y el **archivado** las calificadas; las vistas filtran
+   `calificado_en not null` (solo ven archivado) pero `outputs` crudo acumula draft que nunca se cierran.
+   **Propuesta:** el motor **deja de escribir filas por-item a `outputs`** (el tracking por corrida sigue en
+   `runs.metricas`); `outputs` = solo filas del archivado = histórico limpio que el Sheet espeja 1:1. Quita
+   2 nodos del motor (`Preparar outputs Supabase`, `Reportar outputs al registro`) y reapunta la métrica
+   `outputs` de `Cerrar run` a `$('Armar candidato').all().length`. Toca `core/contracts/ingesta-registro.md`
+   + `dev-doc §7` → **ADR-014 nuevo**. *Alternativa: mantener draft pero a tabla/estado aparte. **Confirmar
+   con Mani antes de tocar `core/`.***
+4. **Sync de docs:** `dev-doc.md` (motor = **37** nodos, no 34; + los 4 cambios cierre 15; + resultado #20).
+   `onboarding-equipo-redes.md` (stale cierre 6: dice "5 tablas", falta **Ajustes** = 6; describe
+   descubrimiento asimétrico, ya es simétrico).
+5. **Commit** de todo (cierre 15 + Fase 0) a `main`, español, conciso.
+   *Verificación: `npm run validate` verde; `jsCode` parsea; diff quirúrgico (no reexpandir el archivado).*
+
+### Fase 1 — Re-import + V1 en vivo (Mani, manual) · **el gate**
+
+1. Re-importar **ambos** workflow.json. Llenar en el workflow que se corre (no el sandbox):
+   `<ANTHROPIC_API_KEY>`, `<SUPADATA_API_KEY>`, `apifyApi` en los 4 Apify, `Airtable PAT`, `Supabase Registro`;
+   IDs en `Config`.
+2. Pre-run: `Candidatos` a 0; `processed_items` vacío (o dejar para V5).
+3. **V1 backfill** (`dias_recencia` alto) → Execute manual. Verificar de un saque: **F3** (apify-igreels trae
+   los 3 referentes, no solo @bayavoce) · **fan-out ADR-013** (2 proyectos que comparten referente → 2
+   Candidatos) · **paginación #4** (no trunca a 100) · **dedup acotado #5** (URL con `in.()`, no re-transcribe)
+   · **métricas embudo** (`runs.metricas`: colectados/asignados/pretrim/filtrados/gate/outputs) · **IG-hashtag
+   = 0** (F2) · **D3** (archivado sin 409).
+4. Leer instrumentación: `journalctl -u n8n` para `[Pre-trim]`/`[Gate]` + `runs.metricas`. Anotar hallazgos.
+   *Riesgo: la paginación de n8n no se probó localmente; si el schema falla se ajusta en Fase 2 (downside
+   acotado: con ≤100 records el comportamiento = hoy).*
+
+### Fase 2 — Fixes reactivos del V1 (Claude, código)
+
+Corregir lo que el V1 exponga (schema de paginación, `in.()` en la URL, edge de fan-out, idioma TikTok #7…).
+Re-validar y re-commit. Iterar con Mani hasta que el V1 quede limpio.
+
+### Fase 3 — Resto de V-runs + higiene de producción (Mani, manual)
+
+- **Sembrar 2–3 referentes TikTok** (hoy 0 → eje TT-perfil vacío) + subir `top_n` de parejas (2 es test).
+- **V2 literalidad** · **V3 curación + archivado** (verifica #20: Sheet alimentado desde el histórico limpio)
+  · **V4 re-rank** · **V5 incremental + dedup** · **V6 resiliencia** (ver ROADMAP §3 para el detalle de cada V).
+- **#9 OAuth Google Sheets** — sacar de modo Testing / GCP permanente **antes** del cron del archivado
+  (vence cada 7 días → falla en silencio).
+- **TODO Airtable** — borrar campos muertos (`Referentes.seguidores`/`flag_viral`, restos de Voces, `link_doc`);
+  `fecha → Created time`.
+- **🔴 ROTAR credenciales** — Airtable PAT + Supabase service_role (expuestas en chats cierres 13–15).
+
+### Fase 4 — Activación (D1–D3)
+
+- **D1** validar TZ `America/Bogota` → activar cron motor + cron archivado.
+- **D2** *(Claude)* `status: active` en manifest + tabla `workflows`; manifest al estado real post-cierre-15.
+  Commit.
+- **D3** demo de 10 min con Majo y Jero (calificar, ver re-rank, bajar histórico).
+
+### Archivos críticos · Verificación · Diferido
+
+- **Archivos:** motor + archivado `workflow.json`; `core/scripts/deploy.mjs` (legacy); `core/contracts/
+  ingesta-registro.md` + `docs/adr/ADR-014-*` (nuevo, #20); `dev-doc.md` + `onboarding-equipo-redes.md`
+  (sync); `Workflows/*/workflow.yaml` + `validate.mjs` (manifest `active`, D2).
+- **Verificación:** código → `cd core/scripts && npm run validate` verde tras cada fase. En vivo → V1–V6 +
+  cross-check Airtable/Supabase (`runs`, `outputs`, vistas histórico/señal) + Sheet. **Producción cuando:** un
+  backfill deja candidatos correctos en Airtable con rastro en Supabase; calificar termina en el Sheet vía el
+  histórico limpio; ambos crons activos en `America/Bogota`.
+- **Diferido (fuera de este empuje):** calibración de pesos/rubric con data real (#13/#18/#25/#26) ·
+  interface Airtable + onboarding (#30/#31/#32) · grado 2 de fan-out (migración 007) · SplitInBatches (#21).
+
 ## ⏳ Pendiente inmediato (manual de Mani, cierre 6)
 
 > Las 6 decisiones están en código y commiteadas. Para que corran en vivo falta lo **manual** (no lo
@@ -203,17 +291,20 @@ hasta definir nicho)**.
 
 > **🧭 PENDIENTE PARA RETOMAR (cierre 14) — checklist único.** El plan de revisión de outputs (Bloques
 > A–D) está **completo**; F1/F3/F4/F5 + D3 **cerrados**. Lo que queda, en orden sugerido:
-> 1. **🔴 Re-import + Execute en n8n (camino crítico).** Verifica de un saque los 3 fixes sin correr en vivo
->    aún: (a) F3 — `apify-igreels` trae owners de los 3 referentes de parejas, no solo @bayavoce; (b) fan-out
+> 1. **🔴 Re-import + Execute en n8n (camino crítico).** Verifica de un saque los fixes sin correr en vivo aún:
+>    (a) F3 — `apify-igreels` trae owners de los 3 referentes de parejas, no solo @bayavoce; (b) fan-out
 >    (ADR-013) — con 2 proyectos que comparten un referente, un video cross-relevante sale como 2 Candidatos
->    (distinto proyecto/voz); (c) D3 — el archivado ya no rebota 409, los outputs entran. Keys llenas
->    (`<ANTHROPIC_API_KEY>`, `<SUPADATA_API_KEY>`, `apifyApi`) en el workflow que se corre, **no** el sandbox.
-> 2. **F2 — decidir IG-hashtag** (retirar/apagar el eje vía toggle por-proyecto; 0 finalistas en 2 runs, gasta
->    Apify). Decisión de producto de Mani (ver "Decisión clave abierta" abajo).
+>    (distinto proyecto/voz); (c) D3 — el archivado ya no rebota 409, los outputs entran; **(d cierre 15)**
+>    paginación (lecturas no se truncan a 100), dedup acotado (`Leer procesados` con `in.()`), `runs.metricas`
+>    con el embudo completo, IG-hashtag en 0. Keys llenas (`<ANTHROPIC_API_KEY>`, `<SUPADATA_API_KEY>`,
+>    `apifyApi`) en el workflow que se corre, **no** el sandbox.
+> 2. **✅ F2 RESUELTO (cierre 15) — IG-hashtag apagado en código.** `ig_hashtags` siempre vacío; TikTok-hashtag
+>    intacto. Reversible. (Si Mani prefiere el toggle por-proyecto en vez del kill global, re-evaluar.)
 > 3. **Sembrar referentes TikTok** (hoy 0 → eje TT-perfil vacío) + ajustar `top_n` de parejas para curación real.
 > 4. **TODO Airtable** — revisión general; concreto: borrar `Referentes.seguidores`/`flag_viral` (campos muertos).
-> 5. **Instrumentar descartes** del Gate/Pre-trim (no logean qué tiran) antes de calibrar pesos/rubric.
-> 6. **Pre-cron:** #4 paginación, #5 tope dedup, #9 OAuth Sheets.
+> 5. **✅ Instrumentación RESUELTA (cierre 15) — falta correr.** Pre-trim/Gate logean descartes (journalctl) +
+>    embudo en `runs.metricas`. Con eso ya se puede **calibrar** pesos/rubric leyendo qué se tira.
+> 6. **Pre-cron:** ~~#4 paginación~~ ✅, ~~#5 tope dedup~~ ✅ (cierre 15); queda **#9 OAuth Sheets** (vence 7d).
 > 7. **Grado 2 de fan-out** (post-MVP, diferido en ADR-013): dedup por `(platform, external_id, proyecto)` →
 >    migración 007 en `core/` + tocar el archivado → aprendizaje por-proyecto limpio + re-surgimiento.
 > 8. **🔴 ROTAR credenciales** Airtable PAT + Supabase service_role (expuestas en chat, cierres 13–14).
@@ -435,13 +526,13 @@ confirmar en V2 con muestras reales). Detalle menor: trunca el transcript a 6000
 
 **🟠 Alto (escala / costo):**
 
-4. **Sin paginación en NINGUNA lectura de Airtable.** Airtable devuelve máx. 100 records/página y exige
-   seguir `offset`. Ni el motor (`Leer Keywords/Referentes/Proyectos/Voces`) ni el archivado
-   (`Leer Candidatos`, `pageSize 100`) iteran el offset → en cuanto algo pase de 100 se **trunca en
-   silencio** (keywords ignoradas, candidatos sin archivar).
-5. **Dedup con tope fijo de 20 000 filas.** `Leer procesados` hace `...&limit=20000`. Cuando
-   `processed_items` lo supere, las filas viejas no se cargan → dedup parcial → re-pago de
-   Supadata/Claude. Mejor: filtrar por los `external_id` de la corrida (`in.(...)`), no traer toda la tabla.
+4. **✅ RESUELTO EN CÓDIGO (2026-06-23 cierre 15) — falta re-import.** Paginación `options.pagination`
+   (offset) en las 4 lecturas del motor (`Leer Keywords/Referentes/Proyectos/Voces`) y las 3 del archivado
+   (`Leer Proyectos/Voces/Candidatos`); los consumidores agregan todas las páginas con `.all().flatMap()`.
+   *(Original: sin paginación → truncado silencioso a 100 records.)*
+5. **✅ RESUELTO EN CÓDIGO (2026-06-23 cierre 15) — falta re-import.** `Leer procesados` ya no usa
+   `limit=20000`; filtra `external_id=in.(<ids de la corrida>)` (de `$('Pre-trim relevancia').all()`).
+   Dedup idéntico, query chica. *(Original: tope fijo 20 000 → dedup parcial al escalar.)*
 6. **✅ RESUELTO (2026-06-16, Mani): Apify migrado a community node.** Era el bloqueante de V1:
    `run-sync-get-dataset-items` topa a 300 s y el run de IG dura 6-7 min → entregaba 0 candidatos
    (confirmado en vivo: IG `ECONNABORTED`). **Fix:** los dos nodos Apify pasaron de
