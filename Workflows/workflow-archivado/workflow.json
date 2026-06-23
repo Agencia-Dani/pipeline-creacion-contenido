@@ -111,7 +111,7 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "filterByFormula", "value": "NOT({calificacion} = '')" },
+            { "name": "filterByFormula", "value": "NOT({estado} = 'nuevo')" },
             { "name": "pageSize", "value": "100" }
           ]
         },
@@ -194,7 +194,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nreturn $('Armar filas archivado').all().map(i => ({ json: i.json.sheet }));\n"
+        "jsCode": "\nconst POS = ['aprobado', 'publicado'];\nreturn $('Armar filas archivado').all().filter(i => POS.includes((i.json.output || {}).estado)).map(i => ({ json: i.json.sheet }));\n"
       },
       "id": "preparar-sheet",
       "name": "Preparar filas Sheet",
@@ -229,6 +229,14 @@
       "typeVersion": 4.5,
       "position": [2640, 200],
       "credentials": { "googleSheetsOAuth2Api": { "name": "<<CREDENCIAL_GOOGLE_SHEETS>>" } }
+    },
+    {
+      "parameters": { "mode": "append", "numberInputs": 2, "options": {} },
+      "id": "reconvergir-sheet",
+      "name": "Reconvergir tras Sheet",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [2760, 360]
     },
     {
       "parameters": {
@@ -298,9 +306,10 @@
     },
     "Armar filas archivado": { "main": [[{ "node": "Preparar outputs Supabase", "type": "main", "index": 0 }]] },
     "Preparar outputs Supabase": { "main": [[{ "node": "Registrar outputs (Supabase)", "type": "main", "index": 0 }]] },
-    "Registrar outputs (Supabase)": { "main": [[{ "node": "Preparar filas Sheet", "type": "main", "index": 0 }]] },
+    "Registrar outputs (Supabase)": { "main": [[{ "node": "Preparar filas Sheet", "type": "main", "index": 0 }, { "node": "Reconvergir tras Sheet", "type": "main", "index": 1 }]] },
     "Preparar filas Sheet": { "main": [[{ "node": "Append al Sheet Histórico", "type": "main", "index": 0 }]] },
-    "Append al Sheet Histórico": { "main": [[{ "node": "Preparar borrado Airtable", "type": "main", "index": 0 }]] },
+    "Append al Sheet Histórico": { "main": [[{ "node": "Reconvergir tras Sheet", "type": "main", "index": 0 }]] },
+    "Reconvergir tras Sheet": { "main": [[{ "node": "Preparar borrado Airtable", "type": "main", "index": 0 }]] },
     "Preparar borrado Airtable": { "main": [[{ "node": "Borrar de Airtable", "type": "main", "index": 0 }]] },
     "Borrar de Airtable": { "main": [[{ "node": "Cerrar run en el registro", "type": "main", "index": 0 }]] }
   },

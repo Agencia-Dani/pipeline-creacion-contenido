@@ -12,13 +12,21 @@
 ```
 Cron diario 9am ─┐
 Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail)
-   └─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos calificados ─► IF ¿hay?
+   └─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos decididos ─► IF ¿hay?
           ├─ no ─────────────────────────────────────────────► Cerrar run
-          └─ sí ─► Armar filas ─► Registrar outputs (Supabase, continue-on-fail)
-                       └─► Append al Sheet Histórico ─► Borrar de Airtable ─► Cerrar run
+          └─ sí ─► Armar filas ─► Registrar outputs (Supabase, continue-on-fail, TODOS)
+                       └─► Append al Sheet Histórico (SOLO aprobado/publicado) ─┐
+                       └────────────────────────────► Reconvergir (Merge) ◄─────┘
+                                  └─► Borrar de Airtable (TODOS) ─► Cerrar run
 ```
 
-- **Lee** `Candidatos` con `calificacion` puesta (`filterByFormula: NOT({calificacion} = '')`).
+- **Lee** `Candidatos` ya decididos por el equipo (`filterByFormula: NOT({estado} = 'nuevo')` →
+  trae `aprobado`/`publicado`/`descartado`; el campo canónico de "decidido" es `estado`, igual que
+  la vista 🔥 del cockpit).
+- **Split (qué va a dónde):** el **Sheet histórico** recibe **solo `aprobado`/`publicado`** (los
+  scripts que se producen). **Supabase `outputs`** y el **borrado de Airtable** toman **todos** los
+  decididos — los `descartado` se registran (alimentan el aprendizaje, `v_senal_seleccion`) y se
+  limpian del cockpit, pero **no ensucian** el histórico visible.
 - **Resuelve nombres**: `proyecto`/`voz` en `Candidatos` son campos *link* (ids), así que lee
   `Proyectos` y `Voces` y mapea id→nombre (igual que el motor).
 - **Registra en Supabase** `outputs` (tipo `guion_reel`): `contenido_o_link` = **texto del script**,
@@ -33,7 +41,9 @@ Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail
 - **Supabase es sumidero** (invariante #1): `Abrir run`, `Registrar outputs` y `Cerrar run` van con
   *Continue On Fail*. Si Supabase no responde, el Sheet igual se escribe y Airtable igual se limpia.
 - **El Sheet NO es continue-on-fail a propósito**: si el append falla, el workflow **corta antes de
-  borrar de Airtable** → no se pierde la curación del equipo; reintenta al otro día.
+  borrar de Airtable** → no se pierde la curación del equipo; reintenta al otro día. El `Merge`
+  *Reconvergir tras Sheet* espera a ambas ramas antes del borrado, así que mantiene este orden **y**
+  deja correr el borrado cuando el lote no trae aprobados (todos `descartado` → rama Sheet vacía).
 - **Idempotencia por upsert + borrado**: en operación normal un record se procesa una vez porque se
   borra de Airtable al final. Si el delete falla (transitorio), `Borrar de Airtable` **reintenta**
   (3 intentos, 2 s) antes de dar error; si igual queda atrás, la corrida siguiente lo re-toma **sin

@@ -336,11 +336,20 @@ idioma TikTok #7), se itera acá.
 > ### B. Workflows complementarios — los MENOS validados (cerrar antes del cron)
 > 3. **Archivado (`workflow-archivado`) — nunca re-corrió desde sus fixes.** Tiene cambios **sin verificar
 >    en vivo**: idempotencia (migración 005: `on_conflict=external_id` + `Prefer: ignore-duplicates` +
->    delete con reintento 3×, cierre 6) y **paginación** de sus 3 lecturas (`Leer Proyectos/Voces/
->    Candidatos`, cierre 15). **La V-run que lo ejercita (V3) NUNCA corrió.** Es el eslabón menos probado
->    que va a prod. Con **ADR-014** (el motor ya no escribe `outputs`), el archivado es **el único que
->    puebla `outputs` = el histórico canónico que alimenta el Sheet** → V3 debe confirmar: calificar en
->    Airtable → fila en `outputs` → fila en el Sheet, sin 409, sin duplicar, sin perder candidatos.
+>    delete con reintento 3×, cierre 6); **paginación** de sus 3 lecturas (`Leer Proyectos/Voces/
+>    Candidatos`, cierre 15); y **el SPLIT (cierre 19, sin correr aún):** filtro de lectura ahora
+>    `NOT({estado} = 'nuevo')` (antes `calificacion` no-vacía) → trae aprobado/publicado/descartado; el
+>    **Sheet recibe solo aprobado/publicado**, mientras Supabase `outputs` + borrado toman **todos** los
+>    decididos (descartados alimentan `v_senal_seleccion` y se limpian del cockpit, sin ensuciar el
+>    histórico). Nodo nuevo `Reconvergir tras Sheet` (Merge) para que el borrado corra aun con 0 aprobados
+>    pero espere al Append. **La V-run que lo ejercita (V3) NUNCA corrió.** Es el eslabón menos probado que
+>    va a prod. Con **ADR-014** (el motor ya no escribe `outputs`), el archivado es **el único que puebla
+>    `outputs` = el histórico canónico que alimenta el Sheet** → V3 debe confirmar: calificar en Airtable
+>    (mezclar aprobados Y descartados) → `outputs` recibe ambos con su `estado` · el Sheet **solo** los
+>    aprobados · todos se borran de Airtable · sin 409, sin duplicar, sin perder candidatos. **Probar el
+>    caso lote 100% descartado** (rama Sheet vacía): el Merge debe dejar pasar el borrado igual (si se
+>    cuelga ahí, el Merge no tolera la entrada vacía en esta versión de n8n → re-evaluar). El archivado
+>    **no gasta Apify/Supadata** → se puede validar gratis, desacoplado del run del motor.
 > 4. **#9 OAuth de Google Sheets — BLOQUEANTE de lanzamiento.** Está en modo *Testing* → el token vence
 >    cada 7 días y el cron del archivado (diario) falla en silencio ~1×/semana; además GCP corre con
 >    créditos gratuitos ($300). Publicar la app OAuth / mover a cuenta GCP permanente **antes** de activar
@@ -366,14 +375,21 @@ idioma TikTok #7), se itera acá.
 > 11. **D2** *(Claude, código + commit)* `status: active` en `workflow.yaml` + tabla `workflows`; manifest
 >     al estado real post-cierre-18.
 > 12. **D3** demo de 10 min con Majo y Jero (calificar, ver re-rank, bajar histórico).
+> 13. **🔁 RECURRENTE — verificar que el motor aprende de las selecciones de Majo/Jero.** El loop YA
+>     está cableado (motor lee `v_senal_seleccion`+`v_senal_tema`; Heat-score: `heat = base*(1+idioma)*
+>     (1+sel)`, `sel=max(selRef,selTema)`; las vistas cuentan `outputs` aprobados/publicados que escribe
+>     el archivado). **Hoy inerte: no hay historial** (ADR-012 #4). Una vez en producción, tras varias
+>     rondas de calificación archivadas, confirmar que un referente/tema que el equipo elige seguido
+>     **sube de heat** en corridas posteriores. No es one-shot: chequear periódicamente que la señal no
+>     esté en 0 (si `v_senal_seleccion` no devuelve filas → el archivado no está poblando `estado`).
 >
 > ### F. Gate de lanzamiento real (externo al repo — reunión con el jefe)
-> 13. **#32 interface user-friendly + #30/#31 dashboard/vistas Airtable.** Decisión transversal de Dani:
+> 14. **#32 interface user-friendly + #30/#31 dashboard/vistas Airtable.** Decisión transversal de Dani:
 >     **nadie usa la herramienta hasta que la interface esté lista.** Es el gate REAL de lanzamiento, no
 >     código del motor. (Detalle en §Mejoras #30–#32.)
 >
 > ### G. Refactor de búsqueda (#34/#35) — POST-MVP, NO ahora ⛔
-> 14. La **DIRECCIÓN del embudo de dos etapas** (descubrir CREADORES ≠ curar CONTENIDO; keywords →
+> 15. La **DIRECCIÓN del embudo de dos etapas** (descubrir CREADORES ≠ curar CONTENIDO; keywords →
 >     pestaña de **Criterios** estructurados *Sirve/No Sirve/Keywords*; búsqueda por hashtag pasa a proponer
 >     referentes que marketing vetea, no a alimentar candidatos directo) es el **refactor de producto más
 >     importante**, pero es un **build grande** (tabla/vista "Creadores propuestos" + superficie de review +
