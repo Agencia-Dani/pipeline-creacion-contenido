@@ -703,7 +703,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items?on_conflict=platform,external_id' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,

@@ -8,7 +8,7 @@
         "voz_nombre": "Milena Morales",
         "min_likes": 0,
         "min_views": 0,
-        "dias_recencia": 75,
+        "dias_recencia": 200,
         "top_n": 10,
         "criterios": "Videos con consejos prácticos para mejorar la comunicación en pareja: expresar necesidades, resolver conflictos, escuchar, poner límites, reconectar. RELEVANTE: aporta una técnica, ejemplo o reflexión aplicable a la relación de pareja. NO RELEVANTE: relaciones en general sin foco en comunicación, motivacional vacío, conquista/citas, comunicación laboral o de liderazgo. Útil = accionable y específico, no una obviedad.",
         "voz_criterios": "Comunicación, Comunicación corporativa y comunicación de parejas",
@@ -26,28 +26,66 @@
         "tg_ig_kw": true,
         "tg_tt_kw": true,
         "tg_tt_ref": true
+      },
+      "recqId0coOkkpXHaS": {
+        "id": "recqId0coOkkpXHaS",
+        "nombre": "Comunicación en empresas",
+        "voz_id": "recek0DxMjprPiodc",
+        "voz_nombre": "Milena Morales",
+        "min_likes": 0,
+        "min_views": 0,
+        "dias_recencia": 200,
+        "top_n": 10,
+        "criterios": "Videos sobre comunicación en el trabajo (directivo o empleado): reuniones, emails, conflictos laborales, hablar con jefes/colegas/clientes, situaciones difíciles de oficina. RELEVANTE: tip o ejemplo de comunicación en contexto laboral. NO RELEVANTE: liderazgo de equipos puro (va a \"líderes\"), comunicación de pareja, productividad/finanzas sin foco comunicacional. Útil = aplicable a la vida laboral cotidiana.",
+        "voz_criterios": "Comunicación, Comunicación corporativa y comunicación de parejas",
+        "keywords": [
+          "Communication",
+          "Leadership",
+          "Corporate"
+        ],
+        "ig_handles": [
+          "howtoconvince",
+          "askvinh",
+          "eloisegagnon_strategist"
+        ],
+        "tt_handles": [],
+        "tg_ig_ref": true,
+        "tg_ig_kw": true,
+        "tg_tt_kw": true,
+        "tg_tt_ref": true
       }
     },
     "ig_urls": [
       "https://www.instagram.com/jefferson_fisher/",
       "https://www.instagram.com/howtoconvince/",
-      "https://www.instagram.com/bayavoce/"
+      "https://www.instagram.com/bayavoce/",
+      "https://www.instagram.com/askvinh/",
+      "https://www.instagram.com/eloisegagnon_strategist/"
     ],
     "tt_profiles": [],
     "ig_hashtags": [],
     "tt_hashtags": [
       "relationships",
-      "communication"
+      "communication",
+      "leadership",
+      "corporate"
     ],
     "ig_owner_to_proj": {
       "jefferson_fisher": [
         "recC45pycBkYsTL0f"
       ],
       "howtoconvince": [
-        "recC45pycBkYsTL0f"
+        "recC45pycBkYsTL0f",
+        "recqId0coOkkpXHaS"
       ],
       "bayavoce": [
         "recC45pycBkYsTL0f"
+      ],
+      "askvinh": [
+        "recqId0coOkkpXHaS"
+      ],
+      "eloisegagnon_strategist": [
+        "recqId0coOkkpXHaS"
       ]
     },
     "tt_owner_to_proj": {},
@@ -56,13 +94,21 @@
         "recC45pycBkYsTL0f"
       ],
       "communication": [
-        "recC45pycBkYsTL0f"
+        "recC45pycBkYsTL0f",
+        "recqId0coOkkpXHaS"
+      ],
+      "leadership": [
+        "recqId0coOkkpXHaS"
+      ],
+      "corporate": [
+        "recqId0coOkkpXHaS"
       ]
     },
     "active_project_ids": [
-      "recC45pycBkYsTL0f"
+      "recC45pycBkYsTL0f",
+      "recqId0coOkkpXHaS"
     ],
-    "max_dias_recencia": 75,
+    "max_dias_recencia": 200,
     "ajustes": {
       "peso_relevancia": 0.7,
       "tt_results_limit": 40,

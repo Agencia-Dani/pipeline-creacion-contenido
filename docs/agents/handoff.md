@@ -21,6 +21,8 @@
 
 ## Estado en una línea
 
+**2026-06-23 (cierre 18) — Run de Fase 3 DIAGNOSTICADO = éxito + bug fan-out×dedup encontrado y arreglado (Mani + Claude).** Mani corrió el run de Fase 3 (2 proyectos *parejas*+*empresas*, `top_n=10`, `dias=200`, referentes compartidos) y subió outputs + los 3 outputs HTTP (`POST-processed-items`/`POST-airtable`/`cerrar-run`). **El primer intento salió SIN scripts (0/20 transcripción): NO fue Supadata ni créditos, fue la `SUPADATA_API_KEY` sin llenar** — Mani la puso y re-corrió. **Run con key VERIFICADO punta a punta:** transcripción ✅ 19/20 (el vacío = fail-open normal, video sin voz); script ES ✅ 19/20 (Haiku literal); **fan-out ADR-013 ✅** (el video compartido `7629904064448449814` entra a `Asignar` por los 2 proyectos; queda 1× en candidatos finales — el gate filtró la copia de *empresas* — grado 1 funciona; 6 parejas + 4 empresas, sin `external_id` dup en el resultado); **recencia 200 ✅** (normalize trae TikTok all-time 2021→2026 + 4 IG viejos, pero el corte capa 2 en `Asignar` los elimina: `Asignar` 304 y pretrim 264 tienen 0 fuera de 200d); **embudo** `360 → 304 asignados → 264 pretrim → 20 heatscore (top_n 10×2) → 10 gate → 10 candidatos`, cruza exacto con `runs.metricas`. **🐞 BUG NUEVO encontrado y ARREGLADO — fan-out × dedup #5:** el run escribió **0 `processed_items`** (debía ~20). Causa: `POST processed_items` mandaba `Prefer: resolution=ignore-duplicates` pero **sin `on_conflict` en la URL** → PostgREST hacía INSERT plano y la `unique(platform, external_id)` (schema 002:25) tiraba 409; el **fan-out mete el video compartido 2× en el mismo batch** (Heat-score 20 filas / 19 únicos) → duplicado intra-batch → batch entero rebota → `onError continueRegularOutput` se traga el 409 → 0 registrados. El V1 no lo pegó (1 proyecto = sin duplicado intra-batch). **Consecuencia:** sin fix, la próxima corrida incremental no se salta ningún video → re-transcribe todo → re-paga Supadata+Claude, justo en multi-proyecto que es el modo por defecto. **FIX aplicado** (`workflow.json:706`, builder/convención): `?on_conflict=platform,external_id` en la URL → ahora emite `INSERT … ON CONFLICT (platform,external_id) DO NOTHING` (tolera intra-batch Y cross-run); mismo patrón que archivado nodo 11 y `Reportar outputs` (fix D3 cierre 14); cumple lo que el schema 002:30 ya documentaba. Diff 1 línea, validador **1143/0**. **SIN COMMIT, FALTA RE-IMPORT + Execute** para verificar `processed_items` poblado (~19 filas, compartido 1×). **Limpieza DB pre-redo** (Mani eligió "solo Fase 3"): borrados 10 Candidatos Fase 3 + su fila `runs`; V1 intacto (6 candidatos, run, 10 `processed_items`). **Núcleo del motor validado end-to-end (V1 + Fase 3); lo que falta para producción quedó consolidado en §Próxima sesión.** Credenciales **A ROTAR** (re-expuestas).
+
 **2026-06-23 (cierre 17) — V1 en vivo DIAGNOSTICADO = éxito + Fase 2 y código de Fase 3 hechos (Mani + Claude).** Mani corrió el V1 (1 proyecto, `top_n=10`, `dias=200`→en realidad la corrida fue con `dias=75`, `boost_idioma=1`) y subió los outputs de todos los nodos a `outputs/` + el de `Armar plan de corrida`. **Revisión punta-a-punta sobre los JSON + Supabase (PAT/service_role inline, A ROTAR).** **Embudo:** `120 IG + 80 TT → 202 normalizados → 160 asignados → 99 pre-trim → 10 heat-score → 6 gate → 6 candidatos`; cruza EXACTO con `runs.metricas` (`{colectados:202,asignados:160,pretrim:99,filtrados:10,gate:6,outputs:6}`) → **instrumentación cierre 15 verificada en vivo.** **VERIFICADO ✅:** **F3 resuelto** (3 referentes IG, `bayavoce=40/howtoconvince=40/jefferson_fisher=39`, monopolio muerto — el fix cierre 14 + cupo por-referente #24 funcionaron); **F2** IG-hashtag devolvió `no_items` (apagado, hard-coded en `Armar plan`: línea `ig_hashtags.push` removida, toggle `tg_ig_kw` ignorado); **TT-perfil** vacío (0 referentes TT); **recencia** (TT all-time 2021→2026 cortado a recientes en `Asignar` capa 2; IG ya filtra en origen); **pre-trim** tira `#fyp/#viral` sin sustancia, deja lo sustantivo; **transcripción 9/10** (campo `transcripcion` en el nodo Transcribir, `script` se rellena en Traducir — solo el no-inglés `ot` falló); **gate** scores reales 0.65–0.9, razones ES on-topic, dropea off-topic (`diaryofasalesgirl`); **boost idioma O2** los 6 candidatos finales son TODOS inglés (`boost_idioma=1`→×2); **atribución bi-eje** referente (`tema=''`) + keyword (`tema=relationships/communication`); **ADR-014 verificado en vivo** (tabla `outputs`=0 filas, el motor ya no escribe draft); **sin runs zombie**, `processed_items=10`. **NO se pudo verificar (no es falla, es setup):** fan-out ADR-013 (1 solo proyecto activo en el run), paginación #4 (tablas config <100 filas — quizá nunca se ejerce salvo `Candidatos`>100 en el archivado), dedup #5 (`processed_items` arrancó vacío). **Veredicto: el V1 es un éxito, no hay bugs que bloqueen.** **Fase 2 hecha:** guard de stubs en `Normalizar IG` (descarta sin `id/shortCode` ni `url`) y `Normalizar TT` (sin `id` ni `webVideoUrl`) — los stubs `{error:"no_items"}` (IG-Hashtag vacío) y `{}` (TT-Perfil vacío) ya no generan fila basura (probado contra los outputs reales: stubs dropeados, 0 reales afectados). Builder Node (convención CLAUDE.md), diff 2 líneas/2 nodos. **Código de Fase 3 hecho:** campos muertos `Referentes.seguidores`+`flag_viral` sacados de `airtable-cockpit.md` + `setup-airtable.mjs` (confirmado muertos: motor solo hace GET a Referentes, en la base viva los 7 están `null`; el contrato MENTÍA con "lo llena el motor"); `workflow.yaml` corregido `flag_viral`→`viral_por_tamano`. Validador **1116/0**. **Mani armó la config del próximo run (Fase 3):** 2 proyectos activos (*Comunicación de parejas* + *Comunicación en empresas*), ambos `top_n=10`/`dias=200`, con referentes compartidos. **Próxima sesión = diagnosticar ESE run** (ver §Próxima sesión). **TODO/Airtable:** `fecha`=createdTime, `link_doc`, restos de Voces YA hechos; falta borrar en UI `Referentes.seguidores`+`flag_viral` (la API no borra campos). Credenciales **A ROTAR**.
 
 **2026-06-23 (cierre 16) — Fase 0 (artefacto final) hecha:** #14 metadata template limpia, #11 deploy.mjs deprecado, #20 = **ADR-014** (motor deja de escribir `outputs` por-item, 37→35 nodos), docs resync a 35. Validador 1107/0. Commit `41f06a5`. **Detalle en §Plan a producción.**
@@ -267,6 +269,13 @@ idioma TikTok #7), se itera acá.
 
 ### Fase 3 — Resto de V-runs + higiene de producción (Mani, manual)
 
+> **Cierre 18:** el **run de Fase 3 corrió y se diagnosticó = éxito** (2 proyectos, fan-out ADR-013 ✅,
+> recencia 200 ✅, transcripción 19/20 ✅). Surgió y se arregló el **bug fan-out×dedup** (`POST
+> processed_items` sin `on_conflict` → 0 procesados; fix `workflow.json:706`). **Falta re-import +
+> Execute** para verificar el fix en vivo. **El detalle de TODO lo que queda para producción está
+> consolidado en §Próxima sesión** (los V-runs restantes están abajo, pero la lista completa y ordenada
+> vive en esa sección única).
+
 - **Sembrar 2–3 referentes TikTok** (hoy 0 → eje TT-perfil vacío) + subir `top_n` de parejas (2 es test).
 - **V2 literalidad** · **V3 curación + archivado** (verifica #20: Sheet alimentado desde el histórico limpio)
   · **V4 re-rank** · **V5 incremental + dedup** · **V6 resiliencia** (ver ROADMAP §3 para el detalle de cada V).
@@ -307,22 +316,73 @@ idioma TikTok #7), se itera acá.
 > 3. **Sembrar Referentes de TikTok** (hoy las 3 cuentas son IG → el eje *TikTok Perfil* sale vacío).
 > 4. **🔴 ROTAR el PAT de Airtable + la service_role de Supabase** (expuestos en el chat de hoy).
 
-## Próxima sesión — diagnosticar el run de Fase 3
+## Próxima sesión — LO QUE FALTA PARA PRODUCCIÓN (consolidado, cierre 18)
 
-> **🧭 PARA RETOMAR (cierre 17).** Fase 0/1/2 + código de Fase 3 hechos; el V1 fue un éxito. **Mani
-> está corriendo el run de Fase 3** (2 proyectos *parejas*+*empresas*, `top_n=10`, `dias=200`, referentes
-> compartidos) y subirá los outputs a `outputs/` (idealmente + `runs.metricas` de Supabase + `Armar plan`).
-> **Tarea de la próxima sesión = diagnosticar ESE run** igual que el V1 (minar `outputs/*.json` con `jq`,
-> cruzar con Supabase). Verificar lo que el V1 NO pudo:
-> 1. **Fan-out ADR-013** — buscar en `asignar-proyecto+voz.json` un mismo `external_id` con 2 `proyecto_id`
->    distintos (un video cross-relevante saliendo como 2 Candidatos con su voz). Confirma el grado 1.
-> 2. **Dedup #5** — `processed_items` tenía 10 ids del V1; esos no deben re-transcribirse (no re-pagar
->    Supadata/Claude). La URL de `Leer procesados` debe armar `external_id=in.(...)`.
-> 3. **Recencia 200** — debe entrar contenido más viejo que en el V1 (que corrió con ~75d).
-> Si todo cierra → seguir con **V2–V6 + manual de Fase 3** (ver §Plan a producción: borrar en UI
-> `Referentes.seguidores`+`flag_viral`, sembrar 2-3 referentes TikTok, #9 OAuth Sheets, **🔴 ROTAR
-> credenciales**) → **Fase 4** (activar crons + D2 manifest `active` + demo equipo). Sugeridos: `/diagnose`
-> si algo del run falla; si no, seguir el plan a mano.
+> **🧭 PARA RETOMAR (cierre 18).** El **núcleo del motor está validado end-to-end** (V1 cierre 17 +
+> run Fase 3 cierre 18: fan-out, recencia 200, transcripción, embudo — todo ✅). El último bug
+> (fan-out×dedup) ya está arreglado en código, **falta verificarlo en vivo**. Lo que queda para sacar
+> esto a producción está **todo acá, en una sola lista ordenada** (antes estaba disperso entre §Plan a
+> producción, §Mejoras y los PARA RETOMAR viejos). Atacar de arriba hacia abajo. **Camino crítico = A → B.**
+>
+> ### A. Verificar el fix de dedup en vivo (camino crítico, Mani manual)
+> 1. **Re-import del motor `workflow.json`** (trae el fix `?on_conflict=platform,external_id` en `POST
+>    processed_items`, línea 706) + llenar keys/IDs en el workflow que se corre (no el sandbox):
+>    `<ANTHROPIC_API_KEY>`, `<SUPADATA_API_KEY>` (¡la que faltó en el cierre 18!), `apifyApi` en los 4 Apify,
+>    `Airtable PAT`, `Supabase Registro`, IDs en `Config`.
+> 2. **Execute** con ≥2 proyectos que compartan referente/keyword (para ejercer el fan-out) → verificar
+>    que `processed_items` quede **poblado** (~19 filas, el video compartido **1×** gracias al ON CONFLICT
+>    DO NOTHING). Si queda en 0 otra vez, el fix no enganchó → re-diagnosticar.
+>
+> ### B. Workflows complementarios — los MENOS validados (cerrar antes del cron)
+> 3. **Archivado (`workflow-archivado`) — nunca re-corrió desde sus fixes.** Tiene cambios **sin verificar
+>    en vivo**: idempotencia (migración 005: `on_conflict=external_id` + `Prefer: ignore-duplicates` +
+>    delete con reintento 3×, cierre 6) y **paginación** de sus 3 lecturas (`Leer Proyectos/Voces/
+>    Candidatos`, cierre 15). **La V-run que lo ejercita (V3) NUNCA corrió.** Es el eslabón menos probado
+>    que va a prod. Con **ADR-014** (el motor ya no escribe `outputs`), el archivado es **el único que
+>    puebla `outputs` = el histórico canónico que alimenta el Sheet** → V3 debe confirmar: calificar en
+>    Airtable → fila en `outputs` → fila en el Sheet, sin 409, sin duplicar, sin perder candidatos.
+> 4. **#9 OAuth de Google Sheets — BLOQUEANTE de lanzamiento.** Está en modo *Testing* → el token vence
+>    cada 7 días y el cron del archivado (diario) falla en silencio ~1×/semana; además GCP corre con
+>    créditos gratuitos ($300). Publicar la app OAuth / mover a cuenta GCP permanente **antes** de activar
+>    el cron del archivado.
+> 5. **Error workflow (B5) — instalado pero nunca probado.** Verificar que **dispare y reporte** ante un
+>    fallo real (forzar un error en una corrida y confirmar que el error workflow lo captura). Riesgo bajo,
+>    pero hoy es fe ciega.
+>
+> ### C. Resto de V-runs (Mani manual; ver ROADMAP §3 para el detalle de cada V)
+> 6. **V2** literalidad (muestras reales del script ES) · **V3** curación + archivado (cubre el punto 3) ·
+>    **V4** re-rank · **V5** incremental + dedup (ahora con el fix del punto A) · **V6** resiliencia.
+>
+> ### D. Higiene de producción (Mani manual)
+> 7. **Sembrar 2–3 referentes TikTok** (hoy 0 → el eje TT-perfil sale vacío) + subir `top_n` real (10 ya es
+>    razonable; 2 era test).
+> 8. **TODO Airtable (borrar en UI, la API no borra campos):** `Referentes.seguidores` + `flag_viral`
+>    (muertos), restos de Voces, `link_doc`; `fecha → Created time`.
+> 9. **🔴 ROTAR credenciales** — Airtable PAT + Supabase service_role (expuestas en chats cierres 13–18).
+>
+> ### E. Fase 4 — Activación
+> 10. **D1** validar TZ `America/Bogota` → activar **cron del motor** (semanal, lunes 8am) + **cron del
+>     archivado** (diario, depende del punto 4).
+> 11. **D2** *(Claude, código + commit)* `status: active` en `workflow.yaml` + tabla `workflows`; manifest
+>     al estado real post-cierre-18.
+> 12. **D3** demo de 10 min con Majo y Jero (calificar, ver re-rank, bajar histórico).
+>
+> ### F. Gate de lanzamiento real (externo al repo — reunión con el jefe)
+> 13. **#32 interface user-friendly + #30/#31 dashboard/vistas Airtable.** Decisión transversal de Dani:
+>     **nadie usa la herramienta hasta que la interface esté lista.** Es el gate REAL de lanzamiento, no
+>     código del motor. (Detalle en §Mejoras #30–#32.)
+>
+> ### G. Refactor de búsqueda (#34/#35) — POST-MVP, NO ahora ⛔
+> 14. La **DIRECCIÓN del embudo de dos etapas** (descubrir CREADORES ≠ curar CONTENIDO; keywords →
+>     pestaña de **Criterios** estructurados *Sirve/No Sirve/Keywords*; búsqueda por hashtag pasa a proponer
+>     referentes que marketing vetea, no a alimentar candidatos directo) es el **refactor de producto más
+>     importante**, pero es un **build grande** (tabla/vista "Creadores propuestos" + superficie de review +
+>     reestructurar `Keywords`→`Criterios` + filtro de relevancia propio + dedup contra `Referentes`).
+>     **Explícitamente decidido: después del núcleo en producción.** NO tocarlo hasta que A–F estén cerrados.
+>     Detalle completo en §Mejoras (DIRECCIÓN 2026-06-23 + #34/#35).
+>
+> **Sugeridos:** `/diagnose` si el re-import del punto A no puebla `processed_items`; si no, seguir la
+> lista a mano. `/tdd` no aplica (el motor corre en n8n, se valida por re-import + Execute).
 >
 > ---
 > *Histórico (cierre 14, el plan de revisión de outputs Bloques A–D está completo; F1/F3/F4/F5 + D3 cerrados):*
@@ -799,6 +859,45 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     `Referentes` ya cargados.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-23 (cierre 18) — Run de Fase 3 diagnosticado + bug fan-out×dedup arreglado *(Mani + Claude)*
+
+**Qué se hizo.** Diagnóstico punta a punta del run de Fase 3 (2 proyectos *parejas*+*empresas*, `top_n=10`,
+`dias=200`, referentes compartidos) sobre `outputs/*.json` + cross-check Supabase/Airtable con credenciales
+vivas (PAT/service_role inline, **A ROTAR**).
+- **Lead inicial (transcripción vacía 0/20):** descartado que fuera Supadata o créditos — era la
+  `SUPADATA_API_KEY` **sin llenar** en el workflow. Mani la puso y re-corrió.
+- **Run con key — verificado:** transcripción 19/20 (el vacío = fail-open, video sin voz), script ES 19/20
+  (Haiku literal), **fan-out ADR-013** (video compartido `7629904064448449814` → entra por 2 proyectos a
+  `Asignar`, queda 1× en candidatos porque el gate filtró la copia de *empresas* — grado 1 OK), **recencia 200**
+  (corte capa 2 en `Asignar` elimina los 41 TT all-time + 4 IG viejos; `Asignar`/pretrim quedan 0 fuera de
+  200d), embudo `360→304→264→20→10→10` cruza exacto con `runs.metricas`.
+- **Limpieza DB pre-redo:** Mani pidió borrar "este run", eligió alcance "solo Fase 3" → borrados 10 Candidatos
+  Fase 3 (Airtable) + su fila `runs` (Supabase); V1 intacto (6 candidatos, run, 10 `processed_items`).
+
+**Bug encontrado y arreglado — fan-out × dedup #5.** El run escribió **0 `processed_items`** (debía ~20). Raíz:
+`POST processed_items` usaba `Prefer: resolution=ignore-duplicates` **sin `on_conflict` en la URL** → INSERT
+plano → la `unique(platform, external_id)` (schema 002:25) tiraba 409; el fan-out mete el video compartido **2×
+en el mismo batch** (Heat-score 20 filas / 19 únicos) → duplicado intra-batch → batch entero rebota →
+`onError continueRegularOutput` traga el 409. Confirmado por el output del nodo (`duplicate key value violates
+unique constraint processed_items_platform_external_id_key`). El V1 no lo pegó (1 proyecto = sin duplicado
+intra-batch). **Fix** (`workflow.json:706`, builder/convención): `?on_conflict=platform,external_id` → emite
+`INSERT … ON CONFLICT (platform,external_id) DO NOTHING` (tolera intra-batch + cross-run); mismo patrón que
+archivado nodo 11 y `Reportar outputs` (D3 cierre 14); cumple lo que el schema 002:30 ya documentaba. Diff 1
+línea, validador **1143/0**.
+
+**Gotcha / aprendizaje.** El re-dump completo del `workflow.json` con `json.dump` **no es surgical** acá: el
+archivo mezcla 24 escapes `\uXXXX` con 87 chars unicode crudos → cualquier dump reformatea 100+ caracteres. Para
+un cambio puntual de URL conviene un Edit de string exacto (diff 1 línea) en vez del builder full-dump, validando
+después que el JSON parsee + connections + jsCode. (Los 4 "FALLA" de `new Function()` sobre los Code nodes son
+falsos positivos: usan top-level `await`, válido en n8n.)
+
+**Qué quedó a medias.** El fix de dedup **sin commit** y **sin verificar en vivo** (necesita re-import + Execute).
+
+**Qué sigue.** Reorganizada §Próxima sesión en **una sola lista consolidada A–G** (todo lo que falta para
+producción, antes disperso). Camino crítico: A (verificar el fix en vivo) → B (archivado + #9 OAuth + error
+workflow, los menos validados). El refactor de búsqueda #34/#35 queda explícitamente **post-MVP**. Sugerido
+`/diagnose` si el re-import no puebla `processed_items`.
 
 ### 2026-06-18 (cierre 9) — Fix reels-only + auditoría del estado vivo *(Mani + Claude)*
 

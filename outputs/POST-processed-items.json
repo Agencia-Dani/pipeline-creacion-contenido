@@ -1,0 +1,11 @@
+[
+  {
+    "error": {
+      "message": "Your request is invalid or could not be processed by the service",
+      "timestamp": 1782242064896,
+      "name": "NodeApiError",
+      "description": "duplicate key value violates unique constraint \"processed_items_platform_external_id_key\"",
+      "context": {}
+    }
+  }
+]
