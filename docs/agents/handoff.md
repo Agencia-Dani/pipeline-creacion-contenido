@@ -202,7 +202,16 @@ hasta definir nicho)**.
 > seguras AHORA (Fase 0) para re-importar un artefacto final; **`outputs` de Supabase debe ser el
 > histórico canónico que alimente el Sheet correctamente** (reencuadre de #20 — ver Fase 0.3).
 
-### Fase 0 — Artefacto final (Claude, código + docs) → commit
+### Fase 0 — Artefacto final (Claude, código + docs) → commit · ✅ HECHA (commit `41f06a5`, 2026-06-23)
+
+> **Cierre 16:** #14 (meta.instanceId + tags limpios), #11 (deploy.mjs deprecado), #20 hecho como
+> **ADR-014** (motor deja de escribir `outputs` por-item; quita 2 nodos → 37→35; `Cerrar run` con
+> executeOnce y métrica `outputs`=`$('Armar candidato').all().length`; contrato ingesta-registro
+> actualizado), dev-doc resync a 35 nodos reales + cambios cierre 15 + paginación archivado, conteos
+> a 35 en PLAN/README/CLAUDE. Validador 1107/0. **Nota:** el onboarding ya estaba al día (6 tablas +
+> simétrico). **Pendiente menor (no en scope):** el checkbox "Buscar en Instagram por palabras clave"
+> del onboarding quedó no-op por F2 (IG-hashtag apagado) — revisar al confirmar F2 en V1. **Empezar en
+> Fase 1.**
 
 1. **#14 — limpiar metadata residual del template** en `Workflows/workflow-short-form-content/workflow.json`
    (`instanceId`, bloque `tags` "Content Strategy/Scraping/AI Automation", ~líneas 1273–1306). Cosmético.
