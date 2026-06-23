@@ -69,6 +69,32 @@
     },
     {
       "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.archivado&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { estado: 'fallo', fin: $now.toISO(), error: 'run de archivado sin cerrar (fallo antes de Cerrar run); barrido por corrida posterior' } }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "barrer-zombies",
+      "name": "Barrer runs zombie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 300],
+      "onError": "continueRegularOutput",
+      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+    },
+    {
+      "parameters": {
         "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Proyectos' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
@@ -297,7 +323,8 @@
     "Cron — diario 9am": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
     "Ejecutar manual": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
     "Config": { "main": [[{ "node": "Abrir run en el registro", "type": "main", "index": 0 }]] },
-    "Abrir run en el registro": { "main": [[{ "node": "Leer Proyectos", "type": "main", "index": 0 }]] },
+    "Abrir run en el registro": { "main": [[{ "node": "Barrer runs zombie", "type": "main", "index": 0 }]] },
+    "Barrer runs zombie": { "main": [[{ "node": "Leer Proyectos", "type": "main", "index": 0 }]] },
     "Leer Proyectos": { "main": [[{ "node": "Leer Voces", "type": "main", "index": 0 }]] },
     "Leer Voces": { "main": [[{ "node": "Leer Candidatos calificados", "type": "main", "index": 0 }]] },
     "Leer Candidatos calificados": { "main": [[{ "node": "IF — hay calificados", "type": "main", "index": 0 }]] },

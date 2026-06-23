@@ -21,6 +21,8 @@
 
 ## Estado en una línea
 
+**2026-06-23 (cierre 19) — Archivado corrido end-to-end + auditoría del ciclo de vida de documentos + B5 (camino de error) cerrado en código (Mani + Claude).** Mani sacó el motor+archivado hacia producción. **Archivado: 1ª ejecución completa con candidatos reales** (estados mezclados aprobado/descartado). En el camino, 2 fallos de la credencial Google Sheets: (1) **OAuth `invalid_grant`** → Mani hizo *reconnect* de la credencial en n8n (consent screen sin toggle Testing/Published → probablemente **Internal**, sin vencimiento de 7 días → desarma el bloqueante #9, falta confirmar que GCP no corra con los $300 free); (2) **503 UNAVAILABLE** (transitorio de Google) → reintento manual funcionó. **Hardening:** `retryOnFail`+`maxTries:3`+`waitBetweenTries:30000` en el nodo *Append al Sheet* (commit `4963a6c`). **Auditoría del ciclo de vida (cruce código↔base viva, PAT/service_role A ROTAR):** verificado punta a punta a dónde va cada documento — **descartados → `outputs` (estado='descartado') → borrados de Airtable → alimentan `v_senal_seleccion` como clase negativa** (no se tiran; bajan la tasa de su referente). Cross-check exacto: `outputs`=16 (12 aprobado+4 descartado) = `runs.metricas.archivados:16`; `v_senal_seleccion` suma calificados=16/seleccionados=12; **Airtable Candidatos=0** (cockpit limpio tras borrado); **0 filas en `outputs` sin estado** → ADR-014 se sostiene (motor no ensucia histórico). **Veredicto escalabilidad: el ciclo de vida ES sostenible** (nada se acumula sin dueño; Candidatos se vacía cada run, outputs/processed_items crecen lineal por diseño). **🐞 ÚNICA grieta = runs zombie:** 2 runs de archivado quedaron `en_curso` para siempre (los 2 intentos fallidos de hoy: OAuth+503 abrieron run → escribieron outputs → fallaron en el Append → nunca llegaron a *Cerrar run*). Quiebra la confiabilidad de `runs` y la trazabilidad (los 16 outputs quedaron sellados con el `run_id` del run FALLIDO `aca7608e`, no del exitoso `b65b04f6`, por `ignore-duplicates`). **FIX B5 aplicado en código** (`workflow-archivado/workflow.json`): nodo nuevo **`Barrer runs zombie`** (PATCH, entre *Abrir run* y *Leer Proyectos*) marca `fallo` cualquier run de archivado anterior `en_curso` (scoped `params->>workflow=eq.archivado` + `id=neq.<run actual>`, `onError continue`). Auto-sanador, idempotente, robusto a cualquier fallo; en el cron diario un zombie vive ≤1 día. Nota clave: `runs.estado` solo admite `en_curso/ok/fallo/parcial` (NO `error`). Validador **1143/0**, 18 nodos. **SIN VERIFICAR EN VIVO: falta re-import + Execute del archivado** (debería barrer los 2 zombies actuales solo). **Limpieza inmediata de los 2 zombies bloqueada** por el clasificador del harness (mutación a DB compartida) → o los barre la próxima corrida, o Mani corre el curl. Credenciales **A ROTAR**.
+
 **2026-06-23 (cierre 18) — Run de Fase 3 DIAGNOSTICADO = éxito + bug fan-out×dedup encontrado y arreglado (Mani + Claude).** Mani corrió el run de Fase 3 (2 proyectos *parejas*+*empresas*, `top_n=10`, `dias=200`, referentes compartidos) y subió outputs + los 3 outputs HTTP (`POST-processed-items`/`POST-airtable`/`cerrar-run`). **El primer intento salió SIN scripts (0/20 transcripción): NO fue Supadata ni créditos, fue la `SUPADATA_API_KEY` sin llenar** — Mani la puso y re-corrió. **Run con key VERIFICADO punta a punta:** transcripción ✅ 19/20 (el vacío = fail-open normal, video sin voz); script ES ✅ 19/20 (Haiku literal); **fan-out ADR-013 ✅** (el video compartido `7629904064448449814` entra a `Asignar` por los 2 proyectos; queda 1× en candidatos finales — el gate filtró la copia de *empresas* — grado 1 funciona; 6 parejas + 4 empresas, sin `external_id` dup en el resultado); **recencia 200 ✅** (normalize trae TikTok all-time 2021→2026 + 4 IG viejos, pero el corte capa 2 en `Asignar` los elimina: `Asignar` 304 y pretrim 264 tienen 0 fuera de 200d); **embudo** `360 → 304 asignados → 264 pretrim → 20 heatscore (top_n 10×2) → 10 gate → 10 candidatos`, cruza exacto con `runs.metricas`. **🐞 BUG NUEVO encontrado y ARREGLADO — fan-out × dedup #5:** el run escribió **0 `processed_items`** (debía ~20). Causa: `POST processed_items` mandaba `Prefer: resolution=ignore-duplicates` pero **sin `on_conflict` en la URL** → PostgREST hacía INSERT plano y la `unique(platform, external_id)` (schema 002:25) tiraba 409; el **fan-out mete el video compartido 2× en el mismo batch** (Heat-score 20 filas / 19 únicos) → duplicado intra-batch → batch entero rebota → `onError continueRegularOutput` se traga el 409 → 0 registrados. El V1 no lo pegó (1 proyecto = sin duplicado intra-batch). **Consecuencia:** sin fix, la próxima corrida incremental no se salta ningún video → re-transcribe todo → re-paga Supadata+Claude, justo en multi-proyecto que es el modo por defecto. **FIX aplicado** (`workflow.json:706`, builder/convención): `?on_conflict=platform,external_id` en la URL → ahora emite `INSERT … ON CONFLICT (platform,external_id) DO NOTHING` (tolera intra-batch Y cross-run); mismo patrón que archivado nodo 11 y `Reportar outputs` (fix D3 cierre 14); cumple lo que el schema 002:30 ya documentaba. Diff 1 línea, validador **1143/0**. **SIN COMMIT, FALTA RE-IMPORT + Execute** para verificar `processed_items` poblado (~19 filas, compartido 1×). **Limpieza DB pre-redo** (Mani eligió "solo Fase 3"): borrados 10 Candidatos Fase 3 + su fila `runs`; V1 intacto (6 candidatos, run, 10 `processed_items`). **Núcleo del motor validado end-to-end (V1 + Fase 3); lo que falta para producción quedó consolidado en §Próxima sesión.** Credenciales **A ROTAR** (re-expuestas).
 
 **2026-06-23 (cierre 17) — V1 en vivo DIAGNOSTICADO = éxito + Fase 2 y código de Fase 3 hechos (Mani + Claude).** Mani corrió el V1 (1 proyecto, `top_n=10`, `dias=200`→en realidad la corrida fue con `dias=75`, `boost_idioma=1`) y subió los outputs de todos los nodos a `outputs/` + el de `Armar plan de corrida`. **Revisión punta-a-punta sobre los JSON + Supabase (PAT/service_role inline, A ROTAR).** **Embudo:** `120 IG + 80 TT → 202 normalizados → 160 asignados → 99 pre-trim → 10 heat-score → 6 gate → 6 candidatos`; cruza EXACTO con `runs.metricas` (`{colectados:202,asignados:160,pretrim:99,filtrados:10,gate:6,outputs:6}`) → **instrumentación cierre 15 verificada en vivo.** **VERIFICADO ✅:** **F3 resuelto** (3 referentes IG, `bayavoce=40/howtoconvince=40/jefferson_fisher=39`, monopolio muerto — el fix cierre 14 + cupo por-referente #24 funcionaron); **F2** IG-hashtag devolvió `no_items` (apagado, hard-coded en `Armar plan`: línea `ig_hashtags.push` removida, toggle `tg_ig_kw` ignorado); **TT-perfil** vacío (0 referentes TT); **recencia** (TT all-time 2021→2026 cortado a recientes en `Asignar` capa 2; IG ya filtra en origen); **pre-trim** tira `#fyp/#viral` sin sustancia, deja lo sustantivo; **transcripción 9/10** (campo `transcripcion` en el nodo Transcribir, `script` se rellena en Traducir — solo el no-inglés `ot` falló); **gate** scores reales 0.65–0.9, razones ES on-topic, dropea off-topic (`diaryofasalesgirl`); **boost idioma O2** los 6 candidatos finales son TODOS inglés (`boost_idioma=1`→×2); **atribución bi-eje** referente (`tema=''`) + keyword (`tema=relationships/communication`); **ADR-014 verificado en vivo** (tabla `outputs`=0 filas, el motor ya no escribe draft); **sin runs zombie**, `processed_items=10`. **NO se pudo verificar (no es falla, es setup):** fan-out ADR-013 (1 solo proyecto activo en el run), paginación #4 (tablas config <100 filas — quizá nunca se ejerce salvo `Candidatos`>100 en el archivado), dedup #5 (`processed_items` arrancó vacío). **Veredicto: el V1 es un éxito, no hay bugs que bloqueen.** **Fase 2 hecha:** guard de stubs en `Normalizar IG` (descarta sin `id/shortCode` ni `url`) y `Normalizar TT` (sin `id` ni `webVideoUrl`) — los stubs `{error:"no_items"}` (IG-Hashtag vacío) y `{}` (TT-Perfil vacío) ya no generan fila basura (probado contra los outputs reales: stubs dropeados, 0 reales afectados). Builder Node (convención CLAUDE.md), diff 2 líneas/2 nodos. **Código de Fase 3 hecho:** campos muertos `Referentes.seguidores`+`flag_viral` sacados de `airtable-cockpit.md` + `setup-airtable.mjs` (confirmado muertos: motor solo hace GET a Referentes, en la base viva los 7 están `null`; el contrato MENTÍA con "lo llena el motor"); `workflow.yaml` corregido `flag_viral`→`viral_por_tamano`. Validador **1116/0**. **Mani armó la config del próximo run (Fase 3):** 2 proyectos activos (*Comunicación de parejas* + *Comunicación en empresas*), ambos `top_n=10`/`dias=200`, con referentes compartidos. **Próxima sesión = diagnosticar ESE run** (ver §Próxima sesión). **TODO/Airtable:** `fecha`=createdTime, `link_doc`, restos de Voces YA hechos; falta borrar en UI `Referentes.seguidores`+`flag_viral` (la API no borra campos). Credenciales **A ROTAR**.
@@ -334,29 +336,27 @@ idioma TikTok #7), se itera acá.
 >    DO NOTHING). Si queda en 0 otra vez, el fix no enganchó → re-diagnosticar.
 >
 > ### B. Workflows complementarios — los MENOS validados (cerrar antes del cron)
-> 3. **Archivado (`workflow-archivado`) — nunca re-corrió desde sus fixes.** Tiene cambios **sin verificar
->    en vivo**: idempotencia (migración 005: `on_conflict=external_id` + `Prefer: ignore-duplicates` +
->    delete con reintento 3×, cierre 6); **paginación** de sus 3 lecturas (`Leer Proyectos/Voces/
->    Candidatos`, cierre 15); y **el SPLIT (cierre 19, sin correr aún):** filtro de lectura ahora
->    `NOT({estado} = 'nuevo')` (antes `calificacion` no-vacía) → trae aprobado/publicado/descartado; el
->    **Sheet recibe solo aprobado/publicado**, mientras Supabase `outputs` + borrado toman **todos** los
->    decididos (descartados alimentan `v_senal_seleccion` y se limpian del cockpit, sin ensuciar el
->    histórico). Nodo nuevo `Reconvergir tras Sheet` (Merge) para que el borrado corra aun con 0 aprobados
->    pero espere al Append. **La V-run que lo ejercita (V3) NUNCA corrió.** Es el eslabón menos probado que
->    va a prod. Con **ADR-014** (el motor ya no escribe `outputs`), el archivado es **el único que puebla
->    `outputs` = el histórico canónico que alimenta el Sheet** → V3 debe confirmar: calificar en Airtable
->    (mezclar aprobados Y descartados) → `outputs` recibe ambos con su `estado` · el Sheet **solo** los
->    aprobados · todos se borran de Airtable · sin 409, sin duplicar, sin perder candidatos. **Probar el
->    caso lote 100% descartado** (rama Sheet vacía): el Merge debe dejar pasar el borrado igual (si se
->    cuelga ahí, el Merge no tolera la entrada vacía en esta versión de n8n → re-evaluar). El archivado
->    **no gasta Apify/Supadata** → se puede validar gratis, desacoplado del run del motor.
-> 4. **#9 OAuth de Google Sheets — BLOQUEANTE de lanzamiento.** Está en modo *Testing* → el token vence
->    cada 7 días y el cron del archivado (diario) falla en silencio ~1×/semana; además GCP corre con
->    créditos gratuitos ($300). Publicar la app OAuth / mover a cuenta GCP permanente **antes** de activar
->    el cron del archivado.
-> 5. **Error workflow (B5) — instalado pero nunca probado.** Verificar que **dispare y reporte** ante un
->    fallo real (forzar un error en una corrida y confirmar que el error workflow lo captura). Riesgo bajo,
->    pero hoy es fe ciega.
+> 3. **✅ Archivado corrido end-to-end con candidatos reales (cierre 19) — V3 esencialmente cubierto.**
+>    Mani lo ejercitó con estados mezclados (aprobado/descartado): `outputs`=16 = `runs.metricas.archivados`,
+>    Candidatos=0 tras borrado, Sheet solo aprobados, descartados a `outputs`+`v_senal_seleccion`, sin 409,
+>    sin duplicar. **Auditoría del ciclo de vida = sostenible** (ver §Estado cierre 19). **Pendiente menor:**
+>    probar explícitamente el **caso lote 100% descartado** (rama Sheet vacía → el Merge `Reconvergir tras
+>    Sheet` debe dejar pasar el borrado igual) — el run de hoy tuvo aprobados, así que esa rama no se ejerció.
+>    Y re-correr una vez tras el re-import del fix de barrido (punto 5).
+> 4. **🟡 #9 OAuth de Google Sheets (cierre 19) — bloqueante probablemente desarmado.** Mani reconectó la
+>    credencial; la consent screen no muestra toggle Testing/Published → casi seguro la app es **Internal**
+>    (Workspace) → los refresh tokens **no vencen** a los 7 días. **Falta confirmar:** (a) que sea Internal
+>    de verdad (no Testing sin verificar); (b) que GCP **no** esté corriendo con los créditos gratuitos
+>    ($300) que se agotan. Si ambas OK, #9 deja de ser bloqueante. El `retryOnFail` del Append (cierre 19,
+>    commit `4963a6c`) ya cubre los 503 transitorios de Google.
+> 5. **✅ Error workflow / camino de error (B5) cerrado en código (cierre 19) — FALTA verificar en vivo.**
+>    Los 2 runs zombie de hoy fueron la prueba en vivo de que un fallo del archivado dejaba el run `en_curso`
+>    para siempre. **Fix:** nodo `Barrer runs zombie` (PATCH, entre *Abrir run* y *Leer Proyectos*) marca
+>    `fallo` los runs de archivado anteriores colgados `en_curso` (auto-sanador, idempotente, scoped a
+>    `params->>workflow=archivado`, excluye el run actual). **Verificar en el re-import:** que la próxima
+>    corrida del archivado deje los 2 zombies actuales (`aca7608e`, `d3d8723c`) en `fallo`. *(Esto NO
+>    reemplaza al error workflow global de n8n para notificación; si se quiere alerta proactiva ante fallo,
+>    eso sigue siendo fe ciega — pero la integridad de `runs` ya queda sana sin él.)*
 >
 > ### C. Resto de V-runs (Mani manual; ver ROADMAP §3 para el detalle de cada V)
 > 6. **V2** literalidad (muestras reales del script ES) · **V3** curación + archivado (cubre el punto 3) ·
@@ -875,6 +875,49 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     `Referentes` ya cargados.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-23 (cierre 19) — Archivado en vivo + auditoría del ciclo de vida + B5 cerrado en código *(Mani + Claude)*
+
+**Qué se hizo.** Mani empujó motor+archivado hacia producción y testeó el **workflow de archivado** por primera
+vez end-to-end con candidatos reales.
+
+- **Credencial Google Sheets, 2 fallos resueltos:** (1) OAuth `invalid_grant` (refresh token inválido/vencido)
+  → *reconnect* de la credencial en n8n; la consent screen no muestra Testing/Published → casi seguro **Internal**
+  (sin vencimiento de 7d) → #9 probablemente desarmado, falta confirmar Internal + que GCP no esté en los $300 free.
+  (2) `503 UNAVAILABLE` (transitorio de Google) → reintento manual OK.
+- **Hardening:** `retryOnFail`+`maxTries:3`+`waitBetweenTries:30000` en *Append al Sheet Histórico*. Commit `4963a6c`.
+- **Auditoría del ciclo de vida (pregunta de Mani: ¿es escalable/sostenible? ¿a dónde van los descartados?).**
+  Crucé el código del archivado contra la base viva (PAT/service_role, **A ROTAR**):
+  - **A dónde va cada documento:** Candidatos (Airtable) = cola de trabajo, se vacía cada run (**0 records** ✅).
+    `outputs` (Supabase) = histórico canónico, TODOS los decididos con su `estado`, append-only idempotente.
+    Sheet = solo `aprobado/publicado`. `v_senal_*` = vistas derivadas. `processed_items` = ledger de dedup.
+  - **Descartados:** → `outputs` (estado='descartado') → borrados de Airtable → **alimentan `v_senal_seleccion`
+    como clase negativa** (bajan la tasa de su referente; no se tiran).
+  - **Cross-checks exactos:** `outputs`=16 (12 aprobado+4 descartado) = `runs.metricas.archivados:16`;
+    `v_senal_seleccion` calificados=16/seleccionados=12; **0 filas en `outputs` sin estado** → ADR-014 se sostiene.
+  - **Veredicto:** el ciclo de vida **es sostenible** — nada se acumula sin dueño.
+- **🐞 Única grieta — runs zombie.** 2 runs de archivado quedaron `en_curso` para siempre (`aca7608e`,
+  `d3d8723c`): los intentos fallidos de hoy abrieron run → escribieron outputs → fallaron en el Append → nunca
+  llegaron a *Cerrar run*. Quiebra la confiabilidad de `runs` + trazabilidad (los 16 outputs quedaron sellados
+  con el `run_id` del run **fallido** por `ignore-duplicates`, no del exitoso `b65b04f6`).
+- **Fix B5 (camino de error) en código.** Nodo nuevo **`Barrer runs zombie`** en `workflow-archivado/workflow.json`
+  (PATCH Supabase entre *Abrir run* y *Leer Proyectos*): marca `fallo` los runs de archivado anteriores `en_curso`,
+  scoped a `params->>workflow=eq.archivado` + `id=neq.<run actual>`, `onError continue`. Auto-sanador, idempotente,
+  robusto a cualquier modo de fallo; en el cron diario un zombie vive ≤1 día.
+
+**Gotchas / aprendizajes.**
+- `runs.estado` solo admite `en_curso/ok/fallo/parcial` (check de `001_registro_inicial.sql:46`) — **NO existe
+  `error`**. Marcar zombies con `error` rebota por constraint; usar `fallo`.
+- Los runs del archivado se distinguen del motor por `params.workflow='archivado'` (no hay columna `tipo`/`workflow`
+  en `runs`). Eso permite barrer solo zombies de archivado.
+- El **clasificador del harness bloqueó el PATCH directo** de los 2 zombies a la DB de producción (mutación a base
+  compartida), aun con Mani autorizándolo. Quedan para barrer por la próxima corrida del archivado (o Mani corre el
+  curl). El fix de código hace la limpieza manual casi innecesaria.
+
+**Qué quedó a medias / qué sigue.** Re-import + Execute del archivado para verificar en vivo que `Barrer runs zombie`
+deja los 2 zombies en `fallo`. Probar el caso **lote 100% descartado** (rama Sheet vacía). Confirmar #9 (Internal +
+GCP no-free). Sigue pendiente lo de §Próxima sesión (camino crítico A = fix dedup del motor; resto de V-runs; higiene;
+rotar credenciales).
 
 ### 2026-06-23 (cierre 18) — Run de Fase 3 diagnosticado + bug fan-out×dedup arreglado *(Mani + Claude)*
 
