@@ -21,6 +21,10 @@
 
 ## Estado en una línea
 
+**2026-06-23 (cierre 17) — V1 en vivo DIAGNOSTICADO = éxito + Fase 2 y código de Fase 3 hechos (Mani + Claude).** Mani corrió el V1 (1 proyecto, `top_n=10`, `dias=200`→en realidad la corrida fue con `dias=75`, `boost_idioma=1`) y subió los outputs de todos los nodos a `outputs/` + el de `Armar plan de corrida`. **Revisión punta-a-punta sobre los JSON + Supabase (PAT/service_role inline, A ROTAR).** **Embudo:** `120 IG + 80 TT → 202 normalizados → 160 asignados → 99 pre-trim → 10 heat-score → 6 gate → 6 candidatos`; cruza EXACTO con `runs.metricas` (`{colectados:202,asignados:160,pretrim:99,filtrados:10,gate:6,outputs:6}`) → **instrumentación cierre 15 verificada en vivo.** **VERIFICADO ✅:** **F3 resuelto** (3 referentes IG, `bayavoce=40/howtoconvince=40/jefferson_fisher=39`, monopolio muerto — el fix cierre 14 + cupo por-referente #24 funcionaron); **F2** IG-hashtag devolvió `no_items` (apagado, hard-coded en `Armar plan`: línea `ig_hashtags.push` removida, toggle `tg_ig_kw` ignorado); **TT-perfil** vacío (0 referentes TT); **recencia** (TT all-time 2021→2026 cortado a recientes en `Asignar` capa 2; IG ya filtra en origen); **pre-trim** tira `#fyp/#viral` sin sustancia, deja lo sustantivo; **transcripción 9/10** (campo `transcripcion` en el nodo Transcribir, `script` se rellena en Traducir — solo el no-inglés `ot` falló); **gate** scores reales 0.65–0.9, razones ES on-topic, dropea off-topic (`diaryofasalesgirl`); **boost idioma O2** los 6 candidatos finales son TODOS inglés (`boost_idioma=1`→×2); **atribución bi-eje** referente (`tema=''`) + keyword (`tema=relationships/communication`); **ADR-014 verificado en vivo** (tabla `outputs`=0 filas, el motor ya no escribe draft); **sin runs zombie**, `processed_items=10`. **NO se pudo verificar (no es falla, es setup):** fan-out ADR-013 (1 solo proyecto activo en el run), paginación #4 (tablas config <100 filas — quizá nunca se ejerce salvo `Candidatos`>100 en el archivado), dedup #5 (`processed_items` arrancó vacío). **Veredicto: el V1 es un éxito, no hay bugs que bloqueen.** **Fase 2 hecha:** guard de stubs en `Normalizar IG` (descarta sin `id/shortCode` ni `url`) y `Normalizar TT` (sin `id` ni `webVideoUrl`) — los stubs `{error:"no_items"}` (IG-Hashtag vacío) y `{}` (TT-Perfil vacío) ya no generan fila basura (probado contra los outputs reales: stubs dropeados, 0 reales afectados). Builder Node (convención CLAUDE.md), diff 2 líneas/2 nodos. **Código de Fase 3 hecho:** campos muertos `Referentes.seguidores`+`flag_viral` sacados de `airtable-cockpit.md` + `setup-airtable.mjs` (confirmado muertos: motor solo hace GET a Referentes, en la base viva los 7 están `null`; el contrato MENTÍA con "lo llena el motor"); `workflow.yaml` corregido `flag_viral`→`viral_por_tamano`. Validador **1116/0**. **Mani armó la config del próximo run (Fase 3):** 2 proyectos activos (*Comunicación de parejas* + *Comunicación en empresas*), ambos `top_n=10`/`dias=200`, con referentes compartidos. **Próxima sesión = diagnosticar ESE run** (ver §Próxima sesión). **TODO/Airtable:** `fecha`=createdTime, `link_doc`, restos de Voces YA hechos; falta borrar en UI `Referentes.seguidores`+`flag_viral` (la API no borra campos). Credenciales **A ROTAR**.
+
+**2026-06-23 (cierre 16) — Fase 0 (artefacto final) hecha:** #14 metadata template limpia, #11 deploy.mjs deprecado, #20 = **ADR-014** (motor deja de escribir `outputs` por-item, 37→35 nodos), docs resync a 35. Validador 1107/0. Commit `41f06a5`. **Detalle en §Plan a producción.**
+
 **2026-06-23 (cierre 15) — 4 mejoras pre-cron de código aplicadas: #4 paginación, #5 dedup acotado, instrumentación de descartes, F2 IG-hashtag apagado (Mani + Claude).** Sesión de código en **ambos** workflows. **Sin commit aún** (working tree); validador **1098/0**; **NO corrió en vivo — falta re-import + Execute** (Mani verifica ahí; la paginación de n8n no se puede probar localmente). Diffs quirúrgicos: motor 81+/9-, archivado 8 líneas (el archivado se editó por replace de texto crudo para no reexpandir su formato compacto). **(1) #4 Paginación Airtable** — `options.pagination` (modo `updateAParameterInEachRequest`, query `offset`={{`$response.body.offset`}}, completa cuando `!offset`) en las 4 lecturas del motor (`Leer Proyectos/Voces/Keywords/Referentes`) y las 3 del archivado (`Leer Proyectos/Voces/Candidatos calificados`). Los consumidores agregan **todas las páginas**: motor `recs` helper → `$(n).all().flatMap(it => it.json.records||[])`; archivado `Armar filas` igual para Candidatos/Proyectos/Voces. Robusto a 1-item-por-página **o** item único (flatMap cubre ambos). El `IF — hay calificados` del archivado no necesita cambio: `Armar filas` es Code run-once-for-all → corre 1× aunque pasen varias páginas. **Resuelve el truncado silencioso a 100 records.** **(2) #5 Dedup acotado** — `Leer procesados` ya no trae `limit=20000`; la URL arma `external_id=in.(<ids de la corrida>)` desde `$('Pre-trim relevancia').all()` (corre antes). Mismo resultado de dedup, query chica → no re-paga Supadata/Claude al escalar `processed_items`. IDs (shortcodes IG / numéricos TT) no necesitan comillas en PostgREST. **(3) Instrumentación de descartes** — `console.log` en Pre-trim (`[Pre-trim] descartados off-topic: n/total -> ids`) y Gate (`[Gate] DESCARTE pid=… id=… score=… motivo=irrelevante|score<min|sin-juicio :: razon`). Visible vía `journalctl -u n8n` (no la pestaña Logs, que esta versión no muestra — mismo patrón que `Transcribir`). Además el embudo entero entra a `runs.metricas`: ahora `colectados/asignados/pretrim/filtrados/gate/outputs` (antes solo colectados/filtrados/outputs) → visible en Supabase sin tocar logs. **Habilita calibrar pesos/rubric viendo qué se tira.** **(4) F2 IG-hashtag apagado** — en `Armar plan` se quitó `if (p.tg_ig_kw) ig_hashtags.push(kk)` (queda comentario): `ig_hashtags` siempre vacío → el Apify IG Hashtag recibe 0 URLs y no trae nada; **TikTok-hashtag intacto**. Reversible (re-agregar la línea) y soft (el toggle por-proyecto sigue existiendo, solo se ignora). **Pendiente:** commit + re-import + Execute para verificar en vivo (paginación, dedup acotado, métricas del embudo, IG-hashtag en 0). **Mani pidió plan mode para atacar el handoff completo y dejar motor + archivado en versión final de producción** (ver §Próxima sesión + §Mejoras). Credenciales Airtable/Supabase **siguen a ROTAR**.
 
 **2026-06-19 (cierre 14) — F3 resuelto (era bug de código), fan-out multi-proyecto (ADR-013) + D3 cerrado (Mani + Claude).** Sesión de código de motor. Commit `76ea422` en `main` (validador 1098/0). **El motor NO corrió en vivo: falta re-import + Execute en n8n.** **F3 RESUELTO ✅ — la causa NO era datos ni Apify, era un bug de `Armar plan de corrida`.** Pista de Mani: las 2 cuentas con 0 reels (@jefferson_fisher, @howtoconvince) tienen contenido reciente y están ligadas a **varios** proyectos; @bayavoce a uno solo (el activo). Causa raíz: `Leer Proyectos` filtra `activo` → el dict `projects` solo tiene el proyecto activo; los loops de referentes/keywords tomaban `f.proyecto[0]` (el **primer** proyecto ligado) → si ese primero está inactivo, `projects[proy]` es `undefined` → `return` → **el referente nunca se mandaba a Apify**. jefferson lista líderes (inactivo) primero, howtoconvince lista empresas (inactivo) primero → ambos descartados; bayavoce lista parejas (activo) → único que pasaba. **Fix 1:** ambos loops iteran **todos** los proyectos ligados y suman a cada activo. Resuelve F3 para cualquier config. **Fan-out multi-proyecto (ADR-013, decisión de grilling):** Mani pidió que el motor sirva para cualquier combinación de Proyectos/Voces/Keywords activos manteniendo coherencia. La estructura ya escala (todo keyed por `proyecto_id`); el punto frágil era cuando 2+ proyectos activos reclaman el mismo video (referente o keyword compartida) — `ig/tt_owner_to_proj` escalar (gana el último) y `kw[t][0]` (gana el primero). **Decisión: fan-out grado 1 (MVP, sin tocar schema).** Un video se evalúa contra **cada proyecto activo que lo reclama**, con su voz y juicio; la unidad de curación pasa a ser **(video, proyecto)** → puede salir como 2 Candidatos. El gate limita el duplicado solo (solo duplica lo que pasa los 2 gates). El dedup sigue **global por `external_id`** (caveat aceptado: el video se ofrece 1× al descubrirlo, no re-surge; histórico guarda 1 fila → aprendizaje por-proyecto más grueso, refinable post-MVP = grado 2, migración 007). **3 nodos:** `Armar plan` (owner maps escalar→array), `Asignar proyecto+voz` (emite 1 item por proyecto que reclama; referente reclama con tema='', keyword con su término; `pid in claims` preserva prioridad referente), `Pre-trim relevancia` (descarte por `(proyecto, external_id)` — si no, el drop de un proyecto mataba la copia del otro). Glosario actualizado (Proyecto + Candidato contradecían la decisión). **D3 RESUELTO ✅** — nodo 31 (`Reportar outputs`) ahora `POST outputs?on_conflict=external_id` + `Prefer: resolution=ignore-duplicates,return=minimal` (mismo patrón que el archivado nodo 11). Con fan-out los `external_id` repetidos entre proyectos son normales → sin este fix el batch rebotaría 409 seguido. dev-doc:124 actualizado. **Verificar en el re-import:** (1) `apify-igreels` trae owners de los 3 handles de parejas, no solo @bayavoce; (2) con 2 proyectos que comparten referente, un video cross-relevante sale como 2 Candidatos (distinto proyecto/voz); (3) archivado ya no rebota 409. Keys (`<ANTHROPIC_API_KEY>`, `<SUPADATA_API_KEY>`, `apifyApi`) llenas en el workflow que se corra, no en el sandbox. **Sigue abierto (ver §Próxima sesión):** F2 (decidir IG-hashtag), TODO Airtable (campos muertos), referentes TikTok sin sembrar, instrumentar descartes gate/pretrim, pre-cron (#4/#5/#9), grado 2 de fan-out (post-MVP). Credenciales Airtable/Supabase **a ROTAR**.
@@ -234,7 +238,12 @@ hasta definir nicho)**.
 5. **Commit** de todo (cierre 15 + Fase 0) a `main`, español, conciso.
    *Verificación: `npm run validate` verde; `jsCode` parsea; diff quirúrgico (no reexpandir el archivado).*
 
-### Fase 1 — Re-import + V1 en vivo (Mani, manual) · **el gate**
+### Fase 1 — Re-import + V1 en vivo (Mani, manual) · ✅ HECHA (cierre 17) — V1 = éxito
+
+> **Cierre 17:** el V1 corrió y se diagnosticó (1 proyecto, embudo 202→6, todo verde). Verificados F3,
+> F2, recencia, pre-trim, gate, transcripción, boost idioma, ADR-014, instrumentación. Pendiente de
+> verificar (necesita setup, no es falla): fan-out, paginación, dedup → se prueban en el run de Fase 3.
+> **Detalle completo en §Estado en una línea (cierre 17).**
 
 1. Re-importar **ambos** workflow.json. Llenar en el workflow que se corre (no el sandbox):
    `<ANTHROPIC_API_KEY>`, `<SUPADATA_API_KEY>`, `apifyApi` en los 4 Apify, `Airtable PAT`, `Supabase Registro`;
@@ -249,10 +258,12 @@ hasta definir nicho)**.
    *Riesgo: la paginación de n8n no se probó localmente; si el schema falla se ajusta en Fase 2 (downside
    acotado: con ≤100 records el comportamiento = hoy).*
 
-### Fase 2 — Fixes reactivos del V1 (Claude, código)
+### Fase 2 — Fixes reactivos del V1 (Claude, código) · ✅ HECHA (cierre 17)
 
-Corregir lo que el V1 exponga (schema de paginación, `in.()` en la URL, edge de fan-out, idioma TikTok #7…).
-Re-validar y re-commit. Iterar con Mani hasta que el V1 quede limpio.
+El V1 salió limpio: el único item de código fue el **guard de stubs** (`Normalizar IG`/`TT` descartan los
+stubs vacíos `{error:"no_items"}` y `{}` de los ejes sin datos). Hecho + probado contra outputs reales.
+Nada más que corregir. Si el run de Fase 3 expone algo nuevo (edge de fan-out, schema de paginación,
+idioma TikTok #7), se itera acá.
 
 ### Fase 3 — Resto de V-runs + higiene de producción (Mani, manual)
 
@@ -296,10 +307,25 @@ Re-validar y re-commit. Iterar con Mani hasta que el V1 quede limpio.
 > 3. **Sembrar Referentes de TikTok** (hoy las 3 cuentas son IG → el eje *TikTok Perfil* sale vacío).
 > 4. **🔴 ROTAR el PAT de Airtable + la service_role de Supabase** (expuestos en el chat de hoy).
 
-## Próxima sesión — corregir config real + estabilizar corridas
+## Próxima sesión — diagnosticar el run de Fase 3
 
-> **🧭 PENDIENTE PARA RETOMAR (cierre 14) — checklist único.** El plan de revisión de outputs (Bloques
-> A–D) está **completo**; F1/F3/F4/F5 + D3 **cerrados**. Lo que queda, en orden sugerido:
+> **🧭 PARA RETOMAR (cierre 17).** Fase 0/1/2 + código de Fase 3 hechos; el V1 fue un éxito. **Mani
+> está corriendo el run de Fase 3** (2 proyectos *parejas*+*empresas*, `top_n=10`, `dias=200`, referentes
+> compartidos) y subirá los outputs a `outputs/` (idealmente + `runs.metricas` de Supabase + `Armar plan`).
+> **Tarea de la próxima sesión = diagnosticar ESE run** igual que el V1 (minar `outputs/*.json` con `jq`,
+> cruzar con Supabase). Verificar lo que el V1 NO pudo:
+> 1. **Fan-out ADR-013** — buscar en `asignar-proyecto+voz.json` un mismo `external_id` con 2 `proyecto_id`
+>    distintos (un video cross-relevante saliendo como 2 Candidatos con su voz). Confirma el grado 1.
+> 2. **Dedup #5** — `processed_items` tenía 10 ids del V1; esos no deben re-transcribirse (no re-pagar
+>    Supadata/Claude). La URL de `Leer procesados` debe armar `external_id=in.(...)`.
+> 3. **Recencia 200** — debe entrar contenido más viejo que en el V1 (que corrió con ~75d).
+> Si todo cierra → seguir con **V2–V6 + manual de Fase 3** (ver §Plan a producción: borrar en UI
+> `Referentes.seguidores`+`flag_viral`, sembrar 2-3 referentes TikTok, #9 OAuth Sheets, **🔴 ROTAR
+> credenciales**) → **Fase 4** (activar crons + D2 manifest `active` + demo equipo). Sugeridos: `/diagnose`
+> si algo del run falla; si no, seguir el plan a mano.
+>
+> ---
+> *Histórico (cierre 14, el plan de revisión de outputs Bloques A–D está completo; F1/F3/F4/F5 + D3 cerrados):*
 > 1. **🔴 Re-import + Execute en n8n (camino crítico).** Verifica de un saque los fixes sin correr en vivo aún:
 >    (a) F3 — `apify-igreels` trae owners de los 3 referentes de parejas, no solo @bayavoce; (b) fan-out
 >    (ADR-013) — con 2 proyectos que comparten un referente, un video cross-relevante sale como 2 Candidatos
@@ -731,6 +757,46 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     Paraguas de #30/#31.
 33. **[FUTURO, no MVP] Perfilador de avatar.** Herramienta que perfile al avatar del cliente y sugiera
     referentes con más autonomía (pedido de Jero). 📍 **Plan:** backlog post-MVP, fuera del alcance actual.
+    **Lo concreta #35** (descubrimiento de creadores como output revisado).
+
+> **🎯 DIRECCIÓN (Mani, 2026-06-23) — embudo de dos etapas: descubrir creadores ≠ curar contenido.**
+> Pedida después de plantar la macro-estructura (NO antes del V1; el núcleo se valida con el modelo
+> actual). Hoy la **keyword hace doble trabajo**: descubre videos nuevos (hashtag-search) Y atribuye/
+> rankea. La dirección separa los dos trabajos en dos etapas y cambia el rol de las keywords:
+>
+> - **Etapa A — descubrimiento de CREADORES (output nuevo, revisado).** La búsqueda amplia (hashtag,
+>   todos los idiomas) deja de alimentar Candidatos directo; pasa a proponer **referentes potenciales**
+>   en un output aparte que marketing revisa y decide promover (o no) a la pestaña `Referentes`. La lista
+>   de referentes se vuelve un **activo curado que compone**. Mete al humano en el loop justo en la parte
+>   ruidosa (vetting de cuentas nuevas) en vez de dejar el ruido entrar al stream de candidatos.
+> - **Etapa B — curación de CONTENIDO (el motor actual, pero solo-referentes).** Con referentes ya
+>   curados, el motor de contenido busca **solo por referentes**. Las keywords dejan de ser eje de
+>   descubrimiento.
+> - **Keywords → criterios de relevancia estructurados.** La pestaña `Keywords` se transforma (o se
+>   reemplaza) por una de **criterios**, cada entrada con campos **Sirve / No Sirve / Keywords / etc.**
+>   Reemplaza el `criterios_relevancia` de texto libre por algo estructurado y no-code-friendly que afina
+>   pre-trim + gate (el campo **No Sirve** = criterio negativo explícito, justo lo que mata el viral-off-
+>   topic). Subsume **#25/#26** (hashtags con fuerza semántica) y la idea previa de "keywords → criterios".
+>
+> **Por qué es coherente:** resuelve la objeción de "solo-referentes mata TikTok" — TikTok no muere
+> porque la búsqueda por hashtag **sigue existiendo**, solo que alimenta el descubrimiento de creadores
+> (Etapa A), no los candidatos. Es el loop que hoy falta: descubrir creadores (amplio, humano-vetted) →
+> minar contenido (curado). **Notas/riesgos a resolver al construir:** (a) el stream de creadores igual
+> necesita un filtro de relevancia o inunda a marketing de ruido (reusar la lógica del gate, no el
+> hashtag crudo); (b) **dedup** — creadores ya en `Referentes` no deben re-surgir; (c) build grande
+> (tabla/vista "Creadores propuestos" + superficie de review + reestructurar `Keywords` → `Criterios`).
+> **Post-MVP, después del núcleo en producción.** Concretiza **#33** y absorbe el "descubrir cuentas
+> nuevas" de **#17**.
+
+34. **[Producto, post-MVP] Keywords → pestaña de criterios estructurados (Sirve/No Sirve/Keywords).**
+    Reemplaza `criterios_relevancia` (texto libre por Proyecto/Voz) por filas estructuradas que el equipo
+    llena no-code. Afina pre-trim + gate; el campo **No Sirve** da criterio negativo explícito. Las
+    keywords dejan de ser eje de descubrimiento (ver Etapa B de la DIRECCIÓN arriba). Subsume #25/#26.
+35. **[Producto, post-MVP] Descubrimiento de creadores como output revisado.** El motor usa la búsqueda
+    por hashtag (todos los idiomas) para proponer **referentes potenciales** en un output aparte; marketing
+    elige cuáles promover a `Referentes`. Concretiza #33 y el "descubrir cuentas nuevas" de #17. Requiere:
+    tabla/vista de creadores propuestos, filtro de relevancia propio (no hashtag crudo), dedup contra
+    `Referentes` ya cargados.
 
 ## Log de avance (más reciente arriba)
 
