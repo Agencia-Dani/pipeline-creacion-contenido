@@ -5,10 +5,10 @@
 > n8n futuro usan el mismo patrón. (El workflow de Substack NO usa esto: su ingesta es el sync
 > Notion → registro de F3, `core/sync/`.)
 >
-> **Estado (2026-06-12):** implementado en el template del wf de reels (nodos *Abrir run en el
-> registro* / *Preparar reporte de outputs* / *Reportar outputs al registro* / *Cerrar run en el
-> registro*, todos Continue On Fail) y el error workflow en
-> [`core/n8n/error-workflow-registro.json`](../n8n/README.md).
+> **Estado (2026-06-23, ADR-014):** el motor de reels reporta corridas con *Abrir run en el registro*
+> + *Cerrar run en el registro* (Continue On Fail); **ya no escribe filas por-item a `outputs`** (se
+> quitaron *Preparar outputs Supabase* / *Reportar outputs al registro*). El **archivado** es el dueño
+> de `outputs`. El error workflow vive en [`core/n8n/error-workflow-registro.json`](../n8n/README.md).
 
 ## Principio innegociable
 
@@ -56,6 +56,12 @@ La service role key bypassa RLS — vive SOLO en n8n (y en el gestor de contrase
 - La respuesta trae el `id` del run → se conserva en el flujo para los pasos 2 y 3.
 
 ### 2. Reportar outputs (uno por pieza producida, o batch)
+
+> **Quién escribe `outputs` (ADR-014).** `outputs` es el **histórico canónico**: una fila por pieza
+> que el equipo realmente seleccionó. En el MVP de reels lo escribe **solo el archivado** (al
+> calificar); el **motor reporta solo `runs`** (su tracking por corrida vive en `runs.metricas`, no
+> en filas `draft` por-candidato). Un workflow puede legítimamente reportar `runs` y delegar
+> `outputs` a otro. Lo de abajo es el patrón completo para el workflow que sí es dueño de `outputs`.
 
 `POST {base}/rest/v1/outputs` — acepta un **array** (una sola llamada con las ~25 piezas):
 

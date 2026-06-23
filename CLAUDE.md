@@ -66,9 +66,10 @@ módulos), `/handoff` (compactar una sesión).
   workflows ([core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md)) y escanea
   secretos. Es la única verificación automática del repo.
 - **Typecheck / lint:** no hay — los scripts son ESM `.mjs` plano, sin TS ni linter.
-- **Run:** `node core/scripts/deploy.mjs <cliente>` arma el workflow importable en `dist/` (resuelve
-  los `<<placeholders>>`). El motor en sí **corre en n8n**, no localmente: se importa el JSON y se
-  dispara con *Execute Workflow* (manual) o el cron semanal. Las corridas de fuego son V1–V6 del
+- **Run:** el motor **corre en n8n**, no localmente: se importa el `workflow.json` (una instancia,
+  editada a mano en el nodo `Config`) y se dispara con *Execute Workflow* (manual) o el cron semanal.
+  *(`core/scripts/deploy.mjs` está **deprecado** — resolvía placeholders por-cliente que el MVP no usa;
+  queda como semilla del multi-cliente F5.)* Las corridas de fuego son V1–V6 del
   [ROADMAP §3](ROADMAP.md).
 
 ## Convenciones

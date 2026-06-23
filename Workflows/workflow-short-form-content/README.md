@@ -14,7 +14,7 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 
 ---
 
-## Qué hace (30 nodos, 2 entradas)
+## Qué hace (35 nodos, 2 entradas)
 
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 

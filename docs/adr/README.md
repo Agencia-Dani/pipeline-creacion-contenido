@@ -19,6 +19,7 @@
 | [ADR-011](./ADR-011-tabla-ajustes-knobs-no-code.md) | Tabla `Ajustes`: knobs del scoring editables por el equipo sin código | Aceptada |
 | [ADR-012](./ADR-012-senal-de-aprendizaje-bi-eje.md) | Señal de aprendizaje bi-eje (por referente Y por keyword/tema) | Aceptada |
 | [ADR-013](./ADR-013-atribucion-multiproyecto-fan-out.md) | Atribución multi-proyecto: fan-out de un video a cada proyecto que lo reclama (grado 1, MVP) | Aceptada |
+| [ADR-014](./ADR-014-outputs-historico-canonico-archivado.md) | `outputs` = histórico canónico; lo escribe solo el archivado (el motor reporta solo `runs`) | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

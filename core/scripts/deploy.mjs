@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// ⚠️ DEPRECADO (2026-06-23). No se usa en el MVP. Resolvía placeholders por-cliente (voz/categorías)
+// que ya no existen: hoy el motor es UNA instancia editada a mano en el nodo `Config` de n8n
+// (ver Workflows/workflow-short-form-content/workflow.yaml). NO se borra: es la semilla del
+// multi-cliente real (F5 del ROADMAP). Si lo retomás, revisá que la config por-cliente y los
+// placeholders sigan vigentes — este script no se mantiene con el motor.
+//
 // Deploy del workflow short-form-content: resuelve los <<placeholders>> del template
 // desde la config del cliente → JSON importable en n8n (runbook F2, Parte C).
 //

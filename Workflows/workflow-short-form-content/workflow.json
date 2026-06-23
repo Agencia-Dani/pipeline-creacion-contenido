@@ -651,60 +651,6 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\nconst outputs = $input.all().map(i => {\n  const d = i.json;\n  return {\n    run_id, external_id: d.external_id || null, tipo: 'guion_reel', titulo: d.titulo || '(sin titulo)',\n    contenido_o_link: d.script || '', estado: 'draft',\n    source_items: [{ platform: d.plataforma || '', url: d.url_referente || '' }],\n    metadata: {\n      proyecto: d.proyecto_nombre || '', voz: d.voz_nombre || '', referente: d.referente || '',\n      url_referente: d.url_referente || '', idioma: d.idioma || '',\n      views: d.views || 0, likes: d.likes || 0, seguidores: d.seguidores || 0,\n      engagement: d.engagement || 0, heat_score: d.heat_score || 0, link_doc: ''\n    }\n  };\n});\nreturn [{ json: { run_id, n: outputs.length, outputs } }];\n"
-      },
-      "id": "preparar-outputs-supabase",
-      "name": "Preparar outputs Supabase",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        7840,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs?on_conflict=external_id' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "supabaseApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "resolution=ignore-duplicates,return=minimal"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.outputs) }}",
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "id": "reportar-outputs-al-registro",
-      "name": "Reportar outputs al registro",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        8120,
-        400
-      ],
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "supabaseApi": {
-          "name": "Supabase Registro"
-        }
-      }
-    },
-    {
-      "parameters": {
         "method": "PATCH",
         "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?id=eq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
         "authentication": "predefinedCredentialType",
@@ -720,7 +666,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"fin\": \"{{ $now.toISO() }}\", \"estado\": \"ok\", \"metricas\": { \"colectados\": {{ $('Merge scrapes').all().length }}, \"asignados\": {{ $('Asignar proyecto+voz').all().length }}, \"pretrim\": {{ $('Pre-trim relevancia').all().length }}, \"filtrados\": {{ $('Heat-score v1').all().length }}, \"gate\": {{ $('Gate de relevancia').all().length }}, \"outputs\": {{ $('Preparar outputs Supabase').first().json.n }} } }",
+        "jsonBody": "={ \"fin\": \"{{ $now.toISO() }}\", \"estado\": \"ok\", \"metricas\": { \"colectados\": {{ $('Merge scrapes').all().length }}, \"asignados\": {{ $('Asignar proyecto+voz').all().length }}, \"pretrim\": {{ $('Pre-trim relevancia').all().length }}, \"filtrados\": {{ $('Heat-score v1').all().length }}, \"gate\": {{ $('Gate de relevancia').all().length }}, \"outputs\": {{ $('Armar candidato').all().length }} } }",
         "options": {
           "timeout": 15000
         }
@@ -738,7 +684,8 @@
         "supabaseApi": {
           "name": "Supabase Registro"
         }
-      }
+      },
+      "executeOnce": true
     },
     {
       "parameters": {
@@ -1155,7 +1102,7 @@
             "index": 0
           },
           {
-            "node": "Preparar outputs Supabase",
+            "node": "Cerrar run en el registro",
             "type": "main",
             "index": 0
           }
@@ -1167,28 +1114,6 @@
         [
           {
             "node": "POST Airtable Candidatos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preparar outputs Supabase": {
-      "main": [
-        [
-          {
-            "node": "Reportar outputs al registro",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Reportar outputs al registro": {
-      "main": [
-        [
-          {
-            "node": "Cerrar run en el registro",
             "type": "main",
             "index": 0
           }
@@ -1334,27 +1259,6 @@
     "binaryMode": "separate"
   },
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "36271efba4145e6febca668c39e9b0ec62832fee7a2b9294b41b8d1357ae3a66"
-  },
-  "tags": [
-    {
-      "updatedAt": "2026-03-23T18:48:09.229Z",
-      "createdAt": "2026-03-23T18:48:09.229Z",
-      "id": "MYEMZPpWW0T7vIGC",
-      "name": "Content Strategy"
-    },
-    {
-      "updatedAt": "2026-03-23T18:48:09.173Z",
-      "createdAt": "2026-03-23T18:48:09.173Z",
-      "id": "pMYxeIphxGeqlevj",
-      "name": "Scraping"
-    },
-    {
-      "updatedAt": "2026-03-23T18:48:09.242Z",
-      "createdAt": "2026-03-23T18:48:09.242Z",
-      "id": "E8GwDvIr40IyDTSw",
-      "name": "AI Automation"
-    }
-  ]
+    "templateCredsSetupCompleted": true
+  }
 }
