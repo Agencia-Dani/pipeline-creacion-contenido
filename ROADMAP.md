@@ -161,31 +161,34 @@ script en español, `idioma`, `thumbnail` y la razón de relevancia, y su rastro
 
 ### Carril C — Curación e histórico · 👤 Dev 3 · ~2–3 h *(C1 arranca ya; C2 necesita A10 + B1 — corre en la misma instancia n8n)*
 
-- [ ] **C1. Sheet "Histórico":** crear el Google Sheet del histórico de seleccionados (columnas =
+- [x] **C1. Sheet "Histórico":** crear el Google Sheet del histórico de seleccionados (columnas =
       `v_historico_seleccionados`: `FECHA CALIFICACION · PROYECTO · VOZ · TITULO · URL ORIGINAL ·
       LINK DOC · IDIOMA · VIEWS · LIKES · SEGUIDORES · HEAT SCORE · CALIFICACION · ESTADO`).
       Compartirlo con el equipo — es SU base descargable (Excel sale nativo de Sheets).
-- [ ] **C2. Workflow de archivado (n8n, cron diario):** lee `Candidatos` con `calificacion`
-      puesta → por cada uno: (1) inserta en Supabase `outputs` (estado según calificación,
-      `calificado_en` = `fecha_calificacion`, metadata completa), (2) append al Sheet Histórico,
-      (3) borra el record de Airtable (retención del free). Idempotente: `external_id` = id del
-      record de Airtable.
-- [ ] **C3. Tracking:** `select * from v_selecciones_por_dia;` responde "el lunes X seleccionaron
-      N videos para tal voz".
+- [x] **C2. Workflow de archivado (n8n, cron diario):** lee `Candidatos` decididos (`NOT estado='nuevo'`)
+      → por cada uno: (1) inserta en Supabase `outputs` (estado según calificación,
+      `calificado_en` = `fecha_calificacion`, metadata completa), (2) append al Sheet Histórico
+      **solo aprobado/publicado**, (3) borra el record de Airtable (retención del free). Idempotente:
+      `external_id` = id del record de Airtable. *(✅ validado para producción cierre 19, ver dev-doc §3.)*
+- [x] **C3. Tracking:** `v_senal_seleccion`/`v_senal_tema` responden la tasa de selección por
+      referente/tema (los descartados bajan la tasa). *(✅ cierre 19.)*
 
 **Hecho cuando:** calificar un candidato de prueba termina en (1) fila en el Sheet con sus dos
 links, (2) contado en `v_selecciones_por_dia` para su voz, (3) fuera de Airtable.
 
 ### Validación — corridas de fuego (los 3 juntos) · ~1.5 h
 
-- [ ] **V1. Backfill:** `dias_recencia=180` → candidatos en Airtable con script en español,
+- [x] **V1. Backfill:** `dias_recencia=180` → candidatos en Airtable con script en español,
       `idioma`, `thumbnail` y la razón de relevancia · `runs` ok · `processed_items` poblada.
+      *(✅ cierre 17/19: embudo verificado + `processed_items` 10→30 sin dup.)*
 - [ ] **V2. Literalidad:** muestrear 2–3: uno en español (script == transcripción tal cual) y
       uno en otro idioma (traducción literal, sin reescritura). El link abre y coincide.
-- [ ] **V3. Curación + histórico:** Majo/Jero califican (🔥/👍/👎 + estado) → archivado corre →
+- [x] **V3. Curación + histórico:** Majo/Jero califican (🔥/👍/👎 + estado) → archivado corre →
       filas en el Sheet con sus dos links · fuera de Airtable · `v_selecciones_por_dia` responde.
+      *(✅ cierre 19: run `687027e2`, archivados:14, Sheet solo aprobados, Candidatos=0, `v_senal_seleccion` ok.)*
 - [ ] **V4. Re-rank:** la vista "🔥 Seleccionados" muestra solo aprobados, caliente→frío.
 - [ ] **V5. Incremental + dedup:** correr con `dias_recencia=1` → no reaparece lo ya procesado.
+      *(parcial: el dedup quedó verificado en vivo, falta la corrida incremental `dias=1` completa.)*
 - [ ] **V6. Resiliencia:** romper la credencial Supabase a propósito → el workflow IGUAL escribe
       a Airtable (el registro es sumidero, no dependencia — invariante #1 de PLAN). Restaurar.
       Un fallo real queda como `run` estado `fallo`.

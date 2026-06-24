@@ -142,36 +142,45 @@ límites: ADR-010 + handoff §Mejoras #13/#18.
 
 ---
 
-## 3. Archivado (`archivado`) — 16 nodos
+## 3. Archivado (`archivado`) — 18 nodos
+
+> **Validado para producción (cierre 19).** Corrió end-to-end con calificados reales (run `687027e2`):
+> idempotencia, paginación, split de estados, barrido de zombies, cierre robusto y curación completa. El
+> cron sigue sin activar (D1 del ROADMAP). Fuente de verdad = `workflow.json`.
 
 ### 3.1 Orden de ejecución
 
 ```
 Cron diario 9am ┐
-                ├─► Config ─► Abrir run ─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos calificados
-Ejecutar manual ┘                                                                       │
-                                                                                        ▼
-                                                                            IF — hay calificados
-                                                              (no) │                    │ (sí)
-                                                                   ▼                    ▼
-                                                             Cerrar run        Armar filas archivado
-                                                                   ▲                    ▼
-                                                                   │           Preparar outputs Supabase
-                                                                   │                    ▼
-                                                                   │           Registrar outputs (Supabase)
-                                                                   │                    ▼
-                                                                   │             Preparar filas Sheet
-                                                                   │                    ▼
-                                                                   │            Append al Sheet Histórico
-                                                                   │                    ▼
-                                                                   │            Preparar borrado Airtable
-                                                                   │                    ▼
-                                                                   └────────────  Borrar de Airtable
+                ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos calificados
+Ejecutar manual ┘                                                                                              │
+                                                                                                               ▼
+                                                                                                   IF — hay calificados
+                                          (no) │                                                               │ (sí)
+                                               ▼                                                               ▼
+                                          Cerrar run                                                Armar filas archivado
+                                               ▲                                                               ▼
+                                               │                                                  Preparar outputs Supabase
+                                               │                                                               ▼
+                                               │                              ┌──────────────  Registrar outputs (Supabase)  (TODOS los decididos)
+                                               │                       (todos)│                                ▼
+                                               │                              │                       Preparar filas Sheet  (SOLO aprobado/publicado)
+                                               │                              │                                ▼
+                                               │                              │                      Append al Sheet Histórico
+                                               │                              ▼                                ▼
+                                               │                            Reconvergir tras Sheet (merge) ◄───┘
+                                               │                                                ▼
+                                               │                                     Preparar borrado Airtable
+                                               │                                                ▼
+                                               └─────────────────────────────────────  Borrar de Airtable
 ```
 
-**Orden de los sumideros = intencional:** Supabase (`outputs`) → Sheet → **recién entonces** borra de
-Airtable. El append al Sheet **no** es continue-on-fail: si el Sheet falla, corta **antes** de borrar
-→ no se pierde la curación del equipo. `Borrar de Airtable` reintenta **3× cada 2s**.
+**El SPLIT de sumideros (cierre 19):** `Registrar outputs` escribe a Supabase **todos** los decididos (con
+su `estado`); el Sheet recibe **solo** `aprobado`/`publicado`; el borrado de Airtable toma **todos**. El
+`Reconvergir tras Sheet` (Merge) garantiza que el borrado corra **aun con 0 aprobados** (rama Sheet vacía) pero
+espere al Append. **Orden de sumideros = intencional:** Supabase → Sheet → **recién entonces** borra de Airtable;
+el Append **no** es continue-on-fail (si el Sheet falla, corta antes de borrar → no se pierde la curación).
+`Borrar de Airtable` reintenta **3× cada 2s**; el Append reintenta **3× cada 30s** (503 transitorios de Google).
 
 ### 3.2 Nodo por nodo
 
@@ -181,18 +190,20 @@ Airtable. El append al Sheet **no** es continue-on-fail: si el Sheet falla, cort
 | 2 | Ejecutar manual | manualTrigger | Execute a mano. |
 | 3 | Config | set | `airtable_base_id`, `supabase_url`, `instance_id`, `sheet_id`, `sheet_tab` (placeholders `<<…>>`). |
 | 4 | Abrir run en el registro | http POST | `POST runs` con `params:{workflow:'archivado'}`, `return=representation`. continue-on-fail. |
-| 5 | Leer Proyectos | http GET | Airtable `Proyectos` (`pageSize 100`) → mapa `id→nombre`. **Pagina** (sigue el `offset`, #4). |
-| 6 | Leer Voces | http GET | Airtable `Voces` (`pageSize 100`) → mapa `id→nombre`. Pagina (#4). |
-| 7 | Leer Candidatos calificados | http GET | Airtable `Candidatos` con `filterByFormula=NOT({calificacion}='')`, `pageSize 100`. **Pagina** (sigue el `offset` → todas las páginas, ya no trunca a 100, #4). `Armar filas` agrega todas las páginas (`flatMap`). |
-| 8 | IF — hay calificados | if | `records.length > 0` → Armar filas; si no → Cerrar run directo. |
-| 9 | Armar filas archivado | code | Por cada calificado arma `{record_id, output, sheet}`. Normaliza `estado` (aprobado/publicado/descartado, default descartado), resuelve proyecto/voz por nombre, `calificado_en = fecha_calificacion`. **`output.external_id = r.id`** (el id del record de Airtable, ver §7). `metadata` lleva `tema`, `calificacion`, `link_doc`. |
-| 10 | Preparar outputs Supabase | code | Extrae `outputs[]` del nodo 9. |
-| 11 | Registrar outputs (Supabase) | http POST | `POST outputs?on_conflict=external_id`, `Prefer: resolution=ignore-duplicates,return=minimal` → **idempotente** (re-correr no duplica). continue-on-fail. |
-| 12 | Preparar filas Sheet | code | Extrae `sheet[]` del nodo 9. |
-| 13 | Append al Sheet Histórico | googleSheets | `append`, `autoMapInputData` → las keys de la fila deben **coincidir exacto** con los encabezados del Sheet. Credencial **OAuth2** (única dependencia de Google del pipeline). **stop-on-fail** (a propósito). |
-| 14 | Preparar borrado Airtable | code | Arma URLs `DELETE` en **batches de 10** (`records[]=…`). |
-| 15 | Borrar de Airtable | http DELETE | Borra los calificados de `Candidatos`. **retry 3× / 2s.** |
-| 16 | Cerrar run en el registro | http PATCH | `PATCH runs` con `fin`, `estado:'ok'`, `metricas:{archivados}`. continue-on-fail. |
+| 5 | Barrer runs zombie | http PATCH | **Auto-sanador (B5, cierre 19).** `PATCH runs` → marca `fallo` los runs de archivado anteriores colgados `en_curso` (scoped `params->>workflow=eq.archivado` + `id=neq.<run actual>`). Repara la integridad de `runs` cuando una corrida previa falló antes de *Cerrar run*. continue-on-fail. |
+| 6 | Leer Proyectos | http GET | Airtable `Proyectos` (`pageSize 100`) → mapa `id→nombre`. **Pagina** (sigue el `offset`, #4). |
+| 7 | Leer Voces | http GET | Airtable `Voces` (`pageSize 100`) → mapa `id→nombre`. Pagina (#4). |
+| 8 | Leer Candidatos calificados | http GET | Airtable `Candidatos` con `filterByFormula=NOT({estado}='nuevo')` (trae aprobado/publicado/descartado), `pageSize 100`. **Pagina** (sigue el `offset` → todas las páginas, no trunca a 100, #4). `Armar filas` agrega todas las páginas (`flatMap`). |
+| 9 | IF — hay calificados | if | `records.length > 0` → Armar filas; si no → Cerrar run directo. |
+| 10 | Armar filas archivado | code | Por cada decidido arma `{record_id, output, sheet}`. Normaliza `estado` (aprobado/publicado/descartado, default descartado), resuelve proyecto/voz por nombre, `calificado_en = fecha_calificacion`. **`output.external_id = r.id`** (el id del record de Airtable, ver §7). `metadata` lleva `tema`, `calificacion`, `link_doc`. |
+| 11 | Preparar outputs Supabase | code | Extrae `outputs[]` (TODOS los decididos) del nodo 10. |
+| 12 | Registrar outputs (Supabase) | http POST | `POST outputs?on_conflict=external_id`, `Prefer: resolution=ignore-duplicates,return=minimal` → **idempotente** (re-correr no duplica). Sale a **2 ramas**: Preparar filas Sheet + Reconvergir (input 1). continue-on-fail. |
+| 13 | Preparar filas Sheet | code | Extrae `sheet[]` del nodo 10 **filtrando a `aprobado`/`publicado`** (los descartados NO van al Sheet). |
+| 14 | Append al Sheet Histórico | googleSheets | `append`, `autoMapInputData` → las keys de la fila deben **coincidir exacto** con los encabezados del Sheet. Credencial **OAuth2** (única dependencia de Google del pipeline). **stop-on-fail** (a propósito). **retry 3× / 30s** (503 de Google). |
+| 15 | Reconvergir tras Sheet | merge | Une la rama Sheet (input 0) con la rama directa de Registrar outputs (input 1) → el borrado corre aun con 0 aprobados, pero espera al Append. |
+| 16 | Preparar borrado Airtable | code | Arma URLs `DELETE` en **batches de 10** (`records[]=…`) con TODOS los decididos. |
+| 17 | Borrar de Airtable | http DELETE | Borra los decididos de `Candidatos`. **retry 3× / 2s.** |
+| 18 | Cerrar run en el registro | http PATCH | `PATCH runs` con `fin`, `estado:'ok'`, `metricas:{archivados}`. **El conteo se hace sobre `Leer Candidatos calificados`** (nodo que corre en ambas ramas del IF) → robusto en el caso 0 calificados (no se cuelga). continue-on-fail. |
 
 ---
 

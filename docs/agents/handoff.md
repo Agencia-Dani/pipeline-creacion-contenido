@@ -318,13 +318,26 @@ idioma TikTok #7), se itera acá.
 > 3. **Sembrar Referentes de TikTok** (hoy las 3 cuentas son IG → el eje *TikTok Perfil* sale vacío).
 > 4. **🔴 ROTAR el PAT de Airtable + la service_role de Supabase** (expuestos en el chat de hoy).
 
-## Próxima sesión — LO QUE FALTA PARA PRODUCCIÓN (consolidado, cierre 18)
+## Próxima sesión — LO QUE FALTA PARA PRODUCCIÓN (consolidado, cierre 19)
 
-> **🧭 PARA RETOMAR (cierre 18).** El **núcleo del motor está validado end-to-end** (V1 cierre 17 +
-> run Fase 3 cierre 18: fan-out, recencia 200, transcripción, embudo — todo ✅). El último bug
-> (fan-out×dedup) ya está arreglado en código, **falta verificarlo en vivo**. Lo que queda para sacar
-> esto a producción está **todo acá, en una sola lista ordenada** (antes estaba disperso entre §Plan a
-> producción, §Mejoras y los PARA RETOMAR viejos). Atacar de arriba hacia abajo. **Camino crítico = A → B.**
+> ### 📊 Estado del núcleo (cierre 19) — qué está / qué falta de un vistazo
+>
+> | Pieza | Estado |
+> |---|---|
+> | **Motor de reels** (detección→transcripción→gate→Candidatos) | ✅ **Validado end-to-end** (V1 cierre 17/19 + Fase 3 cierre 18; dedup `processed_items` 10→30 verificado) |
+> | **Archivado** (curación→outputs/Sheet→borrado) | ✅ **Validado para producción** (V3/C1–C3 cierre 19, run `687027e2`; barrido de zombies + cierre robusto) |
+> | **#9 OAuth Google Sheets** | ✅ Reconectado + retry; GCP sin billing (riesgo $300 muerto) |
+> | **Higiene Airtable (D)** | ✅ Campos muertos borrados, `fecha`=Created time |
+> | **V-runs restantes** (V2/V4/V5/V6) | ⬜ Pendientes (V5 dedup parcial-verificado) |
+> | **Fase 4 — activación** (D1 crons · D2 manifest · D3 demo) | ⬜ Pendiente (D2 = código de Claude) |
+> | **🔴 Rotar credenciales** (PAT + service_role) | ⬜ **Urgente** — expuestas en chats cierres 13–19 |
+> | **Interface user-friendly** (#32/#30/#31) | ⬜ Gate REAL de lanzamiento (decisión del jefe, no código) |
+> | **Refactor de búsqueda** (#34/#35) | ⛔ POST-MVP, no tocar |
+>
+> **🧭 PARA RETOMAR (cierre 19).** El **núcleo técnico (motor + archivado) está validado end-to-end**.
+> Lo que queda para producción está **todo acá, en una sola lista ordenada** (antes disperso entre §Plan a
+> producción, §Mejoras y los PARA RETOMAR viejos). Atacar de arriba hacia abajo. **Camino crítico ya cerrado
+> (A ✅); lo que sigue son los V-runs restantes (C), higiene/rotación (D) y activación (E).**
 >
 > ### A. ✅ Fix de dedup VERIFICADO EN VIVO (cierre 19) — camino crítico cerrado
 > 1. Mani re-importó el motor y corrió (run `b9fe6561`, ok, 14 candidatos). **`processed_items` pasó de 10 →

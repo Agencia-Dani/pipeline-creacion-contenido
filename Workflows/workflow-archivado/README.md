@@ -11,7 +11,7 @@
 
 ```
 Cron diario 9am ─┐
-Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail)
+Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail) ─► Barrer runs zombie
    └─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos decididos ─► IF ¿hay?
           ├─ no ─────────────────────────────────────────────► Cerrar run
           └─ sí ─► Armar filas ─► Registrar outputs (Supabase, continue-on-fail, TODOS)
@@ -40,6 +40,11 @@ Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail
 
 - **Supabase es sumidero** (invariante #1): `Abrir run`, `Registrar outputs` y `Cerrar run` van con
   *Continue On Fail*. Si Supabase no responde, el Sheet igual se escribe y Airtable igual se limpia.
+- **Runs sin zombies (B5)**: si una corrida falla a mitad (ej. el Append rebota OAuth/503), el run queda
+  `en_curso`. `Barrer runs zombie` (justo tras `Abrir run`) marca `fallo` los runs de archivado anteriores
+  colgados (scoped `params->>workflow=archivado`, excluye el actual) → la próxima corrida los limpia sola.
+  Además `Cerrar run` cuenta `archivados` sobre `Leer Candidatos calificados` (corre en ambas ramas del IF)
+  → **cierra `ok` aun con 0 calificados**, sin generar un zombie cada día que no haya nada que archivar.
 - **El Sheet NO es continue-on-fail a propósito**: si el append falla, el workflow **corta antes de
   borrar de Airtable** → no se pierde la curación del equipo; reintenta al otro día. El `Merge`
   *Reconvergir tras Sheet* espera a ambas ramas antes del borrado, así que mantiene este orden **y**

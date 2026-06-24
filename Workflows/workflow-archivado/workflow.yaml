@@ -12,7 +12,7 @@ description: >
   en el histórico permanente (Supabase outputs + Google Sheet "Histórico") y los borra de Airtable
   para respetar el límite del plan free. Es el complemento del motor de reels.
 engine: n8n
-status: draft                     # validado en vivo (C3 ✅); cron sin activar (D1 del ROADMAP)
+status: draft                     # validado end-to-end (V3/C1-C3 ✅, cierre 19); cron sin activar (D1 del ROADMAP)
 owner: dev3
 
 triggers:
