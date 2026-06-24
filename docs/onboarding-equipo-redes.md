@@ -52,13 +52,14 @@ Hay 6 tablas. Piénsenlas en dos grupos.
 
 ### Las que casi no tocan (la configuración de la búsqueda)
 
-- **Proyectos** — cada tema que se busca (ej: "Comunicación", "Ventas"). Adentro se define cuántos
-  videos traer, qué tan atrás buscar y por dónde buscar.
-- **Voces** — para quién se selecciona (un personaje o marca). Sirve para organizar y agrupar.
-- **Keywords** — las palabras/hashtags con que se busca por tema (en Instagram **y** TikTok).
-- **Referentes** — las **cuentas** (de Instagram **y** TikTok) que se siguen. De ahí salen sus videos.
-- **Ajustes** — las "perillas" de cómo la máquina ordena (cuánto pesa cada métrica, etc.). **Ya vienen
-  con valores razonables; no hace falta tocarlas.** Más en 5.6.
+- **Proyectos** — cada tema que se busca (ej: "Comunicación", "Ventas"). Define el tema, los criterios
+  de relevancia y la voz.
+- **Voces** — para quién se selecciona (un personaje o marca). Sirve para organizar y afinar el filtro.
+- **Referentes** — las **cuentas** (de Instagram **y** TikTok) que se siguen. **De ahí salen sus videos**
+  (es la única fuente de búsqueda).
+- **Ajustes** + página **Global** — las "perillas" (cuánto trae por corrida, días, pesos de orden). **Ya
+  vienen con valores razonables; casi no se tocan.** Más en 5.6.
+- **Keywords** — *pausada* (la búsqueda por palabras clave está apagada — ver 5.3).
 
 > Estas las arman una vez y las van ajustando. **No hace falta tocarlas para el trabajo del día.**
 
@@ -80,8 +81,8 @@ seguidores, engagement) y el **heat score** (ver punto 7).
 Esto se hace **una sola vez** al arrancar (y cada vez que quieran sumar un tema o una cuenta nueva).
 **Candidatos no se toca acá** — esa la llena la máquina. Las que arman ustedes son las otras cuatro.
 
-**Orden recomendado:** Voces → Proyectos → Keywords y Referentes. (Hay que crear la Voz y el
-Proyecto antes, porque las otras tablas se "enganchan" a ellos.)
+**Orden recomendado:** Voces → Proyectos → Referentes. (Hay que crear la Voz y el
+Proyecto antes, porque Referentes se "engancha" a ellos.)
 
 Para crear una fila en cualquier tabla en Airtable: entran a la tabla, botón **`+`** abajo de todo
 (o la fila vacía al final), y llenan las columnas. Abajo, columna por columna, qué va en cada una.
@@ -106,11 +107,13 @@ mezclan con los de otro.
 | `nombre` | el tema. Ej: "Comunicación" |
 | `descripcion` | qué cubre el tema |
 | `criterios_relevancia` | **qué hace relevante a un video para este tema, y qué NO.** Es el campo más importante: la máquina lo lee para juzgar si un video sirve de verdad o es viral-vacío. Mientras más concreto, menos basura les llega (ver ejemplo abajo) |
-| `voz_default` | la Voz que crearon en 5.1 (se elige de una lista) |
-| `dias_recencia` | qué tan atrás buscar, en días. **30 a 90** la primera vez (para traer harto); **7** para el día a día |
-| `top_n` | cuántos videos quieren que traiga por corrida (ej: 15 a 25) |
+| `voz_default` | la Voz que crearon en 5.1 (se elige de una lista). **Una sola voz por proyecto** |
 | `activo` | ✅ marcado para que el proyecto entre en las búsquedas. Sin marcar = pausado |
-| `Buscar en Instagram por cuentas` · `… por palabras clave` · `Buscar en TikTok por cuentas` · `… por palabras clave` | los 4 **canales de búsqueda** del proyecto (checkboxes). Si **no marcan ninguno**, se usan los 4. Marquen solo los que quieran para acotar (y no gastar de más) |
+
+> **Cambio (jun-2026):** `dias_recencia`, `top_n` y los checkboxes de canal salieron del Proyecto. Ahora
+> los días de búsqueda, cuántos videos por corrida y los resultados por cuenta son **globales** para
+> todos los proyectos, en la **página Global** (sección 5.6). La búsqueda es **solo por referente** (sus
+> cuentas de Referentes); ya no se busca por palabras clave.
 
 > **Cómo escribir buenos `criterios_relevancia` (esto define la calidad de lo que les llega).** Digan
 > qué sirve y qué no, concreto:
@@ -121,10 +124,14 @@ mezclan con los de otro.
 >
 > Vale la pena que el jefe valide este texto por proyecto.
 
-### 5.3 `Keywords` — las palabras/hashtags con que se busca por tema
+### 5.3 `Keywords` — (pausado por ahora)
 
-Cada palabra funciona como un hashtag (en TikTok **y** en Instagram). **Una sola palabra por fila**
-(`liderazgo` rinde más que `liderazgo efectivo`).
+> **Cambio (jun-2026):** la búsqueda por palabras clave está **apagada**. Hoy el motor busca **solo por
+> los Referentes** (sección 5.4). Esta tabla queda guardada por si más adelante se reactiva la búsqueda
+> por hashtag en TikTok; por ahora no hace falta cargar nada acá (la página está oculta).
+
+Cada palabra funcionaba como un hashtag. **Una sola palabra por fila** (`liderazgo` rinde más que
+`liderazgo efectivo`).
 
 | Columna | Qué escriben |
 |---|---|
@@ -168,18 +175,25 @@ saber qué significa cada columna que van a ver:
 | `relevancia_razon` | **por qué** la máquina lo dejó pasar — léanlo para curar más rápido | máquina |
 | `viral_por_tamano` | ✅ si venía de una cuenta muy grande (+700K) | máquina |
 | **`calificacion`** | 🔥 / 👍 / 👎 | **ustedes** |
-| **`estado`** | nuevo / aprobado / descartado / publicado | **ustedes** |
+| **`estado`** | nuevo / aprobado / descartado | **ustedes** |
 | `notas_equipo` | su feedback sobre el video | **ustedes** (opcional) |
 | `fecha_calificacion` | cuándo lo calificaron | se llena sola |
 | `fecha` | cuándo lo generó la máquina | máquina |
 
-### 5.6 `Ajustes` — las perillas de cómo ordena (casi nunca se toca)
+### 5.6 `Ajustes` y la página **Global** — las perillas (casi nunca se toca)
 
-La máquina ya viene con valores por defecto razonables acá. **No hace falta tocar nada para arrancar.**
-Es una tabla de "clave = valor" en español claro (ej: "Peso de relevancia", "Candidatos por proyecto",
-"Bonus idioma extranjero"). Si en algún momento quieren cambiar cómo ordena o cuánto premia algo,
-**avísennos la primera vez** para no descalibrarla. Tranquilas: si borran o escriben mal una fila, la
-máquina usa el valor por defecto, no se rompe.
+La máquina ya viene con valores por defecto razonables. **No hace falta tocar nada para arrancar.** Es
+una tabla de "clave = valor" en español claro. Si quieren cambiar algo, **avísennos la primera vez**.
+Si borran o escriben mal una fila, la máquina usa el valor por defecto, no se rompe.
+
+Las perillas que sí van a querer tocar viven en la **página Global** (las mismas para todos los
+proyectos):
+- **Candidatos por corrida** — cuántos videos trae cada corrida en total (ej: 100).
+- **Días de recencia** — qué tan atrás busca (ej: 7 para el día a día; más alto la primera vez).
+- **Resultados por cuenta de referente** — cuántos videos baja por cada cuenta (más = más costo). Tiene
+  un tope de seguridad para que no se dispare el gasto.
+
+El resto (pesos de orden, bonus idioma, etc.) casi nunca se toca.
 
 ---
 
@@ -196,7 +210,6 @@ Hay dos cosas que marcan, y son distintas:
 - **nuevo** — recién llegó, nadie lo miró (viene así por defecto)
 - **aprobado** — lo eligen. Esto es lo que cuenta como "seleccionado".
 - **descartado** — lo miraron y no va
-- **publicado** — ya se convirtió en contenido y salió (opcional, para llevar la cuenta)
 
 ### La vista "🔥 Seleccionados"
 Es una pantalla aparte que muestra **solo los que pusieron en `aprobado`**, ordenados del más
@@ -229,17 +242,17 @@ la prioridad del negocio es traer lo que **no** circula en español.
 
 ## 8. Cómo encuentra los videos (y cómo pedir más de algo)
 
-La máquina busca por **dos vías, en las dos plataformas** (Instagram y TikTok):
+La máquina busca **solo por cuenta de referente**, en las dos plataformas (Instagram y TikTok):
 
 - **Por cuenta** — trae los videos de las cuentas que estén en **Referentes**. Si quieren más o mejor
-  cobertura por cuenta: **agreguen Referentes** (de Instagram y/o TikTok).
-- **Por palabra/hashtag** — busca con las de **Keywords**. Si quieren más o mejor cobertura por tema:
-  **agreguen o afinen Keywords.** Cárguenlas como hashtags de **una sola palabra** (`liderazgo` rinde
-  más que `liderazgo efectivo`).
+  cobertura: **agreguen Referentes** (de Instagram y/o TikTok). La plataforma la define cada referente
+  (es de IG o de TikTok); para pausar uno, desmárquenle `activo`.
 
-Cada proyecto elige qué vías usar con los 4 checkboxes (ver 5.2). Si no marcan ninguno, usa las cuatro.
+> **Cambio (jun-2026):** la búsqueda por palabras clave (hashtags) está **apagada** — traía mucho
+> contenido fuera de tema y gastaba de más. El filtro lo hacen ahora los `criterios_relevancia` del
+> Proyecto y de la Voz. La calidad de lo que llega depende de **qué tan buena sea su lista de Referentes**.
 
-Resumen: **Referentes = búsqueda por cuenta · Keywords = búsqueda por tema · las dos corren en IG y TikTok.**
+Resumen: **la fuente es su lista de Referentes. Quieren más/mejor contenido → curen Referentes.**
 
 ---
 

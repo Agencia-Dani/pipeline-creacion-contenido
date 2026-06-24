@@ -24,11 +24,12 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 | `nombre` | texto (primario) | "Comunicación", "Ventas"… |
 | `descripcion` | texto largo | qué cubre el proyecto |
 | `criterios_relevancia` | texto largo | **qué hace relevante a un video para este proyecto** — lo edita el equipo, lo lee el motor para juzgar relevancia (no solo virales). Ver ADR-010 + [refactor-relevancia](../../docs/agents/refactor-relevancia.md) |
-| `voz_default` | link → `Voces` | con qué voz se generan sus guiones |
-| `dias_recencia` | número | ventana de fetch (backfill=180, diario=1–2) |
-| `top_n` | número | cuántos candidatos genera por corrida |
+| `voz_default` | link → `Voces` | la **única** voz del proyecto (un proyecto = una voz; una voz puede servir a varios proyectos). Afina el filtro de relevancia por encima del tema (ADR-010) |
 | `activo` | checkbox | si entra en las corridas |
-| `Buscar en Instagram por cuentas` / `Buscar en Instagram por palabras clave` / `Buscar en TikTok por palabras clave` / `Buscar en TikTok por cuentas` | checkbox | **ejes de descubrimiento** del proyecto. Si **ninguno** está marcado → corren los 4 (default retrocompatible); marcá solo los que quieras para acotar. Evita gastar Apify en ejes vacíos |
+
+> **Cambio ADR-015/016:** `dias_recencia`, `top_n` y los 4 toggles de eje salieron del Proyecto. La
+> ventana, el N por corrida y los resultados por referente son ahora **globales** (tabla `Ajustes`); la
+> plataforma de búsqueda la da `Referente.plataforma` y el descubrimiento es solo por referente.
 
 ### 2. `Voces` — el eje organizativo (para quién se selecciona)
 Separado del proyecto a propósito. **Nota ADR-009:** el MVP no genera en voz (scripts literales),
@@ -43,12 +44,16 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `descripcion` | texto largo | quién es / autoridad |
 | `criterios_relevancia` | texto largo | **qué le sirve a este cliente puntual** (fit de persona/audiencia) — afina el gate de relevancia por encima del tema del Proyecto. Opcional; el Proyecto filtra el tema, la Voz el cliente (ADR-010) |
 
-### 3. `Keywords` — banco de palabras clave (acumula)
+### 3. `Keywords` — banco de palabras clave (**eje dormante**, ADR-015)
+La tabla se conserva pero el motor **no la usa** mientras el flag global `buscar_keyword_tiktok` esté
+off. Su página del dashboard está oculta. Retomar = prender el flag + mostrar la página. El IG-keyword
+se retiró (no servía); el eje dormante es solo TikTok.
+
 | Campo | Tipo | Para qué |
 |---|---|---|
-| `termino` | texto (primario) | la palabra/frase de búsqueda |
+| `termino` | texto (primario) | la palabra/frase de búsqueda (hashtag de TikTok) |
 | `proyecto` | link → `Proyectos` | a qué proyecto pertenece |
-| `activo` | checkbox | si se usa en la búsqueda |
+| `activo` | checkbox | si se usa en la búsqueda (inerte mientras el eje esté off) |
 
 ### 4. `Referentes` — banco de perfiles (la fuente propia)
 | Campo | Tipo | Para qué |
@@ -69,7 +74,7 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `proyecto` | link → `Proyectos` | |
 | `voz` | link → `Voces` | para qué voz se selecciona |
 | `referente` | texto | handle del video fuente (lo llena el motor: el `username` del poster) |
-| `tema` | texto | el **keyword/hashtag** que matcheó el candidato (vacío si entró por referente) — alimenta la señal de aprendizaje por tema (ADR-012); lo llena el motor |
+| `tema` | texto | el **keyword/hashtag** que matcheó el candidato (vacío si entró por referente) — lo llena el motor solo cuando el eje keyword está activo. **Inerte hoy** (eje dormante, ADR-015): queda vacío. Se conserva como substrato del futuro motor de recomendación |
 | `url_referente` | url | link al video original |
 | `views` / `likes` / `seguidores` / `engagement` | número | métricas del fuente |
 | `heat_score` | número | el ranking compuesto (relevancia ⊕ métricas — ADR-010); caliente→frío |
@@ -77,7 +82,7 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `relevancia_razon` | texto largo | **por qué** el gate dejó pasar el video — ayuda al equipo a curar rápido |
 | `viral_por_tamano` | checkbox | el fuente venía de cuenta >700K |
 | **`calificacion`** | single select | 🔥 / 👍 / 👎 — **lo pone el equipo** |
-| **`estado`** | single select | nuevo / aprobado / descartado / publicado |
+| **`estado`** | single select | **nuevo / aprobado / descartado** — binario tras calificar; `publicado` se retiró (era idéntico a aprobado y el record se borra al archivar) |
 | `fecha_calificacion` | last modified time (solo del campo `calificacion`) | **cuándo** se calificó — alimenta el tracking de selecciones |
 | `notas_equipo` | texto largo | feedback del equipo |
 | `fecha` | created time | cuándo llegó el candidato (campo nativo de Airtable, manual: la API no crea computados) |
@@ -101,11 +106,20 @@ vacía, un knob falta, o la `clave` no está en el mapa, usa el default. Lectura
 **Knobs (semilla por defecto):** `Peso de vistas` 0.4 · `Peso de likes` 0.4 · `Peso de interacción`
 0.2 (pesos del prescore métrico) · `Peso de relevancia` 0.7 (IA vs. métricas en el orden final) ·
 `Bonus idioma extranjero` 0.3 (premia no-español) · `Seguidores para marcar viral` 700000 (marca, no
-filtra) · `Candidatos por proyecto` 25 (si el Proyecto no fija `top_n`) · `Mínimo de vistas` 0 /
-`Mínimo de likes` 0 (**piso duro** pre-`top_n`; 0 = nada corta) · `Resultados Instagram por corrida` 8
-/ `Resultados TikTok por corrida` 30 (**volumen/costo** por llamada Apify) · `Relevancia mínima` 0
-(**umbral** del gate; 0 = nada corta). En Config quedan solo los **IDs**
-(`airtable_base_id`/`supabase_url`/`instance_id`, dev-only). Detección de idioma: dev-only.
+filtra) · `Mínimo de vistas` 0 / `Mínimo de likes` 0 (**piso duro**; 0 = nada corta) · `Relevancia
+mínima` 0 (**umbral** del gate; 0 = nada corta).
+
+**Knobs de ejecución globales (ADR-016)** — los que el equipo edita en la **página Global** del
+dashboard: `Candidatos por corrida` 100 (**N total por corrida**, contados como videos distintos; el
+corte final va por heat compuesto tras el gate) · `Días de recencia` 7 (ventana única de fetch) ·
+`Resultados por cuenta de referente` 20 (videos por cuenta por corrida; unifica los viejos
+`Resultados Instagram/TikTok por corrida`).
+
+**Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` 30
+(techo de `Resultados por cuenta de referente`: el motor usa `min(valor_equipo, cap)`) ·
+`cap_top_n` 200 (techo duro de transcripción por corrida; protege el backfill). En Config quedan además
+los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y el flag `buscar_keyword_tiktok` (off,
+ADR-015). Detección de idioma: dev-only.
 
 ---
 

@@ -15,7 +15,7 @@ fields:
   - { key: type,               type: string,  required: true,  desc: "Tipo del catálogo de outputs" }
   - { key: title,              type: string,  required: true,  desc: "Título del output" }
   - { key: content_or_link,    type: string,  required: true,  desc: "Contenido completo, o link al destino nativo (Sheet/Notion)" }
-  - { key: status,             type: string,  required: true,  desc: "draft | aprobado | publicado | descartado" }
+  - { key: status,             type: string,  required: true,  desc: "draft | aprobado | descartado (publicado retirado — ADR-015)" }
   - { key: client,             type: string,  required: true,  desc: "Slug del cliente dueño (FK clients)" }
   - { key: workflow,           type: string,  required: true,  desc: "id del workflow productor (FK workflows)" }
   - { key: run_id,             type: string,  required: true,  desc: "Corrida que lo produjo (FK runs) — trazabilidad" }

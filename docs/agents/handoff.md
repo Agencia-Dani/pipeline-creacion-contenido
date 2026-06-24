@@ -21,6 +21,10 @@
 
 ## Estado en una línea
 
+**2026-06-24 (cierre 21) — Refactor post-producción implementado y firmado: referente-only + keyword dormante + knobs globales + estado binario (Mani + Claude).** Sesión de grilling (`/grill-with-docs`) → 2 ADRs nuevos **firmados (aceptada)** + cascada de código/docs + cambios en la base viva. **Decisiones (en los ADRs, no re-litigar):** **[ADR-015](../adr/ADR-015-busqueda-solo-referente-retiro-keywords.md)** = búsqueda **solo por referente** (IG Reels + TikTok Perfil); el eje **TikTok-keyword queda DORMANTE** tras el flag `buscar_keyword_tiktok` (Config, default 0) — no se borra, se preserva como substrato del futuro motor de recomendación (ROADMAP §5); **IG-keyword retirado** (corre vacío); `v_senal_tema`/`Candidatos.tema` quedan **inertes** (Supabase sin tocar, decisión "DB inerte"); los **4 toggles** del Proyecto fuera. **[ADR-016](../adr/ADR-016-knobs-de-ejecucion-globales-y-tope-de-costo.md)** = `top_n`/`dias_recencia`/`resultados_referente` pasan a **globales** (Ajustes), ya no por-proyecto; **`top_n` = N total/corrida contado como VIDEOS DISTINTOS, con el corte AL FINAL** (en `Armar candidato`, por heat compuesto post-gate) → no se pierde buen contenido por corte ciego; **se transcribe TODO** lo que pasa el pre-trim (ahora load-bearing) + **dedup intra-corrida** en `Transcribir` (1 Supadata por `external_id`); topes **dev-only en Config**: `cap_resultados_referente`(30) clampa el knob del equipo, `cap_top_n`(200) = cinturón de transcripción para backfills. **`estado` binario** (nuevo/aprobado/descartado; **`publicado` retirado** en código + base + docs). **Voz #5 = ya estaba en código** (gate compone criterios Proyecto⊕Voz, ADR-010); solo faltaba dato. **Código:** motor `workflow.json` reescrito vía script de texto-crudo (9 nodos + Config), archivado sin `publicado`, contrato cockpit (Keywords dormante), `setup-airtable.mjs`, `output.schema.yaml`, glosario, dev-doc (banner ⚠️ "el JSON manda"), onboarding, ROADMAP §5. **Validador 1161/0**, grafo intacto (35 nodos motor), 0 refs colgadas. **SIN re-import + Execute en n8n** (lo prueba Mani). **Base viva (vía PAT/MCP, A ROTAR):** `Ajustes` actualizada por API (entran Candidatos por corrida=100/Días de recencia=7/Resultados por cuenta de referente=20; salen las 3 viejas); **página "Global" creada+publicada** en Cockpit Redes (`pagTPBLhdn4bogTc7`, pestaña filtrada a los 3 knobs); `estado` en la base **ya no tenía `publicado`** (Mani lo había quitado). **Pendiente manual (Mani):** re-import + test en n8n (incl. TikTok Perfil con `profiles` — hoy **0 referentes TikTok**); borrar a mano de `Proyectos` los campos `top_n`/`dias_recencia`/4 toggles (la API no borra campos); **habilitar edición** de la página Global (nace solo-lectura); ocultar página `Keywords`; sembrar referentes TikTok + criterios de Voz (solo existe "Milena Morales"). **🔴 ROTAR PAT Airtable + service_role Supabase.** Objetivo de throughput: **~100 scripts/semana**. **Próximo: re-import + V-run del motor refactorizado** (`/diagnose` si algo falla en n8n).
+
+**2026-06-24 (cierre 20) — Dashboard del equipo de redes (interfaz Airtable "Cockpit Redes") construido vía MCP (Mani + Claude).** 6 páginas publicadas: **Calificar (feed)** (galería Candidatos, cover cuadrado, color por calificación, tabs por estado), **Proyectos/Voces (config)** (galerías-hub), **Keywords/Referentes** (grillas de alta), **Ajustes** (grilla). Modelo: crear Keywords/Referentes en su página, en Proyecto solo linkear. **Decisiones (verificadas en código):** `estado` es el campo operativo (el archivado levanta `NOT nuevo`; la señal aprende de `estado in (aprobado,publicado)`), `calificacion` 🔥/👍/👎 = cue visual que NO alimenta aprendizaje, `notas_equipo` = interno opcional, **`publicado` quitado** (idéntico a aprobado + record se borra al archivar) → pestaña sacada del feed; **falta borrar la opción del campo a mano** (el MCP no edita choices). **Límites del MCP → setup manual pendiente (Mani):** las páginas API nacen solo-lectura → activar editar/crear/borrar por página (Ajustes solo-lectura); link-only en los campos Keywords/Referentes de la ficha de Proyecto; helper texts a mano; compartir con Majo/Jero como Editor. Guía campo-por-campo entregada en chat (sin volcar a doc aún). Checkbox "Buscar en IG por palabras clave" = no-op (F2) → esconder. **P0 de config global (caps/dias/top_n) sigue pendiente.** Detalle en §Log cierre 20.
+
 **2026-06-23 (cierre 19) — Archivado corrido end-to-end + auditoría del ciclo de vida de documentos + B5 (camino de error) cerrado en código (Mani + Claude).** Mani sacó el motor+archivado hacia producción. **Archivado: 1ª ejecución completa con candidatos reales** (estados mezclados aprobado/descartado). En el camino, 2 fallos de la credencial Google Sheets: (1) **OAuth `invalid_grant`** → Mani hizo *reconnect* de la credencial en n8n (consent screen sin toggle Testing/Published → probablemente **Internal**, sin vencimiento de 7 días → desarma el bloqueante #9, falta confirmar que GCP no corra con los $300 free); (2) **503 UNAVAILABLE** (transitorio de Google) → reintento manual funcionó. **Hardening:** `retryOnFail`+`maxTries:3`+`waitBetweenTries:30000` en el nodo *Append al Sheet* (commit `4963a6c`). **Auditoría del ciclo de vida (cruce código↔base viva, PAT/service_role A ROTAR):** verificado punta a punta a dónde va cada documento — **descartados → `outputs` (estado='descartado') → borrados de Airtable → alimentan `v_senal_seleccion` como clase negativa** (no se tiran; bajan la tasa de su referente). Cross-check exacto: `outputs`=16 (12 aprobado+4 descartado) = `runs.metricas.archivados:16`; `v_senal_seleccion` suma calificados=16/seleccionados=12; **Airtable Candidatos=0** (cockpit limpio tras borrado); **0 filas en `outputs` sin estado** → ADR-014 se sostiene (motor no ensucia histórico). **Veredicto escalabilidad: el ciclo de vida ES sostenible** (nada se acumula sin dueño; Candidatos se vacía cada run, outputs/processed_items crecen lineal por diseño). **🐞 ÚNICA grieta = runs zombie:** 2 runs de archivado quedaron `en_curso` para siempre (los 2 intentos fallidos de hoy: OAuth+503 abrieron run → escribieron outputs → fallaron en el Append → nunca llegaron a *Cerrar run*). Quiebra la confiabilidad de `runs` y la trazabilidad (los 16 outputs quedaron sellados con el `run_id` del run FALLIDO `aca7608e`, no del exitoso `b65b04f6`, por `ignore-duplicates`). **FIX B5 aplicado en código** (`workflow-archivado/workflow.json`): nodo nuevo **`Barrer runs zombie`** (PATCH, entre *Abrir run* y *Leer Proyectos*) marca `fallo` cualquier run de archivado anterior `en_curso` (scoped `params->>workflow=eq.archivado` + `id=neq.<run actual>`, `onError continue`). Auto-sanador, idempotente, robusto a cualquier fallo; en el cron diario un zombie vive ≤1 día. Nota clave: `runs.estado` solo admite `en_curso/ok/fallo/parcial` (NO `error`). Validador **1143/0**, 18 nodos. **VERIFICADO EN VIVO (misma sesión):** Mani re-importó+corrió motor y archivado. **(1) Camino crítico A ✅** — `processed_items` 10→30, 0 dup → fix fan-out×dedup enganchó, motor sano. **(2) Barrido ✅** — el archivado marcó `fallo` los 2 zombies viejos. **(3) 🐞 Bug nuevo destapado:** la corrida del archivado con **0 calificados** dejó OTRO zombie (`ed663b0e`) — *Cerrar run* calculaba `archivados` sobre `Armar filas archivado`, que no corre en la rama "sin calificados" → falla → zombie casi todos los días en el cron diario. **FIX:** *Cerrar run* ahora cuenta sobre `Leer Candidatos calificados` (corre en ambas ramas). **(4) ARCHIVADO VALIDADO PARA PRODUCCIÓN ✅ — run final `687027e2` con calificados reales:** Mani calificó los 14 candidatos del motor (estados mezclados aprobado/descartado; aprobó solo 👍/🔥) y corrió. Cerró **`ok`/`archivados:14`** en 6s; **`ed663b0e` → `fallo`** (barrido por este run); **0 `en_curso`**; **Candidatos=0** (borrados); **`outputs`=30** (16 lote previo + 14 nuevos: 21 aprobado/9 descartado); **Sheet poblado solo con aprobados** (confirmado por Mani); **`v_senal_seleccion` aprendiendo** (jefferson 5/7, howtoconvince 4/6, bayavoce 3/4 — descartados bajan la tasa). Único caso no ejercido con datos = lote 100% vacío con el código nuevo (seguro por construcción). **Archivado cerrado: idempotencia, paginación, split de estados, barrido, cierre robusto y curación completa — todo probado.** Credenciales **A ROTAR**.
 
 **2026-06-23 (cierre 18) — Run de Fase 3 DIAGNOSTICADO = éxito + bug fan-out×dedup encontrado y arreglado (Mani + Claude).** Mani corrió el run de Fase 3 (2 proyectos *parejas*+*empresas*, `top_n=10`, `dias=200`, referentes compartidos) y subió outputs + los 3 outputs HTTP (`POST-processed-items`/`POST-airtable`/`cerrar-run`). **El primer intento salió SIN scripts (0/20 transcripción): NO fue Supadata ni créditos, fue la `SUPADATA_API_KEY` sin llenar** — Mani la puso y re-corrió. **Run con key VERIFICADO punta a punta:** transcripción ✅ 19/20 (el vacío = fail-open normal, video sin voz); script ES ✅ 19/20 (Haiku literal); **fan-out ADR-013 ✅** (el video compartido `7629904064448449814` entra a `Asignar` por los 2 proyectos; queda 1× en candidatos finales — el gate filtró la copia de *empresas* — grado 1 funciona; 6 parejas + 4 empresas, sin `external_id` dup en el resultado); **recencia 200 ✅** (normalize trae TikTok all-time 2021→2026 + 4 IG viejos, pero el corte capa 2 en `Asignar` los elimina: `Asignar` 304 y pretrim 264 tienen 0 fuera de 200d); **embudo** `360 → 304 asignados → 264 pretrim → 20 heatscore (top_n 10×2) → 10 gate → 10 candidatos`, cruza exacto con `runs.metricas`. **🐞 BUG NUEVO encontrado y ARREGLADO — fan-out × dedup #5:** el run escribió **0 `processed_items`** (debía ~20). Causa: `POST processed_items` mandaba `Prefer: resolution=ignore-duplicates` pero **sin `on_conflict` en la URL** → PostgREST hacía INSERT plano y la `unique(platform, external_id)` (schema 002:25) tiraba 409; el **fan-out mete el video compartido 2× en el mismo batch** (Heat-score 20 filas / 19 únicos) → duplicado intra-batch → batch entero rebota → `onError continueRegularOutput` se traga el 409 → 0 registrados. El V1 no lo pegó (1 proyecto = sin duplicado intra-batch). **Consecuencia:** sin fix, la próxima corrida incremental no se salta ningún video → re-transcribe todo → re-paga Supadata+Claude, justo en multi-proyecto que es el modo por defecto. **FIX aplicado** (`workflow.json:706`, builder/convención): `?on_conflict=platform,external_id` en la URL → ahora emite `INSERT … ON CONFLICT (platform,external_id) DO NOTHING` (tolera intra-batch Y cross-run); mismo patrón que archivado nodo 11 y `Reportar outputs` (fix D3 cierre 14); cumple lo que el schema 002:30 ya documentaba. Diff 1 línea, validador **1143/0**. **SIN COMMIT, FALTA RE-IMPORT + Execute** para verificar `processed_items` poblado (~19 filas, compartido 1×). **Limpieza DB pre-redo** (Mani eligió "solo Fase 3"): borrados 10 Candidatos Fase 3 + su fila `runs`; V1 intacto (6 candidatos, run, 10 `processed_items`). **Núcleo del motor validado end-to-end (V1 + Fase 3); lo que falta para producción quedó consolidado en §Próxima sesión.** Credenciales **A ROTAR** (re-expuestas).
@@ -331,13 +335,53 @@ idioma TikTok #7), se itera acá.
 > | **V-runs restantes** (V2/V4/V5/V6) | ⬜ Pendientes (V5 dedup parcial-verificado) |
 > | **Fase 4 — activación** (D1 crons · D2 manifest · D3 demo) | ⬜ Pendiente (D2 = código de Claude) |
 > | **🔴 Rotar credenciales** (PAT + service_role) | ⬜ **Urgente** — expuestas en chats cierres 13–19 |
-> | **Interface user-friendly** (#32/#30/#31) | ⬜ Gate REAL de lanzamiento (decisión del jefe, no código) |
-> | **Refactor de búsqueda** (#34/#35) | ⛔ POST-MVP, no tocar |
+> | **Config global de ejecución** (caps · dias · top_n en un solo lugar) | ✅ **HECHO (cierre 21)** — ADR-016; Ajustes globales + caps dev-only + página Global. Falta re-import + test en n8n |
+> | **Refactor de búsqueda** (referente-only + keyword dormante) | ✅ **HECHO (cierre 21)** — ADR-015; falta re-import + test en n8n |
+> | **Interface user-friendly** (#32/#30/#31) | ⬜ Gate REAL de lanzamiento (decisión del jefe, no código) · galerías base armadas (cierre 20) |
 >
 > **🧭 PARA RETOMAR (cierre 19).** El **núcleo técnico (motor + archivado) está validado end-to-end**.
 > Lo que queda para producción está **todo acá, en una sola lista ordenada** (antes disperso entre §Plan a
 > producción, §Mejoras y los PARA RETOMAR viejos). Atacar de arriba hacia abajo. **Camino crítico ya cerrado
 > (A ✅); lo que sigue son los V-runs restantes (C), higiene/rotación (D) y activación (E).**
+>
+> ### 🔴 P0 (cierre 20, 2026-06-24) — Panel único de config de ejecución para el equipo de redes
+> **Pedido de Mani.** Las perillas que **definen el flujo entero del workflow y los créditos que se gastan**
+> deben vivir en **un solo lugar, global (no por-proyecto), fácil de cambiar para redes y con límites**.
+> Son cuatro: **cap de resultados IG por corrida · cap de resultados TikTok por corrida · `dias_recencia` ·
+> `top_n`**. Hoy están partidas en dos mundos:
+> - `ig_results_limit` / `tt_results_limit`: ✅ ya globales en **Ajustes** (claves "resultados instagram/tiktok
+>   por corrida"); `Armar plan de corrida` las lee y pisan los defaults del nodo `Config`.
+> - `dias_recencia` / `top_n`: ❌ hoy **por-proyecto** (campos de `Proyectos`), con fallback global
+>   `top_n_fallback` (Ajuste "candidatos por proyecto") y `max(dias_recencia)` de los proyectos activos para
+>   la ventana Apify. **Mover/duplicar a Ajustes como globales que manden sobre la ejecución entera.**
+>
+> **DECISIÓN TOMADA por Mani (2026-06-24): CAP TOTAL por corrida, estándar e idéntico para ambas plataformas.**
+> Un solo número por plataforma = **techo total de resultados de esa corrida**, que se **reparte** entre los
+> ejes activos (cuentas + keywords), no que se multiplica por cada uno. Así el costo NO se dispara al agregar
+> referentes/keywords (sistema escalable) y la perilla es explícita para el equipo de redes. Motivación: hoy
+> el gasto crece lineal con la config — 4 keywords × cap 40 ≈ 160 videos en TikTok; N cuentas × cap en IG.
+>
+> **El cap NO es simétrico hoy (lo que hay que arreglar):**
+> - **IG referentes:** el nodo `Split IG referentes` (`un item por referente IG`, `workflow.json:345`) corre el
+>   Apify IG Reels **1× por cuenta**, cada call con el **`ig_results_limit` completo** (`:354`). ⇒ total IG =
+>   **(nº cuentas IG) × ig_results_limit** (se multiplica). Confirmado en cierre 13.
+> - **TikTok** (perfiles `:836` y hashtags `:373`): **un solo call** con `resultsPerPage = tt_results_limit`,
+>   sin nodo split. **VERIFICAR contra Apify** si `resultsPerPage` es por-hashtag/perfil (⇒ también multiplica:
+>   4 kw × 40 = 160) o total (40). Sin esto no se puede fijar la fórmula del reparto. Pendiente clave del task.
+> - **IG hashtag:** RETIRADO (F2), `ig_hashtags` siempre vacío.
+>
+> **Qué resolver en este task (con la decisión ya tomada):**
+> 1. **Verificar la semántica de Apify** (`resultsPerPage` TikTok por-eje vs total; y confirmar el split IG).
+> 2. **Implementar el cap total** = un número por plataforma repartido entre los ejes activos. En IG ya hay
+>    split por cuenta → `resultsLimit = floor(cap_total / nº_cuentas_activas)` (mín. 1). En TikTok, según la
+>    semántica del paso 1, dividir el cap entre nº de hashtags/perfiles antes de pasar `resultsPerPage`.
+> 3. **Consolidar las 4 perillas en Ajustes** (global, nombres claros en español): cap IG · cap TikTok ·
+>    `dias_recencia` · `top_n`. Hoy `dias_recencia`/`top_n` son por-proyecto → volverlas globales (o dejar el
+>    campo de Proyectos como override opcional; decidir en el ADR).
+> 4. **Límites/validación** (min/max por perilla) para que redes no dispare créditos sin querer.
+> 5. Cuidar que las globales no rompan toggles de eje ni el fan-out por-proyecto (ADR-013).
+> Toca `Armar plan de corrida` + Ajustes (+ posible nodo de reparto). **Termina en ADR** (cambia el modelo de
+> dónde y cómo se configura el volumen/costo de la ejecución).
 >
 > ### A. ✅ Fix de dedup VERIFICADO EN VIVO (cierre 19) — camino crítico cerrado
 > 1. Mani re-importó el motor y corrió (run `b9fe6561`, ok, 14 candidatos). **`processed_items` pasó de 10 →
@@ -891,6 +935,54 @@ Contexto — **cómo busca hoy el motor (asimétrico por plataforma)**, verifica
     `Referentes` ya cargados.
 
 ## Log de avance (más reciente arriba)
+
+### 2026-06-24 (cierre 20) — Dashboard (interfaz Airtable) del equipo de redes construido vía MCP *(Mani + Claude)*
+
+**Qué se hizo.** Se armó la **interfaz "Cockpit Redes"** (`pbdXZRaSlAAGRAPGH`, base `appkdNLlN1v6XdKHn`)
+con el Airtable MCP — el #32 (gate de lanzamiento) deja de ser solo idea: la base ya tiene una superficie
+no-code para Majo/Jero. Iteramos de "tablas crudas" a algo más amigable. **6 páginas, publicadas:**
+- **Calificar (feed)** — galería de Candidatos, cover thumbnail **cuadrado** (`square`/`crop`), color por
+  `calificacion`, orden `heat_score` desc. Tabs por `estado`: Nuevos · Aprobados · Descartados. Tarjeta
+  mínima (thumbnail, calificacion, estado, referente); el resto en la ficha.
+- **Proyectos (config)** · **Voces (config)** — galerías de tarjetas (el proyecto/voz como hub).
+- **Keywords** · **Referentes** — grillas (alta rápida de records), con dropdown por proyecto/plataforma.
+- **Ajustes** — grilla simple (knobs del scoring; pensada solo-lectura para redes).
+
+**Modelo mental (decisión de Mani):** crear Keywords/Referentes en **sus páginas propias**; en las tarjetas
+de Proyecto **solo linkear** los ya creados (separa "crear" de "asociar"). Las 4 perillas de volumen/costo
+(`dias_recencia`, `top_n`, caps IG/TT) → ver **P0** en §Próxima sesión (van a Ajustes, globales).
+
+**Hallazgos de código de esta sesión (verificados, no de memoria):**
+- **`estado` es el campo operativo, NO `calificacion`.** El archivado levanta `NOT {estado}='nuevo'`
+  (`workflow-archivado:140`) y la señal de aprendizaje (`v_senal_seleccion`/`v_senal_tema`) cuenta
+  `estado in ('aprobado','publicado')` (`006:22`). Si el equipo solo pone el emoji y deja `estado=nuevo`,
+  **el candidato no se archiva nunca**. El helper de `estado` debe dejar esto clarísimo.
+- **`calificacion` (🔥/👍/👎) NO alimenta el aprendizaje** — solo viaja al Sheet como columna info. Queda
+  como **cue visual opcional**. (Decisión Mani: se mantiene.)
+- **`notas_equipo` no lo toca ningún workflow** — 100% interno del equipo, opcional.
+- **`publicado` = idéntico a `aprobado`** (mismo trato en Sheet y señal; `:223` `POS=['aprobado','publicado']`)
+  y además el record se borra a diario al archivarse → "publicado" es inalcanzable. **Decisión: quitar.**
+  Hecho: pestaña "Publicados" sacada del feed. **PENDIENTE MANUAL:** borrar la opción `publicado` del campo
+  `estado` en la base (Candidatos → estado) — el `update_field` del MCP **no edita choices de singleSelect**.
+
+**Límites del MCP (lo que NO se puede por API → queda manual en el editor de Airtable):**
+1. **Editar/crear/borrar registros**: las páginas creadas por API nacen **solo-lectura**. Hay que activar
+   por página: editar + crear + borrar (en Ajustes: dejar solo-lectura). **Sin esto el equipo solo mira.**
+2. **Tarjetas de Proyecto = link-only**: desactivar "crear nuevos" en los campos `Keywords`/`Referentes`
+   de la ficha de Proyecto (que solo linkeen existentes).
+3. **Helper text por campo**: se ponen a mano (campo → "Add description").
+4. **Ancho de tarjeta** (thumbnails aún más chicos): slider manual; por API solo se controla la proporción.
+5. **Compartir** la interfaz con Majo/Jero como **Editor** (Share) — sin esto nada de lo anterior aplica.
+
+**Guía campo-por-campo (qué mostrar/esconder · editar/solo-ver · helper text) entregada en chat** para las
+6 vistas. **Aún no volcada a doc** — candidata a [docs/onboarding-equipo-redes.md](../onboarding-equipo-redes.md)
+cuando se confirme la config manual. Principio: el equipo edita `estado`/`calificacion`/`notas_equipo` +
+config; se esconden los internos del motor (`heat_score`, `relevancia_score`, `viral_por_tamano`); ojo con
+el checkbox **"Buscar en Instagram por palabras clave"** = **no-op hoy** (F2 IG-keyword apagado) → esconder.
+
+**Qué sigue.** (a) Mani hace el setup manual del editor (puntos 1–5 de arriba) + borra la opción `publicado`;
+(b) prueba el ciclo completo como Majo/Jero; (c) el **P0 de config global** sigue para otra sesión. El núcleo
+técnico (motor + archivado) ya estaba validado (cierre 19); esto es la capa de uso para el equipo.
 
 ### 2026-06-23 (cierre 19) — Archivado en vivo + auditoría del ciclo de vida + B5 cerrado en código *(Mani + Claude)*
 

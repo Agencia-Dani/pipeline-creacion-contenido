@@ -41,14 +41,11 @@ const sel = (name, ...opts) => ({ name, type: "singleSelect", options: { choices
 
 // ── las 5 tablas (campos NO-link al crear; los links se agregan después) ──
 const tables = [
-  { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto.",
-    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"),
-             num("dias_recencia"), num("top_n"), check("activo"),
-             check("Buscar en Instagram por cuentas"), check("Buscar en Instagram por palabras clave"),
-             check("Buscar en TikTok por palabras clave"), check("Buscar en TikTok por cuentas")] },
+  { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto. dias_recencia/top_n/toggles salieron a Ajustes globales (ADR-016).",
+    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), check("activo")] },
   { name: "Voces", description: "Eje organizativo (para quién se selecciona). Separado del proyecto.",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia")] },
-  { name: "Keywords", description: "Banco de palabras clave por proyecto (acumula).",
+  { name: "Keywords", description: "Banco de palabras clave por proyecto. EJE DORMANTE (ADR-015): el motor no la usa mientras buscar_keyword_tiktok=off; página oculta.",
     fields: [txt("termino"), check("activo")] },
   { name: "Referentes", description: "Banco de perfiles referentes (fuente propia).",
     fields: [txt("handle"), sel("plataforma", "instagram", "tiktok"),
@@ -60,7 +57,7 @@ const tables = [
              num("heat_score", 1), num("relevancia_score", 2), long("relevancia_razon"),
              check("viral_por_tamano"),
              sel("calificacion", "🔥", "👍", "👎"),
-             sel("estado", "nuevo", "aprobado", "descartado", "publicado"),
+             sel("estado", "nuevo", "aprobado", "descartado"),
              long("notas_equipo")] },
   { name: "Ajustes", description: "Knobs del scoring (clave→valor) que el equipo edita sin tocar n8n — ADR-011. El motor los lee y caen sobre los defaults de Config; tabla vacía = motor con defaults.",
     fields: [txt("clave"), num("valor", 2), long("descripcion")] },
@@ -76,12 +73,13 @@ const ajustesSeed = [
   { clave: "Peso de relevancia",              valor: 0.7,    descripcion: "Cuánto pesa el juicio de relevancia (IA) vs. las métricas en el orden final (0 a 1)." },
   { clave: "Bonus idioma extranjero",         valor: 0.3,    descripcion: "Empujón extra a los videos que NO están en español." },
   { clave: "Seguidores para marcar viral",    valor: 700000, descripcion: "A partir de cuántos seguidores se marca el video como viral (solo marca, no descarta)." },
-  { clave: "Candidatos por proyecto",         valor: 25,     descripcion: "Cuántos candidatos trae un proyecto cuando no fijó su propio número." },
   { clave: "Mínimo de vistas",                valor: 0,      descripcion: "Descarta los videos con menos vistas que esto. 0 = no descarta nada." },
   { clave: "Mínimo de likes",                 valor: 0,      descripcion: "Descarta los videos con menos likes que esto. 0 = no descarta nada." },
-  { clave: "Resultados Instagram por corrida", valor: 8,     descripcion: "Cuántos videos baja cada búsqueda de Instagram (más = más costo)." },
-  { clave: "Resultados TikTok por corrida",   valor: 30,     descripcion: "Cuántos videos baja cada búsqueda de TikTok (más = más costo)." },
   { clave: "Relevancia mínima",               valor: 0,      descripcion: "Descarta candidatos con relevancia por debajo de esto (0 a 1). 0 = no descarta nada." },
+  // Knobs de ejecución globales (ADR-016) — la "página Global" del dashboard.
+  { clave: "Candidatos por corrida",          valor: 100,    descripcion: "Cuántos videos distintos trae la corrida en total (no por proyecto). El corte va por el score final." },
+  { clave: "Días de recencia",                valor: 7,      descripcion: "Ventana de búsqueda: solo videos publicados en los últimos N días." },
+  { clave: "Resultados por cuenta de referente", valor: 20,  descripcion: "Cuántos videos baja por cada cuenta de referente (más = más costo). Tope dev: 30." },
 ];
 
 const run = async () => {

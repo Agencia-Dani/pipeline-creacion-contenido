@@ -168,7 +168,7 @@ script en español, `idioma`, `thumbnail` y la razón de relevancia, y su rastro
 - [x] **C2. Workflow de archivado (n8n, cron diario):** lee `Candidatos` decididos (`NOT estado='nuevo'`)
       → por cada uno: (1) inserta en Supabase `outputs` (estado según calificación,
       `calificado_en` = `fecha_calificacion`, metadata completa), (2) append al Sheet Histórico
-      **solo aprobado/publicado**, (3) borra el record de Airtable (retención del free). Idempotente:
+      **solo aprobado**, (3) borra el record de Airtable (retención del free). Idempotente:
       `external_id` = id del record de Airtable. *(✅ validado para producción cierre 19, ver dev-doc §3.)*
 - [x] **C3. Tracking:** `v_senal_seleccion`/`v_senal_tema` responden la tasa de selección por
       referente/tema (los descartados bajan la tasa). *(✅ cierre 19.)*
@@ -219,6 +219,11 @@ incremental no reprocesa · una falla simulada no tumba la entrega · los crons 
 3. **Costo por corrida medido** (`runs.costo_estimado` real) + revisión mensual.
 4. **Pipeline general** ([PLAN.md §5](./PLAN.md)): Substack + sync Notion (F3), capa del jefe
    completa (F4), templatización cliente N+1 (F5), operación sostenible (F6).
+5. **Motor de recomendación / discovery asistido** (cierra el loop de aprendizaje): un workflow que
+   lee el histórico de candidatos **aprobados** (`outputs`) y propone (a) **referentes nuevos** parecidos
+   a los activos y (b) **keywords/frases TikTok** para alimentar el eje keyword dormante. Se apoya en el
+   substrato que ADR-015 preserva (señal por referente + `v_senal_tema` inerte). Workflow aparte, no toca
+   el motor actual.
 
 ## 6. Riesgos de este roadmap
 
