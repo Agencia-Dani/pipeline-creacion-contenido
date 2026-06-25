@@ -17,6 +17,18 @@
 > **corte final a N videos distintos** por heat compuesto vive en `Armar candidato`; `Proyectos` perdió
 > `top_n`/`dias_recencia`/los 4 toggles; `estado` es binario (**`publicado` retirado**).
 >
+> ⚠️ **Enmienda 2026-06-25 (ADR-017) — motor listo para prod.** El eje **keyword TikTok se reactiva**
+> como **toggle** (`buscar_keyword_tiktok` default 1) — deja de estar dormante; la señal por tema
+> (`v_senal_tema`) vuelve a alimentarse. **Tres toggles de eje** en `Ajustes`, default todos ON:
+> `buscar_referente_ig`, `buscar_referente_tiktok`, `buscar_keyword_tiktok` (1/0; `Armar plan` los lee
+> vía `pick` y gatea cada rama). **Knob propio del eje keyword**: `resultados_keyword` (10) con cap
+> dev-only `cap_resultados_keyword` (20); `Apify — TikTok` (hashtags) usa `resultsPerPage =
+> resultados_keyword` (el de perfiles sigue con `resultados_referente`). **Piso por cuenta fuente**
+> `piso_referente` (Config, 5): `Armar candidato` hace round-robin hasta `piso` videos por cuenta antes
+> de rellenar por heat global hasta `top_n` (fail-open con 0). **Barredor de zombies del motor**: nodo
+> nuevo `Barrer runs zombie` entre `Abrir run` y `Leer Proyectos`, y `Abrir run` ahora taggea
+> `params.workflow='motor'`. **Motor: 35 → 36 nodos.**
+>
 > Pies de página: el motor en
 > [`workflows/workflow-short-form-content/`](../../workflows/workflow-short-form-content/), el
 > archivado en [`workflows/workflow-archivado/`](../../workflows/workflow-archivado/). El cockpit
@@ -29,7 +41,7 @@
 
 | Workflow | Trigger | Cadencia | Nodos | Qué hace |
 |---|---|---|---|---|
-| **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 35 | Descubre reels (IG+TikTok, Apify) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** en Airtable + registra la corrida en Supabase |
+| **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 36 | Descubre reels (IG+TikTok, Apify) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** en Airtable + registra la corrida en Supabase |
 | **Archivado** (`archivado`) | Cron + Execute manual | **Diario**, 9am (`0 9 * * *`) | 16 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`) + append al **Sheet Histórico** → los borra de Airtable (para no pasar el límite free) |
 
 Ambos comparten el patrón `Config → Abrir run → … → Cerrar run`: la corrida se registra en la tabla
@@ -38,13 +50,13 @@ Ambos comparten el patrón `Config → Abrir run → … → Cerrar run`: la cor
 
 ---
 
-## 2. Motor (`short-form-content`) — 35 nodos
+## 2. Motor (`short-form-content`) — 36 nodos
 
 ### 2.1 Orden de ejecución (topología real)
 
 ```
 Cron semanal ┐
-             ├─► Config ─► Abrir run ─► Leer Proyectos ─► Leer Voces ─► Leer Keywords
+             ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer Proyectos ─► Leer Voces ─► Leer Keywords
 Ejecutar     ┘                                                                     │
 manual                                              Armar plan ◄─ Leer Ajustes ◄─ Leer Referentes
                                                         │  (fan-out a 4 ramas Apify)
@@ -107,7 +119,8 @@ Notas de orden que muerden si las ignorás:
 | 1 | Cron — semanal (lunes 8am) | scheduleTrigger | Dispara la corrida los lunes 8am (`weeks`, día 1, hora 8). |
 | 2 | Ejecutar manual | manualTrigger | Execute Workflow a mano (las V-runs). |
 | 3 | Config | set | Define los **IDs** (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`) y los **defaults de scoring** (`ig_results_limit` 8, `tt_results_limit` 30, `peso_views` .4, `peso_likes` .4, `peso_eng` .2, `peso_relevancia` .7, `boost_idioma` .3, `umbral_viral` 700000, `top_n_fallback` 25). Los Ajustes de Airtable caen **encima** de estos. |
-| 4 | Abrir run en el registro | http POST | `POST runs` (`instance_id`, `trigger_type:'cron'`, `estado:'en_curso'`, `params:{}`), `Prefer: return=representation` → devuelve `id`. continue-on-fail. |
+| 4 | Abrir run en el registro | http POST | `POST runs` (`instance_id`, `trigger_type:'cron'`, `estado:'en_curso'`, `params:{workflow:'motor'}`), `Prefer: return=representation` → devuelve `id`. continue-on-fail. El tag `workflow:'motor'` es lo que scopea el barredor (4b). |
+| 4b | Barrer runs zombie | http PATCH | **Auto-sanador del motor (ADR-017), entre `Abrir run` y `Leer Proyectos`.** `PATCH runs` → marca `fallo` los runs de motor anteriores colgados `en_curso` (scoped `params->>workflow=eq.motor` + `id=neq.<run actual>`). Espejo del nodo homónimo del archivado. continue-on-fail. |
 | 5 | Leer Proyectos | http GET | Airtable `Proyectos` con `filterByFormula={activo}`. **Pagina** (`options.pagination` sigue el `offset` → todas las páginas, #4). |
 | 6 | Leer Voces | http GET | Airtable `Voces` (todas — el id→nombre y `criterios_relevancia`). Pagina (#4). |
 | 7 | Leer Keywords | http GET | Airtable `Keywords` con `{activo}`. Pagina (#4). |
@@ -117,7 +130,7 @@ Notas de orden que muerden si las ignorás:
 | 11 | Split IG referentes | code | Emite **1 item por referente IG** → hace que `Apify — IG Reels` corra una vez por cuenta. Por eso `ig_results_limit` es cap **por-referente**, no global. |
 | 12 | Apify — IG Reels | apify | Actor `apify~instagram-scraper`, `directUrls` = la URL del referente del item (vía Split), `searchType:'user'`, `resultsLimit`, `onlyPostsNewerThan` si hay ventana. |
 | 13 | Apify — IG Hashtag | apify | Mismo actor, `directUrls` = `instagram.com/explore/tags/<h>/` por cada `ig_hashtag`. **Hoy recibe 0 URLs** (`ig_hashtags` vacío, F2). |
-| 14 | Apify — TikTok | apify | Actor `clockworks~free-tiktok-scraper`, `hashtags=tt_hashtags`, `resultsPerPage`. |
+| 14 | Apify — TikTok | apify | Actor `clockworks~free-tiktok-scraper`, `hashtags=tt_hashtags` (eje keyword, gateado por `buscar_keyword_tiktok`), `resultsPerPage=resultados_keyword` (knob propio del eje keyword, ADR-017). |
 | 15 | Apify — TikTok Perfil | apify | Mismo actor, `profiles=tt_profiles` (referentes TikTok). *Hoy `tt_profiles` sale vacío hasta sembrar Referentes TikTok.* |
 | 16 | Merge IG | merge (append) | Une **IG Reels ⊕ IG Hashtag** en un input → `Normalizar IG`. Sin esto n8n correría el Normalizador 1× por conexión (bug F1). |
 | 17 | Merge TT | merge (append) | Une **TikTok ⊕ TikTok Perfil** → `Normalizar TT`. |
@@ -133,7 +146,7 @@ Notas de orden que muerden si las ignorás:
 | 27 | Transcribir (Supadata) | code | Transcribe cada item del top_n (Supadata, `&text=true&mode=auto`), throttle 1.5s, trunca 6000 chars. `idioma_detectado` = `lang` de Supadata (primario) → fallback `guessLang(transcript)` → `idioma_guess`. **Fail-open** (sin transcript, sigue). `<SUPADATA_API_KEY>`. |
 | 28 | Traducir (Claude Haiku) | code | Traduce **literal** al español **solo si** `idioma_detectado≠es` (sin reescribir/resumir/embellecer). **Fail-open**: si falla, `script = transcript`. Emite `script`, `idioma`. `claude-haiku-4-5`. |
 | 29 | Gate de relevancia | code + Haiku | **Jurado estricto** (precision) contra `criterios`, sobre el `script` (o el caption como **fallback** si no hubo transcript). Dropea `relevante:false` y `score < min_relevancia`. Recalcula `heat_score` **composite** = `peso_relevancia·sHaiku + (1-peso)·percentil(prescore_metrico)`. Marca `[SIN TRANSCRIPT: …]` en `relevancia_razon`. Emite `prescore_metrico`, `relevancia_score`, `relevancia_razon`, `heat_score`. **Fail-open**. Logea descartes: `[Gate] DESCARTE pid=… id=… score=… motivo=…` (cierre 15). |
-| 30 | Armar candidato | code | Reconstruye el objeto candidato final (lista explícita de campos — ver §7). Toma `titulo` del caption (80 chars), `script`, `idioma`, proyecto/voz, `referente`(=username), `url_referente`(=url), métricas, `heat_score`, `viral_por_tamano`, `external_id`, `relevancia_*`, `thumbnail_url`, `tema`(=`_tema`). |
+| 30 | Armar candidato | code | **Corte final a `top_n` videos distintos** (ADR-016) **con piso por cuenta** (`piso_referente`, ADR-017): ordena por heat, hace round-robin hasta `piso` videos por cuenta fuente, rellena el resto por heat global, conserva las copias del fan-out (fail-open con piso=0). Luego reconstruye el objeto candidato final (lista explícita — ver §7): `titulo` del caption (80 chars), `script`, `idioma`, proyecto/voz, `referente`(=username), `url_referente`(=url), métricas, `heat_score`, `viral_por_tamano`, `external_id`, `relevancia_*`, `thumbnail_url`, `tema`(=`_tema`). |
 | 31 | Preparar batch Airtable | code | Arma `records[]` de Airtable (`fields` + links `proyecto`/`voz` + `thumbnail` attachment), en **batches de 10**, `typecast:true`, `estado:'nuevo'`. |
 | 32 | POST Airtable Candidatos | http POST | `POST Candidatos`. **stop-on-fail** (si Airtable rechaza, la corrida falla — es la entrega real). |
 | 33 | Cerrar run en el registro | http PATCH | `PATCH runs?id=eq.<id>` con `fin`, `estado:'ok'`, `metricas` del embudo completo `{colectados, asignados, pretrim, filtrados, gate, outputs}` (`outputs` = `$('Armar candidato').all().length`, ADR-014). **`executeOnce: true`** → cierra el run 1× pese a los N candidatos de entrada. continue-on-fail. |

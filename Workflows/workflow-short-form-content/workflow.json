@@ -88,9 +88,39 @@
               "type": "number"
             },
             {
+              "id": "c_piso",
+              "name": "piso_referente",
+              "value": 5,
+              "type": "number"
+            },
+            {
               "id": "c_kw",
               "name": "buscar_keyword_tiktok",
-              "value": 0,
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "c_ref_ig",
+              "name": "buscar_referente_ig",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "c_ref_tt",
+              "name": "buscar_referente_tiktok",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "c_rk",
+              "name": "resultados_keyword",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "c_caprk",
+              "name": "cap_resultados_keyword",
+              "value": 20,
               "type": "number"
             },
             {
@@ -339,7 +369,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst proyectos = recs('Leer Proyectos');\nconst voces = recs('Leer Voces');\nconst keywords = recs('Leer Keywords');\nconst referentes = recs('Leer Referentes');\nconst _nrm = (s) => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();\nconst cfg0 = $('Config').first().json;\nconst AJUSTE_MAP = { 'peso de vistas':'peso_views', 'peso de likes':'peso_likes', 'peso de interaccion':'peso_eng', 'peso de relevancia':'peso_relevancia', 'bonus idioma extranjero':'boost_idioma', 'seguidores para marcar viral':'umbral_viral', 'minimo de vistas':'min_views', 'minimo de likes':'min_likes', 'relevancia minima':'min_relevancia', 'candidatos por corrida':'top_n', 'dias de recencia':'dias_recencia', 'resultados por cuenta de referente':'resultados_referente' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const key = AJUSTE_MAP[_nrm(f.clave)]; if (key && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[key] = Number(f.valor); });\n\n// Knobs de ejecucion GLOBALES (ADR-016): ajustes (equipo) > Config (default). Topes dev-only en Config.\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst dias_recencia = Number(pick('dias_recencia', 7));\nconst top_n = Number(pick('top_n', 100));\nconst cap_rr = Number(cfg0.cap_resultados_referente || 0);\nconst rr_raw = Number(pick('resultados_referente', 20));\nconst resultados_referente = cap_rr > 0 ? Math.min(rr_raw, cap_rr) : rr_raw; // cap max (ADR-016)\nconst cap_top_n = Number(cfg0.cap_top_n || 0);\nconst FLAG_KW = Number(cfg0.buscar_keyword_tiktok || 0) > 0; // eje TikTok-keyword DORMANTE (ADR-015)\n\nconst vozById = {};\nconst vozCritById = {};\nvoces.forEach(v => { const vf = v.fields || {}; vozById[v.id] = vf.nombre || ''; vozCritById[v.id] = (vf.criterios_relevancia || '').toString().trim(); });\n\nconst projects = {};\nproyectos.forEach(p => {\n  const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = {\n    id: p.id, nombre: f.nombre || '',\n    voz_id: vozId, voz_nombre: vozId && vozById[vozId] ? vozById[vozId] : '',\n    criterios: (f.criterios_relevancia || '').toString().trim(),\n    voz_criterios: vozId && vozCritById[vozId] ? vozCritById[vozId] : '',\n    keywords: [], ig_handles: [], tt_handles: []\n  };\n});\nkeywords.forEach(k => {\n  const f = k.fields || {}; if (!f.termino) return;\n  (Array.isArray(f.proyecto) ? f.proyecto : []).forEach(proy => { if (projects[proy]) projects[proy].keywords.push(String(f.termino).trim()); });\n});\nreferentes.forEach(r => {\n  const f = r.fields || {};\n  const handle = String(f.handle || '').trim().replace(/^@/, '');\n  if (!handle) return;\n  const plat = String(f.plataforma || '').toLowerCase();\n  (Array.isArray(f.proyecto) ? f.proyecto : []).forEach(proy => {\n    if (!projects[proy]) return;\n    if (plat.indexOf('insta') >= 0) projects[proy].ig_handles.push(handle);\n    else if (plat.indexOf('tik') >= 0) projects[proy].tt_handles.push(handle);\n  });\n});\n\nconst ig_urls = []; const ig_owner_to_proj = {};\nconst tt_profiles = []; const tt_owner_to_proj = {};\nconst tt_hashtags = []; const kw_to_proj = {};\nObject.values(projects).forEach(p => {\n  // Referente-only (ADR-015): IG por cuenta (directUrls), TikTok por perfil (profiles). Siempre.\n  p.ig_handles.forEach(h => { ig_urls.push('https://www.instagram.com/' + h + '/'); (ig_owner_to_proj[h.toLowerCase()] = ig_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n  p.tt_handles.forEach(h => { tt_profiles.push(h); (tt_owner_to_proj[h.toLowerCase()] = tt_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n  // Keyword: eje DORMANTE. Solo se arma si buscar_keyword_tiktok esta on (ADR-015). IG-keyword retirado.\n  if (FLAG_KW) p.keywords.forEach(k => { const kk = k.replace(/^#/, '').toLowerCase().replace(/\\s+/g, ''); if (!kk) return; (kw_to_proj[kk] = kw_to_proj[kk] || []).push(p.id); tt_hashtags.push(kk); });\n});\n\nreturn [{ json: {\n  projects, ig_urls: [...new Set(ig_urls)], tt_profiles: [...new Set(tt_profiles)],\n  ig_hashtags: [], tt_hashtags: [...new Set(tt_hashtags)],\n  ig_owner_to_proj, tt_owner_to_proj, kw_to_proj, active_project_ids: Object.keys(projects),\n  dias_recencia, resultados_referente, top_n, cap_top_n, ajustes\n} }];\n"
+        "jsCode": "\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst proyectos = recs('Leer Proyectos');\nconst voces = recs('Leer Voces');\nconst keywords = recs('Leer Keywords');\nconst referentes = recs('Leer Referentes');\nconst _nrm = (s) => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();\nconst cfg0 = $('Config').first().json;\nconst AJUSTE_MAP = { 'peso de vistas':'peso_views', 'peso de likes':'peso_likes', 'peso de interaccion':'peso_eng', 'peso de relevancia':'peso_relevancia', 'bonus idioma extranjero':'boost_idioma', 'seguidores para marcar viral':'umbral_viral', 'minimo de vistas':'min_views', 'minimo de likes':'min_likes', 'relevancia minima':'min_relevancia', 'candidatos por corrida':'top_n', 'dias de recencia':'dias_recencia', 'resultados por cuenta de referente':'resultados_referente', 'buscar por referentes en instagram':'buscar_referente_ig', 'buscar por referentes en tiktok':'buscar_referente_tiktok', 'buscar por keywords en tiktok':'buscar_keyword_tiktok', 'resultados por keyword':'resultados_keyword' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const key = AJUSTE_MAP[_nrm(f.clave)]; if (key && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[key] = Number(f.valor); });\n\n// Knobs de ejecucion GLOBALES (ADR-016): ajustes (equipo) > Config (default). Topes dev-only en Config.\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst dias_recencia = Number(pick('dias_recencia', 7));\nconst top_n = Number(pick('top_n', 100));\nconst cap_rr = Number(cfg0.cap_resultados_referente || 0);\nconst rr_raw = Number(pick('resultados_referente', 20));\nconst resultados_referente = cap_rr > 0 ? Math.min(rr_raw, cap_rr) : rr_raw; // cap max (ADR-016)\nconst cap_top_n = Number(cfg0.cap_top_n || 0);\n// Knob propio del eje keyword + cap dev-only (ADR-017): descubrimiento ciego = volumen mas chico, topeado.\nconst cap_rk = Number(cfg0.cap_resultados_keyword || 0);\nconst rk_raw = Number(pick('resultados_keyword', 10));\nconst resultados_keyword = cap_rk > 0 ? Math.min(rk_raw, cap_rk) : rk_raw;\n// Toggles de eje (ADR-017): ajustes (equipo) > Config. Default ON. Referentes ambas plataformas + keyword TikTok.\nconst BUSCAR_REF_IG = Number(pick('buscar_referente_ig', 1)) > 0;\nconst BUSCAR_REF_TT = Number(pick('buscar_referente_tiktok', 1)) > 0;\nconst FLAG_KW = Number(pick('buscar_keyword_tiktok', 1)) > 0; // eje TikTok-keyword reactivado como toggle (ADR-017)\n\nconst vozById = {};\nconst vozCritById = {};\nvoces.forEach(v => { const vf = v.fields || {}; vozById[v.id] = vf.nombre || ''; vozCritById[v.id] = (vf.criterios_relevancia || '').toString().trim(); });\n\nconst projects = {};\nproyectos.forEach(p => {\n  const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = {\n    id: p.id, nombre: f.nombre || '',\n    voz_id: vozId, voz_nombre: vozId && vozById[vozId] ? vozById[vozId] : '',\n    criterios: (f.criterios_relevancia || '').toString().trim(),\n    voz_criterios: vozId && vozCritById[vozId] ? vozCritById[vozId] : '',\n    keywords: [], ig_handles: [], tt_handles: []\n  };\n});\nkeywords.forEach(k => {\n  const f = k.fields || {}; if (!f.termino) return;\n  (Array.isArray(f.proyecto) ? f.proyecto : []).forEach(proy => { if (projects[proy]) projects[proy].keywords.push(String(f.termino).trim()); });\n});\nreferentes.forEach(r => {\n  const f = r.fields || {};\n  const handle = String(f.handle || '').trim().replace(/^@/, '');\n  if (!handle) return;\n  const plat = String(f.plataforma || '').toLowerCase();\n  (Array.isArray(f.proyecto) ? f.proyecto : []).forEach(proy => {\n    if (!projects[proy]) return;\n    if (plat.indexOf('insta') >= 0) projects[proy].ig_handles.push(handle);\n    else if (plat.indexOf('tik') >= 0) projects[proy].tt_handles.push(handle);\n  });\n});\n\nconst ig_urls = []; const ig_owner_to_proj = {};\nconst tt_profiles = []; const tt_owner_to_proj = {};\nconst tt_hashtags = []; const kw_to_proj = {};\nObject.values(projects).forEach(p => {\n  // Referente: IG por cuenta (directUrls), TikTok por perfil (profiles). Gateado por toggle (ADR-017).\n  if (BUSCAR_REF_IG) p.ig_handles.forEach(h => { ig_urls.push('https://www.instagram.com/' + h + '/'); (ig_owner_to_proj[h.toLowerCase()] = ig_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n  if (BUSCAR_REF_TT) p.tt_handles.forEach(h => { tt_profiles.push(h); (tt_owner_to_proj[h.toLowerCase()] = tt_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n  // Keyword TikTok: eje reactivado como toggle (ADR-017). Solo se arma si buscar_keyword_tiktok on. IG-keyword retirado.\n  if (FLAG_KW) p.keywords.forEach(k => { const kk = k.replace(/^#/, '').toLowerCase().replace(/\\s+/g, ''); if (!kk) return; (kw_to_proj[kk] = kw_to_proj[kk] || []).push(p.id); tt_hashtags.push(kk); });\n});\n\nreturn [{ json: {\n  projects, ig_urls: [...new Set(ig_urls)], tt_profiles: [...new Set(tt_profiles)],\n  ig_hashtags: [], tt_hashtags: [...new Set(tt_hashtags)],\n  ig_owner_to_proj, tt_owner_to_proj, kw_to_proj, active_project_ids: Object.keys(projects),\n  dias_recencia, resultados_referente, resultados_keyword, top_n, cap_top_n, ajustes\n} }];\n"
       },
       "id": "armar-plan-de-corrida",
       "name": "Armar plan de corrida",
@@ -388,7 +418,7 @@
         "resource": "Actors",
         "operation": "Run actor and get dataset",
         "actorId": "clockworks~free-tiktok-scraper",
-        "customBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var a=p.ajustes||{}; return { hashtags: p.tt_hashtags, resultsPerPage: p.resultados_referente, shouldDownloadVideos: false, shouldDownloadCovers: false }; })() }}"
+        "customBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var a=p.ajustes||{}; return { hashtags: p.tt_hashtags, resultsPerPage: p.resultados_keyword, shouldDownloadVideos: false, shouldDownloadCovers: false }; })() }}"
       },
       "id": "apify-tiktok",
       "name": "Apify — TikTok",
@@ -607,7 +637,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Corte final (ADR-016): top-N VIDEOS DISTINTOS por heat compuesto; conserva todas las copias (fan-out).\nconst N = Number(($('Armar plan de corrida').first().json || {}).top_n || $('Config').first().json.top_n || 100);\nconst _all = $input.all().slice().sort((a, b) => (Number(b.json.heat_score || 0)) - (Number(a.json.heat_score || 0)));\nconst _sel = new Set(); const _keep = new Set();\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id) { _keep.add(it); continue; } if (!_sel.has(id)) { if (_sel.size >= N) continue; _sel.add(id); } _keep.add(it); }\nconst out = [];\nfor (const it of _all) {\n  if (!_keep.has(it)) continue;\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || '', tema: d._tema || ''\n  } });\n}\nreturn out;\n"
+        "jsCode": "\n// Corte final (ADR-016 + piso por cuenta ADR-017): top-N VIDEOS DISTINTOS por heat, con piso leve por cuenta fuente; conserva copias (fan-out).\nconst N = Number(($('Armar plan de corrida').first().json || {}).top_n || $('Config').first().json.top_n || 100);\nconst _all = $input.all().slice().sort((a, b) => (Number(b.json.heat_score || 0)) - (Number(a.json.heat_score || 0)));\nconst PISO = Number($('Config').first().json.piso_referente || 0); // piso leve por cuenta fuente (ADR-017): evita que un referente acapare el corte.\n// 1) videos distintos en orden de heat (el primero de cada external_id) con su cuenta fuente.\nconst _seenId = new Set(); const _distinct = [];\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || _seenId.has(id)) continue; _seenId.add(id); _distinct.push({ id, user: String(it.json.username || '').toLowerCase() }); }\nconst _sel = new Set();\n// 2) PISO: round-robin por rank, hasta PISO videos por cuenta, sin pasar de N.\nif (PISO > 0) { const _byUser = {}; _distinct.forEach(d => { (_byUser[d.user] = _byUser[d.user] || []).push(d.id); }); const _users = Object.keys(_byUser); for (let r = 0; r < PISO && _sel.size < N; r++) { for (const u of _users) { if (_sel.size >= N) break; const arr = _byUser[u]; if (r < arr.length) _sel.add(arr[r]); } } }\n// 3) FILL: completar por heat global hasta N videos distintos.\nfor (const d of _distinct) { if (_sel.size >= N) break; _sel.add(d.id); }\n// 4) conservar todas las copias (fan-out) de los videos elegidos + items sin id.\nconst _keep = new Set();\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id) { _keep.add(it); continue; } if (_sel.has(id)) _keep.add(it); }\nconst out = [];\nfor (const it of _all) {\n  if (!_keep.has(it)) continue;\n  const d = it.json;\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || '', tema: d._tema || ''\n  } });\n}\nreturn out;\n"
       },
       "id": "armar-candidato",
       "name": "Armar candidato",
@@ -780,7 +810,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"cron\", \"estado\": \"en_curso\", \"params\": {} }",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"cron\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"motor\" } }",
         "options": {
           "timeout": 15000
         }
@@ -889,6 +919,47 @@
           "name": "Supabase Registro"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { estado: 'fallo', fin: $now.toISO(), error: 'run de motor sin cerrar (fallo antes de Cerrar run); barrido por corrida posterior' } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "barrer-runs-zombie-motor",
+      "name": "Barrer runs zombie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9240,
+        560
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -930,7 +1001,7 @@
       "main": [
         [
           {
-            "node": "Leer Proyectos",
+            "node": "Barrer runs zombie",
             "type": "main",
             "index": 0
           }
@@ -1264,6 +1335,17 @@
         [
           {
             "node": "Apify — IG Reels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Barrer runs zombie": {
+      "main": [
+        [
+          {
+            "node": "Leer Proyectos",
             "type": "main",
             "index": 0
           }

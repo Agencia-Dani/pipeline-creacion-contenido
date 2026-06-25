@@ -45,7 +45,7 @@ const tables = [
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), check("activo")] },
   { name: "Voces", description: "Eje organizativo (para quién se selecciona). Separado del proyecto.",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia")] },
-  { name: "Keywords", description: "Banco de palabras clave por proyecto. EJE DORMANTE (ADR-015): el motor no la usa mientras buscar_keyword_tiktok=off; página oculta.",
+  { name: "Keywords", description: "Banco de palabras clave (solo TikTok) por proyecto. Eje reactivado (ADR-017): el motor lo usa cuando 'Buscar por keywords en TikTok'=1.",
     fields: [txt("termino"), check("activo")] },
   { name: "Referentes", description: "Banco de perfiles referentes (fuente propia).",
     fields: [txt("handle"), sel("plataforma", "instagram", "tiktok"),
@@ -80,6 +80,11 @@ const ajustesSeed = [
   { clave: "Candidatos por corrida",          valor: 100,    descripcion: "Cuántos videos distintos trae la corrida en total (no por proyecto). El corte va por el score final." },
   { clave: "Días de recencia",                valor: 7,      descripcion: "Ventana de búsqueda: solo videos publicados en los últimos N días." },
   { clave: "Resultados por cuenta de referente", valor: 20,  descripcion: "Cuántos videos baja por cada cuenta de referente (más = más costo). Tope dev: 30." },
+  // Toggles de eje + knob keyword (ADR-017) — la "página Global" del dashboard.
+  { clave: "Buscar por referentes en Instagram", valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en Instagram. 1 = sí, 0 = no." },
+  { clave: "Buscar por referentes en TikTok",    valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en TikTok. 1 = sí, 0 = no." },
+  { clave: "Buscar por keywords en TikTok",      valor: 1,   descripcion: "Activa el descubrimiento por hashtags/keywords en TikTok (cuentas desconocidas). 1 = sí, 0 = no." },
+  { clave: "Resultados por keyword",             valor: 10,  descripcion: "Cuántos videos baja por cada keyword de TikTok. Más bajo que referentes porque es descubrimiento ciego (más basura). Tope dev: 20." },
 ];
 
 const run = async () => {

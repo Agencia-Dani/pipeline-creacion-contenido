@@ -44,10 +44,10 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `descripcion` | texto largo | quién es / autoridad |
 | `criterios_relevancia` | texto largo | **qué le sirve a este cliente puntual** (fit de persona/audiencia) — afina el gate de relevancia por encima del tema del Proyecto. Opcional; el Proyecto filtra el tema, la Voz el cliente (ADR-010) |
 
-### 3. `Keywords` — banco de palabras clave (**eje dormante**, ADR-015)
-La tabla se conserva pero el motor **no la usa** mientras el flag global `buscar_keyword_tiktok` esté
-off. Su página del dashboard está oculta. Retomar = prender el flag + mostrar la página. El IG-keyword
-se retiró (no servía); el eje dormante es solo TikTok.
+### 3. `Keywords` — banco de palabras clave (**eje activo, solo TikTok**, ADR-017)
+La tabla alimenta el descubrimiento por hashtag en TikTok cuando el toggle `Buscar por keywords en
+TikTok` (Ajustes) está on (default). El IG-keyword se retiró (no servía); el eje keyword es solo
+TikTok. Volumen propio y topeado: ver `Resultados por keyword` en Ajustes.
 
 | Campo | Tipo | Para qué |
 |---|---|---|
@@ -112,14 +112,20 @@ mínima` 0 (**umbral** del gate; 0 = nada corta).
 **Knobs de ejecución globales (ADR-016)** — los que el equipo edita en la **página Global** del
 dashboard: `Candidatos por corrida` 100 (**N total por corrida**, contados como videos distintos; el
 corte final va por heat compuesto tras el gate) · `Días de recencia` 7 (ventana única de fetch) ·
-`Resultados por cuenta de referente` 20 (videos por cuenta por corrida; unifica los viejos
-`Resultados Instagram/TikTok por corrida`).
+`Resultados por cuenta de referente` 20 (videos por cuenta de referente por corrida).
+
+**Toggles de eje + knob keyword (ADR-017)** — también en la página Global: `Buscar por referentes en
+Instagram` 1 · `Buscar por referentes en TikTok` 1 · `Buscar por keywords en TikTok` 1 (1=on/0=off;
+default todos on: referentes ambas plataformas + keyword solo TikTok) · `Resultados por keyword` 10
+(videos por keyword TikTok; más chico que referentes porque es descubrimiento ciego).
 
 **Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` 30
-(techo de `Resultados por cuenta de referente`: el motor usa `min(valor_equipo, cap)`) ·
-`cap_top_n` 200 (techo duro de transcripción por corrida; protege el backfill). En Config quedan además
-los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y el flag `buscar_keyword_tiktok` (off,
-ADR-015). Detección de idioma: dev-only.
+(techo de `Resultados por cuenta de referente`) · `cap_resultados_keyword` 20 (techo de `Resultados por
+keyword`; ambos: el motor usa `min(valor_equipo, cap)`) · `cap_top_n` 200 (techo duro de transcripción
+por corrida, vale para todos los ejes juntos; protege el backfill — es el gobernador de créditos real).
+En Config quedan además los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y los defaults de
+los toggles (`buscar_referente_ig`/`buscar_referente_tiktok`/`buscar_keyword_tiktok`, todos 1). Detección
+de idioma: dev-only.
 
 ---
 
