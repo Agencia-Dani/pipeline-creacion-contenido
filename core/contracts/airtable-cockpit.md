@@ -102,6 +102,7 @@ vacía, un knob falta, o la `clave` no está en el mapa, usa el default. Lectura
 | `clave` | texto (primario) | el nombre del knob, en español (debe coincidir con `AJUSTE_MAP`) |
 | `valor` | número (precisión 2) | el valor que sobrescribe el default |
 | `descripcion` | texto largo | qué hace el knob (para el equipo) |
+| `Mostrar al equipo` | checkbox | si está marcado, el knob sale en la página **Configuración Global** (la que edita el equipo); sin marcar, solo en **Ajustes Dev-Only**. Es el filtro de esa página (una condición `= ✓`), no lo lee el motor. Marcados: los knobs globales de ADR-016/017 (recencia, candidatos, resultados por referente/keyword, los 3 toggles); sin marcar: los pesos/mínimos del scoring (avanzados). |
 
 **Knobs (semilla por defecto):** `Peso de vistas` 0.4 · `Peso de likes` 0.4 · `Peso de interacción`
 0.2 (pesos del prescore métrico) · `Peso de relevancia` 0.7 (IA vs. métricas en el orden final) ·

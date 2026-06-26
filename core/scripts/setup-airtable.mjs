@@ -60,7 +60,7 @@ const tables = [
              sel("estado", "nuevo", "aprobado", "descartado"),
              long("notas_equipo")] },
   { name: "Ajustes", description: "Knobs del scoring (clave→valor) que el equipo edita sin tocar n8n — ADR-011. El motor los lee y caen sobre los defaults de Config; tabla vacía = motor con defaults.",
-    fields: [txt("clave"), num("valor", 2), long("descripcion")] },
+    fields: [txt("clave"), num("valor", 2), long("descripcion"), check("Mostrar al equipo")] },
 ];
 
 // Semillas de Ajustes: los knobs que el equipo edita en español claro. El motor (nodo "Armar plan")
@@ -76,15 +76,16 @@ const ajustesSeed = [
   { clave: "Mínimo de vistas",                valor: 0,      descripcion: "Descarta los videos con menos vistas que esto. 0 = no descarta nada." },
   { clave: "Mínimo de likes",                 valor: 0,      descripcion: "Descarta los videos con menos likes que esto. 0 = no descarta nada." },
   { clave: "Relevancia mínima",               valor: 0,      descripcion: "Descarta candidatos con relevancia por debajo de esto (0 a 1). 0 = no descarta nada." },
-  // Knobs de ejecución globales (ADR-016) — la "página Global" del dashboard.
-  { clave: "Candidatos por corrida",          valor: 100,    descripcion: "Cuántos videos distintos trae la corrida en total (no por proyecto). El corte va por el score final." },
-  { clave: "Días de recencia",                valor: 7,      descripcion: "Ventana de búsqueda: solo videos publicados en los últimos N días." },
-  { clave: "Resultados por cuenta de referente", valor: 20,  descripcion: "Cuántos videos baja por cada cuenta de referente (más = más costo). Tope dev: 30." },
-  // Toggles de eje + knob keyword (ADR-017) — la "página Global" del dashboard.
-  { clave: "Buscar por referentes en Instagram", valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en Instagram. 1 = sí, 0 = no." },
-  { clave: "Buscar por referentes en TikTok",    valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en TikTok. 1 = sí, 0 = no." },
-  { clave: "Buscar por keywords en TikTok",      valor: 1,   descripcion: "Activa el descubrimiento por hashtags/keywords en TikTok (cuentas desconocidas). 1 = sí, 0 = no." },
-  { clave: "Resultados por keyword",             valor: 10,  descripcion: "Cuántos videos baja por cada keyword de TikTok. Más bajo que referentes porque es descubrimiento ciego (más basura). Tope dev: 20." },
+  // Knobs de ejecución globales (ADR-016) — visibles al equipo en la "página Global" del dashboard
+  // ("Mostrar al equipo": true filtra esa página; sin el flag van solo a "Ajustes Dev-Only").
+  { clave: "Candidatos por corrida",          valor: 100,    descripcion: "Cuántos videos distintos trae la corrida en total (no por proyecto). El corte va por el score final.", "Mostrar al equipo": true },
+  { clave: "Días de recencia",                valor: 7,      descripcion: "Ventana de búsqueda: solo videos publicados en los últimos N días.", "Mostrar al equipo": true },
+  { clave: "Resultados por cuenta de referente", valor: 20,  descripcion: "Cuántos videos baja por cada cuenta de referente (más = más costo). Tope dev: 30.", "Mostrar al equipo": true },
+  // Toggles de eje + knob keyword (ADR-017) — también en la "página Global".
+  { clave: "Buscar por referentes en Instagram", valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en Instagram. 1 = sí, 0 = no.", "Mostrar al equipo": true },
+  { clave: "Buscar por referentes en TikTok",    valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en TikTok. 1 = sí, 0 = no.", "Mostrar al equipo": true },
+  { clave: "Buscar por keywords en TikTok",      valor: 1,   descripcion: "Activa el descubrimiento por hashtags/keywords en TikTok (cuentas desconocidas). 1 = sí, 0 = no.", "Mostrar al equipo": true },
+  { clave: "Resultados por keyword",             valor: 10,  descripcion: "Cuántos videos baja por cada keyword de TikTok. Más bajo que referentes porque es descubrimiento ciego (más basura). Tope dev: 20.", "Mostrar al equipo": true },
 ];
 
 const run = async () => {
