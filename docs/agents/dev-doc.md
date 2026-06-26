@@ -173,7 +173,7 @@ límites: ADR-010 + handoff §Mejoras #13/#18.
 ### 3.1 Orden de ejecución
 
 ```
-Cron diario 9am ┐
+Cron semanal (dom 6pm) ┐
                 ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos calificados
 Ejecutar manual ┘                                                                                              │
                                                                                                                ▼
@@ -208,7 +208,7 @@ el Append **no** es continue-on-fail (si el Sheet falla, corta antes de borrar �
 
 | # | Nodo | Tipo | Qué hace |
 |---|---|---|---|
-| 1 | Cron — diario 9am | scheduleTrigger | `0 9 * * *`. |
+| 1 | Cron — semanal (domingo 6pm) | scheduleTrigger | `0 18 * * 0` (domingo 18:00, un día antes del motor). |
 | 2 | Ejecutar manual | manualTrigger | Execute a mano. |
 | 3 | Config | set | `airtable_base_id`, `supabase_url`, `instance_id`, `sheet_id`, `sheet_tab` (placeholders `<<…>>`). |
 | 4 | Abrir run en el registro | http POST | `POST runs` con `params:{workflow:'archivado'}`, `return=representation`. continue-on-fail. |

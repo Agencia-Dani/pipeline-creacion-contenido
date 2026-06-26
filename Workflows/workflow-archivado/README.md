@@ -1,6 +1,6 @@
 # Archivado de curación — carril C (C2)
 
-> Workflow de **n8n** que cierra el loop de curación del MVP de reels. Corre **diario por cron**:
+> Workflow de **n8n** que cierra el loop de curación del MVP de reels. Corre **semanal por cron (domingo 6pm)**, un día antes de la corrida del motor (lunes 8am), para darle tiempo al equipo de redes a usar los scripts antes de que se limpien de Airtable:
 > toma los `Candidatos` que el equipo (Majo/Jero) ya calificó en Airtable, los manda al histórico
 > permanente (Supabase + Google Sheet) y los **borra de Airtable** para no reventar el plan free
 > (1.000 records). Es el complemento del motor B3 (`../workflow-short-form-content/`).
@@ -10,7 +10,7 @@
 ## Qué hace (flujo)
 
 ```
-Cron diario 9am ─┐
+Cron semanal (dom 6pm) ─┐
 Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail) ─► Barrer runs zombie
    └─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos decididos ─► IF ¿hay?
           ├─ no ─────────────────────────────────────────────► Cerrar run
@@ -96,8 +96,9 @@ Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail
 
 ## Limitaciones conocidas (MVP)
 
-- **Sin paginación**: lee 1 página (hasta 100 candidatos calificados / corrida). Con cron diario y
-  `top_n` chico entra cómodo; si se acumulan >100, agregar loop de `offset`.
+- **Sin paginación**: lee 1 página (hasta 100 candidatos calificados / corrida). Con cron semanal
+  cada corrida archiva el lote de toda la semana (≈1 corrida del motor, `top_n` ≈100), así que queda
+  al filo de la página; si se acumulan >100 calificados, agregar loop de `offset`.
 - **El motor deja una fila `outputs` "draft"** por candidato producido (sin `calificado_en`); este
   workflow crea la fila **archivada** (con `calificado_en`). Las vistas del histórico filtran por
   `calificado_en is not null`, así que solo aparece la archivada. Las draft quedan como rastro de

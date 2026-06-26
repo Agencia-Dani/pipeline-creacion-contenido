@@ -5,12 +5,12 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "cronExpression", "expression": "0 9 * * *" }
+            { "field": "cronExpression", "expression": "0 18 * * 0" }
           ]
         }
       },
-      "id": "cron-diario",
-      "name": "Cron — diario 9am",
+      "id": "cron-semanal-domingo",
+      "name": "Cron — semanal (domingo 6pm)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [0, 200]
@@ -320,7 +320,7 @@
     }
   ],
   "connections": {
-    "Cron — diario 9am": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
+    "Cron — semanal (domingo 6pm)": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
     "Ejecutar manual": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
     "Config": { "main": [[{ "node": "Abrir run en el registro", "type": "main", "index": 0 }]] },
     "Abrir run en el registro": { "main": [[{ "node": "Barrer runs zombie", "type": "main", "index": 0 }]] },
