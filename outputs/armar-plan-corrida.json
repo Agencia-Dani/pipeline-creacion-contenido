@@ -6,10 +6,6 @@
         "nombre": "Comunicación de parejas",
         "voz_id": "recek0DxMjprPiodc",
         "voz_nombre": "Milena Morales",
-        "min_likes": 0,
-        "min_views": 0,
-        "dias_recencia": 200,
-        "top_n": 10,
         "criterios": "Videos con consejos prácticos para mejorar la comunicación en pareja: expresar necesidades, resolver conflictos, escuchar, poner límites, reconectar. RELEVANTE: aporta una técnica, ejemplo o reflexión aplicable a la relación de pareja. NO RELEVANTE: relaciones en general sin foco en comunicación, motivacional vacío, conquista/citas, comunicación laboral o de liderazgo. Útil = accionable y específico, no una obviedad.",
         "voz_criterios": "Comunicación, Comunicación corporativa y comunicación de parejas",
         "keywords": [
@@ -21,21 +17,13 @@
           "howtoconvince",
           "bayavoce"
         ],
-        "tt_handles": [],
-        "tg_ig_ref": true,
-        "tg_ig_kw": true,
-        "tg_tt_kw": true,
-        "tg_tt_ref": true
+        "tt_handles": []
       },
       "recqId0coOkkpXHaS": {
         "id": "recqId0coOkkpXHaS",
         "nombre": "Comunicación en empresas",
         "voz_id": "recek0DxMjprPiodc",
         "voz_nombre": "Milena Morales",
-        "min_likes": 0,
-        "min_views": 0,
-        "dias_recencia": 200,
-        "top_n": 10,
         "criterios": "Videos sobre comunicación en el trabajo (directivo o empleado): reuniones, emails, conflictos laborales, hablar con jefes/colegas/clientes, situaciones difíciles de oficina. RELEVANTE: tip o ejemplo de comunicación en contexto laboral. NO RELEVANTE: liderazgo de equipos puro (va a \"líderes\"), comunicación de pareja, productividad/finanzas sin foco comunicacional. Útil = aplicable a la vida laboral cotidiana.",
         "voz_criterios": "Comunicación, Comunicación corporativa y comunicación de parejas",
         "keywords": [
@@ -48,11 +36,7 @@
           "askvinh",
           "eloisegagnon_strategist"
         ],
-        "tt_handles": [],
-        "tg_ig_ref": true,
-        "tg_ig_kw": true,
-        "tg_tt_kw": true,
-        "tg_tt_ref": true
+        "tt_handles": []
       }
     },
     "ig_urls": [
@@ -108,19 +92,27 @@
       "recC45pycBkYsTL0f",
       "recqId0coOkkpXHaS"
     ],
-    "max_dias_recencia": 200,
+    "dias_recencia": 150,
+    "resultados_referente": 20,
+    "resultados_keyword": 10,
+    "top_n": 100,
+    "cap_top_n": 200,
     "ajustes": {
+      "dias_recencia": 150,
+      "buscar_referente_ig": 1,
       "peso_relevancia": 0.7,
-      "tt_results_limit": 40,
-      "boost_idioma": 1,
-      "ig_results_limit": 40,
+      "top_n": 100,
+      "boost_idioma": 0.45,
+      "resultados_keyword": 10,
       "peso_likes": 0.4,
+      "buscar_keyword_tiktok": 1,
       "min_likes": 0,
       "peso_views": 0.4,
+      "resultados_referente": 20,
       "min_relevancia": 0,
       "min_views": 0,
       "umbral_viral": 700000,
-      "top_n_fallback": 25,
+      "buscar_referente_tiktok": 1,
       "peso_eng": 0.2
     }
   }

@@ -111,6 +111,20 @@ Notas de orden que muerden si las ignorás:
 - **`Armar candidato` tiene dos salidas:** `Preparar batch Airtable` (los candidatos al equipo) y
   `Cerrar run` directo. El motor **ya no escribe filas por-item a `outputs`** (ADR-014); por eso
   `Cerrar run` lleva `executeOnce: true` (recibe los N candidatos pero cierra el run una sola vez).
+- **`Transcribir (Supadata)` es un Code node SERIAL bajo el watchdog del task runner**
+  (`N8N_RUNNERS_TASK_TIMEOUT`, 900s en el pod). Transcribe los videos distintos uno por uno (HTTP a
+  Supadata + `SLEEP_MS`); si el loop pasa de 900s el runner mata el nodo (no es timeout de la API).
+  Reventó el 2026-06-29 con **106 videos distintos** (top_n=100 × 2 proyectos activos, deduped).
+  - **El cuello real es Supadata, no el tiempo.** Free tier = **100 créditos/mes**, **~1-2 créditos/video**,
+    **1 request/segundo**. Una sola corrida a top_n=100×2proy ≈ 106-212 créditos → **excede el mes entero
+    en una corrida**. La throughput meta (~100 scripts/sem) es **imposible en free tier**: o se sube de
+    plan en Supadata, o se baja top_n drásticamente (decisión de costo, va con el jefe).
+  - **El límite 1 req/s descarta la concurrencia** (un Promise pool violaría el rate limit) → el loop
+    DEBE ser serial mientras se esté en este tier. `SLEEP_MS=1000` es el piso correcto (≤1 req/s aun si
+    una respuesta vuelve instantánea). El pool de concurrencia solo se vuelve viable **si se sube de plan**
+    en Supadata (más req/s); ahí sí colapsaría el HTTP serial — pero es decisión post-upgrade.
+  - **Mitigación de tiempo (no de costo):** subir `N8N_RUNNERS_TASK_TIMEOUT` (InstaPods = VPS con SSH,
+    va en el `.env`/compose de n8n) da headroom para que el loop serial no muera por el watchdog.
 
 ### 2.2 Nodo por nodo
 
