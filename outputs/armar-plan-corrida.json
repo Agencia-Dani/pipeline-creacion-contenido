@@ -96,7 +96,7 @@
     "resultados_referente": 20,
     "resultados_keyword": 10,
     "top_n": 100,
-    "cap_top_n": 200,
+    "cap_top_n": 20,
     "ajustes": {
       "dias_recencia": 150,
       "buscar_referente_ig": 1,
