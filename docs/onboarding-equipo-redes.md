@@ -1,18 +1,47 @@
-# Onboarding equipo de redes — cómo usar el sistema de reels
+# Manual del equipo de redes — cómo usar el sistema de reels
 
-> Guía para Majo y Jero. Pensada para empezar a usar el sistema sin saber nada de cómo está
-> hecho por dentro. Si algo no se entiende o falta, anotalo al final (sección "Lo que necesitamos").
+> Guía para Majo y Jero. Pensada para operar el sistema **sin saber nada de cómo está hecho por
+> dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
+> falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
+>
+> *Actualizado: 2026-07-07. Refleja el motor en producción con los tres ejes de búsqueda activos
+> (referentes en Instagram, referentes en TikTok, y keywords en TikTok).*
+
+---
+
+## 0. Lo que SÍ y lo que NO (léanlo primero, es el resumen de todo)
+
+**Lo que SÍ hacen ustedes:**
+- ✅ Entrar a **Airtable** todos los días (o cada 2-3 días) y **calificar** los videos que llegaron.
+- ✅ Poner en cada candidato dos cosas: la **calificación** (🔥/👍/👎) y el **estado** (aprobado/descartado).
+- ✅ Calificar **también lo que descartan** (👎 + descartado): así la máquina aprende y mejora.
+- ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**) y de
+  **Keywords** (hashtags de TikTok). Esa lista es de dónde sale todo el contenido.
+- ✅ Escribir buenos `criterios_relevancia` en cada Proyecto (es lo que decide la calidad de lo que llega).
+
+**Lo que NO hacen (nunca):**
+- ❌ **No** llenan la tabla **Candidatos** a mano — esa la llena sola la máquina.
+- ❌ **No** entran a n8n, Supabase, ni nada que suene "técnico". Eso es sala de máquinas, no es su trabajo.
+- ❌ **No** dejan un Proyecto activo **sin fuentes**. Un proyecto activo sin ningún Referente ni ninguna
+  Keyword **no trae nada**: es un proyecto muerto (ver §5.2). Todo proyecto activo necesita al menos una
+  cuenta en Referentes o una palabra en Keywords.
+- ❌ **No** escriben la arroba doble (`@@cuenta`). Va **una sola**: `@cuenta`. (La máquina lo corrige si
+  se equivocan, pero mejor bien de entrada.)
+- ❌ **No** asignan una Voz que no tenga que ver con el tema del Proyecto (ver §5.1 / §5.2).
+- ❌ **No** tocan las "perillas" avanzadas (pesos, bonus) sin avisarnos la primera vez (§5.6).
+
+Si tienen 30 segundos y solo leen esto, ya pueden trabajar. El resto del manual es el detalle.
 
 ---
 
 ## 1. Qué es esto y para qué sirve
 
-Hay una máquina que trabaja para ustedes. Cada cierto tiempo sale a Instagram y TikTok, encuentra
-videos de referentes sobre los temas que les interesan, los **transcribe y traduce al español**, los
+Hay una máquina que trabaja para ustedes. Cada semana sale a Instagram y TikTok, encuentra videos de
+referentes y de hashtags sobre los temas que les interesan, los **transcribe y traduce al español**, los
 ordena de **más prometedor a menos**, y se los deja servidos en una lista.
 
-El trabajo de ustedes no es buscar ni escribir. Es **decidir**: entrar a la lista, leer, y marcar
-cuáles sirven. La máquina **aprende** de lo que eligen y va mejorando lo que les trae.
+El trabajo de ustedes no es buscar ni escribir. Es **decidir**: entrar a la lista, leer, y marcar cuáles
+sirven. La máquina **aprende** de lo que eligen y va mejorando lo que les trae.
 
 En una frase: **la máquina encuentra y ordena; ustedes eligen y adaptan.**
 
@@ -23,26 +52,31 @@ En una frase: **la máquina encuentra y ordena; ustedes eligen y adaptan.**
 | Herramienta | Para qué | Qué hacen ahí |
 |---|---|---|
 | **Airtable** | El tablero de trabajo | Leen los videos y los califican. Es donde viven el 95% del tiempo. |
-| **Google Sheet "Histórico"** | El archivo de lo ya elegido | Solo lo consultan/descargan. No escriben ahí. |
+| **Google Sheet "Histórico"** | El archivo de lo ya elegido | Solo lo consultan/descargan. **No escriben ahí.** |
 
-Todo lo demás (los robots, las bases de datos por detrás) es **sala de máquinas**. No necesitan
-entrar nunca. Si alguien menciona "n8n", "Supabase" o "el cron", es plomería interna, no es asunto
-del equipo de redes.
+Todo lo demás (los robots, las bases de datos por detrás) es **sala de máquinas**. No necesitan entrar
+nunca. Si alguien menciona "n8n", "Supabase" o "el cron", es plomería interna, no es asunto del equipo
+de redes.
 
 ---
 
-## 3. La rutina (lo que hacen cada día o cada semana)
+## 3. La rutina (lo que hacen durante la semana)
 
-1. La máquina corre sola y deja videos nuevos en Airtable.
-2. Entran a Airtable, a la tabla **Candidatos**.
+1. La máquina corre sola (una vez por semana) y deja videos nuevos en Airtable.
+2. Entran a Airtable, a la tabla **Candidatos** (o a la vista **Calificar**).
 3. Cada fila es un video ya transcrito y traducido al español, con su métrica y su link al original.
-4. Leen el texto, miran el video original si quieren, y **deciden**.
-5. Califican (ver punto 6).
-6. Lo que aprueban queda guardado en el Histórico automáticamente y sale de la lista. Lo que no
+4. Leen el texto (o miran el video original y la portada), y **deciden**.
+5. Califican (ver §6).
+6. Lo que aprueban queda guardado en el Histórico **automáticamente** y sale de la lista. Lo que no
    tocaron sigue esperando.
 
-Regla mental: **Airtable es su bandeja de entrada.** La máquina la llena, ustedes la vacían
-decidiendo. Lo que califican desaparece de pendientes y queda archivado.
+Regla mental: **Airtable es su bandeja de entrada.** La máquina la llena, ustedes la vacían decidiendo.
+Lo que califican desaparece de pendientes y queda archivado.
+
+> **¿Cuándo se limpia la lista?** Un proceso automático corre **los domingos a las 18:00** y se lleva al
+> Histórico todo lo que ustedes **ya calificaron** durante la semana (aprobado o descartado), y lo borra
+> de Airtable. Los que dejaron sin calificar **no se borran**: siguen esperando. Por eso conviene calificar
+> **antes del domingo** — así el archivo queda ordenado y la lista no se amontona.
 
 ---
 
@@ -50,16 +84,16 @@ decidiendo. Lo que califican desaparece de pendientes y queda archivado.
 
 Hay 6 tablas. Piénsenlas en dos grupos.
 
-### Las que casi no tocan (la configuración de la búsqueda)
+### Las que arman una vez (la configuración de la búsqueda)
 
-- **Proyectos** — cada tema que se busca (ej: "Comunicación", "Ventas"). Define el tema, los criterios
-  de relevancia y la voz.
-- **Voces** — para quién se selecciona (un personaje o marca). Sirve para organizar y afinar el filtro.
-- **Referentes** — las **cuentas** (de Instagram **y** TikTok) que se siguen. **De ahí salen sus videos**
-  (es la única fuente de búsqueda).
-- **Ajustes** + página **Global** — las "perillas" (cuánto trae por corrida, días, pesos de orden). **Ya
-  vienen con valores razonables; casi no se tocan.** Más en 5.6.
-- **Keywords** — *pausada* (la búsqueda por palabras clave está apagada — ver 5.3).
+- **Proyectos** — cada tema que se busca (ej: "Comunicación", "Ventas", "Storytelling"). Define el tema,
+  los criterios de relevancia y la voz.
+- **Voces** — para quién se selecciona (un personaje o marca). Organiza y afina el filtro.
+- **Referentes** — las **cuentas** (de Instagram **y** TikTok) que se siguen. **De ahí salen videos.**
+- **Keywords** — los **hashtags de TikTok** que se rastrean. **Eje activo** (ver §5.3): la máquina también
+  descubre videos por hashtag en TikTok, además de por cuenta.
+- **Ajustes** + página **Configuración Global** — las "perillas" (cuánto trae por corrida, días, qué ejes
+  se prenden). **Ya vienen con valores razonables; casi no se tocan.** Más en §5.6.
 
 > Estas las arman una vez y las van ajustando. **No hace falta tocarlas para el trabajo del día.**
 
@@ -67,25 +101,23 @@ Hay 6 tablas. Piénsenlas en dos grupos.
 
 - **Candidatos** — los videos que llegaron, esperando que ustedes los califiquen. Acá viven.
 
-En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en
-español), el **idioma original**, el **link al video original**, las **métricas** (views, likes,
-seguidores, engagement) y el **heat score** (ver punto 7).
-
-**Lo único que llenan ustedes** en cada fila: la **calificación**, el **estado** y, si quieren,
-**notas del equipo**.
+En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
+el **idioma original**, la **portada**, el **link al video original**, las **métricas** (views, likes,
+seguidores, engagement) y el **heat score** (§7). **Lo único que llenan ustedes:** la **calificación**, el
+**estado** y, si quieren, **notas del equipo**.
 
 ---
 
 ## 5. Configuración inicial: cómo llenar cada tabla la primera vez
 
-Esto se hace **una sola vez** al arrancar (y cada vez que quieran sumar un tema o una cuenta nueva).
-**Candidatos no se toca acá** — esa la llena la máquina. Las que arman ustedes son las otras cuatro.
+Esto se hace **una sola vez** al arrancar (y cada vez que quieran sumar un tema, una cuenta o un hashtag
+nuevo). **Candidatos no se toca acá** — esa la llena la máquina. Las que arman ustedes son las otras.
 
-**Orden recomendado:** Voces → Proyectos → Referentes. (Hay que crear la Voz y el
-Proyecto antes, porque Referentes se "engancha" a ellos.)
+**Orden recomendado:** Voces → Proyectos → Referentes → Keywords. (Hay que crear la Voz y el Proyecto
+antes, porque Referentes y Keywords se "enganchan" a ellos.)
 
-Para crear una fila en cualquier tabla en Airtable: entran a la tabla, botón **`+`** abajo de todo
-(o la fila vacía al final), y llenan las columnas. Abajo, columna por columna, qué va en cada una.
+Para crear una fila: entran a la tabla, botón **`+`** abajo de todo (o la fila vacía al final), y llenan
+las columnas. Abajo, columna por columna, qué va en cada una.
 
 ### 5.1 `Voces` — para quién se selecciona
 
@@ -95,82 +127,99 @@ Una Voz = un personaje o marca para la que curan contenido (ej: "Cora", "30X ins
 |---|---|
 | `nombre` | el nombre de la voz. Ej: "Cora" |
 | `descripcion` | quién es / de qué tiene autoridad |
-| `criterios_relevancia` | qué le sirve a este cliente puntual (opcional; afina el filtro de relevancia por encima del tema del Proyecto) |
+| `criterios_relevancia` | qué le sirve a este cliente puntual (opcional; afina el filtro por encima del tema del Proyecto) |
+
+> **Cuidado con la coherencia Voz ↔ Proyecto.** La Voz tiene que tener sentido con el tema del Proyecto al
+> que la asignan. Ejemplo real que salió mal: una voz de *bienestar y maternidad* asignada a un proyecto de
+> *Storytelling*. No pegan → el filtro se confunde y llega contenido raro. **Regla: la Voz y el Proyecto
+> tienen que hablar del mismo mundo.**
 
 ### 5.2 `Proyectos` — el tema que se busca
 
-Un Proyecto = un tema aislado (ej: "Comunicación", "Ventas"). Los resultados de un proyecto no se
-mezclan con los de otro.
+Un Proyecto = un tema aislado (ej: "Comunicación", "Ventas"). Los resultados de un proyecto no se mezclan
+con los de otro.
 
 | Columna | Qué escriben |
 |---|---|
 | `nombre` | el tema. Ej: "Comunicación" |
 | `descripcion` | qué cubre el tema |
-| `criterios_relevancia` | **qué hace relevante a un video para este tema, y qué NO.** Es el campo más importante: la máquina lo lee para juzgar si un video sirve de verdad o es viral-vacío. Mientras más concreto, menos basura les llega (ver ejemplo abajo) |
+| `criterios_relevancia` | **qué hace relevante a un video para este tema, y qué NO.** Es el campo más importante: la máquina lo lee para juzgar si un video sirve de verdad o es viral-vacío. Mientras más concreto, menos basura les llega (ejemplo abajo) |
 | `voz_default` | la Voz que crearon en 5.1 (se elige de una lista). **Una sola voz por proyecto** |
 | `activo` | ✅ marcado para que el proyecto entre en las búsquedas. Sin marcar = pausado |
 
-> **Cambio (jun-2026):** `dias_recencia`, `top_n` y los checkboxes de canal salieron del Proyecto. Ahora
-> los días de búsqueda, cuántos videos por corrida y los resultados por cuenta son **globales** para
-> todos los proyectos, en la **página Global** (sección 5.6). La búsqueda es **solo por referente** (sus
-> cuentas de Referentes); ya no se busca por palabras clave.
+> **🔴 Regla de oro: un Proyecto activo necesita fuentes.** Un proyecto marcado `activo` pero **sin ningún
+> Referente y sin ninguna Keyword** ligados **no trae absolutamente nada** — es un proyecto muerto que solo
+> ocupa lugar. Antes de activar un proyecto, asegúrense de que tenga **al menos una** cuenta en Referentes
+> **o** una palabra en Keywords. (Pasó en la primera corrida real: un proyecto quedó activo sin fuentes y
+> no produjo nada.)
 
-> **Cómo escribir buenos `criterios_relevancia` (esto define la calidad de lo que les llega).** Digan
-> qué sirve y qué no, concreto:
+> **Cambio de config:** `dias_recencia`, `top_n` y los checkboxes de canal **ya no viven en el Proyecto**.
+> Ahora los días de búsqueda, cuántos videos por corrida y los resultados por cuenta son **globales** para
+> todos los proyectos, en la **página Configuración Global** (§5.6).
+
+> **Cómo escribir buenos `criterios_relevancia` (esto define la calidad de lo que llega).** Digan qué sirve
+> y qué no, concreto:
 > - ❌ Vago: *"videos de liderazgo"*.
-> - ✅ Útil: *"Sirve: tácticas concretas de feedback, manejo de equipos, casos reales con un
->   aprendizaje accionable. No sirve: frases motivacionales sin sustancia, 'mindset' genérico,
->   clickbait, o videos que solo mencionan 'líder' de adorno."*
+> - ✅ Útil: *"Sirve: tácticas concretas de feedback, manejo de equipos, casos reales con un aprendizaje
+>   accionable. No sirve: frases motivacionales sin sustancia, 'mindset' genérico, clickbait, o videos que
+>   solo mencionan 'líder' de adorno."*
 >
 > Vale la pena que el jefe valide este texto por proyecto.
 
-### 5.3 `Keywords` — (pausado por ahora)
+### 5.3 `Keywords` — los hashtags de TikTok que se rastrean (**eje activo**)
 
-> **Cambio (jun-2026):** la búsqueda por palabras clave está **apagada**. Hoy el motor busca **solo por
-> los Referentes** (sección 5.4). Esta tabla queda guardada por si más adelante se reactiva la búsqueda
-> por hashtag en TikTok; por ahora no hace falta cargar nada acá (la página está oculta).
+Cada palabra funciona como un **hashtag de TikTok**. La máquina, además de mirar las cuentas de Referentes,
+busca videos que usen estos hashtags en TikTok. Es **descubrimiento a ciegas**: trae cuentas que no conocen,
+así que aparece más variedad… pero también más ruido (por eso trae menos por hashtag que por cuenta).
 
-Cada palabra funcionaba como un hashtag. **Una sola palabra por fila** (`liderazgo` rinde más que
-`liderazgo efectivo`).
+**Una sola palabra por fila** rinde más (`liderazgo` funciona mejor que `liderazgo efectivo`, porque la
+máquina pega el espacio y busca el hashtag `#liderazgoefectivo`, que casi nadie usa).
 
 | Columna | Qué escriben |
 |---|---|
-| `termino` | la palabra. Ej: "liderazgo" |
+| `termino` | la palabra/hashtag. Ej: "liderazgo" (sin el `#`, la máquina lo agrega) |
 | `proyecto` | a qué Proyecto pertenece (se elige de la lista) |
 | `activo` | ✅ para usarla; sin marcar para guardarla sin que se use |
 
-### 5.4 `Referentes` — las cuentas de Instagram (y TikTok) que se siguen
+> **Ojo:** este eje es **solo TikTok**. En Instagram la búsqueda es **solo por cuenta** (Referentes), no
+> por hashtag — la búsqueda por hashtag en Instagram traía basura y se retiró.
 
-Cada fila es una cuenta de la que la máquina trae videos.
+### 5.4 `Referentes` — las cuentas de Instagram y TikTok que se siguen
+
+Cada fila es una cuenta de la que la máquina trae videos. **Es la fuente más importante y de mejor calidad**
+(cuentas que ustedes eligieron a mano).
 
 | Columna | Qué escriben |
 |---|---|
-| `handle` | la cuenta con arroba. Ej: "@simonsinek" |
+| `handle` | la cuenta con **una sola** arroba. Ej: `@simonsinek` |
 | `plataforma` | `instagram` o `tiktok` (lista) |
 | `proyecto` | a qué Proyecto alimenta (lista) |
 | `notas` | por qué la agregaron (opcional) |
 | `activo` | ✅ para rastrearla |
 
-> **No llenen `seguidores` ni `flag_viral`.** Esas las completa la máquina sola cuando visita la
-> cuenta. `flag_viral` solo **marca** las cuentas muy grandes (+700K); no las excluye.
-> **Carguen cuentas de las dos plataformas:** la máquina ahora sigue cuentas tanto de Instagram como
-> de TikTok. Hoy solo hay cargadas de Instagram, así que **hacen falta las de TikTok.**
+> **No llenen `seguidores` ni `viral_por_tamano`.** Esas las completa la máquina sola. El flag de viral solo
+> **marca** las cuentas muy grandes (+700K); no las excluye.
+>
+> **🟠 Falta sembrar TikTok.** Hoy casi todos los Referentes cargados son de Instagram. La máquina **sí sigue
+> cuentas de TikTok** (el eje está prendido), pero si no cargan cuentas de TikTok, ese eje corre vacío. **Hace
+> falta que agreguen cuentas de TikTok** para aprovecharlo.
 
 ### 5.5 `Candidatos` — NO se llena a mano
 
-Esta es la bandeja que llena la máquina. Ustedes solo califican (sección 6). Aun así, conviene
-saber qué significa cada columna que van a ver:
+Esta es la bandeja que llena la máquina. Ustedes solo califican (§6). Aun así, conviene saber qué significa
+cada columna que van a ver:
 
 | Columna | Qué significa | Quién la llena |
 |---|---|---|
 | `titulo` | título/contexto del video fuente | máquina |
-| `script` | la transcripción del video en español (literal, ver sección 8) | máquina |
+| `script` | la transcripción del video en español (literal, ver §9) | máquina |
 | `idioma` | idioma del original: es / en / pt / it / fr / otro | máquina |
 | `thumbnail` | la portada del video (para escanear sin abrir el link) | máquina |
 | `url_referente` | link al video original | máquina |
 | `referente` | la cuenta de donde salió | máquina |
+| `tema` | el **hashtag** que hizo aparecer el video (vacío si entró por cuenta de referente) | máquina |
 | `views` `likes` `seguidores` `engagement` | métricas del video fuente | máquina |
-| `heat_score` | el número de orden caliente→frío (sección 7) | máquina |
+| `heat_score` | el número de orden caliente→frío (§7) | máquina |
 | `relevancia_score` | qué tan relevante lo juzgó la máquina (0 a 1), aparte de lo viral | máquina |
 | `relevancia_razon` | **por qué** la máquina lo dejó pasar — léanlo para curar más rápido | máquina |
 | `viral_por_tamano` | ✅ si venía de una cuenta muy grande (+700K) | máquina |
@@ -180,20 +229,38 @@ saber qué significa cada columna que van a ver:
 | `fecha_calificacion` | cuándo lo calificaron | se llena sola |
 | `fecha` | cuándo lo generó la máquina | máquina |
 
-### 5.6 `Ajustes` y la página **Global** — las perillas (casi nunca se toca)
+> **A veces un candidato llega con el `script` vacío.** Significa que la máquina no pudo transcribir ese
+> video (audio raro, sin voz, o falló el transcriptor). No es un error de ustedes. Qué hacer: **miren el
+> video original** (el link `url_referente`) y la portada, y decidan igual; o si no vale la pena, **descártenlo**.
 
-La máquina ya viene con valores por defecto razonables. **No hace falta tocar nada para arrancar.** Es
-una tabla de "clave = valor" en español claro. Si quieren cambiar algo, **avísennos la primera vez**.
-Si borran o escriben mal una fila, la máquina usa el valor por defecto, no se rompe.
+### 5.6 `Ajustes` y la página **Configuración Global** — las perillas
 
-Las perillas que sí van a querer tocar viven en la **página Global** (las mismas para todos los
-proyectos):
-- **Candidatos por corrida** — cuántos videos trae cada corrida en total (ej: 100).
-- **Días de recencia** — qué tan atrás busca (ej: 7 para el día a día; más alto la primera vez).
-- **Resultados por cuenta de referente** — cuántos videos baja por cada cuenta (más = más costo). Tiene
-  un tope de seguridad para que no se dispare el gasto.
+La máquina ya viene con valores por defecto razonables. **No hace falta tocar nada para arrancar.** Es una
+tabla de "clave = valor" en español claro. Si borran o escriben mal una fila, la máquina usa el valor por
+defecto, no se rompe.
 
-El resto (pesos de orden, bonus idioma, etc.) casi nunca se toca.
+Las perillas que sí van a querer tocar viven en la página **Configuración Global** (las mismas para todos
+los proyectos):
+
+**Volumen y ventana:**
+- **Candidatos por corrida** — cuántos videos entrega cada corrida en total (ej: 100).
+- **Días de recencia** — qué tan atrás busca (ej: 7 para el día a día; más alto la primera vez o para un
+  backfill).
+- **Resultados por cuenta de referente** — cuántos videos baja por cada cuenta de Referentes (más = más costo).
+- **Resultados por keyword** — cuántos videos baja por cada hashtag de TikTok. Es **más chico** que el de
+  referentes a propósito (el hashtag es descubrimiento a ciegas, más riesgoso).
+
+**Los tres ejes de búsqueda (prender/apagar, 1 = prendido / 0 = apagado; por defecto los tres prendidos):**
+- **Buscar por referentes en Instagram** — cuentas de IG en Referentes.
+- **Buscar por referentes en TikTok** — cuentas de TikTok en Referentes.
+- **Buscar por keywords en TikTok** — hashtags de la tabla Keywords.
+
+> Usen los toggles para **apagar un eje** si no lo están usando (ej: si todavía no cargaron cuentas de
+> TikTok, no pasa nada por dejarlo prendido: corre vacío). No hace falta tocarlos para el día a día.
+
+El resto de las perillas (pesos de orden, bonus de idioma, mínimos) son **avanzadas** y viven en la página
+**Ajustes Dev-Only**. **No las toquen sin avisarnos la primera vez.** Igual, todas tienen un tope de
+seguridad para que nadie dispare el gasto sin querer.
 
 ---
 
@@ -206,53 +273,58 @@ Hay dos cosas que marcan, y son distintas:
 - 👍 = sirve
 - 👎 = no sirve
 
-### `estado` — la decisión de flujo
+### `estado` — la decisión de flujo (esta es la que "cuenta")
 - **nuevo** — recién llegó, nadie lo miró (viene así por defecto)
-- **aprobado** — lo eligen. Esto es lo que cuenta como "seleccionado".
-- **descartado** — lo miraron y no va
+- **aprobado** — lo eligen. **Esto es lo que cuenta como "seleccionado"** y va al Histórico.
+- **descartado** — lo miraron y no va. **También califíquenlo** (👎): la máquina aprende del "no".
+
+> **¿Cuál es más importante?** El `estado`. La máquina aprende sobre todo de aprobado vs descartado. La
+> `calificacion` (🔥/👍/👎) es una ayuda visual para ustedes y una señal más fina. Lo ideal: pongan **las dos**.
 
 ### La vista "🔥 Seleccionados"
-Es una pantalla aparte que muestra **solo los que pusieron en `aprobado`**, ordenados del más
-caliente al más frío. **Es solo para ver**, no califican ahí. Funciona así: ustedes aprueban en la
-lista normal de Candidatos → automáticamente aparecen en esta vista. Es su "mapa de calor" de lo
-elegido, y se rearma solo.
+Es una pantalla aparte que muestra **solo los que pusieron en `aprobado`**, ordenados del más caliente al
+más frío. **Es solo para ver**, no califican ahí. Funciona así: ustedes aprueban en la lista normal de
+Candidatos → automáticamente aparecen en esta vista. Es su "mapa de calor" de lo elegido, y se rearma solo.
 
 ---
 
 ## 7. El heat score, en cristiano
 
-Es un número que la máquina le pone a cada video para ordenarlos: **los de arriba son los más
-prometedores**, según vistas, likes, engagement y qué tan parecidos son a lo que ustedes ya eligieron
-antes.
+Es un número que la máquina le pone a cada video para ordenarlos: **los de arriba son los más prometedores**,
+según vistas, likes, engagement, relevancia, y qué tan parecidos son a lo que ustedes ya eligieron antes.
 
 Tres cosas que conviene saber:
 
-1. **No es una nota sobre 10.** El número solo sirve para **ordenar**. No piensen "¿0.8 es bueno?",
-   piensen "¿está arriba o abajo en la lista?".
-2. **Es relativo a cada tanda.** Se compara cada video contra los otros de la misma corrida, no
-   contra un ideal fijo.
-3. **Aprende de ustedes.** Cuando aprueban videos de cierta cuenta o cierto idioma, la máquina
-   empieza a traer más parecido y a ponerlo más arriba. **Calificar bien hoy mejora lo que les llega
-   mañana.** Por eso vale la pena calificar incluso lo que descartan.
+1. **No es una nota sobre 10.** El número solo sirve para **ordenar**. No piensen "¿0.8 es bueno?", piensen
+   "¿está arriba o abajo en la lista?".
+2. **Es relativo a cada tanda.** Se compara cada video contra los otros de la misma corrida, no contra un
+   ideal fijo.
+3. **Aprende de ustedes.** Cuando aprueban videos de cierta cuenta o cierto idioma, la máquina empieza a
+   traer más parecido y a ponerlo más arriba. **Calificar bien hoy mejora lo que les llega mañana.** Por eso
+   vale la pena calificar incluso lo que descartan.
 
-El sistema le da un **empujón extra** al contenido en otros idiomas (inglés, portugués, etc.), porque
-la prioridad del negocio es traer lo que **no** circula en español.
+El sistema le da un **empujón extra** al contenido en otros idiomas (inglés, portugués, etc.), porque la
+prioridad del negocio es traer lo que **no** circula en español.
 
 ---
 
 ## 8. Cómo encuentra los videos (y cómo pedir más de algo)
 
-La máquina busca **solo por cuenta de referente**, en las dos plataformas (Instagram y TikTok):
+La máquina busca por **tres canales** en paralelo:
 
-- **Por cuenta** — trae los videos de las cuentas que estén en **Referentes**. Si quieren más o mejor
-  cobertura: **agreguen Referentes** (de Instagram y/o TikTok). La plataforma la define cada referente
-  (es de IG o de TikTok); para pausar uno, desmárquenle `activo`.
+1. **Cuentas de Instagram** (Referentes con plataforma = instagram) — la fuente curada de IG.
+2. **Cuentas de TikTok** (Referentes con plataforma = tiktok) — la fuente curada de TikTok.
+3. **Hashtags de TikTok** (Keywords activas) — descubrimiento a ciegas, trae cuentas nuevas.
 
-> **Cambio (jun-2026):** la búsqueda por palabras clave (hashtags) está **apagada** — traía mucho
-> contenido fuera de tema y gastaba de más. El filtro lo hacen ahora los `criterios_relevancia` del
-> Proyecto y de la Voz. La calidad de lo que llega depende de **qué tan buena sea su lista de Referentes**.
+**Cómo pedir más o mejor contenido:**
+- ¿Quieren más de una temática o mejor calidad? → **agreguen buenos Referentes** (de IG y TikTok). Es la
+  palanca más fuerte, porque son cuentas que ustedes eligieron.
+- ¿Quieren descubrir cuentas nuevas en TikTok? → **agreguen Keywords** (hashtags). Trae variedad pero también
+  más ruido para filtrar.
+- ¿Un referente dejó de servir? → **desmárquenle `activo`** (no hace falta borrarlo).
 
-Resumen: **la fuente es su lista de Referentes. Quieren más/mejor contenido → curen Referentes.**
+Resumen: **la calidad de lo que llega depende de qué tan buena sea su lista de Referentes y Keywords. Quieren
+más/mejor → curen esas dos tablas.**
 
 ---
 
@@ -260,21 +332,72 @@ Resumen: **la fuente es su lista de Referentes. Quieren más/mejor contenido →
 
 Honestidad por adelantado, para que no se sorprendan:
 
-- **El empujón por idioma es parejo para todos los idiomas no-español.** No premia más el inglés que
-  el portugués, por ejemplo: todos los no-español reciben el mismo empujón.
-- **La traducción es literal, no adaptada.** El script es el video tal cual, traducido. La adaptación
-  a la voz/marca la hacen ustedes.
-- **El orden es menos estable con poco volumen.** Con pocas corridas el heat score puede ser ruidoso;
-  se afina a medida que entra más data y ustedes califican.
+- **La traducción es literal, no adaptada.** El script es el video tal cual, traducido al español. La
+  adaptación a la voz/marca la hacen ustedes.
+- **El descubrimiento por hashtag mete ruido.** Al traer cuentas desconocidas de TikTok, a veces llega
+  contenido flojo o fuera de tema. Los filtros de la máquina tiran la mayoría, pero algo pasa: por eso
+  ustedes califican.
+- **A veces un video llega sin transcripción** (§5.5): mírenlo y decidan a mano.
+- **El empujón por idioma es parejo para todos los idiomas no-español.** No premia más el inglés que el
+  portugués: todos los no-español reciben el mismo empujón.
+- **El orden es menos estable con poco volumen.** Con pocas corridas el heat score puede ser ruidoso; se
+  afina a medida que entra más data y ustedes califican.
 
 Ninguna de estas rompe el uso diario. Son cosas en la lista para mejorar más adelante.
 
 ---
 
-## 10. Lo que necesitamos / lo que podría cambiar
+## 10. Preguntas frecuentes (para no tener que preguntar)
 
-> Espacio para el equipo. Anoten acá lo que les falta, lo que les confunde, o lo que cambiarían.
-> Esto es lo que prioriza el equipo técnico para las próximas mejoras.
+**¿Cada cuánto entra contenido nuevo?** Una vez por semana (corrida automática). Pueden calificar cualquier
+día; lo calificado se archiva el domingo a las 18:00.
+
+**Califiqué algo por error, ¿lo puedo cambiar?** Sí, mientras no haya pasado el archivado del domingo. Solo
+cambien la `calificacion` o el `estado`. Después del domingo ya se fue al Histórico.
+
+**Aprobé un video pero desapareció de la lista. ¿Se perdió?** No. Los aprobados se van al **Google Sheet
+"Histórico"** cada domingo. Ahí quedan guardados y exportables. La lista de Candidatos se limpia sola para
+no llenarse.
+
+**¿Tengo que calificar TODO lo que llega?** Idealmente sí, aunque sea para descartar. Lo que no califican no
+se archiva ni le enseña nada a la máquina: queda flotando. Descartar (👎) es tan útil como aprobar.
+
+**Llegó poco contenido esta semana, ¿está roto?** Probablemente no. Puede ser que haya poco material reciente,
+que un proyecto no tenga bastantes fuentes, o que las cuentas no publicaron. Revisen que sus Proyectos activos
+tengan Referentes/Keywords (§5.2). Si igual les parece raro, avísennos.
+
+**Veo un candidato con el script vacío.** La máquina no pudo transcribirlo. Miren el video original y decidan,
+o descártenlo (§5.5).
+
+**Agregué un referente y no trajo nada.** Chequeen: ¿está `activo` marcado? ¿el `handle` está bien escrito
+(una sola arroba)? ¿la `plataforma` es la correcta? ¿está ligado a un Proyecto **activo**? Si todo está bien,
+puede ser que la cuenta no publicó en la ventana de días (§5.6). Denle una semana.
+
+**¿Puedo borrar un Proyecto/Referente/Keyword?** Mejor **desmárquenle `activo`** en vez de borrar: así queda
+guardado por si lo quieren de vuelta, y no rompen nada. Borrar también se puede, pero es definitivo.
+
+**¿Qué es "heat score", en serio importa el número?** No el número exacto, solo el orden (§7). Arriba = más
+prometedor. Punto.
+
+---
+
+## 11. Si algo se rompe o no entienden (a quién avisar)
+
+Antes de escribirnos, chequeen esta lista rápida — resuelve la mayoría:
+
+1. ¿El Proyecto está `activo`?
+2. ¿Tiene al menos un Referente o una Keyword ligado y `activo`?
+3. ¿Los `handle` están bien escritos (una sola arroba, plataforma correcta)?
+4. ¿La Voz que asignaron tiene sentido con el tema del Proyecto?
+
+Si con eso no se resuelve, escríbannos con **qué esperaban** y **qué pasó** (una captura ayuda muchísimo).
+
+---
+
+## 12. Lo que necesitamos / lo que podría cambiar
+
+> Espacio para el equipo. Anoten acá lo que les falta, lo que les confunde, o lo que cambiarían. Esto es lo
+> que prioriza el equipo técnico para las próximas mejoras.
 
 | Fecha | Quién | Qué necesito / qué cambiaría | Por qué |
 |---|---|---|---|
