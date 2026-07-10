@@ -1,7 +1,9 @@
 # ADR-013 — Atribución multi-proyecto: fan-out de un video a cada proyecto que lo reclama
 
 - **Estado:** aceptada — 2026-06-18 (grilling con Mani; grado 1 / MVP). Revisa la nota de consecuencias
-  de [ADR-012](./ADR-012-senal-de-aprendizaje-bi-eje.md) sobre keywords compartidas.
+  de [ADR-012](./ADR-012-senal-de-aprendizaje-bi-eje.md) sobre keywords compartidas. **Enmendada por
+  [ADR-018](./ADR-018-un-candidato-por-video-dedup-salida.md)** (2026-07-09): la evaluación sigue siendo
+  por (video, proyecto), pero la **emisión** es una sola por video — gana la copia con mejor relevancia.
 - **Contexto:** el motor descubre videos por **referente** (cuenta sembrada) y por **keyword/hashtag**,
   y los atribuye a un Proyecto (con su Voz) en `Asignar proyecto+voz`, antes de juzgar relevancia. Un
   mismo referente o keyword puede estar ligado a **varios proyectos activos a la vez** (en la base viva,
