@@ -94,12 +94,6 @@
               "type": "number"
             },
             {
-              "id": "c_kw",
-              "name": "buscar_keyword_tiktok",
-              "value": 1,
-              "type": "number"
-            },
-            {
               "id": "c_ref_ig",
               "name": "buscar_referente_ig",
               "value": 1,
@@ -109,18 +103,6 @@
               "id": "c_ref_tt",
               "name": "buscar_referente_tiktok",
               "value": 1,
-              "type": "number"
-            },
-            {
-              "id": "c_rk",
-              "name": "resultados_keyword",
-              "value": 10,
-              "type": "number"
-            },
-            {
-              "id": "c_caprk",
-              "name": "cap_resultados_keyword",
-              "value": 20,
               "type": "number"
             },
             {
@@ -268,57 +250,6 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Keywords' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "options": {
-          "timeout": 20000,
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "qs",
-                    "name": "offset",
-                    "value": "={{ $response.body.offset }}"
-                  }
-                ]
-              },
-              "paginationMode": "updateAParameterInEachRequest",
-              "nextURL": "",
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.offset }}",
-              "limitPagesFetched": false
-            }
-          }
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "filterByFormula",
-              "value": "{activo}"
-            }
-          ]
-        }
-      },
-      "id": "leer-keywords",
-      "name": "Leer Keywords",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1120,
-        400
-      ],
-      "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "GET",
         "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
@@ -369,7 +300,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst proyectos = recs('Leer Proyectos');\nconst voces = recs('Leer Voces');\nconst keywords = recs('Leer Keywords');\nconst referentes = recs('Leer Referentes');\nconst _nrm = (s) => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();\nconst cfg0 = $('Config').first().json;\nconst AJUSTE_MAP = { 'peso de vistas':'peso_views', 'peso de likes':'peso_likes', 'peso de interaccion':'peso_eng', 'peso de relevancia':'peso_relevancia', 'bonus idioma extranjero':'boost_idioma', 'seguidores para marcar viral':'umbral_viral', 'minimo de vistas':'min_views', 'minimo de likes':'min_likes', 'relevancia minima':'min_relevancia', 'candidatos por corrida':'top_n', 'dias de recencia':'dias_recencia', 'resultados por cuenta de referente':'resultados_referente', 'buscar por referentes en instagram':'buscar_referente_ig', 'buscar por referentes en tiktok':'buscar_referente_tiktok', 'buscar por keywords en tiktok':'buscar_keyword_tiktok', 'resultados por keyword':'resultados_keyword' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const key = AJUSTE_MAP[_nrm(f.clave)]; if (key && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[key] = Number(f.valor); });\n\n// Knobs de ejecucion GLOBALES (ADR-016): ajustes (equipo) > Config (default). Topes dev-only en Config.\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst dias_recencia = Number(pick('dias_recencia', 7));\nconst top_n = Number(pick('top_n', 100));\nconst cap_rr = Number(cfg0.cap_resultados_referente || 0);\nconst rr_raw = Number(pick('resultados_referente', 20));\nconst resultados_referente = cap_rr > 0 ? Math.min(rr_raw, cap_rr) : rr_raw; // cap max (ADR-016)\nconst cap_top_n = Number(cfg0.cap_top_n || 0);\n// Knob propio del eje keyword + cap dev-only (ADR-017): descubrimiento ciego = volumen mas chico, topeado.\nconst cap_rk = Number(cfg0.cap_resultados_keyword || 0);\nconst rk_raw = Number(pick('resultados_keyword', 10));\nconst resultados_keyword = cap_rk > 0 ? Math.min(rk_raw, cap_rk) : rk_raw;\n// Toggles de eje (ADR-017): ajustes (equipo) > Config. Default ON. Referentes ambas plataformas + keyword TikTok.\nconst BUSCAR_REF_IG = Number(pick('buscar_referente_ig', 1)) > 0;\nconst BUSCAR_REF_TT = Number(pick('buscar_referente_tiktok', 1)) > 0;\nconst FLAG_KW = Number(pick('buscar_keyword_tiktok', 1)) > 0; // eje TikTok-keyword reactivado como toggle (ADR-017)\n\nconst vozById = {};\nconst vozCritById = {};\nvoces.forEach(v => { const vf = v.fields || {}; vozById[v.id] = vf.nombre || ''; vozCritById[v.id] = (vf.criterios_relevancia || '').toString().trim(); });\n\nconst projects = {};\nproyectos.forEach(p => {\n  const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = {\n    id: p.id, nombre: f.nombre || '',\n    voz_id: vozId, voz_nombre: vozId && vozById[vozId] ? vozById[vozId] : '',\n    criterios: (f.criterios_relevancia || '').toString().trim(),\n    voz_criterios: vozId && vozCritById[vozId] ? vozCritById[vozId] : '',\n    keywords: [], ig_handles: [], tt_handles: []\n  };\n});\nkeywords.forEach(k => {\n  const f = k.fields || {}; if (!f.termino) return;\n  (Array.isArray(f.proyecto) ? f.proyecto : []).forEach(proy => { if (projects[proy]) projects[proy].keywords.push(String(f.termino).trim()); });\n});\nreferentes.forEach(r => {\n  const f = r.fields || {};\n  const handle = String(f.handle || '').trim().replace(/^@/, '');\n  if (!handle) return;\n  const plat = String(f.plataforma || '').toLowerCase();\n  (Array.isArray(f.proyecto) ? f.proyecto : []).forEach(proy => {\n    if (!projects[proy]) return;\n    if (plat.indexOf('insta') >= 0) projects[proy].ig_handles.push(handle);\n    else if (plat.indexOf('tik') >= 0) projects[proy].tt_handles.push(handle);\n  });\n});\n\nconst ig_urls = []; const ig_owner_to_proj = {};\nconst tt_profiles = []; const tt_owner_to_proj = {};\nconst tt_hashtags = []; const kw_to_proj = {};\nObject.values(projects).forEach(p => {\n  // Referente: IG por cuenta (directUrls), TikTok por perfil (profiles). Gateado por toggle (ADR-017).\n  if (BUSCAR_REF_IG) p.ig_handles.forEach(h => { ig_urls.push('https://www.instagram.com/' + h + '/'); (ig_owner_to_proj[h.toLowerCase()] = ig_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n  if (BUSCAR_REF_TT) p.tt_handles.forEach(h => { tt_profiles.push(h); (tt_owner_to_proj[h.toLowerCase()] = tt_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n  // Keyword TikTok: eje reactivado como toggle (ADR-017). Solo se arma si buscar_keyword_tiktok on. IG-keyword retirado.\n  if (FLAG_KW) p.keywords.forEach(k => { const kk = k.replace(/^#/, '').toLowerCase().replace(/\\s+/g, ''); if (!kk) return; (kw_to_proj[kk] = kw_to_proj[kk] || []).push(p.id); tt_hashtags.push(kk); });\n});\n\nreturn [{ json: {\n  projects, ig_urls: [...new Set(ig_urls)], tt_profiles: [...new Set(tt_profiles)],\n  ig_hashtags: [], tt_hashtags: [...new Set(tt_hashtags)],\n  ig_owner_to_proj, tt_owner_to_proj, kw_to_proj, active_project_ids: Object.keys(projects),\n  dias_recencia, resultados_referente, resultados_keyword, top_n, cap_top_n, ajustes\n} }];\n"
+        "jsCode": "\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst proyectos = recs('Leer Proyectos');\nconst voces = recs('Leer Voces');\nconst referentes = recs('Leer Referentes');\nconst _nrm = (s) => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();\nconst cfg0 = $('Config').first().json;\nconst AJUSTE_MAP = { 'peso de vistas':'peso_views', 'peso de likes':'peso_likes', 'peso de interaccion':'peso_eng', 'peso de relevancia':'peso_relevancia', 'bonus idioma extranjero':'boost_idioma', 'seguidores para marcar viral':'umbral_viral', 'minimo de vistas':'min_views', 'minimo de likes':'min_likes', 'relevancia minima':'min_relevancia', 'candidatos por corrida':'top_n', 'dias de recencia':'dias_recencia', 'resultados por cuenta de referente':'resultados_referente', 'buscar por referentes en instagram':'buscar_referente_ig', 'buscar por referentes en tiktok':'buscar_referente_tiktok' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const key = AJUSTE_MAP[_nrm(f.clave)]; if (key && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[key] = Number(f.valor); });\n\n// Knobs de ejecucion GLOBALES (ADR-016): ajustes (equipo) > Config (default). Topes dev-only en Config.\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst dias_recencia = Number(pick('dias_recencia', 7));\nconst top_n = Number(pick('top_n', 100));\nconst cap_rr = Number(cfg0.cap_resultados_referente || 0);\nconst rr_raw = Number(pick('resultados_referente', 20));\nconst resultados_referente = cap_rr > 0 ? Math.min(rr_raw, cap_rr) : rr_raw; // cap max (ADR-016)\nconst cap_top_n = Number(cfg0.cap_top_n || 0);\n// Toggles de eje (ADR-017): ajustes (equipo) > Config. Default ON. Referentes en ambas plataformas — unico eje de descubrimiento (ADR-019).\nconst BUSCAR_REF_IG = Number(pick('buscar_referente_ig', 1)) > 0;\nconst BUSCAR_REF_TT = Number(pick('buscar_referente_tiktok', 1)) > 0;\n\nconst vozById = {};\nconst vozCritById = {};\nvoces.forEach(v => { const vf = v.fields || {}; vozById[v.id] = vf.nombre || ''; vozCritById[v.id] = (vf.criterios_relevancia || '').toString().trim(); });\n\nconst projects = {};\nproyectos.forEach(p => {\n  const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = {\n    id: p.id, nombre: f.nombre || '',\n    voz_id: vozId, voz_nombre: vozId && vozById[vozId] ? vozById[vozId] : '',\n    criterios: (f.criterios_relevancia || '').toString().trim(),\n    voz_criterios: vozId && vozCritById[vozId] ? vozCritById[vozId] : '',\n    ig_handles: [], tt_handles: []\n  };\n});\nreferentes.forEach(r => {\n  const f = r.fields || {};\n  const handle = String(f.handle || '').trim().replace(/^@/, '');\n  if (!handle) return;\n  const plat = String(f.plataforma || '').toLowerCase();\n  (Array.isArray(f.proyecto) ? f.proyecto : []).forEach(proy => {\n    if (!projects[proy]) return;\n    if (plat.indexOf('insta') >= 0) projects[proy].ig_handles.push(handle);\n    else if (plat.indexOf('tik') >= 0) projects[proy].tt_handles.push(handle);\n  });\n});\n\nconst ig_urls = []; const ig_owner_to_proj = {};\nconst tt_profiles = []; const tt_owner_to_proj = {};\nObject.values(projects).forEach(p => {\n  // Referente: IG por cuenta (directUrls), TikTok por perfil (profiles). Gateado por toggle (ADR-017).\n  if (BUSCAR_REF_IG) p.ig_handles.forEach(h => { ig_urls.push('https://www.instagram.com/' + h + '/'); (ig_owner_to_proj[h.toLowerCase()] = ig_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n  if (BUSCAR_REF_TT) p.tt_handles.forEach(h => { tt_profiles.push(h); (tt_owner_to_proj[h.toLowerCase()] = tt_owner_to_proj[h.toLowerCase()] || []).push(p.id); });\n});\n\nreturn [{ json: {\n  projects, ig_urls: [...new Set(ig_urls)], tt_profiles: [...new Set(tt_profiles)],\n  ig_owner_to_proj, tt_owner_to_proj, active_project_ids: Object.keys(projects),\n  dias_recencia, resultados_referente, top_n, cap_top_n, ajustes\n} }];\n"
       },
       "id": "armar-plan-de-corrida",
       "name": "Armar plan de corrida",
@@ -414,27 +345,8 @@
     },
     {
       "parameters": {
-        "authentication": "apifyApi",
-        "resource": "Actors",
-        "operation": "Run actor and get dataset",
-        "actorId": "clockworks~free-tiktok-scraper",
-        "customBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var a=p.ajustes||{}; return { hashtags: p.tt_hashtags, resultsPerPage: p.resultados_keyword, shouldDownloadVideos: false, shouldDownloadCovers: false }; })() }}"
-      },
-      "id": "apify-tiktok",
-      "name": "Apify — TikTok",
-      "type": "@apify/n8n-nodes-apify.apify",
-      "typeVersion": 1,
-      "position": [
-        2240,
-        400
-      ],
-      "onError": "continueRegularOutput",
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "\nconst item = $input.item.json;\n// Solo reels/videos: IG trae fotos y carruseles que no se pueden transcribir; descartar lo que no sea video.\nif (item.type && item.type !== 'Video') { return null; }\n// Stub de un eje vacío (IG-Hashtag con 0 URLs devuelve {error:'no_items'}): sin id ni url -> descartar.\nif (!(item.id || item.shortCode || item.shortcode) && !item.url) { return null; }\nconst seguidores = item.followersCount || item.ownerFollowersCount || (item.metaData && item.metaData.followersCount) || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.biography || item.ownerBio || (item.metaData && item.metaData.biography) || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || item.videoPlayCount || item.igPlayCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  thumbnail_url: item.displayUrl || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: (function(){ var d = new Date(item.timestamp); return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]; })()\n} };\n"
+        "jsCode": "\nconst item = $input.item.json;\n// Solo reels/videos: IG trae fotos y carruseles que no se pueden transcribir; descartar lo que no sea video.\nif (item.type && item.type !== 'Video') { return null; }\n// Stub de Apify (llamada vacía devuelve {error:'no_items'}): sin id ni url -> descartar.\nif (!(item.id || item.shortCode || item.shortcode) && !item.url) { return null; }\nconst seguidores = item.followersCount || item.ownerFollowersCount || (item.metaData && item.metaData.followersCount) || 0;\nreturn { json: {\n  plataforma: 'instagram',\n  external_id: String(item.id || item.shortCode || item.shortcode || ''),\n  username: item.ownerUsername || '',\n  nombre: item.ownerFullName || '',\n  seguidores,\n  bio: item.biography || item.ownerBio || (item.metaData && item.metaData.biography) || '',\n  descripcion: item.caption || '',\n  likes: item.likesCount || 0,\n  comentarios: item.commentsCount || 0,\n  reproducciones: item.videoViewCount || item.videoPlayCount || item.igPlayCount || 0,\n  url: item.url || '',\n  video_url: item.url || '',\n  thumbnail_url: item.displayUrl || '',\n  hashtags: (item.hashtags || []).join(', '),\n  duracion_video: item.videoDuration || 0,\n  engagement_rate: seguidores > 0 ? (((item.likesCount || 0) + (item.commentsCount || 0)) / seguidores * 100).toFixed(2) : '0',\n  fecha_publicacion: (function(){ var d = new Date(item.timestamp); return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]; })()\n} };\n"
       },
       "id": "normalizar-ig",
       "name": "Normalizar IG",
@@ -464,34 +376,6 @@
         "mode": "append",
         "options": {}
       },
-      "id": "merge-ig",
-      "name": "Merge IG",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
-      "position": [
-        2240,
-        510
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "append",
-        "options": {}
-      },
-      "id": "merge-tt",
-      "name": "Merge TT",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
-      "position": [
-        2520,
-        620
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "append",
-        "options": {}
-      },
       "id": "merge-scrapes",
       "name": "Merge scrapes",
       "type": "n8n-nodes-base.merge",
@@ -503,7 +387,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const plan = $('Armar plan de corrida').first().json;\nconst projects = plan.projects, ig_owner = plan.ig_owner_to_proj || {}, tt_owner = plan.tt_owner_to_proj || {}, kw = plan.kw_to_proj || {};\nconst activeIds = plan.active_project_ids || [];\nconst DIAS = Number(plan.dias_recencia || 0); // recencia global (ADR-016)\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  if (!d.url) continue;\n  const u = String(d.username || '').toLowerCase().replace(/^@/, '');\n  // Fan-out (ADR-013): un mismo video puede ser reclamado por varios proyectos activos a la vez.\n  // claims: proyecto_id -> tema. El referente (cuenta sembrada) reclama con tema=''; la keyword\n  // aporta el termino matcheado. 'pid in claims' (no truthiness) preserva el '' del referente\n  // y deja que la keyword reclame SOLO los proyectos que el referente no reclamo.\n  const claims = {};\n  const ownerList = (d.plataforma || '') === 'instagram' ? (ig_owner[u] || [])\n                  : (d.plataforma || '') === 'tiktok' ? (tt_owner[u] || []) : [];\n  ownerList.forEach(pid => { if (!(pid in claims)) claims[pid] = ''; });\n  const tags = String(d.hashtags || '').toLowerCase().split(',').map(s => s.trim().replace(/^#/, '').replace(/\\s+/g, '')).filter(Boolean);\n  for (const t of tags) { (kw[t] || []).forEach(pid => { if (!(pid in claims)) claims[pid] = t; }); }\n  // fallback: si nada lo reclamo y hay UN solo proyecto activo, se lo lleva ese.\n  let pids = Object.keys(claims);\n  if (!pids.length && activeIds.length === 1) { claims[activeIds[0]] = ''; pids = [activeIds[0]]; }\n  for (const proyId of pids) {\n    const p = projects[proyId];\n    if (!p) continue;\n    // guardia de recencia (capa 2): descarta lo mas viejo que dias_recencia del proyecto.\n    // 0 = sin limite. Si no hay fecha, se conserva (no se puede juzgar la edad).\n    if (DIAS > 0 && d.fecha_publicacion) {\n      const ts = Date.parse(d.fecha_publicacion);\n      if (Number.isFinite(ts) && (Date.now() - ts) > DIAS * 86400000) continue;\n    }\n    out.push({ json: Object.assign({}, d, {\n      proyecto_id: proyId, proyecto_nombre: p.nombre, voz_id: p.voz_id, voz_nombre: p.voz_nombre,\n      _tema: claims[proyId]\n    }) });\n  }\n}\nreturn out;"
+        "jsCode": "const plan = $('Armar plan de corrida').first().json;\nconst projects = plan.projects, ig_owner = plan.ig_owner_to_proj || {}, tt_owner = plan.tt_owner_to_proj || {};\nconst activeIds = plan.active_project_ids || [];\nconst DIAS = Number(plan.dias_recencia || 0); // recencia global (ADR-016)\nconst out = [];\nfor (const it of $input.all()) {\n  const d = it.json;\n  if (!d.url) continue;\n  const u = String(d.username || '').toLowerCase().replace(/^@/, '');\n  // Fan-out (ADR-013): un mismo video puede ser reclamado por varios proyectos activos a la vez\n  // (referente compartido entre proyectos). Solo reclama el referente (ADR-019).\n  const claims = {};\n  const ownerList = (d.plataforma || '') === 'instagram' ? (ig_owner[u] || [])\n                  : (d.plataforma || '') === 'tiktok' ? (tt_owner[u] || []) : [];\n  ownerList.forEach(pid => { if (!(pid in claims)) claims[pid] = ''; });\n  // fallback: si nada lo reclamo y hay UN solo proyecto activo, se lo lleva ese.\n  let pids = Object.keys(claims);\n  if (!pids.length && activeIds.length === 1) { claims[activeIds[0]] = ''; pids = [activeIds[0]]; }\n  for (const proyId of pids) {\n    const p = projects[proyId];\n    if (!p) continue;\n    // guardia de recencia (capa 2): descarta lo mas viejo que dias_recencia del proyecto.\n    // 0 = sin limite. Si no hay fecha, se conserva (no se puede juzgar la edad).\n    if (DIAS > 0 && d.fecha_publicacion) {\n      const ts = Date.parse(d.fecha_publicacion);\n      if (Number.isFinite(ts) && (Date.now() - ts) > DIAS * 86400000) continue;\n    }\n    out.push({ json: Object.assign({}, d, {\n      proyecto_id: proyId, proyecto_nombre: p.nombre, voz_id: p.voz_id, voz_nombre: p.voz_nombre\n    }) });\n  }\n}\nreturn out;"
       },
       "id": "asignar-proyecto-voz",
       "name": "Asignar proyecto+voz",
@@ -516,7 +400,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Pre-trim de relevancia (Haiku) — colador LAXO sobre el caption, ANTES de transcribir.\n// Optimiza recall: descarta solo lo OBVIAMENTE off-topic. Fail-open (si Haiku falla, pasa todo).\n// Caption pobre (sin texto real): eje referente pasa sin juicio, eje keyword se descarta directo.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst plan = $('Armar plan de corrida').first().json || {};\nconst projects = plan.projects || {};\nconst items = $('Asignar proyecto+voz').all().map(i => i.json);\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\n\nconst drop = new Set();\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const p = projects[pid] || {};\n  const critProy = (p.criterios || '').toString().trim();\n  const critVoz = (p.voz_criterios || '').toString().trim();\n  const criterios = [critProy, critVoz].filter(Boolean).join('\\n').trim();\n  const criteriosTxt = [critProy ? 'CRITERIOS DE TEMA (principal):\\n' + critProy : '', critVoz ? 'AJUSTE DE VOZ (complementa, no manda):\\n' + critVoz : ''].filter(Boolean).join('\\n\\n');\n  if (!criterios) continue; // sin rúbrica no se juzga: no se descarta nada\n  // Caption pobre = sin evidencia para juzgar (fix calidad run 07-09). Eje referente (fuente curada,\n  // _tema=''): pasa SIN juicio -> lo juzga el gate con el transcript. Eje keyword (descubrimiento\n  // ciego): descarte directo, un caption de puro hashtag no prueba nada.\n  const _senal = (d) => String(d.descripcion || '').replace(/https?:\\/\\/\\S+/g, ' ').replace(/[#@]\\S+/g, ' ').replace(/[^\\p{L}\\p{N}?!.,;: ]/gu, ' ').replace(/\\s+/g, ' ').trim();\n  const _judge = [];\n  let _exentos = 0, _pobresKw = 0;\n  for (const d of arr) {\n    if (!String(d.external_id || '')) continue;\n    if (_senal(d).length < 25) { if (d._tema) { drop.add(pid + '|' + String(d.external_id)); _pobresKw++; } else { _exentos++; } continue; }\n    _judge.push(d);\n  }\n  if (_exentos || _pobresKw) console.log('[Pre-trim] captions pobres pid=' + pid + ': ' + _exentos + ' exentos (referente, pasan al gate), ' + _pobresKw + ' descartados (keyword)');\n  const lote = _judge.map(d => ({\n    id: String(d.external_id || ''),\n    texto: (String(d.descripcion || '') + ' ' + String(d.hashtags || '')).replace(/\\s+/g, ' ').trim().slice(0, 500)\n  })).filter(x => x.id);\n  if (!lote.length) continue;\n  const sys = 'Sos un filtro de relevancia LAXO. Te doy el tema de un proyecto, sus criterios (el TEMA manda; el AJUSTE DE VOZ solo complementa), y una lista de videos (id + texto del caption). Devolve UNICAMENTE un JSON {\"descartar\":[ids]} con los ids OBVIAMENTE fuera de tema. En la duda NO descartes (preferimos dejar pasar de mas). No expliques nada.';\n  const usr = 'TEMA: ' + (p.nombre || '') + '\\n' + criteriosTxt + '\\n\\nVIDEOS:\\n' + JSON.stringify(lote);\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.anthropic.com/v1/messages',\n      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n      body: { model: 'claude-haiku-4-5', max_tokens: 1000, system: sys, messages: [{ role: 'user', content: usr }] },\n      json: true,\n      timeout: 30000\n    });\n    let txt = '';\n    try { txt = (resp.content && resp.content[0] && resp.content[0].text) || ''; } catch (e) {}\n    const m = String(txt).match(/\\{[\\s\\S]*\\}/);\n    if (m) { const parsed = JSON.parse(m[0]); (parsed.descartar || []).forEach(id => drop.add(pid + '|' + String(id))); }\n  } catch (e) { /* fail-open: no se descarta nada de este proyecto */ }\n}\n\nconst _desc = [...drop];\nconsole.log('[Pre-trim] descartados off-topic: ' + _desc.length + '/' + items.length + (_desc.length ? ' -> ' + _desc.join(', ') : ''));\nconst out = [];\nfor (const d of items) { if (!drop.has(String(d.proyecto_id) + '|' + String(d.external_id || ''))) out.push({ json: d }); }\nreturn out;\n"
+        "jsCode": "\n// Pre-trim de relevancia (Haiku) — colador LAXO sobre el caption, ANTES de transcribir.\n// Optimiza recall: descarta solo lo OBVIAMENTE off-topic. Fail-open (si Haiku falla, pasa todo).\n// Caption pobre (sin texto real): pasa sin juicio -> lo juzga el gate con el transcript.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst plan = $('Armar plan de corrida').first().json || {};\nconst projects = plan.projects || {};\nconst items = $('Asignar proyecto+voz').all().map(i => i.json);\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\n\nconst drop = new Set();\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const p = projects[pid] || {};\n  const critProy = (p.criterios || '').toString().trim();\n  const critVoz = (p.voz_criterios || '').toString().trim();\n  const criterios = [critProy, critVoz].filter(Boolean).join('\\n').trim();\n  const criteriosTxt = [critProy ? 'CRITERIOS DE TEMA (principal):\\n' + critProy : '', critVoz ? 'AJUSTE DE VOZ (complementa, no manda):\\n' + critVoz : ''].filter(Boolean).join('\\n\\n');\n  if (!criterios) continue; // sin rúbrica no se juzga: no se descarta nada\n  // Caption pobre = sin evidencia para juzgar (fix calidad run 07-09): pasa SIN juicio ->\n  // lo juzga el gate con el transcript (la fuente siempre es curada: referente, ADR-019).\n  const _senal = (d) => String(d.descripcion || '').replace(/https?:\\/\\/\\S+/g, ' ').replace(/[#@]\\S+/g, ' ').replace(/[^\\p{L}\\p{N}?!.,;: ]/gu, ' ').replace(/\\s+/g, ' ').trim();\n  const _judge = [];\n  let _exentos = 0;\n  for (const d of arr) {\n    if (!String(d.external_id || '')) continue;\n    if (_senal(d).length < 25) { _exentos++; continue; }\n    _judge.push(d);\n  }\n  if (_exentos) console.log('[Pre-trim] captions pobres pid=' + pid + ': ' + _exentos + ' exentos (pasan al gate)');\n  const lote = _judge.map(d => ({\n    id: String(d.external_id || ''),\n    texto: (String(d.descripcion || '') + ' ' + String(d.hashtags || '')).replace(/\\s+/g, ' ').trim().slice(0, 500)\n  })).filter(x => x.id);\n  if (!lote.length) continue;\n  const sys = 'Sos un filtro de relevancia LAXO. Te doy el tema de un proyecto, sus criterios (el TEMA manda; el AJUSTE DE VOZ solo complementa), y una lista de videos (id + texto del caption). Devolve UNICAMENTE un JSON {\"descartar\":[ids]} con los ids OBVIAMENTE fuera de tema. En la duda NO descartes (preferimos dejar pasar de mas). No expliques nada.';\n  const usr = 'TEMA: ' + (p.nombre || '') + '\\n' + criteriosTxt + '\\n\\nVIDEOS:\\n' + JSON.stringify(lote);\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.anthropic.com/v1/messages',\n      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n      body: { model: 'claude-haiku-4-5', max_tokens: 1000, system: sys, messages: [{ role: 'user', content: usr }] },\n      json: true,\n      timeout: 30000\n    });\n    let txt = '';\n    try { txt = (resp.content && resp.content[0] && resp.content[0].text) || ''; } catch (e) {}\n    const m = String(txt).match(/\\{[\\s\\S]*\\}/);\n    if (m) { const parsed = JSON.parse(m[0]); (parsed.descartar || []).forEach(id => drop.add(pid + '|' + String(id))); }\n  } catch (e) { /* fail-open: no se descarta nada de este proyecto */ }\n}\n\nconst _desc = [...drop];\nconsole.log('[Pre-trim] descartados off-topic: ' + _desc.length + '/' + items.length + (_desc.length ? ' -> ' + _desc.join(', ') : ''));\nconst out = [];\nfor (const d of items) { if (!drop.has(String(d.proyecto_id) + '|' + String(d.external_id || ''))) out.push({ json: d }); }\nreturn out;\n"
       },
       "id": "pre-trim-relevancia",
       "name": "Pre-trim relevancia",
@@ -582,7 +466,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\nconst signalTema = {};\nrows('Leer señal tema').forEach(r => { if (r && r.tema) signalTema[String(r.tema)] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = d.idioma_nativo || guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const selRef = signal[(d.username || '') + '|' + idioma] || 0;\n    const selTema = signalTema[String(d._tema || '')] || 0;\n    const sel = Math.max(selRef, selTema); // bi-eje (O7): referente o keyword/tema\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  fresh.forEach(d => out.push({ json: d })); // ADR-016: sin corte por proyecto; se transcribe todo\n}\n// cap_top_n (dev-only): techo duro de transcripcion por corrida (protege backfill).\n// ADR-016: cuenta VIDEOS DISTINTOS por heat, no filas (video,proyecto); el fan-out no consume cupo.\nconst CAP = Number($('Config').first().json.cap_top_n || 0);\nif (CAP > 0) { out.sort((a, b) => (b.json.heat_score || 0) - (a.json.heat_score || 0)); const keepIds = new Set(); const capped = []; for (const it of out) { const id = String(it.json.external_id || ''); if (!id) { capped.push(it); continue; } if (!keepIds.has(id)) { if (keepIds.size >= CAP) continue; keepIds.add(id); } capped.push(it); } return capped; }\nreturn out;\n"
+        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = d.idioma_nativo || guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const sel = signal[(d.username || '') + '|' + idioma] || 0; // señal por referente (ADR-019)\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  fresh.forEach(d => out.push({ json: d })); // ADR-016: sin corte por proyecto; se transcribe todo\n}\n// cap_top_n (dev-only): techo duro de transcripcion por corrida (protege backfill).\n// ADR-016: cuenta VIDEOS DISTINTOS por heat, no filas (video,proyecto); el fan-out no consume cupo.\nconst CAP = Number($('Config').first().json.cap_top_n || 0);\nif (CAP > 0) { out.sort((a, b) => (b.json.heat_score || 0) - (a.json.heat_score || 0)); const keepIds = new Set(); const capped = []; for (const it of out) { const id = String(it.json.external_id || ''); if (!id) { capped.push(it); continue; } if (!keepIds.has(id)) { if (keepIds.size >= CAP) continue; keepIds.add(id); } capped.push(it); } return capped; }\nreturn out;\n"
       },
       "id": "heat-score-v1",
       "name": "Heat-score v1",
@@ -637,7 +521,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Corte final (ADR-016 + piso ADR-017 + dedup ADR-018): top-N VIDEOS DISTINTOS por heat, piso leve por cuenta fuente, UNA copia por video.\nconst N = Number(($('Armar plan de corrida').first().json || {}).top_n || $('Config').first().json.top_n || 100);\nconst _all = $input.all().slice().sort((a, b) => (Number(b.json.heat_score || 0)) - (Number(a.json.heat_score || 0)));\nconst PISO = Number($('Config').first().json.piso_referente || 0); // piso leve por cuenta fuente (ADR-017): evita que un referente acapare el corte.\n// 1) videos distintos en orden de heat (el primero de cada external_id) con su cuenta fuente.\nconst _seenId = new Set(); const _distinct = [];\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || _seenId.has(id)) continue; _seenId.add(id); _distinct.push({ id, user: String(it.json.username || '').toLowerCase() }); }\nconst _sel = new Set();\n// 2) PISO: round-robin por rank, hasta PISO videos por cuenta, sin pasar de N.\nif (PISO > 0) { const _byUser = {}; _distinct.forEach(d => { (_byUser[d.user] = _byUser[d.user] || []).push(d.id); }); const _users = Object.keys(_byUser); for (let r = 0; r < PISO && _sel.size < N; r++) { for (const u of _users) { if (_sel.size >= N) break; const arr = _byUser[u]; if (r < arr.length) _sel.add(arr[r]); } } }\n// 3) FILL: completar por heat global hasta N videos distintos.\nfor (const d of _distinct) { if (_sel.size >= N) break; _sel.add(d.id); }\n// 4) UNA copia por video (ADR-018, enmienda ADR-013): del fan-out gana la de mayor relevancia_score (empate: heat). Items sin id se conservan.\nconst _rs = (x) => (x.json.relevancia_score != null ? Number(x.json.relevancia_score) : -1);\nconst _best = {};\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || !_sel.has(id)) continue; const prev = _best[id]; if (!prev || _rs(it) > _rs(prev) || (_rs(it) === _rs(prev) && Number(it.json.heat_score || 0) > Number(prev.json.heat_score || 0))) _best[id] = it; }\nconst _keep = new Set(Object.values(_best));\nfor (const it of _all) { if (!String(it.json.external_id || '')) _keep.add(it); }\nconst out = [];\nfor (const it of _all) {\n  if (!_keep.has(it)) continue;\n  const d = it.json;\n  const _tituloBase = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  // Decisión #6 (2026-07-09): sin transcript pasa igual (fail-open) pero con marca visible en el feed.\n  const titulo = (String(d.script || '').trim() ? '' : '⚠️ SIN GUION | ') + _tituloBase;\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || '', tema: d._tema || ''\n  } });\n}\nreturn out;\n"
+        "jsCode": "\n// Corte final (ADR-016 + piso ADR-017 + dedup ADR-018): top-N VIDEOS DISTINTOS por heat, piso leve por cuenta fuente, UNA copia por video.\nconst N = Number(($('Armar plan de corrida').first().json || {}).top_n || $('Config').first().json.top_n || 100);\nconst _all = $input.all().slice().sort((a, b) => (Number(b.json.heat_score || 0)) - (Number(a.json.heat_score || 0)));\nconst PISO = Number($('Config').first().json.piso_referente || 0); // piso leve por cuenta fuente (ADR-017): evita que un referente acapare el corte.\n// 1) videos distintos en orden de heat (el primero de cada external_id) con su cuenta fuente.\nconst _seenId = new Set(); const _distinct = [];\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || _seenId.has(id)) continue; _seenId.add(id); _distinct.push({ id, user: String(it.json.username || '').toLowerCase() }); }\nconst _sel = new Set();\n// 2) PISO: round-robin por rank, hasta PISO videos por cuenta, sin pasar de N.\nif (PISO > 0) { const _byUser = {}; _distinct.forEach(d => { (_byUser[d.user] = _byUser[d.user] || []).push(d.id); }); const _users = Object.keys(_byUser); for (let r = 0; r < PISO && _sel.size < N; r++) { for (const u of _users) { if (_sel.size >= N) break; const arr = _byUser[u]; if (r < arr.length) _sel.add(arr[r]); } } }\n// 3) FILL: completar por heat global hasta N videos distintos.\nfor (const d of _distinct) { if (_sel.size >= N) break; _sel.add(d.id); }\n// 4) UNA copia por video (ADR-018, enmienda ADR-013): del fan-out gana la de mayor relevancia_score (empate: heat). Items sin id se conservan.\nconst _rs = (x) => (x.json.relevancia_score != null ? Number(x.json.relevancia_score) : -1);\nconst _best = {};\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || !_sel.has(id)) continue; const prev = _best[id]; if (!prev || _rs(it) > _rs(prev) || (_rs(it) === _rs(prev) && Number(it.json.heat_score || 0) > Number(prev.json.heat_score || 0))) _best[id] = it; }\nconst _keep = new Set(Object.values(_best));\nfor (const it of _all) { if (!String(it.json.external_id || '')) _keep.add(it); }\nconst out = [];\nfor (const it of _all) {\n  if (!_keep.has(it)) continue;\n  const d = it.json;\n  const _tituloBase = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  // Decisión #6 (2026-07-09): sin transcript pasa igual (fail-open) pero con marca visible en el feed.\n  const titulo = (String(d.script || '').trim() ? '' : '⚠️ SIN GUION | ') + _tituloBase;\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || ''\n  } });\n}\nreturn out;\n"
       },
       "id": "armar-candidato",
       "name": "Armar candidato",
@@ -650,7 +534,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined, tema: d.tema || undefined, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
+        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
       },
       "id": "preparar-batch-airtable",
       "name": "Preparar batch Airtable",
@@ -861,25 +745,6 @@
         "authentication": "apifyApi",
         "resource": "Actors",
         "operation": "Run actor and get dataset",
-        "actorId": "apify~instagram-scraper",
-        "customBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var a=p.ajustes||{}; var d=Number(p.dias_recencia||0); var b={ directUrls: (p.ig_hashtags||[]).map(function(h){return 'https://www.instagram.com/explore/tags/'+h+'/';}), resultsType: 'reels', resultsLimit: p.resultados_referente, addParentData: true }; if(d>0) b.onlyPostsNewerThan = d + ' days'; return b; })() }}"
-      },
-      "id": "apify-ig-hashtag",
-      "name": "Apify — IG Hashtag",
-      "type": "@apify/n8n-nodes-apify.apify",
-      "typeVersion": 1,
-      "position": [
-        1960,
-        620
-      ],
-      "onError": "continueRegularOutput",
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "authentication": "apifyApi",
-        "resource": "Actors",
-        "operation": "Run actor and get dataset",
         "actorId": "clockworks~free-tiktok-scraper",
         "customBody": "={{ (function(){ var p=$('Armar plan de corrida').first().json; var a=p.ajustes||{}; return { profiles: p.tt_profiles, resultsPerPage: p.resultados_referente, shouldDownloadVideos: false, shouldDownloadCovers: false }; })() }}"
       },
@@ -893,32 +758,6 @@
       ],
       "onError": "continueRegularOutput",
       "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_tema?select=tema,tasa_seleccion' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "supabaseApi",
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "id": "leer-senal-tema",
-      "name": "Leer señal tema",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3780,
-        580
-      ],
-      "onError": "continueRegularOutput",
-      "alwaysOutputData": true,
-      "credentials": {
-        "supabaseApi": {
-          "name": "Supabase Registro"
-        }
-      }
     },
     {
       "parameters": {
@@ -1023,17 +862,6 @@
       "main": [
         [
           {
-            "node": "Leer Keywords",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leer Keywords": {
-      "main": [
-        [
-          {
             "node": "Leer Referentes",
             "type": "main",
             "index": 0
@@ -1056,16 +884,6 @@
       "main": [
         [
           {
-            "node": "Apify — IG Hashtag",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Apify — TikTok",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Apify — TikTok Perfil",
             "type": "main",
             "index": 0
@@ -1082,18 +900,7 @@
       "main": [
         [
           {
-            "node": "Merge IG",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Apify — TikTok": {
-      "main": [
-        [
-          {
-            "node": "Merge TT",
+            "node": "Normalizar IG",
             "type": "main",
             "index": 0
           }
@@ -1148,7 +955,7 @@
       "main": [
         [
           {
-            "node": "Leer señal tema",
+            "node": "Leer procesados",
             "type": "main",
             "index": 0
           }
@@ -1275,51 +1082,7 @@
         ]
       ]
     },
-    "Apify — IG Hashtag": {
-      "main": [
-        [
-          {
-            "node": "Merge IG",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
     "Apify — TikTok Perfil": {
-      "main": [
-        [
-          {
-            "node": "Merge TT",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Leer señal tema": {
-      "main": [
-        [
-          {
-            "node": "Leer procesados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge IG": {
-      "main": [
-        [
-          {
-            "node": "Normalizar IG",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge TT": {
       "main": [
         [
           {

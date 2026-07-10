@@ -18,7 +18,7 @@ Lo que existe hoy en el repo:
 | Pieza | Qué es | Estado |
 |---|---|---|
 | `README.md` | Visión del sistema central | ✅ Escrito |
-| `Workflows/workflow-short-form-content/` | **Máquina**: motor de reels n8n (35 nodos, JSON importable; ADR-009 + ADR-010 + ADR-011). Cron semanal + Execute manual → lee la config del equipo en Airtable (incl. Ajustes) → Apify (descubrimiento simétrico: referentes + keywords en IG y TikTok, 4 llamadas) → pre-trim Haiku + heat-score métrico + dedup → Supadata transcribe + Claude Haiku traduce literal → Gate Haiku (CALIDAD) → candidatos a Airtable + registro Supabase. Sin Google en el motor. | ✅ Corrió manual (V1) · ❌ **cron sin activar** · placeholders `<<...>>` por cliente |
+| `Workflows/workflow-short-form-content/` | **Máquina**: motor de reels n8n (30 nodos, JSON importable; ADR-009 + ADR-010 + ADR-011 + ADR-019). Cron semanal + Execute manual → lee la config del equipo en Airtable (incl. Ajustes) → Apify (solo por referentes: IG + TikTok, 2 llamadas) → pre-trim Haiku + heat-score métrico + dedup → Supadata transcribe + Claude Haiku traduce literal → Gate Haiku (CALIDAD) → candidatos a Airtable + registro Supabase. Sin Google en el motor. | ✅ Corrió manual (V1) · ❌ **cron sin activar** · placeholders `<<...>>` por cliente |
 | `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) · ❌ **hoy inactivo** — se re-monta en F3 |
 
 > **Estado operativo (2026-06-11):** ninguno de los dos workflows está sirviendo hoy. La puesta
@@ -127,7 +127,7 @@ de contenido se mapea contra estas 8 etapas en su manifest (las que no aplican s
 
 | Etapa | Responsabilidad | En reels (MVP — ADR-009) | En substack hoy |
 |---|---|---|---|
-| 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok (cuentas/keywords desde el cockpit Airtable) | Bot recorre fuentes validadas |
+| 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok (cuentas de referentes desde el cockpit Airtable — ADR-019) | Bot recorre fuentes validadas |
 | 2. NORMALIZAR | Todo item cae al schema común `content_item` | Nodos "Normalizar IG/TT" (mismas keys desde cada API) | Implícito en el playbook |
 | 3. FILTRAR / SCOREAR | Params de la corrida + criterios del cliente → selección | Pre-trim Haiku laxo (descarta off-topic obvio del caption, recall) + heat-score v1 métrico: likes+views+engagement × idioma/selección (fórmula: ROADMAP §1) + dedup contra `processed_items`. El substring `tema` salió (ADR-010) | Pregunta filtro + scoring 5 criterios |
 | 4. ENRIQUECER | Transcribir, extraer, research profundo | Supadata Whisper + traducción literal al español (Claude Haiku, solo si hace falta), en 2 Code nodes | Research profundo del brief |

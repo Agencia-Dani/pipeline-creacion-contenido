@@ -11,8 +11,8 @@ contract_version: 1
 id: short-form-content
 name: "Motor de reels — referentes → candidatos (ADR-009)"
 description: >
-  Cada semana lee la config del equipo en Airtable (proyectos, voces, keywords, referentes),
-  scrapea Reels de IG y videos de TikTok (Apify), los ordena de caliente a frío con el
+  Cada semana lee la config del equipo en Airtable (proyectos, voces, referentes),
+  scrapea Reels de IG y videos de TikTok (Apify, solo por referentes — ADR-019), los ordena de caliente a frío con el
   heat-score v1, descarta lo ya visto (dedup en Supabase), transcribe (Supadata) y traduce
   literal al español con Claude Haiku solo si el original no está en español, y entrega los
   candidatos a la tabla Candidatos de Airtable para que el equipo de redes los califique.
@@ -33,7 +33,7 @@ inputs:
   # multi-cliente real = F5). El patrón de ruta queda declarado para cuando exista.
   client_config: "clients/{cliente}/short-form-content.yaml"
   config_node: "Nodo 'Config' (editar tras importar): airtable_base_id, supabase_url, instance_id + pesos del heat y límites de scrape."
-  airtable_cockpit: "core/contracts/airtable-cockpit.md — Proyectos/Voces/Keywords/Referentes (lectura) + Candidatos (escritura)."
+  airtable_cockpit: "core/contracts/airtable-cockpit.md — Proyectos/Voces/Referentes (lectura) + Candidatos (escritura)."
   # filtros calibrables. scope: client = identidad estable del cliente (hoy viven en Airtable
   # por-proyecto + en el nodo Config; ninguno se pasa por corrida porque no hay form trigger).
   filters:
@@ -57,7 +57,7 @@ inputs:
     # NINGUNA credencial de Google.
 
 stages:                           # las 8 etapas canónicas de PLAN §2.4 (sin vacíos; n/a si no aplica)
-  colectar: "Lee la config del equipo en Airtable (Proyectos/Voces/Keywords/Referentes), arma el plan, y scrapea con Apify: IG Reels (directUrls de referentes, onlyPostsNewerThan) + TikTok (hashtags de keywords)."
+  colectar: "Lee la config del equipo en Airtable (Proyectos/Voces/Referentes), arma el plan, y scrapea con Apify solo por referentes (ADR-019): IG Reels (directUrls, onlyPostsNewerThan) + TikTok Perfil (profiles)."
   normalizar: "Normalizar IG/TT → formato común content_item (+ external_id) → Merge (append) → Asignar proyecto+voz (capa 2 de recencia: descarta lo más viejo que dias_recencia)."
   filtrar_scorear: "Pre-trim (Haiku LAXO sobre el caption): descarta off-topic obvio antes de transcribir usando criterios_relevancia del Proyecto/Voz (recall, fail-open). Heat-score v1 = prescore métrico 0.4·norm(views)+0.4·norm(likes)+0.2·norm(eng) ×(1+idioma)×(1+selección) + dedup contra processed_items (Supabase); viral_por_tamano marca, no corta; top_n por proyecto. (El substring `tema` salió — ADR-010.)"
   enriquecer: "Transcribir (Supadata) + Traducir (Claude Haiku) en 2 Code nodes (this.helpers.httpRequest): external_id atado al item (sin merge-by-position), lang de Supadata primario con fallback sobre el transcript. Traduce literal solo si el original no está en español. Fail-open."

@@ -23,13 +23,13 @@ filtro de relevancia por encima del tema del Proyecto** (el Proyecto es la base,
 cliente — ADR-010). En el MVP no genera guiones (scripts literales — ADR-009).
 
 **Referente**:
-Una cuenta de Instagram o TikTok de la que el motor trae videos. **La fuente de descubrimiento activa**
-(ADR-015): hoy el motor solo busca por las cuentas de referente sembradas por el equipo.
+Una cuenta de Instagram o TikTok de la que el motor trae videos. **La única fuente de descubrimiento**
+(ADR-019): el motor solo busca por las cuentas de referente sembradas por el equipo.
 
 **Keyword**:
-Una palabra/frase de búsqueda que funciona como hashtag de TikTok. **Eje dormante** (ADR-015): la tabla
-se conserva pero el motor no la usa mientras el flag `buscar_keyword_tiktok` esté off. El IG-keyword se
-retiró (no servía).
+Término **retirado del dominio** (ADR-019). Era una palabra/frase de búsqueda (hashtag de TikTok) para
+descubrimiento ciego; el eje se removió por completo y el descubrimiento de fuentes nuevas es problema
+del futuro motor de descubrimiento de referentes (ROADMAP §5).
 
 **Candidato**:
 Un video ya transcrito y traducido al español, esperando que el equipo lo califique en Airtable.
@@ -40,7 +40,7 @@ proyectos es dos candidatos, cada uno con su voz, su heat-score y su juicio de r
 El número con que el motor ordena los candidatos de caliente a frío. Combina la relevancia/calidad
 del contenido (juicio semántico contra los criterios del Proyecto ⊕ la Voz) con su desempeño objetivo
 (views/likes/engagement, percentil dentro de la corrida) y la señal de selección histórica **por
-referente** (el eje por keyword/tema quedó dormante — ADR-015).
+referente** (única señal de aprendizaje — ADR-019).
 
 **Relevancia tópica**:
 Qué tan genuinamente el video trata la temática del Proyecto, más allá de que use ganchos o etiquetas

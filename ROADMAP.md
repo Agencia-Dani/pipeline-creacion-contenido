@@ -51,7 +51,7 @@ Los 7 puntos, con qué cambia cada uno:
    en Sheets; Excel sale nativo). Supabase sigue siendo la fuente de verdad del historial.
 
 **Transversal:** Airtable es **el punto de entrada único** de quienes manejan el pipeline
-(proyectos, voces, keywords, referentes, calificación) — no-code e imposible de romper. El Sheet
+(proyectos, voces, referentes, calificación) — no-code e imposible de romper. El Sheet
 es la salida histórica. n8n y Supabase son sala de máquinas: ningún no-dev necesita tocarlos.
 
 ### Heat-score v1 (los criterios, concretos)
@@ -219,11 +219,11 @@ incremental no reprocesa · una falla simulada no tumba la entrega · los crons 
 3. **Costo por corrida medido** (`runs.costo_estimado` real) + revisión mensual.
 4. **Pipeline general** ([PLAN.md §5](./PLAN.md)): Substack + sync Notion (F3), capa del jefe
    completa (F4), templatización cliente N+1 (F5), operación sostenible (F6).
-5. **Motor de recomendación / discovery asistido** (cierra el loop de aprendizaje): un workflow que
-   lee el histórico de candidatos **aprobados** (`outputs`) y propone (a) **referentes nuevos** parecidos
-   a los activos y (b) **keywords/frases TikTok** para alimentar el eje keyword dormante. Se apoya en el
-   substrato que ADR-015 preserva (señal por referente + `v_senal_tema` inerte). Workflow aparte, no toca
-   el motor actual.
+5. **Motor de descubrimiento de referentes** (cierra el loop de aprendizaje): un workflow que
+   lee el histórico de candidatos **aprobados** (`outputs`) y propone **referentes nuevos** parecidos
+   a los activos, para que el equipo los apruebe y siembre. Se apoya en la señal por referente
+   (`v_senal_seleccion`). Es el reemplazo definitivo del eje keyword, removido por ADR-019 (el
+   descubrimiento ciego por hashtag no dio calidad). Workflow aparte, no toca el motor actual.
 
 ## 6. Riesgos de este roadmap
 

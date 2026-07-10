@@ -14,7 +14,7 @@
 
 ---
 
-## Las 6 tablas
+## Las 5 tablas
 
 ### 1. `Proyectos` — la unidad de búsqueda (qué se busca)
 Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunicación, Ventas, Liderazgo.
@@ -44,18 +44,7 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `descripcion` | texto largo | quién es / autoridad |
 | `criterios_relevancia` | texto largo | **qué le sirve a este cliente puntual** (fit de persona/audiencia) — afina el gate de relevancia por encima del tema del Proyecto. Opcional; el Proyecto filtra el tema, la Voz el cliente (ADR-010) |
 
-### 3. `Keywords` — banco de palabras clave (**eje activo, solo TikTok**, ADR-017)
-La tabla alimenta el descubrimiento por hashtag en TikTok cuando el toggle `Buscar por keywords en
-TikTok` (Ajustes) está on (default). El IG-keyword se retiró (no servía); el eje keyword es solo
-TikTok. Volumen propio y topeado: ver `Resultados por keyword` en Ajustes.
-
-| Campo | Tipo | Para qué |
-|---|---|---|
-| `termino` | texto (primario) | la palabra/frase de búsqueda (hashtag de TikTok) |
-| `proyecto` | link → `Proyectos` | a qué proyecto pertenece |
-| `activo` | checkbox | si se usa en la búsqueda (inerte mientras el eje esté off) |
-
-### 4. `Referentes` — banco de perfiles (la fuente propia)
+### 3. `Referentes` — banco de perfiles (**la única fuente de descubrimiento**, ADR-019)
 | Campo | Tipo | Para qué |
 |---|---|---|
 | `handle` | texto (primario) | @cuenta |
@@ -64,7 +53,7 @@ TikTok. Volumen propio y topeado: ver `Resultados por keyword` en Ajustes.
 | `activo` | checkbox | si se rastrea |
 | `notas` | texto largo | por qué se agregó |
 
-### 5. `Candidatos` — los scripts a calificar (donde el equipo cura)
+### 4. `Candidatos` — los scripts a calificar (donde el equipo cura)
 | Campo | Tipo | Para qué |
 |---|---|---|
 | `titulo` | texto (primario) | título/contexto del video fuente |
@@ -74,7 +63,6 @@ TikTok. Volumen propio y topeado: ver `Resultados por keyword` en Ajustes.
 | `proyecto` | link → `Proyectos` | |
 | `voz` | link → `Voces` | para qué voz se selecciona |
 | `referente` | texto | handle del video fuente (lo llena el motor: el `username` del poster) |
-| `tema` | texto | el **keyword/hashtag** que matcheó el candidato (vacío si entró por referente) — lo llena el motor solo cuando el eje keyword está activo. **Inerte hoy** (eje dormante, ADR-015): queda vacío. Se conserva como substrato del futuro motor de recomendación |
 | `url_referente` | url | link al video original |
 | `views` / `likes` / `seguidores` / `engagement` | número | métricas del fuente |
 | `heat_score` | número | el ranking compuesto (relevancia ⊕ métricas — ADR-010); caliente→frío |
@@ -91,7 +79,7 @@ TikTok. Volumen propio y topeado: ver `Resultados por keyword` en Ajustes.
 filtro `estado = aprobado` + orden `heat_score` descendente — el mapa de calor "se rehace" solo
 con lo elegido, sin código. Se crea a mano al armar la base (las vistas no salen por API).
 
-### 6. `Ajustes` — los knobs del scoring (clave→valor, ADR-011)
+### 5. `Ajustes` — los knobs del scoring (clave→valor, ADR-011)
 Donde el equipo afina cómo rankea el motor **sin tocar n8n**, en **español claro**. Una fila por knob;
 el equipo edita el `valor`. El motor (`Armar plan`) **traduce cada `clave` amigable a su parámetro
 interno** (mapa `AJUSTE_MAP`) y la aplica **sobre los defaults del nodo Config**: si la tabla está
@@ -102,7 +90,7 @@ vacía, un knob falta, o la `clave` no está en el mapa, usa el default. Lectura
 | `clave` | texto (primario) | el nombre del knob, en español (debe coincidir con `AJUSTE_MAP`) |
 | `valor` | número (precisión 2) | el valor que sobrescribe el default |
 | `descripcion` | texto largo | qué hace el knob (para el equipo) |
-| `Mostrar al equipo` | checkbox | si está marcado, el knob sale en la página **Configuración Global** (la que edita el equipo); sin marcar, solo en **Ajustes Dev-Only**. Es el filtro de esa página (una condición `= ✓`), no lo lee el motor. Marcados: los knobs globales de ADR-016/017 (recencia, candidatos, resultados por referente/keyword, los 3 toggles); sin marcar: los pesos/mínimos del scoring (avanzados). |
+| `Mostrar al equipo` | checkbox | si está marcado, el knob sale en la página **Configuración Global** (la que edita el equipo); sin marcar, solo en **Ajustes Dev-Only**. Es el filtro de esa página (una condición `= ✓`), no lo lee el motor. Marcados: los knobs globales de ADR-016/017 (recencia, candidatos, resultados por referente, los 2 toggles); sin marcar: los pesos/mínimos del scoring (avanzados). |
 
 **Knobs (semilla por defecto):** `Peso de vistas` 0.4 · `Peso de likes` 0.4 · `Peso de interacción`
 0.2 (pesos del prescore métrico) · `Peso de relevancia` 0.7 (IA vs. métricas en el orden final) ·
@@ -115,24 +103,21 @@ dashboard: `Candidatos por corrida` 100 (**N total por corrida**, contados como 
 corte final va por heat compuesto tras el gate) · `Días de recencia` 7 (ventana única de fetch) ·
 `Resultados por cuenta de referente` 20 (videos por cuenta de referente por corrida).
 
-**Toggles de eje + knob keyword (ADR-017)** — también en la página Global: `Buscar por referentes en
-Instagram` 1 · `Buscar por referentes en TikTok` 1 · `Buscar por keywords en TikTok` 1 (1=on/0=off;
-default todos on: referentes ambas plataformas + keyword solo TikTok) · `Resultados por keyword` 10
-(videos por keyword TikTok; más chico que referentes porque es descubrimiento ciego).
+**Toggles de eje (ADR-017; el eje keyword se removió — ADR-019)** — también en la página Global:
+`Buscar por referentes en Instagram` 1 · `Buscar por referentes en TikTok` 1 (1=on/0=off; default
+ambos on).
 
 **Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` 30
-(techo de `Resultados por cuenta de referente`) · `cap_resultados_keyword` 20 (techo de `Resultados por
-keyword`; ambos: el motor usa `min(valor_equipo, cap)`) · `cap_top_n` 200 (techo duro de transcripción
-por corrida, vale para todos los ejes juntos; protege el backfill — es el gobernador de créditos real).
+(techo de `Resultados por cuenta de referente`; el motor usa `min(valor_equipo, cap)`) · `cap_top_n`
+200 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real).
 En Config quedan además los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y los defaults de
-los toggles (`buscar_referente_ig`/`buscar_referente_tiktok`/`buscar_keyword_tiktok`, todos 1). Detección
-de idioma: dev-only.
+los toggles (`buscar_referente_ig`/`buscar_referente_tiktok`, ambos 1). Detección de idioma: dev-only.
 
 ---
 
 ## Cómo lo usa el motor (n8n)
 
-1. **Lee** (inicio de corrida): Proyectos activos + sus Keywords/Referentes/Voz/filtros +
+1. **Lee** (inicio de corrida): Proyectos activos + sus Referentes/Voz +
    `criterios_relevancia`, **y la tabla `Ajustes`** (nodo `Leer Ajustes`). Batch (1 page por tabla)
    para no gastar API calls. Los `criterios` y los `ajustes` viajan en el plan de corrida (nodo
    `Armar plan`); los criterios alimentan el gate de relevancia (Haiku, ADR-010) y los ajustes caen
@@ -147,14 +132,14 @@ de idioma: dev-only.
    `calificado_en` + metadata), hace **append al Sheet "Histórico"** (exportable a Excel) y los
    **borra de Airtable** → así no se pasa de 1.000 registros.
 4. Las selecciones acumuladas alimentan el heat-score de la próxima corrida → **el sistema aprende
-   qué priorizar**, en **dos ejes** (ADR-012): por **referente** (`v_senal_seleccion`) y por
-   **keyword/tema** (`v_senal_tema`, vía `Candidatos.tema`). *(El few-shot por voz de ADR-008 queda en
-   pausa — ADR-009.)*
+   qué priorizar**, por **referente** (`v_senal_seleccion`). *(La señal por keyword/tema —
+   `v_senal_tema`, ADR-012 — quedó **inerte** al removerse el eje keyword, ADR-019; la vista sigue en
+   Supabase sin lectores. El few-shot por voz de ADR-008 queda en pausa — ADR-009.)*
 
 ## Reglas para no salir del plan free
 
 - **Retención:** Candidatos calificados se archivan a Supabase y se limpian de Airtable. Proyectos,
-  Voces, Keywords y Referentes son chicos y permanentes (no crecen sin control).
+  Voces y Referentes son chicos y permanentes (no crecen sin control).
 - **Batching:** toda lectura/escritura de n8n agrupa registros (10/call). Un cron diario con
   batching entra cómodo bajo 1.000 calls/mes.
 - **Secreto:** el Personal Access Token (PAT) de Airtable vive en n8n + gestor de contraseñas,
@@ -172,5 +157,5 @@ node core/scripts/setup-airtable.mjs      # crea la base y devuelve el baseId
 ```
 
 Devuelve el `baseId` (`app...`) → va a la credencial de Airtable en n8n, y siembra los defaults de
-`Ajustes`. Alternativa sin compartir token: crear las 6 tablas a mano siguiendo esta misma
+`Ajustes`. Alternativa sin compartir token: crear las 5 tablas a mano siguiendo esta misma
 especificación.

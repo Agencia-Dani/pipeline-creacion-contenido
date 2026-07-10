@@ -45,14 +45,12 @@ const tables = [
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), check("activo")] },
   { name: "Voces", description: "Eje organizativo (para quién se selecciona). Separado del proyecto.",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia")] },
-  { name: "Keywords", description: "Banco de palabras clave (solo TikTok) por proyecto. Eje reactivado (ADR-017): el motor lo usa cuando 'Buscar por keywords en TikTok'=1.",
-    fields: [txt("termino"), check("activo")] },
-  { name: "Referentes", description: "Banco de perfiles referentes (fuente propia).",
+  { name: "Referentes", description: "Banco de perfiles referentes (la única fuente de descubrimiento — ADR-019).",
     fields: [txt("handle"), sel("plataforma", "instagram", "tiktok"),
              check("activo"), long("notas")] },
   { name: "Candidatos", description: "Scripts (transcripción/traducción literal — ADR-009) a calificar por el equipo.",
     fields: [txt("titulo"), long("script"), sel("idioma", "es", "en", "pt", "it", "fr", "otro"),
-             attach("thumbnail"), txt("referente"), txt("tema"), url("url_referente"),
+             attach("thumbnail"), txt("referente"), url("url_referente"),
              num("views"), num("likes"), num("seguidores"), num("engagement", 1),
              num("heat_score", 1), num("relevancia_score", 2), long("relevancia_razon"),
              check("viral_por_tamano"),
@@ -81,11 +79,9 @@ const ajustesSeed = [
   { clave: "Candidatos por corrida",          valor: 100,    descripcion: "Cuántos videos distintos trae la corrida en total (no por proyecto). El corte va por el score final.", "Mostrar al equipo": true },
   { clave: "Días de recencia",                valor: 7,      descripcion: "Ventana de búsqueda: solo videos publicados en los últimos N días.", "Mostrar al equipo": true },
   { clave: "Resultados por cuenta de referente", valor: 20,  descripcion: "Cuántos videos baja por cada cuenta de referente (más = más costo). Tope dev: 30.", "Mostrar al equipo": true },
-  // Toggles de eje + knob keyword (ADR-017) — también en la "página Global".
+  // Toggles de eje (ADR-017; el eje keyword se removió — ADR-019) — también en la "página Global".
   { clave: "Buscar por referentes en Instagram", valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en Instagram. 1 = sí, 0 = no.", "Mostrar al equipo": true },
   { clave: "Buscar por referentes en TikTok",    valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en TikTok. 1 = sí, 0 = no.", "Mostrar al equipo": true },
-  { clave: "Buscar por keywords en TikTok",      valor: 1,   descripcion: "Activa el descubrimiento por hashtags/keywords en TikTok (cuentas desconocidas). 1 = sí, 0 = no.", "Mostrar al equipo": true },
-  { clave: "Resultados por keyword",             valor: 10,  descripcion: "Cuántos videos baja por cada keyword de TikTok. Más bajo que referentes porque es descubrimiento ciego (más basura). Tope dev: 20.", "Mostrar al equipo": true },
 ];
 
 const run = async () => {
@@ -97,7 +93,6 @@ const run = async () => {
   // ── links (se agregan después: referencian ids que no existían al crear) ──
   const links = [
     ["Proyectos", "voz_default", "Voces"],
-    ["Keywords", "proyecto", "Proyectos"],
     ["Referentes", "proyecto", "Proyectos"],
     ["Candidatos", "proyecto", "Proyectos"],
     ["Candidatos", "voz", "Voces"],
@@ -136,7 +131,7 @@ const run = async () => {
   console.log(`\n✅ Cockpit creado.\n   baseId: ${baseId}`);
   console.log("   → Pegá ese baseId en la credencial de Airtable de n8n.");
   console.log("   → Dale acceso de editor a Majo y Jero (Share → hasta 5 en el plan free).");
-  console.log("   → Cargá los datos semilla: Proyectos, Voces, Keywords y Referentes iniciales");
+  console.log("   → Cargá los datos semilla: Proyectos, Voces y Referentes iniciales");
   console.log("     (incluí referentes en EN/PT/IT/FR — prioridad del jefe, ADR-009).");
   console.log("   → Creá a mano en Candidatos el campo 'fecha' tipo 'Created time' (cuándo llegó");
   console.log("     el candidato — la API no crea campos computados).");

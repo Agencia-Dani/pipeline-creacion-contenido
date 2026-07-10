@@ -29,6 +29,17 @@
 > nuevo `Barrer runs zombie` entre `Abrir run` y `Leer Proyectos`, y `Abrir run` ahora taggea
 > `params.workflow='motor'`. **Motor: 35 → 36 nodos.**
 >
+> ⚠️ **Enmienda 2026-07-09 (ADR-019) — remoción total del eje keyword; motor 36 → 30 nodos.** El motor
+> descubre **solo por referentes**. Salen 6 nodos: `Leer Keywords`, `Apify — TikTok` (hashtags),
+> `Apify — IG Hashtag`, `Merge IG`, `Merge TT` (cada Apify va directo a su Normalizador) y `Leer señal
+> tema`. Salen también: `buscar_keyword_tiktok`/`resultados_keyword`/`cap_resultados_keyword` (Config +
+> Ajustes), el reclamo por keyword y `_tema` en `Asignar`, la rama por eje del pre-trim (vuelve a
+> mono-eje: caption pobre → exento), el `max(selRef, selTema)` del Heat-score (señal solo por
+> referente) y el campo `tema` de la salida. `v_senal_tema` queda **inerte** en Supabase (sin lectores;
+> el archivado sigue copiando `tema: ''` fail-safe). Las filas/tabla keyword de Airtable se borran a
+> mano (checklist ADR-019). Las menciones keyword en las filas de abajo quedan como histórico; el JSON
+> manda.
+>
 > Pies de página: el motor en
 > [`workflows/workflow-short-form-content/`](../../workflows/workflow-short-form-content/), el
 > archivado en [`workflows/workflow-archivado/`](../../workflows/workflow-archivado/). El cockpit
@@ -41,7 +52,7 @@
 
 | Workflow | Trigger | Cadencia | Nodos | Qué hace |
 |---|---|---|---|---|
-| **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 36 | Descubre reels (IG+TikTok, Apify) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** en Airtable + registra la corrida en Supabase |
+| **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 30 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** en Airtable + registra la corrida en Supabase |
 | **Archivado** (`archivado`) | Cron + Execute manual | **Diario**, 9am (`0 9 * * *`) | 16 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`) + append al **Sheet Histórico** → los borra de Airtable (para no pasar el límite free) |
 
 Ambos comparten el patrón `Config → Abrir run → … → Cerrar run`: la corrida se registra en la tabla
@@ -50,29 +61,28 @@ Ambos comparten el patrón `Config → Abrir run → … → Cerrar run`: la cor
 
 ---
 
-## 2. Motor (`short-form-content`) — 36 nodos
+## 2. Motor (`short-form-content`) — 30 nodos
 
 ### 2.1 Orden de ejecución (topología real)
 
 ```
 Cron semanal ┐
-             ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer Proyectos ─► Leer Voces ─► Leer Keywords
+             ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer Proyectos ─► Leer Voces
 Ejecutar     ┘                                                                     │
 manual                                              Armar plan ◄─ Leer Ajustes ◄─ Leer Referentes
-                                                        │  (fan-out a 4 ramas Apify)
-       ┌────────────────────┬────────────────────┬─────┴───────────────┐
-       ▼                    ▼                    ▼                       ▼
- Split IG referentes   Apify IG Hashtag     Apify TikTok        Apify TikTok Perfil
-       ▼                    │                    │                       │
- Apify IG Reels            │                    │                       │
-       └──► Merge IG ◄─────┘                    └──► Merge TT ◄──────────┘
-              ▼                                         ▼
-        Normalizar IG ──────► Merge scrapes ◄──── Normalizar TT
+                                                        │  (fan-out a 2 ramas Apify)
+                             ┌──────────────────────────┴───────────────┐
+                             ▼                                          ▼
+                       Split IG referentes                     Apify TikTok Perfil
+                             ▼                                          │
+                       Apify IG Reels                                   │
+                             ▼                                          ▼
+                       Normalizar IG ──────► Merge scrapes ◄──── Normalizar TT
                                     │
                                     ▼
                           Asignar proyecto+voz ─► Pre-trim relevancia
                                                           │
-                            Leer señal selección ─► Leer señal tema ─► Leer procesados ─► Heat-score v1
+                            Leer señal selección ─► Leer procesados ─► Heat-score v1
                                                                                               │
                                               ┌───────────────────────────────────────────────┤
                                               ▼                                               ▼
@@ -94,14 +104,16 @@ Notas de orden que muerden si las ignorás:
   lo referencia por nombre (`$('Abrir run…')`); n8n corre las ramas en orden de conexión, así que si
   `Abrir run` cuelga en paralelo, corre **después** del pipeline y la referencia rompe (`hasn't been
   executed`). (Bug ya pisado, cierre 3.)
-- **Las 5 lecturas de Airtable son una cadena serial** (Proyectos→Voces→Keywords→Referentes→Ajustes→
+- **Las 4 lecturas de Airtable son una cadena serial** (Proyectos→Voces→Referentes→Ajustes→
   Armar plan), no un fan-out. **Paginan** (cierre 15, #4): `options.pagination` sigue el `offset` de
   Airtable hasta agotar páginas → no se truncan a 100 records.
-- **`Split IG referentes`** corre el Apify IG Reels **1× por referente** (por eso `ig_results_limit` es
-  cap **por-referente**, no global). Las 2 ramas IG (Reels de perfil + Hashtag) se unen en `Merge IG`
-  (append) antes de `Normalizar IG`; las 2 TikTok (hashtag + perfil) en `Merge TT`. Sin estos merge,
-  n8n correría el Normalizador 1× por conexión y perdería una rama (bug F1, cierre 12).
-- **Las 3 lecturas de Supabase** (señal selección → señal tema → procesados) van enhebradas **después
+- **`Split IG referentes`** corre el Apify IG Reels **1× por referente** (por eso el límite de
+  resultados es cap **por-referente**, no global). Cada Apify va **directo a su Normalizador**
+  (ADR-019): los `Merge IG`/`Merge TT` salieron junto con las ramas hashtag — con una sola fuente por
+  plataforma no unifican nada (el bug F1 era de 2 fuentes al mismo input). ⚠️ Ojo: con un toggle de
+  plataforma en 0 (o 0 referentes de esa plataforma), esa rama entera puede no ejecutar — verificar que
+  `Merge scrapes` no se quede esperando (test de borde del re-import ADR-019).
+- **Las 2 lecturas de Supabase** (señal selección → procesados) van enhebradas **después
   de Pre-trim**, no al inicio: así no bloquean el fan-out de Apify. `Leer procesados` consulta solo los
   `external_id` de la corrida (`in.(…)`, dedup acotado #5) — ya no `limit=20000`.
 - **`Heat-score v1` tiene dos salidas:** una al pipeline de enriquecimiento (Transcribir→…→candidato)
@@ -137,40 +149,34 @@ Notas de orden que muerden si las ignorás:
 | 4b | Barrer runs zombie | http PATCH | **Auto-sanador del motor (ADR-017), entre `Abrir run` y `Leer Proyectos`.** `PATCH runs` → marca `fallo` los runs de motor anteriores colgados `en_curso` (scoped `params->>workflow=eq.motor` + `id=neq.<run actual>`). Espejo del nodo homónimo del archivado. continue-on-fail. |
 | 5 | Leer Proyectos | http GET | Airtable `Proyectos` con `filterByFormula={activo}`. **Pagina** (`options.pagination` sigue el `offset` → todas las páginas, #4). |
 | 6 | Leer Voces | http GET | Airtable `Voces` (todas — el id→nombre y `criterios_relevancia`). Pagina (#4). |
-| 7 | Leer Keywords | http GET | Airtable `Keywords` con `{activo}`. Pagina (#4). |
-| 8 | Leer Referentes | http GET | Airtable `Referentes` con `{activo}`. Pagina (#4). |
-| 9 | Leer Ajustes | http GET | Airtable `Ajustes` (todas). Pagina (#4). continue-on-fail → fail-open: sin tabla, usa los defaults de Config. |
-| 10 | Armar plan de corrida | code | El cerebro de la config. Construye `projects{}` (con `criterios`, `voz_criterios`, `top_n`, `dias_recencia`, `min_views/likes`, toggles de eje), las listas de descubrimiento (`ig_urls` de referentes, `tt_profiles`, `ig_hashtags`, `tt_hashtags` de keywords colapsadas a un hashtag), los mapas `*_owner_to_proj`/`kw_to_proj`, `max_dias_recencia`, y `ajustes` (traduce la `clave` española → key interna vía **`AJUSTE_MAP`**). Los consumidores de las lecturas 5–9 agregan todas las páginas (`flatMap` sobre `.records`). **`ig_hashtags` queda siempre vacío** (F2 apagado, cierre 15): el eje IG-hashtag no aporta; TikTok-hashtag intacto. |
-| 11 | Split IG referentes | code | Emite **1 item por referente IG** → hace que `Apify — IG Reels` corra una vez por cuenta. Por eso `ig_results_limit` es cap **por-referente**, no global. |
-| 12 | Apify — IG Reels | apify | Actor `apify~instagram-scraper`, `directUrls` = la URL del referente del item (vía Split), `searchType:'user'`, `resultsLimit`, `onlyPostsNewerThan` si hay ventana. |
-| 13 | Apify — IG Hashtag | apify | Mismo actor, `directUrls` = `instagram.com/explore/tags/<h>/` por cada `ig_hashtag`. **Hoy recibe 0 URLs** (`ig_hashtags` vacío, F2). |
-| 14 | Apify — TikTok | apify | Actor `clockworks~free-tiktok-scraper`, `hashtags=tt_hashtags` (eje keyword, gateado por `buscar_keyword_tiktok`), `resultsPerPage=resultados_keyword` (knob propio del eje keyword, ADR-017). |
-| 15 | Apify — TikTok Perfil | apify | Mismo actor, `profiles=tt_profiles` (referentes TikTok). *Hoy `tt_profiles` sale vacío hasta sembrar Referentes TikTok.* |
-| 16 | Merge IG | merge (append) | Une **IG Reels ⊕ IG Hashtag** en un input → `Normalizar IG`. Sin esto n8n correría el Normalizador 1× por conexión (bug F1). |
-| 17 | Merge TT | merge (append) | Une **TikTok ⊕ TikTok Perfil** → `Normalizar TT`. |
-| 18 | Normalizar IG | code | Mapea cada post IG (de **Merge IG**) al `content_item` común: `plataforma`, `external_id`, `username`, `seguidores`, `descripcion` (caption), `likes`, `comentarios`, `reproducciones`, `url`, `video_url`, `thumbnail_url` (`displayUrl`), `hashtags`, `engagement_rate`, `fecha_publicacion`. Descarta no-video (`type !== 'Video'`). |
-| 19 | Normalizar TT | code | Idem para TikTok (de **Merge TT**): `authorMeta`, `diggCount`→likes, `playCount`→reproducciones, `videoMeta.coverUrl`→thumbnail. Mismas keys que IG. |
-| 20 | Merge scrapes | merge (append) | Une IG + TikTok en un solo lote, sin índice (append puro). |
-| 21 | Asignar proyecto+voz | code | **Fan-out (ADR-013):** emite **1 item por cada proyecto activo que reclama** el video (referente con `_tema=''`, keyword con su término). Asigna `proyecto_id`/`voz_id`/`_tema`: **1)** por referente (IG por cuenta / TT por perfil), **2)** por keyword (hashtag del caption → ambas plataformas), **3)** fallback al único proyecto activo. Descarta sin `url`, sin proyecto, y lo más viejo que `dias_recencia` (recencia capa 2). Emite `_top_n`, `_dias`, `_keywords`, `_tema`. |
-| 22 | Pre-trim relevancia | code + Haiku | Colador **laxo** (recall) sobre el caption, por proyecto, contra `criterios` (Proyecto⊕Voz). Descarte por **`(proyecto, external_id)`** (no global, para no matar la copia del otro proyecto del fan-out). Descarta solo lo **obviamente** off-topic; sin criterios no descarta nada. **Caption pobre** (<25 chars de texto real, sin hashtags/menciones/urls/emojis): eje **referente** pasa **sin juicio** (lo juzga el gate con transcript), eje **keyword** se **descarta directo** sin pagar Haiku (cierre 27, fix calidad run 07-09). **Fail-open**. `claude-haiku-4-5`. Logea descartes: `[Pre-trim] descartados off-topic: n/total -> ids` (cierre 15) y `[Pre-trim] captions pobres pid=…`. |
-| 23 | Leer señal selección | http GET | Supabase `v_senal_seleccion` (`referente`, `idioma`, `tasa_seleccion`). continue-on-fail. |
-| 24 | Leer señal tema | http GET | Supabase `v_senal_tema` (`tema`, `tasa_seleccion`). continue-on-fail. |
-| 25 | Leer procesados | http GET | Supabase `processed_items` filtrado a los `external_id` de **esta corrida** (`external_id=in.(…)`, dedup acotado #5) → el set de dedup. Ya no `limit=20000`. continue-on-fail. |
-| 26 | Heat-score v1 | code | **Prescore métrico** = `peso_views·pct(views) + peso_likes·pct(likes) + peso_eng·pct(eng)` por proyecto; × `(1+boost_idioma)` si `guessLang(caption+bio)≠es`; × `(1+sel)` con `sel = max(señal_referente, señal_tema)` (bi-eje O7). **Piso duro** `min_views`/`min_likes` y **dedup** (`!seen`) antes del `top_n` por proyecto. Emite `heat_score`, `idioma_guess`, `viral_por_tamano`. Lee 22, 23, 24, 25 + Config⊕ajustes. |
-| 27 | Transcribir (Supadata) | code | Transcribe cada item del top_n (Supadata, `&text=true&mode=auto`), throttle 1.5s, trunca 6000 chars. `idioma_detectado` = `lang` de Supadata (primario) → fallback `guessLang(transcript)` → `idioma_guess`. **Fail-open** (sin transcript, sigue). `<SUPADATA_API_KEY>`. |
-| 28 | Traducir (Claude Haiku) | code | Traduce **literal** al español **solo si** `idioma_detectado≠es` (sin reescribir/resumir/embellecer). **Fail-open**: si falla, `script = transcript`. Emite `script`, `idioma`. `claude-haiku-4-5`. |
-| 29 | Gate de relevancia | code + Haiku | **Jurado estricto** (precision) contra `criterios`, sobre el `script` (o el caption como **fallback** si no hubo transcript). Dropea `relevante:false` y `score < min_relevancia`. Recalcula `heat_score` **composite** = `peso_relevancia·sHaiku + (1-peso)·percentil(prescore_metrico)`. Marca `[SIN TRANSCRIPT: …]` en `relevancia_razon`. Emite `prescore_metrico`, `relevancia_score`, `relevancia_razon`, `heat_score`. **Fail-open**. Logea descartes: `[Gate] DESCARTE pid=… id=… score=… motivo=…` (cierre 15). |
-| 30 | Armar candidato | code | **Corte final a `top_n` videos distintos** (ADR-016) **con piso por cuenta** (`piso_referente`, ADR-017): ordena por heat, hace round-robin hasta `piso` videos por cuenta fuente, rellena el resto por heat global (fail-open con piso=0). **Emite UNA copia por video (ADR-018):** del fan-out gana la de mayor `relevancia_score` (empate: heat); items sin `external_id` se conservan. Luego reconstruye el objeto candidato final (lista explícita — ver §7): `titulo` del caption (80 chars; **prefijo `⚠️ SIN GUION |` si `script` vacío**, decisión #6 cierre 27), `script`, `idioma`, proyecto/voz, `referente`(=username), `url_referente`(=url), métricas, `heat_score`, `viral_por_tamano`, `external_id`, `relevancia_*`, `thumbnail_url`, `tema`(=`_tema`). |
-| 31 | Preparar batch Airtable | code | Arma `records[]` de Airtable (`fields` + links `proyecto`/`voz` + `thumbnail` attachment), en **batches de 10**, `typecast:true`, `estado:'nuevo'`. |
-| 32 | POST Airtable Candidatos | http POST | `POST Candidatos`. **stop-on-fail** (si Airtable rechaza, la corrida falla — es la entrega real). |
-| 33 | Cerrar run en el registro | http PATCH | `PATCH runs?id=eq.<id>` con `fin`, `estado:'ok'`, `metricas` del embudo completo `{colectados, asignados, pretrim, filtrados, gate, outputs}` (`outputs` = `$('Armar candidato').all().length`, ADR-014). **`executeOnce: true`** → cierra el run 1× pese a los N candidatos de entrada. continue-on-fail. |
-| 34 | Preparar procesados | code | Arma el batch `processed_items` (`instance_id`, `platform`, `external_id`, `url`, `seguidores`, `flag_viral`, `idioma`) de **todo lo que salió de Heat-score** (el top_n transcrito). |
-| 35 | POST processed_items | http POST | `POST processed_items`, `Prefer: resolution=ignore-duplicates`. continue-on-fail. |
+| 7 | Leer Referentes | http GET | Airtable `Referentes` con `{activo}`. Pagina (#4). |
+| 8 | Leer Ajustes | http GET | Airtable `Ajustes` (todas). Pagina (#4). continue-on-fail → fail-open: sin tabla, usa los defaults de Config. |
+| 9 | Armar plan de corrida | code | El cerebro de la config. Construye `projects{}` (con `criterios`, `voz_criterios`), las listas de descubrimiento (`ig_urls` de referentes, `tt_profiles`), los mapas `*_owner_to_proj`, los knobs globales (`top_n`, `dias_recencia`, `resultados_referente` con su cap) y `ajustes` (traduce la `clave` española → key interna vía **`AJUSTE_MAP`**). Gatea cada plataforma por su toggle (`buscar_referente_ig`/`buscar_referente_tiktok`). Los consumidores de las lecturas 5–8 agregan todas las páginas (`flatMap` sobre `.records`). **Solo referentes** (ADR-019): no arma hashtags ni mapas de keyword. |
+| 10 | Split IG referentes | code | Emite **1 item por referente IG** → hace que `Apify — IG Reels` corra una vez por cuenta. Por eso el límite de resultados es cap **por-referente**, no global. |
+| 11 | Apify — IG Reels | apify | Actor `apify~instagram-scraper`, `directUrls` = la URL del referente del item (vía Split), `searchType:'user'`, `resultsLimit`, `onlyPostsNewerThan` si hay ventana. |
+| 12 | Apify — TikTok Perfil | apify | Actor `clockworks~free-tiktok-scraper`, `profiles=tt_profiles` (referentes TikTok), `resultsPerPage=resultados_referente`. |
+| 13 | Normalizar IG | code | Mapea cada post IG (de **Apify — IG Reels**, directo — ADR-019) al `content_item` común: `plataforma`, `external_id`, `username`, `seguidores`, `descripcion` (caption), `likes`, `comentarios`, `reproducciones`, `url`, `video_url`, `thumbnail_url` (`displayUrl`), `hashtags`, `engagement_rate`, `fecha_publicacion`. Descarta no-video (`type !== 'Video'`) y el stub de Apify (`{error:'no_items'}`). |
+| 14 | Normalizar TT | code | Idem para TikTok (de **Apify — TikTok Perfil**, directo): `authorMeta`, `diggCount`→likes, `playCount`→reproducciones, `videoMeta.coverUrl`→thumbnail. Mismas keys que IG. Descarta el stub `{}` (0 referentes TikTok). |
+| 15 | Merge scrapes | merge (append) | Une IG + TikTok en un solo lote, sin índice (append puro). |
+| 16 | Asignar proyecto+voz | code | **Fan-out (ADR-013):** emite **1 item por cada proyecto activo que reclama** el video. Reclama **solo el referente** (ADR-019): IG por cuenta / TT por perfil, con fallback al único proyecto activo. Descarta sin `url`, sin proyecto, y lo más viejo que `dias_recencia` (recencia capa 2). Emite `proyecto_id`/`voz_id`. |
+| 17 | Pre-trim relevancia | code + Haiku | Colador **laxo** (recall) sobre el caption, por proyecto, contra `criterios` (Proyecto⊕Voz). Descarte por **`(proyecto, external_id)`** (no global, para no matar la copia del otro proyecto del fan-out). Descarta solo lo **obviamente** off-topic; sin criterios no descarta nada. **Caption pobre** (<25 chars de texto real, sin hashtags/menciones/urls/emojis): pasa **sin juicio** — lo juzga el gate con el transcript (mono-eje desde ADR-019; la fuente siempre es curada). **Fail-open**. `claude-haiku-4-5`. Logea descartes: `[Pre-trim] descartados off-topic: n/total -> ids` (cierre 15) y `[Pre-trim] captions pobres pid=…: N exentos`. |
+| 18 | Leer señal selección | http GET | Supabase `v_senal_seleccion` (`referente`, `idioma`, `tasa_seleccion`). continue-on-fail. |
+| 19 | Leer procesados | http GET | Supabase `processed_items` filtrado a los `external_id` de **esta corrida** (`external_id=in.(…)`, dedup acotado #5) → el set de dedup. Ya no `limit=20000`. continue-on-fail. |
+| 20 | Heat-score v1 | code | **Prescore métrico** = `peso_views·pct(views) + peso_likes·pct(likes) + peso_eng·pct(eng)` por proyecto; × `(1+boost_idioma)` si `guessLang(caption+bio)≠es`; × `(1+sel)` con `sel` = señal por referente (`v_senal_seleccion`; mono-eje desde ADR-019). **Piso duro** `min_views`/`min_likes` y **dedup** (`!seen`); `cap_top_n` recorta por videos distintos. Emite `heat_score`, `idioma_guess`, `viral_por_tamano`. Lee 17, 18, 19 + Config⊕ajustes. |
+| 21 | Transcribir (Supadata) | code | Transcribe cada item del top_n (Supadata, `&text=true&mode=auto`), throttle 1.5s, trunca 6000 chars. `idioma_detectado` = `lang` de Supadata (primario) → fallback `guessLang(transcript)` → `idioma_guess`. **Fail-open** (sin transcript, sigue). `<SUPADATA_API_KEY>`. |
+| 22 | Traducir (Claude Haiku) | code | Traduce **literal** al español **solo si** `idioma_detectado≠es` (sin reescribir/resumir/embellecer). **Fail-open**: si falla, `script = transcript`. Emite `script`, `idioma`. `claude-haiku-4-5`. |
+| 23 | Gate de relevancia | code + Haiku | **Jurado estricto** (precision) contra `criterios`, sobre el `script` (o el caption como **fallback** si no hubo transcript). Dropea `relevante:false` y `score < min_relevancia`. Recalcula `heat_score` **composite** = `peso_relevancia·sHaiku + (1-peso)·percentil(prescore_metrico)`. Marca `[SIN TRANSCRIPT: …]` en `relevancia_razon`. Emite `prescore_metrico`, `relevancia_score`, `relevancia_razon`, `heat_score`. **Fail-open**. Logea descartes: `[Gate] DESCARTE pid=… id=… score=… motivo=…` (cierre 15). |
+| 24 | Armar candidato | code | **Corte final a `top_n` videos distintos** (ADR-016) **con piso por cuenta** (`piso_referente`, ADR-017): ordena por heat, hace round-robin hasta `piso` videos por cuenta fuente, rellena el resto por heat global (fail-open con piso=0). **Emite UNA copia por video (ADR-018):** del fan-out gana la de mayor `relevancia_score` (empate: heat); items sin `external_id` se conservan. Luego reconstruye el objeto candidato final (lista explícita — ver §7): `titulo` del caption (80 chars; **prefijo `⚠️ SIN GUION |` si `script` vacío**, decisión #6 cierre 27), `script`, `idioma`, proyecto/voz, `referente`(=username), `url_referente`(=url), métricas, `heat_score`, `viral_por_tamano`, `external_id`, `relevancia_*`, `thumbnail_url`. |
+| 25 | Preparar batch Airtable | code | Arma `records[]` de Airtable (`fields` + links `proyecto`/`voz` + `thumbnail` attachment), en **batches de 10**, `typecast:true`, `estado:'nuevo'`. |
+| 26 | POST Airtable Candidatos | http POST | `POST Candidatos`. **stop-on-fail** (si Airtable rechaza, la corrida falla — es la entrega real). |
+| 27 | Cerrar run en el registro | http PATCH | `PATCH runs?id=eq.<id>` con `fin`, `estado:'ok'`, `metricas` del embudo completo `{colectados, asignados, pretrim, filtrados, gate, outputs}` (`outputs` = `$('Armar candidato').all().length`, ADR-014). **`executeOnce: true`** → cierra el run 1× pese a los N candidatos de entrada. continue-on-fail. |
+| 28 | Preparar procesados | code | Arma el batch `processed_items` (`instance_id`, `platform`, `external_id`, `url`, `seguidores`, `flag_viral`, `idioma`) de **todo lo que salió de Heat-score** (el top_n transcrito). |
+| 29 | POST processed_items | http POST | `POST processed_items`, `Prefer: resolution=ignore-duplicates`. continue-on-fail. |
 
 ### 2.3 El scoring en una frase
 
 `Heat-score v1` produce un **prescore métrico** (percentiles de views/likes/engagement, con boost por
-idioma no-español y por señal de aprendizaje bi-eje), corta por piso duro + dedup, y deja el `top_n`
+idioma no-español y por la señal de selección por referente), corta por piso duro + dedup, y deja el `top_n`
 por proyecto. El `Gate de relevancia` lo **re-rankea** con el juicio semántico de Haiku:
 `heat_score = peso_relevancia·score_Haiku + (1-peso_relevancia)·percentil(prescore)`. Todos los knobs
 salen de **Config** y los pisa la tabla **Ajustes** de Airtable (ADR-011). El detalle del modelo y sus
@@ -253,15 +259,14 @@ Base "Reels Cockpit", 6 tablas (contrato completo en
 |---|---|---|---|
 | `Proyectos` | **lee** (`Leer Proyectos`, `{activo}`) | **lee** (`id→nombre`) | El motor lee config (criterios, top_n, dias_recencia, min_*, toggles, voz_default); el archivado solo resuelve el nombre. |
 | `Voces` | **lee** (`Leer Voces`) | **lee** (`id→nombre`) | `criterios_relevancia` afina el gate. |
-| `Keywords` | **lee** (`Leer Keywords`, `{activo}`) | — | `termino` → hashtag. |
-| `Referentes` | **lee** (`Leer Referentes`, `{activo}`) | — | `handle` + `plataforma` → IG por cuenta / TikTok por perfil. |
+| `Referentes` | **lee** (`Leer Referentes`, `{activo}`) | — | `handle` + `plataforma` → IG por cuenta / TikTok por perfil. **La única fuente de descubrimiento** (ADR-019). |
 | `Ajustes` | **lee** (`Leer Ajustes`) | — | Knobs clave→valor; pisa los defaults de Config (fail-open). |
 | `Candidatos` | **escribe** (`POST`, `typecast`, batch 10) | **lee** (calificados) + **borra** (`DELETE`, batch 10) | El único write del motor a Airtable. El equipo califica acá; el archivado lo vacía. |
 
 **Campos de `Candidatos` que escribe el motor** (nodo `Preparar batch Airtable`): `titulo`, `script`,
 `idioma`, `referente`, `url_referente`, `views`, `likes`, `seguidores`, `engagement`, `heat_score`,
-`viral_por_tamano`, `relevancia_score`, `relevancia_razon`, `tema`, `estado:'nuevo'`, `proyecto`
-(link), `voz` (link), `thumbnail` (attachment).
+`viral_por_tamano`, `relevancia_score`, `relevancia_razon`, `estado:'nuevo'`, `proyecto`
+(link), `voz` (link), `thumbnail` (attachment). *(`tema` salió con el eje keyword — ADR-019.)*
 **Campos que NO toca el motor** (los pone el equipo o Airtable): `calificacion`, `notas_equipo`,
 `fecha` (created time), `fecha_calificacion` (last modified de `calificacion`). El `estado` lo escribe
 el motor como `nuevo` y luego lo cambia el equipo.
@@ -283,11 +288,12 @@ vive en n8n, jamás en git). Tablas y quién las toca:
 | `v_historico_seleccionados` | vista | — | Sheet / dashboard | `004` la cambió para exponer `contenido_o_link` como `script` (no `link_doc`). Filtra `calificado_en is not null`. |
 | `v_selecciones_por_dia` | vista | — | tracking | "el lunes seleccionaron N para tal voz". |
 | `v_senal_seleccion` | vista | — | **motor** (`Leer señal selección`) | Tasa de selección por `referente`/`idioma` → boost del heat. |
-| `v_senal_tema` | vista | — | **motor** (`Leer señal tema`) | Tasa por `metadata->>'tema'` (`006`, ADR-012). El segundo eje del aprendizaje. |
+| `v_senal_tema` | vista | — | **nadie (inerte, ADR-019)** | Tasa por `metadata->>'tema'` (`006`, ADR-012). Era el segundo eje del aprendizaje; quedó sin lectores al remover el eje keyword (DB inerte, sin migración). |
 
 **`outputs.metadata` (jsonb), convención para `guion_reel`** (lo escribe el archivado): `proyecto`,
 `voz`, `referente`, `url_referente`, `idioma`, `views`, `likes`, `seguidores`, `engagement`,
-`heat_score`, `tema`, `calificacion`, `link_doc` (vestigial, siempre `''`). Las vistas de
+`heat_score`, `tema` (vestigial desde ADR-019: `Candidatos.tema` ya no existe → el archivado escribe
+`''` fail-safe), `calificacion`, `link_doc` (vestigial, siempre `''`). Las vistas de
 señal/histórico leen de acá.
 
 ---
@@ -314,9 +320,10 @@ De dónde sale y a dónde llega cada campo que importa:
   - ✅ **Desde ADR-014 el motor ya no escribe `outputs`** → no hay filas `draft` huérfanas; `outputs` es
     el histórico canónico (solo piezas calificadas, `calificado_en` seteada). Las vistas de
     histórico/señal filtran `calificado_en is not null`.
-- **`tema`** — el keyword/hashtag que matcheó. Lo setea `Asignar proyecto+voz` (`_tema`) → `Armar
-  candidato` (`tema`) → `Candidatos.tema` (Airtable). De ahí el **archivado** lo copia a
-  `outputs.metadata.tema` → alimenta `v_senal_tema` (el único writer de `outputs`).
+- **`tema`** — **histórico/inerte desde ADR-019** (era el keyword/hashtag que matcheaba el video). El
+  motor ya no lo setea ni lo escribe; `Candidatos.tema` se retiró del contrato. El **archivado** sigue
+  copiando `tema: f.tema || ''` a `outputs.metadata.tema` (fail-safe: siempre `''`) y `v_senal_tema`
+  quedó sin lectores. Las filas viejas de `outputs` conservan su `tema` poblado.
 - **`idioma`** — hay **dos**: `idioma_guess` (de `guessLang` sobre el caption, en `Heat-score`, para el
   boost) y `idioma_detectado`/`idioma` (de Supadata en `Transcribir`, el de entrega). El que llega a
   Airtable/Supabase es el de entrega.

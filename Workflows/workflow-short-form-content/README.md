@@ -14,14 +14,13 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 
 ---
 
-## Qué hace (35 nodos, 2 entradas)
+## Qué hace (30 nodos, 2 entradas)
 
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 
 1. **COLECTAR** — `Config` → abre el run en el registro (Supabase) → lee Airtable (Proyectos, Voces,
-   Keywords, Referentes, **Ajustes**) → `Armar plan de corrida` arma los 2 ejes de descubrimiento → **4
-   nodos Apify** (IG por cuenta-referente + IG por hashtag-keyword + TikTok por hashtag-keyword +
-   TikTok por perfil-referente): **ambos ejes en ambas plataformas**.
+   Referentes, **Ajustes**) → `Armar plan de corrida` arma la búsqueda por referentes → **2 nodos
+   Apify** (IG por cuenta-referente + TikTok por perfil-referente): **solo referentes** (ADR-019).
 2. **NORMALIZAR** — `Normalizar IG`/`Normalizar TT` mapean el shape crudo de cada API al mismo
    `content_item` (incluida la portada del video) → `Merge scrapes` (append) → `Asignar proyecto+voz`.
 3. **FILTRAR / SCOREAR** — `Pre-trim relevancia` (Haiku laxo sobre el caption, cuela off-topic antes
@@ -40,22 +39,21 @@ Todos los gates son **fail-open**: si Haiku o Supadata fallan, el item pasa (no 
 
 ---
 
-## Descubrimiento (cómo busca, por eje y plataforma)
+## Descubrimiento (cómo busca)
 
-**Descubrimiento simétrico** — los dos ejes (referentes + keywords) aplican a **ambas plataformas**,
-con una llamada Apify por celda (4 en total):
+**Solo por referentes** (ADR-019) — una llamada Apify por plataforma:
 
-| | Por referente (cuenta) | Por keyword (hashtag) |
-|---|---|---|
-| **Instagram** | ✅ `Apify — IG Reels`: reels recientes de cada `Referente` IG (`directUrls`) | ✅ `Apify — IG Hashtag`: cada `Keyword` como `explore/tags/` → **descubre cuentas nuevas** (el gate filtra el ruido) |
-| **TikTok** | ✅ `Apify — TikTok Perfil`: cada `Referente` TikTok (`profiles`) | ✅ `Apify — TikTok`: cada `Keyword` como hashtag (OR) |
+| Plataforma | Nodo |
+|---|---|
+| **Instagram** | `Apify — IG Reels`: reels recientes de cada `Referente` IG (`directUrls`, 1 llamada por cuenta vía `Split IG referentes`) |
+| **TikTok** | `Apify — TikTok Perfil`: cada `Referente` TikTok (`profiles`) |
 
-Cada par converge a su `Normalizar` (mismo `content_item`) → `Merge scrapes` (append). La asignación a
-proyecto (`Asignar proyecto+voz`) es simétrica: matchea **por cuenta** (referente sembrado) y, si no,
-**por hashtag del caption** (keyword), en ambas plataformas. Las keywords se cargan como se hashtaggean
-(una palabra; **multi-palabra colapsa** a `#palabrapalabra`, lo hace el motor). Para activar las celdas
-de referente hay que **sembrar `Referentes`** de cada plataforma (las llamadas con lista vacía
-no traen nada, fail-open).
+Cada rama va a su `Normalizar` (mismo `content_item`) → `Merge scrapes` (append) → `Asignar
+proyecto+voz` matchea **por cuenta**: cada video se asigna a los proyectos activos que sembraron a su
+referente (fan-out ADR-013; la salida dedupea a un Candidato por video, ADR-018). El descubrimiento de
+cuentas nuevas no lo hace el motor: es el futuro motor de descubrimiento de referentes (ROADMAP §5).
+Para activar cada plataforma hay que **sembrar `Referentes`** (las llamadas con lista vacía no traen
+nada, fail-open) y tener su toggle de `Ajustes` en 1.
 
 ---
 
@@ -68,10 +66,9 @@ métrico) · *Peso de relevancia* (0.7, IA vs métricas en el orden) · *Bonus i
 duro** pre-`top_n`) · *Resultados Instagram/TikTok por corrida* (**volumen/costo** Apify) ·
 *Relevancia mínima* (**umbral** del gate). Default = "nada corta". El motor (`Armar plan`) **mapea
 cada clave amigable → su parámetro interno** (`AJUSTE_MAP`) y la aplica **sobre los defaults del nodo
-`Config`** (tabla vacía/caída = defaults, fail-open). En `Config` quedan solo los **IDs** (dev-only).
-La **personalización del descubrimiento** por proyecto vive en `Proyectos` (checkboxes *Buscar en
-Instagram/TikTok por cuentas/palabras clave*) y en `Keywords`/`Referentes`; `criterios_relevancia` en
-`Proyectos`/`Voces`.
+`Config`** (tabla vacía/caída = defaults, fail-open). En `Config` quedan solo los **IDs** y los caps
+dev-only. La **personalización del descubrimiento** vive en `Referentes` (qué cuentas, por proyecto)
+y los 2 toggles de plataforma de `Ajustes`; `criterios_relevancia` en `Proyectos`/`Voces`.
 
 ---
 

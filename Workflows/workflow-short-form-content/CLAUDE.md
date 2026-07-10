@@ -7,16 +7,16 @@ el contrato en [workflow.yaml](./workflow.yaml), el uso en [README.md](./README.
 
 ## Qué es
 
-Un único workflow de **n8n** (`workflow.json`, 35 nodos, 2 entradas: cron semanal + Execute manual)
+Un único workflow de **n8n** (`workflow.json`, 30 nodos, 2 entradas: cron semanal + Execute manual)
 que es el **motor de reels** del MVP. Lee la config del equipo en **Airtable** (Proyectos, Voces,
-Keywords, Referentes) → descubre reels IG + TikTok (Apify) → prescore métrico (`Heat-score v1`) →
+Referentes) → descubre reels IG + TikTok (Apify, solo por referentes — ADR-019) → prescore métrico (`Heat-score v1`) →
 transcribe (Supadata) → **traduce literal al español con Claude Haiku solo si no está en español** →
 **gate de relevancia** (Haiku estricto contra `criterios_relevancia`, compone el `heat_score`) →
 entrega **candidatos a Airtable** (estado `nuevo`) + registra la corrida en **Supabase**
 (continue-on-fail). **El motor no usa ninguna credencial de Google.** Ver el flujo de 8 etapas y el
 mapa de descubrimiento en el README.
 
-El equipo de redes (Majo, Jero) **solo toca Airtable**: arma la búsqueda (Keywords + Referentes), ve
+El equipo de redes (Majo, Jero) **solo toca Airtable**: arma la búsqueda (Referentes), ve
 el mapa de calor (vista 🔥), y califica/selecciona scripts. El script es **texto** (sin Google Doc —
 ADR-009); el "link" es la URL del video original.
 
