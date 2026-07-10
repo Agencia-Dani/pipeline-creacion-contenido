@@ -1,82 +1,24 @@
 [
   {
     "projects": {
-      "recC45pycBkYsTL0f": {
-        "id": "recC45pycBkYsTL0f",
-        "nombre": "Comunicación de parejas",
-        "voz_id": "recek0DxMjprPiodc",
-        "voz_nombre": "Milena Morales",
-        "criterios": "Videos con consejos prácticos para mejorar la comunicación en pareja: expresar necesidades, resolver conflictos, escuchar, poner límites, reconectar. RELEVANTE: aporta una técnica, ejemplo o reflexión aplicable a la relación de pareja. NO RELEVANTE: relaciones en general sin foco en comunicación, motivacional vacío, conquista/citas, comunicación laboral o de liderazgo. Útil = accionable y específico, no una obviedad.",
-        "voz_criterios": "La esencia del contenido de Milena Morales se centra en la comunicación consciente, el empoderamiento personal y el liderazgo auténtico. A través de sus mentorías, talleres y redes sociales, comparte herramientas prácticas para superar el miedo a hablar en público, conectar emocionalmente con la audiencia y construir una marca personal sólida. Su enfoque fusiona la rigurosidad técnica de su experiencia en grandes medios de comunicación con el *coaching* de vida, promoviendo que una comunicación efectiva no nace solo de la técnica, sino del autoconocimiento y de la confianza interior.",
+      "recEXjDokvNSKiBiv": {
+        "id": "recEXjDokvNSKiBiv",
+        "nombre": "Trading Psychology",
+        "voz_id": "rec9Ig3onkhfdV5Jy",
+        "voz_nombre": "Juan Pablo Vieira",
+        "criterios": "Los videos relevantes vienen de voces de autoridad en el trading, estos videos especifican como deberia ser utilizada la psicología a favor de un buen desempeño en el trading, tips de como afrontar situaciones particulares en el trading y cual deberia ser el mindset implantado en un trader ideal",
+        "voz_criterios": "Juan Pablo Vieira es un reconocido especialista en finanzas con más de 20 años de experiencia, galardonado en múltiples ocasiones como el mejor trader de Colombia por la Bolsa de Valores de Colombia. Actualmente es el CEO y fundador de JP Tactical Trading, una fintech dedicada a la gestión de patrimonio y trading algorítmico cuyo modelo matemático de proyección de divisas ha sido destacado por el Banco de la República. Además de su rol corporativo, se desempeña como conferencista, educador financiero y embajador de brókers internacionales.",
         "keywords": [
-          "Relationships",
-          "Communication"
+          "forex",
+          "Trading",
+          "wealth"
         ],
         "ig_handles": [
-          "jefferson_fisher",
-          "howtoconvince",
-          "bayavoce"
-        ],
-        "tt_handles": []
-      },
-      "recRm0QmuaLUWBdqz": {
-        "id": "recRm0QmuaLUWBdqz",
-        "nombre": "Storytelling",
-        "voz_id": "recHskS3sqk0vnGQP",
-        "voz_nombre": "Rosario Gomez",
-        "criterios": "Un video de Storytelling es relevante cuando se generan tips para conseguir un mejor desempeño en el storytelling, todo lo que sean tips rapidos, analisis del storytelling de famosos o personajes celebres, como aplicarlo en la comunicacion corporativa, el crecimiento y/o reputación de una marca y \npersonal sirve, no sirven experiencias personales de otros creadores",
-        "voz_criterios": "La esencia del contenido de Rosario Gómez en redes sociales gira en torno al estilo de vida consciente, el bienestar y el crecimiento integral, fusionando su faceta como mamá con su experiencia en comunicación. A través de un enfoque auténtico y cercano, comparte herramientas prácticas sobre salud física y mental, alimentación saludable, viajes y maternidad, complementadas con reflexiones de desarrollo personal y consejos de comunicación asertiva. Su propósito es inspirar a su comunidad a construir una vida equilibrada y con propósito, convirtiendo sus plataformas en un espacio de desconexión positiva, aprendizaje y empoderamiento cotidiano.",
-        "keywords": [
-          "Branding",
-          "Corporate"
-        ],
-        "ig_handles": [
-          "quinlanwalther",
-          "jefferson_fisher",
-          "howtoconvince",
-          "askvinh",
-          "vvanedwards"
-        ],
-        "tt_handles": []
-      },
-      "recerq1TtCGtlQycW": {
-        "id": "recerq1TtCGtlQycW",
-        "nombre": "Comunicación para lideres",
-        "voz_id": "recek0DxMjprPiodc",
-        "voz_nombre": "Milena Morales",
-        "criterios": "Videos sobre cómo un líder comunica con su equipo: dar feedback, delegar, alinear, motivar, comunicar decisiones difíciles, manejar 1:1. RELEVANTE: técnica o ejemplo de comunicación de un líder/manager hacia su equipo. NO RELEVANTE: liderazgo sin foco comunicacional, comunicación entre pares sin rol de mando, comunicación de pareja, tips corporativos genéricos no ligados a dirigir personas. Útil = accionable para quien lidera un equipo.",
-        "voz_criterios": "La esencia del contenido de Milena Morales se centra en la comunicación consciente, el empoderamiento personal y el liderazgo auténtico. A través de sus mentorías, talleres y redes sociales, comparte herramientas prácticas para superar el miedo a hablar en público, conectar emocionalmente con la audiencia y construir una marca personal sólida. Su enfoque fusiona la rigurosidad técnica de su experiencia en grandes medios de comunicación con el *coaching* de vida, promoviendo que una comunicación efectiva no nace solo de la técnica, sino del autoconocimiento y de la confianza interior.",
-        "keywords": [
-          "Communication",
-          "Leadership"
-        ],
-        "ig_handles": [
-          "quinlanwalther",
-          "jefferson_fisher",
-          "howtoconvince",
-          "askvinh",
-          "vvanedwards",
-          "eloisegagnon_strategist"
-        ],
-        "tt_handles": []
-      },
-      "recqId0coOkkpXHaS": {
-        "id": "recqId0coOkkpXHaS",
-        "nombre": "Comunicación en empresas",
-        "voz_id": "recek0DxMjprPiodc",
-        "voz_nombre": "Milena Morales",
-        "criterios": "Videos sobre comunicación en el trabajo (directivo o empleado): reuniones, emails, conflictos laborales, hablar con jefes/colegas/clientes, situaciones difíciles de oficina. RELEVANTE: tip o ejemplo de comunicación en contexto laboral. NO RELEVANTE: liderazgo de equipos puro (va a \"líderes\"), comunicación de pareja, productividad/finanzas sin foco comunicacional. Útil = aplicable a la vida laboral cotidiana.",
-        "voz_criterios": "La esencia del contenido de Milena Morales se centra en la comunicación consciente, el empoderamiento personal y el liderazgo auténtico. A través de sus mentorías, talleres y redes sociales, comparte herramientas prácticas para superar el miedo a hablar en público, conectar emocionalmente con la audiencia y construir una marca personal sólida. Su enfoque fusiona la rigurosidad técnica de su experiencia en grandes medios de comunicación con el *coaching* de vida, promoviendo que una comunicación efectiva no nace solo de la técnica, sino del autoconocimiento y de la confianza interior.",
-        "keywords": [
-          "Communication",
-          "Leadership",
-          "Branding",
-          "Corporate"
-        ],
-        "ig_handles": [
-          "howtoconvince",
-          "askvinh",
-          "eloisegagnon_strategist"
+          "nicholascrown",
+          "casper_smc",
+          "martinelli_paul",
+          "krosh.ivan",
+          "abeteddymaruta"
         ],
         "tt_handles": []
       },
@@ -87,104 +29,88 @@
         "voz_nombre": "Juan Pablo Vieira",
         "criterios": "Un video es relevante siempre que sea en formato corto/medianamente corto y que se den tips TÉCNICOS rápidos para traders, todo lo que hable de figuras, conceptos, rutinas, estrategias entre otras cosas relevantes de las que se puedan dar consejos rápidos, no sirven recomendaciones explicitas de inversión ni consejos de copiar y pegar estrategias",
         "voz_criterios": "Juan Pablo Vieira es un reconocido especialista en finanzas con más de 20 años de experiencia, galardonado en múltiples ocasiones como el mejor trader de Colombia por la Bolsa de Valores de Colombia. Actualmente es el CEO y fundador de JP Tactical Trading, una fintech dedicada a la gestión de patrimonio y trading algorítmico cuyo modelo matemático de proyección de divisas ha sido destacado por el Banco de la República. Además de su rol corporativo, se desempeña como conferencista, educador financiero y embajador de brókers internacionales.",
-        "keywords": [],
-        "ig_handles": [],
+        "keywords": [
+          "forex",
+          "Trading",
+          "wealth"
+        ],
+        "ig_handles": [
+          "nicholascrown",
+          "casper_smc",
+          "martinelli_paul",
+          "krosh.ivan",
+          "abeteddymaruta"
+        ],
         "tt_handles": []
       }
     },
     "ig_urls": [
-      "https://www.instagram.com/jefferson_fisher/",
-      "https://www.instagram.com/howtoconvince/",
-      "https://www.instagram.com/bayavoce/",
-      "https://www.instagram.com/quinlanwalther/",
-      "https://www.instagram.com/askvinh/",
-      "https://www.instagram.com/vvanedwards/",
-      "https://www.instagram.com/eloisegagnon_strategist/"
+      "https://www.instagram.com/nicholascrown/",
+      "https://www.instagram.com/casper_smc/",
+      "https://www.instagram.com/martinelli_paul/",
+      "https://www.instagram.com/krosh.ivan/",
+      "https://www.instagram.com/abeteddymaruta/"
     ],
     "tt_profiles": [],
     "ig_hashtags": [],
     "tt_hashtags": [
-      "relationships",
-      "communication",
-      "branding",
-      "corporate",
-      "leadership"
+      "forex",
+      "trading",
+      "wealth"
     ],
     "ig_owner_to_proj": {
-      "jefferson_fisher": [
-        "recC45pycBkYsTL0f",
-        "recRm0QmuaLUWBdqz",
-        "recerq1TtCGtlQycW"
+      "nicholascrown": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ],
-      "howtoconvince": [
-        "recC45pycBkYsTL0f",
-        "recRm0QmuaLUWBdqz",
-        "recerq1TtCGtlQycW",
-        "recqId0coOkkpXHaS"
+      "casper_smc": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ],
-      "bayavoce": [
-        "recC45pycBkYsTL0f"
+      "martinelli_paul": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ],
-      "quinlanwalther": [
-        "recRm0QmuaLUWBdqz",
-        "recerq1TtCGtlQycW"
+      "krosh.ivan": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ],
-      "askvinh": [
-        "recRm0QmuaLUWBdqz",
-        "recerq1TtCGtlQycW",
-        "recqId0coOkkpXHaS"
-      ],
-      "vvanedwards": [
-        "recRm0QmuaLUWBdqz",
-        "recerq1TtCGtlQycW"
-      ],
-      "eloisegagnon_strategist": [
-        "recerq1TtCGtlQycW",
-        "recqId0coOkkpXHaS"
+      "abeteddymaruta": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ]
     },
     "tt_owner_to_proj": {},
     "kw_to_proj": {
-      "relationships": [
-        "recC45pycBkYsTL0f"
+      "forex": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ],
-      "communication": [
-        "recC45pycBkYsTL0f",
-        "recerq1TtCGtlQycW",
-        "recqId0coOkkpXHaS"
+      "trading": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ],
-      "branding": [
-        "recRm0QmuaLUWBdqz",
-        "recqId0coOkkpXHaS"
-      ],
-      "corporate": [
-        "recRm0QmuaLUWBdqz",
-        "recqId0coOkkpXHaS"
-      ],
-      "leadership": [
-        "recerq1TtCGtlQycW",
-        "recqId0coOkkpXHaS"
+      "wealth": [
+        "recEXjDokvNSKiBiv",
+        "recviL1S33r723VrP"
       ]
     },
     "active_project_ids": [
-      "recC45pycBkYsTL0f",
-      "recRm0QmuaLUWBdqz",
-      "recerq1TtCGtlQycW",
-      "recqId0coOkkpXHaS",
+      "recEXjDokvNSKiBiv",
       "recviL1S33r723VrP"
     ],
-    "dias_recencia": 10,
+    "dias_recencia": 60,
     "resultados_referente": 20,
-    "resultados_keyword": 10,
+    "resultados_keyword": 20,
     "top_n": 100,
-    "cap_top_n": 20,
+    "cap_top_n": 150,
     "ajustes": {
-      "dias_recencia": 10,
+      "dias_recencia": 60,
       "buscar_referente_ig": 1,
       "peso_relevancia": 0.7,
       "top_n": 100,
       "boost_idioma": 0.45,
-      "resultados_keyword": 10,
+      "resultados_keyword": 20,
       "peso_likes": 0.4,
       "buscar_keyword_tiktok": 1,
       "min_likes": 0,
