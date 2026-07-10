@@ -1,0 +1,997 @@
+{
+  "name": "Descubrimiento de referentes — sugeridos IG → propuestos (ADR-020)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "name": "Cron — semanal (lunes 9am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "id": "cron-semanal-lunes-9am",
+      "position": [
+        240,
+        380
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "Ejecutar manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "id": "ejecutar-manual",
+      "position": [
+        450,
+        550
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "airtable_base_id",
+              "value": "<<AIRTABLE_BASE_ID>>",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "supabase_url",
+              "value": "<<SUPABASE_URL>>",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "instance_id",
+              "value": "<<INSTANCE_ID>>",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "cap_semillas",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "c5",
+              "name": "cap_perfiles_detalle",
+              "value": 20,
+              "type": "number"
+            },
+            {
+              "id": "c6",
+              "name": "propuestas_max",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "c7",
+              "name": "afinidad_minima",
+              "value": 0.6,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "id": "config",
+      "position": [
+        660,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"cron\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"descubrimiento\" } }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "name": "Abrir run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "abrir-run-en-el-registro",
+      "position": [
+        870,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.descubrimiento&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { estado: 'fallo', fin: $now.toISO(), error: 'run de descubrimiento sin cerrar (fallo antes de Cerrar run); barrido por corrida posterior' } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Barrer runs zombie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "barrer-runs-zombie",
+      "position": [
+        1080,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Proyectos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "{activo}"
+            }
+          ]
+        }
+      },
+      "name": "Leer Proyectos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "id": "leer-proyectos",
+      "position": [
+        1290,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Voces' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      },
+      "name": "Leer Voces",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "id": "leer-voces",
+      "position": [
+        1500,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      },
+      "name": "Leer Referentes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "id": "leer-referentes",
+      "position": [
+        1710,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes%20propuestos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      },
+      "name": "Leer Propuestos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "leer-propuestos",
+      "position": [
+        1920,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar promoción — cierra el loop: filas de 'Referentes propuestos' con estado=aprobado se\n// convierten en Referentes (activo) y se marcan promovido. Máx 10 por corrida (batch Airtable).\nconst recs = $('Leer Propuestos').all().flatMap(it => (it.json && it.json.records) || []);\nconst aprobados = recs.filter(r => String(((r.fields || {}).estado) || '') === 'aprobado').slice(0, 10);\nconst hoy = new Date().toISOString().slice(0, 10);\nconst crear = aprobados.map(r => { const f = r.fields || {}; return { fields: {\n  handle: String(f.handle || '').trim(),\n  plataforma: f.plataforma || 'instagram',\n  proyecto: Array.isArray(f.proyecto) ? f.proyecto : [],\n  activo: true,\n  notas: 'Promovido por descubrimiento ' + hoy + (f.afinidad != null ? ' (afinidad ' + f.afinidad + ')' : '') + (f.razon ? ': ' + String(f.razon).slice(0, 300) : '')\n} }; });\nconst marcar = aprobados.map(r => ({ id: r.id, fields: { estado: 'promovido' } }));\nif (crear.length) console.log('[Descubrimiento] promoviendo ' + crear.length + ' referente(s): ' + crear.map(c => c.fields.handle).join(', '));\nreturn [{ json: { hay: crear.length > 0, crear, marcar } }];"
+      },
+      "name": "Preparar promoción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "preparar-promocion",
+      "position": [
+        2130,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ($json.crear || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — hay aprobados",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "id": "if-hay-aprobados",
+      "position": [
+        2340,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $json.crear, typecast: true } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "POST Referentes (promoción)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "id": "post-referentes-promocion",
+      "position": [
+        2550,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes%20propuestos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $('Preparar promoción').first().json.marcar, typecast: true } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "PATCH Propuestos promovidos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "id": "patch-propuestos-promovidos",
+      "position": [
+        240,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Ajustes' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Leer Ajustes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "leer-ajustes",
+      "position": [
+        450,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,tasa_seleccion,calificados' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "name": "Leer señal selección",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "leer-senal-seleccion",
+      "position": [
+        660,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Armar plan de descubrimiento (ADR-020) — semillas rankeadas por señal + set de dedup + knobs.\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst _nrm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();\nconst cfg0 = $('Config').first().json;\n// Knobs del equipo (Ajustes) sobre defaults de Config; caps de costo solo en Config (patrón ADR-011/016).\nconst AJUSTE_MAP = { 'propuestas por corrida': 'propuestas_max', 'afinidad minima de propuesta': 'afinidad_minima' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const k = AJUSTE_MAP[_nrm(f.clave)]; if (k && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[k] = Number(f.valor); });\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst propuestas_max = Math.max(1, Number(pick('propuestas_max', 10)));\nconst afinidad_minima = Number(pick('afinidad_minima', 0.6));\nconst cap_semillas = Math.max(1, Number(cfg0.cap_semillas || 8));\nconst cap_detalle = Math.max(1, Number(cfg0.cap_perfiles_detalle || 20));\n\n// Proyectos activos con criterios Proyecto ⊕ Voz (mismo modelo que el gate del motor, ADR-010).\nconst voces = {};\nrecs('Leer Voces').forEach(v => { const f = v.fields || {}; voces[v.id] = (f.criterios_relevancia || '').toString().trim(); });\nconst projects = {};\nrecs('Leer Proyectos').forEach(p => { const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = { id: p.id, nombre: f.nombre || '', criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: (vozId && voces[vozId]) || '' };\n});\n\n// Dedup: cualquier handle ya conocido no se re-propone (Referentes activo o no + Propuestos en cualquier estado).\nconst conocidos = new Set();\nconst referentes = recs('Leer Referentes');\nreferentes.forEach(r => { const h = String(((r.fields || {}).handle) || '').trim().replace(/^@+/, '').toLowerCase(); if (h) conocidos.add(h); });\nrecs('Leer Propuestos').forEach(r => { const h = String(((r.fields || {}).handle) || '').trim().replace(/^@+/, '').toLowerCase(); if (h) conocidos.add(h); });\n\n// Semillas: referentes IG activos de proyectos activos, rankeados por tasa de selección (fail-open sin señal).\nconst senal = {};\n$('Leer señal selección').all().forEach(it => { const s = it.json || {}; if (s.referente) senal[String(s.referente).toLowerCase()] = { tasa: Number(s.tasa_seleccion || 0), cal: Number(s.calificados || 0) }; });\nconst semMap = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('insta') < 0) return; // v1 solo IG (ADR-020)\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMap[k] = semMap[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMap[k].proyectos.add(id));\n});\nconst semillas = Object.entries(semMap)\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj = {};\nsemillas.forEach(s => { seed_to_proj[s.handle.toLowerCase()] = s.proyectos; });\nconsole.log('[Descubrimiento] semillas (' + semillas.length + '): ' + semillas.map(s => s.handle + '(' + s.tasa.toFixed(2) + ')').join(', '));\nreturn [{ json: { semillas: semillas.map(s => s.handle), seed_to_proj, conocidos: [...conocidos], projects, propuestas_max, afinidad_minima, cap_detalle } }];"
+      },
+      "name": "Armar plan de descubrimiento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "armar-plan-de-descubrimiento",
+      "position": [
+        870,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "apifyApi",
+        "resource": "Actors",
+        "operation": "Run actor and get dataset",
+        "actorId": "apify~instagram-profile-scraper",
+        "customBody": "={{ { usernames: $('Armar plan de descubrimiento').first().json.semillas } }}"
+      },
+      "name": "Apify — Perfiles semilla",
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "apify-perfiles-semilla",
+      "position": [
+        1080,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agregar sugeridos — junta relatedProfiles de todas las semillas, dedup y rankea por frecuencia\n// (sugerido por N semillas > sugerido por 1). Corta a cap_perfiles_detalle antes de pagar el detalle.\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst conocidos = new Set(plan.conocidos || []);\nconst seedToProj = plan.seed_to_proj || {};\nconst cand = {};\nfor (const it of $input.all()) {\n  const d = it.json || {};\n  const seed = String(d.username || '').toLowerCase();\n  const proys = seedToProj[seed] || [];\n  for (const rp of (Array.isArray(d.relatedProfiles) ? d.relatedProfiles : [])) {\n    const u = String((rp && rp.username) || '').trim().replace(/^@+/, ''); if (!u) continue;\n    if (rp.is_private) continue;\n    const k = u.toLowerCase(); if (conocidos.has(k)) continue;\n    const c = (cand[k] = cand[k] || { username: u, freq: 0, proyectos: new Set(), semillas: new Set() });\n    c.freq++; proys.forEach(p => c.proyectos.add(p)); if (seed) c.semillas.add(seed);\n  }\n}\nconst top = Object.values(cand).sort((a, b) => b.freq - a.freq).slice(0, Number(plan.cap_detalle || 20));\nconst candidatos = {};\ntop.forEach(c => { candidatos[c.username.toLowerCase()] = { username: c.username, freq: c.freq, proyectos: [...c.proyectos], semillas: [...c.semillas] }; });\nconsole.log('[Descubrimiento] sugeridos únicos nuevos: ' + Object.keys(cand).length + ' → pasan a detalle: ' + top.length);\nreturn [{ json: { usernames: top.map(c => c.username), candidatos, unicos: Object.keys(cand).length } }];"
+      },
+      "name": "Agregar sugeridos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "agregar-sugeridos",
+      "position": [
+        1290,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "apifyApi",
+        "resource": "Actors",
+        "operation": "Run actor and get dataset",
+        "actorId": "apify~instagram-profile-scraper",
+        "customBody": "={{ { usernames: $('Agregar sugeridos').first().json.usernames } }}"
+      },
+      "name": "Apify — Detalle sugeridos",
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "apify-detalle-sugeridos",
+      "position": [
+        1500,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vetting relevancia (Haiku) — jurado estricto sobre bio + captions de últimos posts, por proyecto\n// reclamante (criterios Proyecto ⊕ Voz, ADR-010). FAIL-CLOSED (ADR-020): si Haiku falla o no hay\n// criterios, NO se propone (el riesgo acá es inundar al equipo de ruido, no perder contenido).\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst projects = plan.projects || {};\nconst candidatos = ($('Agregar sugeridos').first().json || {}).candidatos || {};\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\n\nconst detalle = {};\nfor (const it of $input.all()) {\n  const d = it.json || {};\n  const u = String(d.username || '').toLowerCase(); if (!u || !candidatos[u]) continue;\n  if (d.private) continue;\n  const caps = (Array.isArray(d.latestPosts) ? d.latestPosts : [])\n    .map(p => String((p && p.caption) || '').replace(/\\s+/g, ' ').trim()).filter(Boolean)\n    .slice(0, 8).map(c => c.slice(0, 180));\n  detalle[u] = { username: d.username, bio: String(d.biography || '').trim(), seguidores: Number(d.followersCount || 0), caps, url: String(d.url || ('https://www.instagram.com/' + d.username + '/')) };\n}\n\nconst porProy = {};\nObject.values(candidatos).forEach(c => { const u = c.username.toLowerCase(); if (!detalle[u]) return;\n  c.proyectos.forEach(pid => { if (!projects[pid]) return; (porProy[pid] = porProy[pid] || []).push(u); });\n});\n\nconst juicio = {}; // username → { afin, razon, proyectos }\nlet first = true;\nfor (const pid in porProy) {\n  const p = projects[pid];\n  const criterios = [p.criterios ? 'CRITERIOS DE TEMA (principal):\\n' + p.criterios : '', p.voz_criterios ? 'AJUSTE DE VOZ (complementa, no manda):\\n' + p.voz_criterios : ''].filter(Boolean).join('\\n\\n');\n  if (!criterios) { console.log('[Vetting] proyecto sin criterios, se salta (fail-closed): ' + p.nombre); continue; }\n  const lote = porProy[pid].map(u => { const d = detalle[u]; return { id: d.username, bio: d.bio.slice(0, 300), posts: d.caps.join(' | ').slice(0, 1200), seguidores: d.seguidores }; });\n  if (!lote.length) continue;\n  if (!first) await sleep(1000); first = false;\n  const sys = 'Sos un jurado ESTRICTO que evalua CUENTAS de Instagram como posibles referentes de contenido para un proyecto. Te doy el tema del proyecto, sus criterios, y una lista de cuentas (id + bio + captions de sus ultimos posts). Para cada cuenta decidi que tan AFIN es el contenido que publica a los criterios (importa lo que publica, no su fama). Precision: ante la duda, score bajo. Devolve UNICAMENTE un JSON {\"juicio\":[{\"id\":\"...\",\"afin\":0.0,\"razon\":\"breve, en espanol\"}]}. afin 0..1.';\n  const usr = 'TEMA: ' + (p.nombre || '') + '\\n' + criterios + '\\n\\nCUENTAS:\\n' + JSON.stringify(lote);\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n      body: { model: 'claude-haiku-4-5', max_tokens: 4000, system: sys, messages: [{ role: 'user', content: usr }] },\n      json: true, timeout: 60000\n    });\n    let txt = ''; (resp.content || []).forEach(b => { if (b && b.type === 'text') txt += b.text; });\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    const j = m ? JSON.parse(m[0]) : null;\n    ((j && j.juicio) || []).forEach(x => {\n      const u = String(x.id || '').toLowerCase(); if (!detalle[u]) return;\n      const afin = Math.max(0, Math.min(1, Number(x.afin || 0)));\n      const prev = juicio[u];\n      if (!prev) juicio[u] = { afin, razon: String(x.razon || ''), proyectos: [pid] };\n      else { if (afin > prev.afin) { prev.afin = afin; prev.razon = String(x.razon || ''); } if (prev.proyectos.indexOf(pid) < 0) prev.proyectos.push(pid); }\n    });\n  } catch (e) { console.log('[Vetting] Haiku falló para ' + p.nombre + ' — FAIL-CLOSED, no se propone nada de este lote: ' + (e.message || e)); }\n}\n\nconst out = [];\nfor (const u in juicio) { const d = detalle[u]; const c = candidatos[u];\n  out.push({ json: { username: d.username, afin: juicio[u].afin, razon: juicio[u].razon, proyectos: juicio[u].proyectos, seguidores: d.seguidores, bio: d.bio, url: d.url, semillas: (c.semillas || []).join(', '), freq: c.freq || 1 } });\n}\nconsole.log('[Vetting] cuentas juzgadas con score: ' + out.length);\nif (!out.length) return [{ json: { _vacio: true } }]; // la cadena sigue hasta Cerrar run\nreturn out;"
+      },
+      "name": "Vetting relevancia (Haiku)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "vetting-relevancia-haiku",
+      "position": [
+        1710,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Armar propuestas — umbral de afinidad + cap por corrida (Ajustes) → batches de 10 para Airtable.\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst MAX = Math.max(1, Number(plan.propuestas_max || 10));\nconst items = $input.all().map(i => i.json).filter(d => d && d.username && !d._vacio);\nconst elegidos = items.filter(d => Number(d.afin || 0) >= MIN)\n  .sort((a, b) => (b.afin - a.afin) || ((b.freq || 0) - (a.freq || 0))).slice(0, MAX);\nif (!elegidos.length) { console.log('[Descubrimiento] 0 propuestas sobre el umbral ' + MIN); return [{ json: { hay_propuestas: false, propuestos: 0 } }]; }\nconst records = elegidos.map(d => ({ fields: {\n  handle: '@' + d.username, plataforma: 'instagram', proyecto: d.proyectos || [],\n  afinidad: Math.round(Number(d.afin) * 100) / 100, razon: String(d.razon || '').slice(0, 500),\n  seguidores: Number(d.seguidores || 0), bio: String(d.bio || '').slice(0, 500), url: d.url,\n  semillas: d.semillas || '', estado: 'propuesto'\n} }));\nconsole.log('[Descubrimiento] proponiendo ' + records.length + ': ' + elegidos.map(d => d.username + '(' + d.afin + ')').join(', '));\nconst out = [];\nfor (let i = 0; i < records.length; i += 10) out.push({ json: { hay_propuestas: true, records: records.slice(i, i + 10), propuestos: records.length } });\nreturn out;"
+      },
+      "name": "Armar propuestas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "armar-propuestas",
+      "position": [
+        1920,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ($json.records || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — hay propuestas",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "id": "if-hay-propuestas",
+      "position": [
+        2130,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes%20propuestos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $json.records, typecast: true } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "POST Airtable Propuestos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "id": "post-airtable-propuestos",
+      "position": [
+        2340,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?id=eq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (function(){\nvar g = function(n, f){ try { return f($(n)); } catch (e) { return null; } };\nvar plan = g('Armar plan de descubrimiento', function(x){ return x.first().json; }) || {};\nvar ag = g('Agregar sugeridos', function(x){ return x.first().json; }) || {};\nvar vet = g('Vetting relevancia (Haiku)', function(x){ return x.all().map(function(i){ return i.json; }).filter(function(d){ return d && d.username; }); }) || [];\nvar ap = g('Armar propuestas', function(x){ return x.first().json; }) || {};\nvar prom = g('Preparar promoción', function(x){ return x.first().json; }) || {};\nreturn { fin: $now.toISO(), estado: 'ok', metricas: { semillas: (plan.semillas || []).length, sugeridos_unicos: ag.unicos || 0, detalle: (ag.usernames || []).length, vetteados: vet.length, propuestos: ap.propuestos || 0, promovidos: (prom.crear || []).length } };\n})() }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "name": "Cerrar run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "cerrar-run-en-el-registro",
+      "position": [
+        2550,
+        720
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron — semanal (lunes 9am)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar manual": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Abrir run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abrir run en el registro": {
+      "main": [
+        [
+          {
+            "node": "Barrer runs zombie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Barrer runs zombie": {
+      "main": [
+        [
+          {
+            "node": "Leer Proyectos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Proyectos": {
+      "main": [
+        [
+          {
+            "node": "Leer Voces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Voces": {
+      "main": [
+        [
+          {
+            "node": "Leer Referentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Referentes": {
+      "main": [
+        [
+          {
+            "node": "Leer Propuestos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Propuestos": {
+      "main": [
+        [
+          {
+            "node": "Preparar promoción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — hay aprobados": {
+      "main": [
+        [
+          {
+            "node": "POST Referentes (promoción)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leer Ajustes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar promoción": {
+      "main": [
+        [
+          {
+            "node": "IF — hay aprobados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Referentes (promoción)": {
+      "main": [
+        [
+          {
+            "node": "PATCH Propuestos promovidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PATCH Propuestos promovidos": {
+      "main": [
+        [
+          {
+            "node": "Leer Ajustes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Ajustes": {
+      "main": [
+        [
+          {
+            "node": "Leer señal selección",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer señal selección": {
+      "main": [
+        [
+          {
+            "node": "Armar plan de descubrimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar plan de descubrimiento": {
+      "main": [
+        [
+          {
+            "node": "Apify — Perfiles semilla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — Perfiles semilla": {
+      "main": [
+        [
+          {
+            "node": "Agregar sugeridos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agregar sugeridos": {
+      "main": [
+        [
+          {
+            "node": "Apify — Detalle sugeridos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — Detalle sugeridos": {
+      "main": [
+        [
+          {
+            "node": "Vetting relevancia (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vetting relevancia (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Armar propuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — hay propuestas": {
+      "main": [
+        [
+          {
+            "node": "POST Airtable Propuestos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar propuestas": {
+      "main": [
+        [
+          {
+            "node": "IF — hay propuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Airtable Propuestos": {
+      "main": [
+        [
+          {
+            "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

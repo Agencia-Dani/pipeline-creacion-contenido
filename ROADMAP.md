@@ -219,11 +219,14 @@ incremental no reprocesa · una falla simulada no tumba la entrega · los crons 
 3. **Costo por corrida medido** (`runs.costo_estimado` real) + revisión mensual.
 4. **Pipeline general** ([PLAN.md §5](./PLAN.md)): Substack + sync Notion (F3), capa del jefe
    completa (F4), templatización cliente N+1 (F5), operación sostenible (F6).
-5. **Motor de descubrimiento de referentes** (cierra el loop de aprendizaje): un workflow que
-   lee el histórico de candidatos **aprobados** (`outputs`) y propone **referentes nuevos** parecidos
-   a los activos, para que el equipo los apruebe y siembre. Se apoya en la señal por referente
-   (`v_senal_seleccion`). Es el reemplazo definitivo del eje keyword, removido por ADR-019 (el
-   descubrimiento ciego por hashtag no dio calidad). Workflow aparte, no toca el motor actual.
+5. **Motor de descubrimiento de referentes** (cierra el loop de aprendizaje) — **✅ CONSTRUIDO
+   ([ADR-020](./docs/adr/ADR-020-motor-descubrimiento-referentes.md), 2026-07-10; falta importar en
+   n8n y la 1ª corrida)**: `Workflows/workflow-descubrimiento-referentes/` propone **referentes
+   nuevos** parecidos a los que mejor convierten (semillas rankeadas por `v_senal_seleccion` →
+   sugeridos del propio Instagram vía Apify → vetting Haiku contra criterios), a la tabla
+   `Referentes propuestos` para que el equipo apruebe; los aprobados se siembran solos. Es el
+   reemplazo definitivo del eje keyword, removido por ADR-019 (el descubrimiento ciego por hashtag
+   no dio calidad). Workflow aparte, no toca el motor actual.
 
 ## 6. Riesgos de este roadmap
 

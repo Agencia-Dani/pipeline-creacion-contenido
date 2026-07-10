@@ -39,7 +39,7 @@ const check = (name) => ({ name, type: "checkbox", options: { color: "greenBrigh
 const attach = (name) => ({ name, type: "multipleAttachments" });
 const sel = (name, ...opts) => ({ name, type: "singleSelect", options: { choices: opts.map((o) => ({ name: o })) } });
 
-// ── las 5 tablas (campos NO-link al crear; los links se agregan después) ──
+// ── las 6 tablas (campos NO-link al crear; los links se agregan después) ──
 const tables = [
   { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto. dias_recencia/top_n/toggles salieron a Ajustes globales (ADR-016).",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), check("activo")] },
@@ -59,6 +59,11 @@ const tables = [
              long("notas_equipo")] },
   { name: "Ajustes", description: "Knobs del scoring (clave→valor) que el equipo edita sin tocar n8n — ADR-011. El motor los lee y caen sobre los defaults de Config; tabla vacía = motor con defaults.",
     fields: [txt("clave"), num("valor", 2), long("descripcion"), check("Mostrar al equipo")] },
+  { name: "Referentes propuestos", description: "Cuentas candidatas a Referente que propone el workflow de descubrimiento (ADR-020). El equipo marca estado aprobado/descartado; los aprobados se promueven solos a Referentes en la corrida siguiente.",
+    fields: [txt("handle"), sel("plataforma", "instagram", "tiktok"),
+             num("afinidad", 2), long("razon"), num("seguidores"), long("bio"), url("url"),
+             txt("semillas"),
+             sel("estado", "propuesto", "aprobado", "descartado", "promovido")] },
 ];
 
 // Semillas de Ajustes: los knobs que el equipo edita en español claro. El motor (nodo "Armar plan")
@@ -82,6 +87,9 @@ const ajustesSeed = [
   // Toggles de eje (ADR-017; el eje keyword se removió — ADR-019) — también en la "página Global".
   { clave: "Buscar por referentes en Instagram", valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en Instagram. 1 = sí, 0 = no.", "Mostrar al equipo": true },
   { clave: "Buscar por referentes en TikTok",    valor: 1,   descripcion: "Activa la búsqueda por cuentas de referente en TikTok. 1 = sí, 0 = no.", "Mostrar al equipo": true },
+  // Knobs del workflow de descubrimiento de referentes (ADR-020). Mapa propio en su "Armar plan de descubrimiento".
+  { clave: "Propuestas por corrida",             valor: 10,  descripcion: "Cuántos referentes nuevos propone el descubrimiento por semana, como máximo.", "Mostrar al equipo": true },
+  { clave: "Afinidad mínima de propuesta",       valor: 0.6, descripcion: "Qué tan afín a los criterios del proyecto debe ser una cuenta para proponerse (0 a 1).", "Mostrar al equipo": true },
 ];
 
 const run = async () => {
@@ -94,6 +102,7 @@ const run = async () => {
   const links = [
     ["Proyectos", "voz_default", "Voces"],
     ["Referentes", "proyecto", "Proyectos"],
+    ["Referentes propuestos", "proyecto", "Proyectos"],
     ["Candidatos", "proyecto", "Proyectos"],
     ["Candidatos", "voz", "Voces"],
   ];

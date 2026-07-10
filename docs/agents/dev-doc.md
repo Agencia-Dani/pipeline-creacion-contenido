@@ -48,12 +48,13 @@
 
 ---
 
-## 1. Los dos workflows de un vistazo
+## 1. Los workflows de un vistazo
 
 | Workflow | Trigger | Cadencia | Nodos | Qué hace |
 |---|---|---|---|---|
 | **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 30 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** en Airtable + registra la corrida en Supabase |
 | **Archivado** (`archivado`) | Cron + Execute manual | **Diario**, 9am (`0 9 * * *`) | 16 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`) + append al **Sheet Histórico** → los borra de Airtable (para no pasar el límite free) |
+| **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (`0 9 * * 1`) | 24 | Promueve a `Referentes` los propuestos que el equipo marcó `aprobado` → semillas = referentes IG activos rankeados por `v_senal_seleccion` → Apify `instagram-profile-scraper` (2 pasadas: `relatedProfiles` de semillas → detalle de sugeridos) → dedup contra Referentes+Propuestos → vetting Haiku (**FAIL-CLOSED**) → escribe **Referentes propuestos**. Orden: `Config → Abrir run → Barrer zombies → Leer Proyectos/Voces/Referentes/Propuestos → Preparar promoción → IF hay aprobados (→ POST Referentes → PATCH promovidos) → Leer Ajustes → Leer señal → Armar plan → Apify semillas → Agregar sugeridos → Apify detalle → Vetting → Armar propuestas → IF hay propuestas (→ POST Propuestos) → Cerrar run`. Detalle en su [README](../../Workflows/workflow-descubrimiento-referentes/README.md); fuente de verdad: su `workflow.json`. |
 
 Ambos comparten el patrón `Config → Abrir run → … → Cerrar run`: la corrida se registra en la tabla
 `runs` de Supabase (abre `en_curso`, cierra `ok` con métricas). Todos los nodos de Supabase son

@@ -24,12 +24,20 @@ cliente — ADR-010). En el MVP no genera guiones (scripts literales — ADR-009
 
 **Referente**:
 Una cuenta de Instagram o TikTok de la que el motor trae videos. **La única fuente de descubrimiento**
-(ADR-019): el motor solo busca por las cuentas de referente sembradas por el equipo.
+(ADR-019): el motor solo busca por las cuentas de referente sembradas por el equipo — a mano o
+promovidas desde los Referentes propuestos (ADR-020).
+
+**Referente propuesto**:
+Una cuenta candidata a Referente que el **workflow de descubrimiento** (ADR-020) propone cada semana:
+sugeridos del propio Instagram a partir de las **semillas** (los referentes activos que mejor
+convierten según la señal de selección), veteados con Haiku contra los criterios del proyecto. Vive en
+la tabla `Referentes propuestos`; el equipo la marca aprobado/descartado y los aprobados se promueven
+solos a `Referentes`. Un handle propuesto no se re-propone (descartar es definitivo).
 
 **Keyword**:
 Término **retirado del dominio** (ADR-019). Era una palabra/frase de búsqueda (hashtag de TikTok) para
-descubrimiento ciego; el eje se removió por completo y el descubrimiento de fuentes nuevas es problema
-del futuro motor de descubrimiento de referentes (ROADMAP §5).
+descubrimiento ciego; el eje se removió por completo y su reemplazo es el motor de descubrimiento de
+referentes (ADR-020).
 
 **Candidato**:
 Un video ya transcrito y traducido al español, esperando que el equipo lo califique en Airtable.

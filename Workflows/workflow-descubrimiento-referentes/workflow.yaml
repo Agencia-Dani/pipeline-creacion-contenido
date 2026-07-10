@@ -1,0 +1,78 @@
+# Manifest — cumple core/contracts/workflow-manifest.md (v1)
+#
+# Etapa A del embudo de dos etapas (descubrir CREADORES ≠ curar CONTENIDO): propone referentes
+# nuevos parecidos a los que ya funcionan, el equipo aprueba, el workflow los siembra en
+# Referentes. Diseño y porqués en docs/adr/ADR-020-motor-descubrimiento-referentes.md.
+contract_version: 1
+
+id: descubrimiento-referentes
+name: "Descubrimiento de referentes — sugeridos IG → propuestos"
+description: >
+  Corre semanal: toma los referentes IG activos que mejor convierten (v_senal_seleccion), pide a
+  Instagram sus cuentas sugeridas (relatedProfiles vía Apify), las vetea con Haiku contra los
+  criterios de cada proyecto y escribe propuestas en la tabla "Referentes propuestos" del cockpit.
+  Al inicio de cada corrida promueve a Referentes las propuestas que el equipo marcó aprobado.
+engine: n8n
+status: draft                     # construido (ADR-020); sin importar aún en la instancia n8n
+owner: mani
+
+triggers:
+  - type: cron
+    schedule: "0 9 * * 1"         # lunes 9:00 AM — 1h después del motor, con la señal fresca del archivado del domingo
+    timezone: America/Bogota
+  - type: manual                  # "Execute Workflow" en n8n
+
+inputs:
+  client_config: "clients/{cliente}/descubrimiento-referentes.yaml"   # MVP: 1 instancia editada en el nodo Config
+  filters:
+    - key: propuestas_max
+      type: number
+      scope: client
+      default: 10
+      desc: "Cap de propuestas por corrida (fila 'Propuestas por corrida' en Ajustes; default en Config)"
+    - key: afinidad_minima
+      type: number
+      scope: client
+      default: 0.6
+      desc: "Umbral del vetting Haiku (fila 'Afinidad mínima de propuesta' en Ajustes)"
+    - key: cap_semillas
+      type: number
+      scope: client
+      default: 8
+      desc: "Tope dev-only de semillas por corrida (Config)"
+    - key: cap_perfiles_detalle
+      type: number
+      scope: client
+      default: 20
+      desc: "Tope dev-only de perfiles sugeridos que pagan la 2ª llamada Apify (Config)"
+  credentials:
+    - airtable_token              # credencial n8n 'Airtable PAT' (airtableTokenApi)
+    - supabase_service_role       # credencial n8n 'Supabase Registro' (supabaseApi)
+    - apify_token                 # credencial n8n 'apifyApi' (community node @apify)
+    - anthropic_api_key           # placeholder <ANTHROPIC_API_KEY> en el Code node de vetting
+
+stages:                           # las 8 etapas canónicas; acá la "pieza" es una CUENTA, no un video
+  colectar: "Apify instagram-profile-scraper 2 pasadas: perfiles semilla → relatedProfiles; detalle de sugeridos (bio, followers, latestPosts)."
+  normalizar: "Agregar sugeridos: flatten de relatedProfiles, dedup contra Referentes + Propuestos, ranking por frecuencia entre semillas."
+  filtrar_scorear: "Vetting Haiku (FAIL-CLOSED): afinidad 0..1 contra criterios Proyecto⊕Voz sobre bio + captions; umbral y cap de Ajustes."
+  enriquecer: n/a
+  generar: n/a
+  calidad: n/a
+  entregar: "POST a la tabla 'Referentes propuestos' (estado=propuesto) + rama de promoción: aprobado → crea Referente activo y marca promovido."
+  notificar: n/a
+
+outputs:
+  - type: referente_propuesto     # una cuenta candidata a Referente, con afinidad + razón
+    destination_native: airtable  # tabla "Referentes propuestos" del cockpit
+    registered: yes               # runs con params.workflow='descubrimiento' + metricas del embudo
+
+runbook:
+  setup: "Importar workflow.json en n8n → completar nodo Config (base_id, supabase_url, instance_id) y <ANTHROPIC_API_KEY> en 'Vetting relevancia (Haiku)' → mapear credenciales (Airtable PAT, Supabase Registro, apifyApi). Requiere la tabla 'Referentes propuestos' + 2 filas de Ajustes en la base (contrato airtable-cockpit.md)."
+  start: "Activar el workflow en n8n (cron lunes 9am, validar timezone America/Bogota)."
+  stop: "Desactivar el workflow en n8n."
+  test: "Execute Workflow manual → verificar: run 'descubrimiento' cerrado ok en Supabase con metricas {semillas, sugeridos_unicos, detalle, vetteados, propuestos, promovidos}; filas nuevas estado=propuesto en 'Referentes propuestos' sin repetir handles de Referentes/Propuestos; marcar una propuesta como aprobado y re-ejecutar → aparece en Referentes (activo) y la fila queda promovido."
+  docs:
+    - README.md
+    - ../../docs/adr/ADR-020-motor-descubrimiento-referentes.md
+
+cost_per_run: "~$0.10 — ~28 perfiles Apify (~$0.07) + 1-2 llamadas Haiku; sin Supadata."

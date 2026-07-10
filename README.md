@@ -40,6 +40,7 @@ content-pipeline/
 ├── README.md          ← este archivo (la orientación)
 └── Workflows/         ← un subfolder por flujo de contenido
     ├── workflow-short-form-content/
+    ├── workflow-descubrimiento-referentes/
     └── workflow-substack/
 ```
 

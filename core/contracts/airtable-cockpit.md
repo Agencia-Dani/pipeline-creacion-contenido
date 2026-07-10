@@ -14,7 +14,7 @@
 
 ---
 
-## Las 5 tablas
+## Las 6 tablas
 
 ### 1. `Proyectos` — la unidad de búsqueda (qué se busca)
 Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunicación, Ventas, Liderazgo.
@@ -107,11 +107,35 @@ corte final va por heat compuesto tras el gate) · `Días de recencia` 7 (ventan
 `Buscar por referentes en Instagram` 1 · `Buscar por referentes en TikTok` 1 (1=on/0=off; default
 ambos on).
 
+**Knobs del descubrimiento de referentes (ADR-020)** — los lee el workflow de descubrimiento (no el
+motor): `Propuestas por corrida` 10 (cap de propuestas semanales) · `Afinidad mínima de propuesta`
+0.6 (umbral del vetting Haiku, 0-1).
+
 **Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` 30
 (techo de `Resultados por cuenta de referente`; el motor usa `min(valor_equipo, cap)`) · `cap_top_n`
 200 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real).
 En Config quedan además los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y los defaults de
 los toggles (`buscar_referente_ig`/`buscar_referente_tiktok`, ambos 1). Detección de idioma: dev-only.
+
+### 6. `Referentes propuestos` — la bandeja del descubrimiento (ADR-020)
+Cuentas candidatas a Referente que propone el **workflow de descubrimiento** cada semana
+(sugeridos del propio Instagram a partir de los referentes que mejor convierten, veteados con
+Haiku). El equipo revisa y marca `estado`; los `aprobado` se **promueven solos** a `Referentes`
+(activo ✓) en la corrida siguiente y quedan `promovido`. **El motor de reels NO lee esta tabla.**
+
+| Campo | Tipo | Para qué |
+|---|---|---|
+| `handle` | texto (primario) | @cuenta propuesta |
+| `plataforma` | single select | instagram / tiktok (v1 solo propone instagram) |
+| `proyecto` | link → `Proyectos` | a qué proyecto(s) alimentaría |
+| `afinidad` | número (0-1) | juicio Haiku contra los criterios del proyecto |
+| `razon` | texto largo | por qué la propone (en español, para decidir rápido) |
+| `seguidores` / `bio` / `url` | número / texto largo / url | contexto de la cuenta para revisar sin salir de Airtable |
+| `semillas` | texto | qué referentes activos la sugirieron |
+| **`estado`** | single select | **propuesto / aprobado / descartado / promovido** — propuesto lo pone el workflow; aprobado/descartado el equipo; promovido el workflow al sembrarla |
+
+Un handle propuesto una vez **no se re-propone** (dedup contra esta tabla en cualquier estado y
+contra `Referentes`): descartar es definitivo salvo alta manual.
 
 ---
 
@@ -157,5 +181,5 @@ node core/scripts/setup-airtable.mjs      # crea la base y devuelve el baseId
 ```
 
 Devuelve el `baseId` (`app...`) → va a la credencial de Airtable en n8n, y siembra los defaults de
-`Ajustes`. Alternativa sin compartir token: crear las 5 tablas a mano siguiendo esta misma
+`Ajustes`. Alternativa sin compartir token: crear las 6 tablas a mano siguiendo esta misma
 especificación.

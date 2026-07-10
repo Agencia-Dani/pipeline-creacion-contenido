@@ -25,6 +25,7 @@
 | [ADR-017](./ADR-017-reactivar-keyword-tiktok-y-toggles-de-eje.md) | Reactivar eje keyword TikTok como toggle + 3 toggles de eje + knob/cap por keyword + piso por cuenta | Aceptada (revertida por ADR-019 en lo keyword; toggles de referente y piso quedan) |
 | [ADR-018](./ADR-018-un-candidato-por-video-dedup-salida.md) | Un Candidato por video: dedup de salida del fan-out (gana la copia con mejor relevancia) | Aceptada (enmienda ADR-013) |
 | [ADR-019](./ADR-019-remocion-total-eje-keyword.md) | Remoción total del eje keyword: el motor descubre solo por referentes (enmienda ADR-015, revierte ADR-017, reduce ADR-012) | Aceptada |
+| [ADR-020](./ADR-020-motor-descubrimiento-referentes.md) | Motor de descubrimiento de referentes: sugeridos de IG + vetting Haiku + aprobación del equipo (workflow aparte; completa ADR-019) | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.
