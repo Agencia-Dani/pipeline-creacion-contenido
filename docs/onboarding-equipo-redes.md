@@ -4,8 +4,9 @@
 > dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
 > falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
 >
-> *Actualizado: 2026-07-09. Refleja el motor en producción buscando **solo por referentes**
-> (cuentas de Instagram y TikTok). Las keywords/hashtags se retiraron: no traían calidad.*
+> *Actualizado: 2026-07-10. Refleja el motor en producción buscando **solo por referentes**
+> (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron: no traían calidad — y el
+> **buscador de cuentas nuevas** (§8.1): la máquina ahora también les propone referentes.*
 
 ---
 
@@ -17,6 +18,8 @@
 - ✅ Calificar **también lo que descartan** (👎 + descartado): así la máquina aprende y mejora.
 - ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**).
   Esa lista es de dónde sale **todo** el contenido: cuentas buenas = candidatos buenos.
+- ✅ Revisar **una vez por semana** la tabla **Referentes propuestos**: la máquina les sugiere cuentas
+  nuevas; ustedes marcan `aprobado` o `descartado` y las aprobadas se siembran solas (§8.1).
 - ✅ Escribir buenos `criterios_relevancia` en cada Proyecto (es lo que decide la calidad de lo que llega).
 
 **Lo que NO hacen (nunca):**
@@ -96,9 +99,12 @@ Hay 6 tablas. Piénsenlas en dos grupos.
 
 > Estas las arman una vez y las van ajustando. **No hace falta tocarlas para el trabajo del día.**
 
-### La que usan todos los días
+### Las que usan para trabajar
 
-- **Candidatos** — los videos que llegaron, esperando que ustedes los califiquen. Acá viven.
+- **Candidatos** — los videos que llegaron, esperando que ustedes los califiquen. Acá viven (todos
+  los días).
+- **Referentes propuestos** — las cuentas nuevas que la máquina les sugiere para sumar a Referentes.
+  La revisan **una vez por semana** (§8.1).
 
 En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
 el **idioma original**, la **portada**, el **link al video original**, las **métricas** (views, likes,
@@ -302,6 +308,40 @@ transcripción en videos que después se descartaban.)*
 Resumen: **la calidad de lo que llega depende de qué tan buena sea su lista de Referentes. Quieren
 más/mejor → curen esa tabla.**
 
+### 8.1 El buscador de cuentas nuevas (Referentes propuestos)
+
+Para que la lista de Referentes no se agote, hay un segundo robot que corre **los lunes a la mañana**
+y les propone cuentas nuevas. Cómo las encuentra: toma sus referentes que **mejor están funcionando**
+(los que más aprueban ustedes), mira qué cuentas sugiere Instagram como "parecidas", filtra las que ya
+conocen y las que no pegan con los temas, y les deja **hasta 10 por semana** en la tabla
+**Referentes propuestos**.
+
+Cada propuesta llega con todo para decidir sin salir de Airtable:
+
+| Columna | Qué es |
+|---|---|
+| `handle` | la cuenta propuesta (con link en `url`) |
+| `afinidad` | qué tan bien pega con el tema, de 0 a 1 (solo llegan las de 0.6 para arriba) |
+| `razon` | **por qué** la propone, en español — léanla primero |
+| `bio` / `seguidores` | contexto de la cuenta |
+| `semillas` | cuáles de SUS referentes la "recomendaron" |
+| **`estado`** | lo único que tocan ustedes |
+
+**Su trabajo (una vez por semana, 5 minutos):** revisar las filas en `propuesto` y cambiar el
+`estado`:
+- **aprobado** — la quieren. **No hay que hacer nada más**: el lunes siguiente la máquina la crea
+  sola en Referentes (activa, con la razón en las notas) y la marca `promovido`. Empieza a traer
+  videos en esa misma corrida.
+- **descartado** — no va. **Ojo: es definitivo** — esa cuenta no se les vuelve a proponer nunca
+  (si se arrepienten, siempre pueden agregarla a mano en Referentes).
+
+Tres cosas para saber:
+- **Solo propone cuentas de Instagram** por ahora. Las de TikTok las siguen sembrando ustedes a mano.
+- **No reemplaza su criterio.** Nada entra a Referentes sin que ustedes lo aprueben. Sigue valiendo
+  agregar cuentas a mano cuando encuentren una buena.
+- Mientras mejor califiquen los Candidatos durante la semana, mejores semillas usa el buscador →
+  mejores propuestas les llegan. Todo se retroalimenta.
+
 ---
 
 ## 9. Lo que el sistema todavía NO hace (limitaciones conocidas)
@@ -310,9 +350,9 @@ Honestidad por adelantado, para que no se sorprendan:
 
 - **La traducción es literal, no adaptada.** El script es el video tal cual, traducido al español. La
   adaptación a la voz/marca la hacen ustedes.
-- **No descubre cuentas nuevas solo.** La máquina solo trae videos de los Referentes que ustedes
-  sembraron; si una cuenta se agota, la reponen ustedes. (Un "buscador de referentes nuevos" está en
-  el plan, más adelante.)
+- **Los videos salen solo de sus Referentes.** Si la lista es floja, lo que llega es flojo. El
+  buscador de cuentas nuevas (§8.1) ayuda a reponerla, pero solo propone: la decisión de qué cuenta
+  entra sigue siendo de ustedes (y en TikTok todavía siembran a mano).
 - **A veces un video llega sin transcripción** (§5.4): mírenlo y decidan a mano. Esos llegan con el
   título marcado **⚠️ SIN GUION** en el feed.
 - **El empujón por idioma es parejo para todos los idiomas no-español.** No premia más el inglés que el
@@ -352,6 +392,13 @@ puede ser que la cuenta no publicó en la ventana de días (§5.5). Denle una se
 
 **¿Puedo borrar un Proyecto/Referente?** Mejor **desmárquenle `activo`** en vez de borrar: así queda
 guardado por si lo quieren de vuelta, y no rompen nada. Borrar también se puede, pero es definitivo.
+
+**Aprobé una cuenta en Referentes propuestos, ¿cuándo empieza a traer videos?** El lunes siguiente:
+el buscador la crea en Referentes a la mañana y desde esa misma semana entra en las corridas. No
+tienen que copiar nada a mano (§8.1).
+
+**Descarté una cuenta propuesta y me arrepentí.** El buscador no la vuelve a proponer (descartar es
+definitivo), pero pueden agregarla a mano en Referentes cuando quieran, como cualquier otra cuenta.
 
 **¿Qué es "heat score", en serio importa el número?** No el número exacto, solo el orden (§7). Arriba = más
 prometedor. Punto.
