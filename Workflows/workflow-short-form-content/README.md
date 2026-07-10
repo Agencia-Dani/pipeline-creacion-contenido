@@ -14,7 +14,7 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 
 ---
 
-## Qué hace (30 nodos, 2 entradas)
+## Qué hace (33 nodos, 2 entradas)
 
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 
@@ -30,10 +30,13 @@ Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
    español; `lang` de Supadata como fuente primaria).
 5. **CALIDAD** — `Gate de relevancia` (Haiku **estricto** sobre el transcript): juzga contra
    `criterios_relevancia` (Proyecto ⊕ Voz), dropea lo irrelevante, y compone
-   `heat_score = peso_relevancia·score_haiku + (1-peso)·percentil(prescore)`.
+   `heat_score = peso_relevancia·score_haiku + (1-peso)·percentil(prescore)`. Los descartes con score
+   **borderline** (banda 0.35–0.6, cap ~10/corrida) no mueren en silencio: se suben a la tabla
+   **`Descartes del gate`** del cockpit para auditar falsos negativos (ADR-021).
 6. **ENTREGAR** — `Armar candidato` → `Preparar batch Airtable` → POST a `Candidatos` (estado `nuevo`,
    con script, idioma, thumbnail, `relevancia_score`/`relevancia_razon`) + registro en Supabase
-   (`outputs`/`runs`, continue-on-fail).
+   (`runs` con las métricas completas del embudo: `sin_guion`, llamadas por servicio y desglose por
+   referente — nodo `Resumen del run`, ADR-021; continue-on-fail).
 
 Todos los gates son **fail-open**: si Haiku o Supadata fallan, el item pasa (no se vacía la entrega).
 

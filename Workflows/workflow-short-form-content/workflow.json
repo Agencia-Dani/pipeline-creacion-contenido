@@ -88,6 +88,24 @@
               "type": "number"
             },
             {
+              "id": "c_dmin",
+              "name": "banda_descarte_min",
+              "value": 0.35,
+              "type": "number"
+            },
+            {
+              "id": "c_dmax",
+              "name": "banda_descarte_max",
+              "value": 0.6,
+              "type": "number"
+            },
+            {
+              "id": "c_dcap",
+              "name": "cap_descartes",
+              "value": 10,
+              "type": "number"
+            },
+            {
               "id": "c_piso",
               "name": "piso_referente",
               "value": 5,
@@ -507,7 +525,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Gate de relevancia (Haiku) — jurado ESTRICTO sobre el transcript (precision). Llena CALIDAD (PLAN §2.4).\n// Juzga relevancia/calidad contra criterios_relevancia (Proyecto ⊕ Voz) → {relevante, score, razon}.\n// Dropea los relevante:false. Composite: heat = PESO·score_haiku + (1-PESO)·percentil(prescore métrico).\n// Sin transcript: juzga el caption (descripcion) como fallback; si pasa, se marca [SIN TRANSCRIPT...].\n// Fail-open: sin criterios o si Haiku falla, pasa todo y ordena por el prescore métrico.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst PESO = Number(cfg.peso_relevancia != null ? cfg.peso_relevancia : 0.7);\nconst MIN_REL = Number(cfg.min_relevancia || 0); // umbral duro: dropea score < MIN_REL (default 0)\nconst projects = ($('Armar plan de corrida').first().json || {}).projects || {};\nconst SLEEP_MS = 1000;\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst items = $input.all().map(i => i.json);\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\n\nconst out = [];\nlet first = true;\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const p = projects[pid] || {};\n  const critProy = (p.criterios || '').toString().trim();\n  const critVoz = (p.voz_criterios || '').toString().trim();\n  const criterios = [critProy, critVoz].filter(Boolean).join('\\n').trim();\n  const criteriosTxt = [critProy ? 'CRITERIOS DE TEMA (principal):\\n' + critProy : '', critVoz ? 'AJUSTE DE VOZ (complementa, no manda):\\n' + critVoz : ''].filter(Boolean).join('\\n\\n');\n  const juicio = {}; // external_id → { relevante, score, razon }\n  if (criterios) {\n    const lote = arr.map(d => ({ id: String(d.external_id || ''), texto: (String(d.script || '').trim() || String(d.descripcion || '').trim()).replace(/\\s+/g, ' ').trim().slice(0, 1500) })).filter(x => x.id && x.texto);\n    if (lote.length) {\n      if (!first) await sleep(SLEEP_MS); first = false;\n      const sys = 'Sos un jurado ESTRICTO de relevancia y calidad. Te doy el tema de un proyecto, sus criterios (el TEMA manda; el AJUSTE DE VOZ solo complementa), y una lista de videos (id + transcript). Para cada uno decidi si es RELEVANTE y UTIL segun los criterios. Precision: ante la duda, marca relevante:false. Devolve UNICAMENTE un JSON {\"juicio\":[{\"id\":\"...\",\"relevante\":true,\"score\":0.0,\"razon\":\"breve\"}]}. score 0..1 = que tan bien cumple los criterios.';\n      const usr = 'TEMA: ' + (p.nombre || '') + '\\n' + criteriosTxt + '\\n\\nVIDEOS:\\n' + JSON.stringify(lote);\n      try {\n        const resp = await this.helpers.httpRequest({\n          method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n          headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n          body: { model: 'claude-haiku-4-5', max_tokens: 4000, system: sys, messages: [{ role: 'user', content: usr }] },\n          json: true, timeout: 60000\n        });\n        let txt = '';\n        try { txt = (resp.content && resp.content[0] && resp.content[0].text) || ''; } catch (e) {}\n        const m = String(txt).match(/\\{[\\s\\S]*\\}/);\n        if (m) { const parsed = JSON.parse(m[0]); (parsed.juicio || []).forEach(j => { juicio[String(j.id)] = j; }); }\n      } catch (e) { /* fail-open: juicio vacío → todos pasan, ordena por métrica */ }\n    }\n  }\n  const kept = arr.filter(d => { const j = juicio[String(d.external_id)]; if (j && j.relevante === false) return false; const sc = j && typeof j.score === 'number' ? j.score : null; if (sc != null && sc < MIN_REL) return false; return true; });\n  arr.forEach(d => { if (kept.indexOf(d) >= 0) return; const j = juicio[String(d.external_id)]; const motivo = j ? (j.relevante === false ? 'irrelevante' : 'score<min') : 'sin-juicio'; console.log('[Gate] DESCARTE pid=' + pid + ' id=' + d.external_id + ' score=' + (j && j.score != null ? j.score : 'n/a') + ' motivo=' + motivo + (j && j.razon ? ' :: ' + j.razon : '')); });\n  const prescores = kept.map(d => Number(d.heat_score || 0));\n  kept.forEach(d => {\n    const j = juicio[String(d.external_id)];\n    const sHaiku = j && typeof j.score === 'number' ? Math.max(0, Math.min(1, j.score)) : null;\n    const metricPct = pct(prescores, Number(d.heat_score || 0));\n    const composite = sHaiku != null ? (PESO * sHaiku + (1 - PESO) * metricPct) : metricPct;\n    const sinScript = !String(d.script || '').trim();\n    const razonBase = (j && j.razon) || '';\n    const razon = sinScript ? ('[SIN TRANSCRIPT: juzgado por caption, revisar manual] ' + razonBase).trim() : razonBase;\n    out.push({ json: Object.assign({}, d, {\n      prescore_metrico: Number(d.heat_score || 0),\n      relevancia_score: sHaiku,\n      relevancia_razon: razon,\n      heat_score: Math.round(composite * 10000) / 10000\n    }) });\n  });\n}\nreturn out;\n"
+        "jsCode": "\n// Gate de relevancia (Haiku) — jurado ESTRICTO sobre el transcript (precision). Llena CALIDAD (PLAN §2.4).\n// Juzga relevancia/calidad contra criterios_relevancia (Proyecto ⊕ Voz) → {relevante, score, razon}.\n// Dropea los relevante:false. Composite: heat = PESO·score_haiku + (1-PESO)·percentil(prescore métrico).\n// Sin transcript: juzga el caption (descripcion) como fallback; si pasa, se marca [SIN TRANSCRIPT...].\n// Fail-open: sin criterios o si Haiku falla, pasa todo y ordena por el prescore métrico.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst PESO = Number(cfg.peso_relevancia != null ? cfg.peso_relevancia : 0.7);\nconst MIN_REL = Number(cfg.min_relevancia || 0); // umbral duro: dropea score < MIN_REL (default 0)\n// Descartes visibles (ADR-021): la banda borderline (donde viven los errores del jurado) se expone\n// al equipo en el cockpit en vez de morir en un console.log. Knobs dev-only en Config.\nconst BANDA_MIN = Number(cfg.banda_descarte_min != null ? cfg.banda_descarte_min : 0.35);\nconst BANDA_MAX = Number(cfg.banda_descarte_max != null ? cfg.banda_descarte_max : 0.6);\nconst CAP_DESC = Number(cfg.cap_descartes != null ? cfg.cap_descartes : 10);\nconst _borderline = [];\nconst projects = ($('Armar plan de corrida').first().json || {}).projects || {};\nconst SLEEP_MS = 1000;\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst items = $input.all().map(i => i.json);\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\n\nconst out = [];\nlet first = true;\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const p = projects[pid] || {};\n  const critProy = (p.criterios || '').toString().trim();\n  const critVoz = (p.voz_criterios || '').toString().trim();\n  const criterios = [critProy, critVoz].filter(Boolean).join('\\n').trim();\n  const criteriosTxt = [critProy ? 'CRITERIOS DE TEMA (principal):\\n' + critProy : '', critVoz ? 'AJUSTE DE VOZ (complementa, no manda):\\n' + critVoz : ''].filter(Boolean).join('\\n\\n');\n  const juicio = {}; // external_id → { relevante, score, razon }\n  if (criterios) {\n    const lote = arr.map(d => ({ id: String(d.external_id || ''), texto: (String(d.script || '').trim() || String(d.descripcion || '').trim()).replace(/\\s+/g, ' ').trim().slice(0, 1500) })).filter(x => x.id && x.texto);\n    if (lote.length) {\n      if (!first) await sleep(SLEEP_MS); first = false;\n      const sys = 'Sos un jurado ESTRICTO de relevancia y calidad. Te doy el tema de un proyecto, sus criterios (el TEMA manda; el AJUSTE DE VOZ solo complementa), y una lista de videos (id + transcript). Para cada uno decidi si es RELEVANTE y UTIL segun los criterios. Precision: ante la duda, marca relevante:false. Devolve UNICAMENTE un JSON {\"juicio\":[{\"id\":\"...\",\"relevante\":true,\"score\":0.0,\"razon\":\"breve\"}]}. score 0..1 = que tan bien cumple los criterios.';\n      const usr = 'TEMA: ' + (p.nombre || '') + '\\n' + criteriosTxt + '\\n\\nVIDEOS:\\n' + JSON.stringify(lote);\n      try {\n        const resp = await this.helpers.httpRequest({\n          method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n          headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n          body: { model: 'claude-haiku-4-5', max_tokens: 4000, system: sys, messages: [{ role: 'user', content: usr }] },\n          json: true, timeout: 60000\n        });\n        let txt = '';\n        try { txt = (resp.content && resp.content[0] && resp.content[0].text) || ''; } catch (e) {}\n        const m = String(txt).match(/\\{[\\s\\S]*\\}/);\n        if (m) { const parsed = JSON.parse(m[0]); (parsed.juicio || []).forEach(j => { juicio[String(j.id)] = j; }); }\n      } catch (e) { /* fail-open: juicio vacío → todos pasan, ordena por métrica */ }\n    }\n  }\n  const kept = arr.filter(d => { const j = juicio[String(d.external_id)]; if (j && j.relevante === false) return false; const sc = j && typeof j.score === 'number' ? j.score : null; if (sc != null && sc < MIN_REL) return false; return true; });\n  arr.forEach(d => { if (kept.indexOf(d) >= 0) return; const j = juicio[String(d.external_id)]; const motivo = j ? (j.relevante === false ? 'irrelevante' : 'score<min') : 'sin-juicio'; console.log('[Gate] DESCARTE pid=' + pid + ' id=' + d.external_id + ' score=' + (j && j.score != null ? j.score : 'n/a') + ' motivo=' + motivo + (j && j.razon ? ' :: ' + j.razon : ''));\n    const sc = j && typeof j.score === 'number' ? j.score : null;\n    if (sc != null && sc >= BANDA_MIN && sc <= BANDA_MAX) _borderline.push({ d, score: sc, razon: (j && j.razon) || '' });\n  });\n  const prescores = kept.map(d => Number(d.heat_score || 0));\n  kept.forEach(d => {\n    const j = juicio[String(d.external_id)];\n    const sHaiku = j && typeof j.score === 'number' ? Math.max(0, Math.min(1, j.score)) : null;\n    const metricPct = pct(prescores, Number(d.heat_score || 0));\n    const composite = sHaiku != null ? (PESO * sHaiku + (1 - PESO) * metricPct) : metricPct;\n    const sinScript = !String(d.script || '').trim();\n    const razonBase = (j && j.razon) || '';\n    const razon = sinScript ? ('[SIN TRANSCRIPT: juzgado por caption, revisar manual] ' + razonBase).trim() : razonBase;\n    out.push({ json: Object.assign({}, d, {\n      prescore_metrico: Number(d.heat_score || 0),\n      relevancia_score: sHaiku,\n      relevancia_razon: razon,\n      heat_score: Math.round(composite * 10000) / 10000\n    }) });\n  });\n}\n// Emite los borderline marcados _descarte (cap global por corrida, mejores primero):\n// Armar candidato los ignora; Preparar batch Descartes los sube al cockpit (ADR-021).\n_borderline.sort((a, b) => b.score - a.score);\nfor (const b of _borderline.slice(0, Math.max(0, CAP_DESC))) {\n  out.push({ json: Object.assign({}, b.d, { _descarte: true, relevancia_score: b.score, relevancia_razon: b.razon }) });\n}\nif (_borderline.length) console.log('[Gate] descartes borderline expuestos: ' + Math.min(_borderline.length, Math.max(0, CAP_DESC)) + '/' + _borderline.length);\nreturn out;\n"
       },
       "id": "gate-relevancia",
       "name": "Gate de relevancia",
@@ -521,7 +539,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Corte final (ADR-016 + piso ADR-017 + dedup ADR-018): top-N VIDEOS DISTINTOS por heat, piso leve por cuenta fuente, UNA copia por video.\nconst N = Number(($('Armar plan de corrida').first().json || {}).top_n || $('Config').first().json.top_n || 100);\nconst _all = $input.all().slice().sort((a, b) => (Number(b.json.heat_score || 0)) - (Number(a.json.heat_score || 0)));\nconst PISO = Number($('Config').first().json.piso_referente || 0); // piso leve por cuenta fuente (ADR-017): evita que un referente acapare el corte.\n// 1) videos distintos en orden de heat (el primero de cada external_id) con su cuenta fuente.\nconst _seenId = new Set(); const _distinct = [];\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || _seenId.has(id)) continue; _seenId.add(id); _distinct.push({ id, user: String(it.json.username || '').toLowerCase() }); }\nconst _sel = new Set();\n// 2) PISO: round-robin por rank, hasta PISO videos por cuenta, sin pasar de N.\nif (PISO > 0) { const _byUser = {}; _distinct.forEach(d => { (_byUser[d.user] = _byUser[d.user] || []).push(d.id); }); const _users = Object.keys(_byUser); for (let r = 0; r < PISO && _sel.size < N; r++) { for (const u of _users) { if (_sel.size >= N) break; const arr = _byUser[u]; if (r < arr.length) _sel.add(arr[r]); } } }\n// 3) FILL: completar por heat global hasta N videos distintos.\nfor (const d of _distinct) { if (_sel.size >= N) break; _sel.add(d.id); }\n// 4) UNA copia por video (ADR-018, enmienda ADR-013): del fan-out gana la de mayor relevancia_score (empate: heat). Items sin id se conservan.\nconst _rs = (x) => (x.json.relevancia_score != null ? Number(x.json.relevancia_score) : -1);\nconst _best = {};\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || !_sel.has(id)) continue; const prev = _best[id]; if (!prev || _rs(it) > _rs(prev) || (_rs(it) === _rs(prev) && Number(it.json.heat_score || 0) > Number(prev.json.heat_score || 0))) _best[id] = it; }\nconst _keep = new Set(Object.values(_best));\nfor (const it of _all) { if (!String(it.json.external_id || '')) _keep.add(it); }\nconst out = [];\nfor (const it of _all) {\n  if (!_keep.has(it)) continue;\n  const d = it.json;\n  const _tituloBase = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  // Decisión #6 (2026-07-09): sin transcript pasa igual (fail-open) pero con marca visible en el feed.\n  const titulo = (String(d.script || '').trim() ? '' : '⚠️ SIN GUION | ') + _tituloBase;\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || ''\n  } });\n}\nreturn out;\n"
+        "jsCode": "\n// Corte final (ADR-016 + piso ADR-017 + dedup ADR-018): top-N VIDEOS DISTINTOS por heat, piso leve por cuenta fuente, UNA copia por video.\nconst N = Number(($('Armar plan de corrida').first().json || {}).top_n || $('Config').first().json.top_n || 100);\nconst _all = $input.all().filter(i => !i.json._descarte).slice().sort( // los _descarte van al cockpit por su propia rama (ADR-021)\n(a, b) => (Number(b.json.heat_score || 0)) - (Number(a.json.heat_score || 0)));\nconst PISO = Number($('Config').first().json.piso_referente || 0); // piso leve por cuenta fuente (ADR-017): evita que un referente acapare el corte.\n// 1) videos distintos en orden de heat (el primero de cada external_id) con su cuenta fuente.\nconst _seenId = new Set(); const _distinct = [];\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || _seenId.has(id)) continue; _seenId.add(id); _distinct.push({ id, user: String(it.json.username || '').toLowerCase() }); }\nconst _sel = new Set();\n// 2) PISO: round-robin por rank, hasta PISO videos por cuenta, sin pasar de N.\nif (PISO > 0) { const _byUser = {}; _distinct.forEach(d => { (_byUser[d.user] = _byUser[d.user] || []).push(d.id); }); const _users = Object.keys(_byUser); for (let r = 0; r < PISO && _sel.size < N; r++) { for (const u of _users) { if (_sel.size >= N) break; const arr = _byUser[u]; if (r < arr.length) _sel.add(arr[r]); } } }\n// 3) FILL: completar por heat global hasta N videos distintos.\nfor (const d of _distinct) { if (_sel.size >= N) break; _sel.add(d.id); }\n// 4) UNA copia por video (ADR-018, enmienda ADR-013): del fan-out gana la de mayor relevancia_score (empate: heat). Items sin id se conservan.\nconst _rs = (x) => (x.json.relevancia_score != null ? Number(x.json.relevancia_score) : -1);\nconst _best = {};\nfor (const it of _all) { const id = String(it.json.external_id || ''); if (!id || !_sel.has(id)) continue; const prev = _best[id]; if (!prev || _rs(it) > _rs(prev) || (_rs(it) === _rs(prev) && Number(it.json.heat_score || 0) > Number(prev.json.heat_score || 0))) _best[id] = it; }\nconst _keep = new Set(Object.values(_best));\nfor (const it of _all) { if (!String(it.json.external_id || '')) _keep.add(it); }\nconst out = [];\nfor (const it of _all) {\n  if (!_keep.has(it)) continue;\n  const d = it.json;\n  const _tituloBase = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  // Decisión #6 (2026-07-09): sin transcript pasa igual (fail-open) pero con marca visible en el feed.\n  const titulo = (String(d.script || '').trim() ? '' : '⚠️ SIN GUION | ') + _tituloBase;\n  out.push({ json: {\n    titulo,\n    script: String(d.script || '').slice(0, 95000),\n    idioma: d.idioma || d.idioma_detectado || '',\n    proyecto_id: d.proyecto_id || null, proyecto_nombre: d.proyecto_nombre || '',\n    voz_id: d.voz_id || null, voz_nombre: d.voz_nombre || '',\n    referente: d.username || '', url_referente: d.url || '',\n    views: Number(d.reproducciones || 0), likes: Number(d.likes || 0),\n    seguidores: Number(d.seguidores || 0), engagement: parseFloat(d.engagement_rate) || 0,\n    heat_score: Number(d.heat_score || 0), viral_por_tamano: !!d.viral_por_tamano,\n    plataforma: d.plataforma || '', external_id: String(d.external_id || ''),\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || '', thumbnail_url: d.thumbnail_url || ''\n  } });\n}\nreturn out;\n"
       },
       "id": "armar-candidato",
       "name": "Armar candidato",
@@ -598,7 +616,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"fin\": \"{{ $now.toISO() }}\", \"estado\": \"ok\", \"metricas\": { \"colectados\": {{ $('Merge scrapes').all().length }}, \"asignados\": {{ $('Asignar proyecto+voz').all().length }}, \"pretrim\": {{ $('Pre-trim relevancia').all().length }}, \"filtrados\": {{ $('Heat-score v1').all().length }}, \"gate\": {{ $('Gate de relevancia').all().length }}, \"outputs\": {{ $('Armar candidato').all().length }} } }",
+        "jsonBody": "={{ { fin: $now.toISO(), estado: 'ok', metricas: $json.metricas } }}",
         "options": {
           "timeout": 15000
         }
@@ -799,6 +817,64 @@
           "name": "Supabase Registro"
         }
       }
+    },
+    {
+      "id": "m1-prep-descartes",
+      "name": "Preparar batch Descartes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5240,
+        620
+      ],
+      "parameters": {
+        "jsCode": "\n// Descartes del gate visibles (ADR-021): sube al cockpit SOLO la banda borderline que el gate marcó\n// con _descarte. El equipo audita y marca 'veredicto'; el archivado los cuenta y los limpia el domingo.\nconst items = $('Gate de relevancia').all().map(i => i.json).filter(d => d._descarte);\nconst recs = items.map(d => {\n  const titulo = String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video');\n  const f = {\n    titulo, script: String(d.script || '').slice(0, 95000),\n    referente: d.username || '', url_referente: d.url || '',\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out; // [] si no hay borderline: el POST no corre\n"
+      }
+    },
+    {
+      "id": "m1-post-descartes",
+      "name": "POST Airtable Descartes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5440,
+        620
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Descartes del gate') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "m1-resumen-run",
+      "name": "Resumen del run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8200,
+        400
+      ],
+      "parameters": {
+        "jsCode": "\n// Resumen del run (ADR-021) — arma runs.metricas: embudo + sin_guion + llamadas estimadas por\n// servicio + desglose por referente (evaluados/gate_pass en videos DISTINTOS; habilita la higiene\n// de fuentes de ADR-022). Cerrar run persiste $json.metricas tal cual.\nconst gateAll = $('Gate de relevancia').all();\nconst gateKept = gateAll.filter(i => !i.json._descarte);\nconst outputs = $('Armar candidato').all();\nconst gateIn = $('Traducir (Claude Haiku)').all();\nconst _distinct = (items) => new Set(items.map(i => String(i.json.external_id || '')).filter(Boolean)).size;\nconst _lotes = (items) => new Set(items.map(i => String(i.json.proyecto_id || '')).filter(Boolean)).size;\n// llamadas estimadas: Supadata = videos distintos transcritos (dedup intra-corrida, ADR-016);\n// Haiku = 1 lote por proyecto en pre-trim/gate (cota superior: exentos/sin-criterios no llaman) +\n// 1 traducción por copia no-ES con transcript (el fan-out re-traduce copias: mejora pendiente).\nconst llamadas = {\n  supadata: _distinct($('Transcribir (Supadata)').all()),\n  haiku_lotes_pretrim: _lotes($('Asignar proyecto+voz').all()),\n  haiku_lotes_gate: _lotes(gateIn),\n  haiku_traducciones: gateIn.filter(i => String(i.json.transcripcion || '').trim() && (i.json.idioma || 'es') !== 'es').length\n};\nconst por_referente = {};\nconst _mark = (items, key) => { const seen = new Set(); for (const it of items) { const u = String(it.json.username || '').toLowerCase(); const id = String(it.json.external_id || ''); if (!u || !id) continue; const k = u + '|' + id; if (seen.has(k)) continue; seen.add(k); (por_referente[u] = por_referente[u] || { evaluados: 0, gate_pass: 0 })[key]++; } };\n_mark(gateIn, 'evaluados');\n_mark(gateKept, 'gate_pass');\nconst metricas = {\n  colectados: $('Merge scrapes').all().length,\n  asignados: $('Asignar proyecto+voz').all().length,\n  pretrim: $('Pre-trim relevancia').all().length,\n  filtrados: $('Heat-score v1').all().length,\n  gate: gateKept.length,\n  outputs: outputs.length,\n  sin_guion: outputs.filter(i => !String(i.json.script || '').trim()).length,\n  descartes_expuestos: gateAll.length - gateKept.length,\n  llamadas, por_referente\n};\nconsole.log('[Resumen] ' + JSON.stringify(metricas));\nreturn [{ json: { metricas } }];\n"
+      }
     }
   ],
   "pinData": {},
@@ -998,7 +1074,7 @@
             "index": 0
           },
           {
-            "node": "Cerrar run en el registro",
+            "node": "Resumen del run",
             "type": "main",
             "index": 0
           }
@@ -1067,6 +1143,11 @@
             "node": "Armar candidato",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Preparar batch Descartes",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -1109,6 +1190,28 @@
         [
           {
             "node": "Leer Proyectos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar batch Descartes": {
+      "main": [
+        [
+          {
+            "node": "POST Airtable Descartes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen del run": {
+      "main": [
+        [
+          {
+            "node": "Cerrar run en el registro",
             "type": "main",
             "index": 0
           }

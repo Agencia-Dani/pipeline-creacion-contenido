@@ -139,7 +139,7 @@ nodes**: `Transcribir (Supadata)` + `Traducir (Claude Haiku)` (vía `this.helper
 > archivado domingo) antes de arrancar la siguiente. Sin medición primero, no hay forma de saber si el
 > resto funcionó.
 
-### Fase M1 — Medición (ADR-021)
+### 🔧 Fase M1 — Medición (ADR-021) — CÓDIGO ✅ 2026-07-10, falta la corrida en vivo
 - **Archivado:** copiar `relevancia_score`/`relevancia_razon` a `outputs.metadata` + Sheet; computar la
   fila semanal de **Métricas** por proyecto (precisión de entrega, separación del gate, volumen vs
   target) + la global de salud (embudo, % SIN GUION, runs fallidos, duración, conteo de llamadas por
@@ -154,6 +154,10 @@ nodes**: `Transcribir (Supadata)` + `Traducir (Claude Haiku)` (vía `this.helper
   `setup-airtable.mjs`.
 - **Hecho cuando:** tras un ciclo real, las dos páginas muestran la semana, los números cruzan con
   `runs.metricas`, y el equipo auditó sus primeros descartes borderline.
+- *Estado 2026-07-10: código completo en ambos `workflow.json` (motor 33 nodos, archivado 24) +
+  smoke tests 12/12 + tablas `Métricas`/`Descartes del gate` creadas en la base viva (round-trip
+  verificado) + 3 páginas publicadas (Métricas — Calidad / Métricas — Salud / Descartes (auditar)).
+  **Falta:** re-import de motor y archivado en n8n (ver handoff) y el primer ciclo real.*
 
 ### Fase M2 — Loop de aprendizaje (ADR-022)
 - **Archivado:** destilación semanal por proyecto → campo `criterios_aprendidos` en `Proyectos`

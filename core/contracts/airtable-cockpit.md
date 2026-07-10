@@ -14,7 +14,7 @@
 
 ---
 
-## Las 6 tablas
+## Las 8 tablas
 
 ### 1. `Proyectos` — la unidad de búsqueda (qué se busca)
 Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunicación, Ventas, Liderazgo.
@@ -113,7 +113,9 @@ motor): `Propuestas por corrida` 10 (cap de propuestas semanales) · `Afinidad m
 
 **Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` 30
 (techo de `Resultados por cuenta de referente`; el motor usa `min(valor_equipo, cap)`) · `cap_top_n`
-200 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real).
+100 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real)
+· `banda_descarte_min` 0.35 / `banda_descarte_max` 0.6 / `cap_descartes` 10 (la banda borderline de
+descartes que se expone al equipo — ADR-021).
 En Config quedan además los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y los defaults de
 los toggles (`buscar_referente_ig`/`buscar_referente_tiktok`, ambos 1). Detección de idioma: dev-only.
 
@@ -137,6 +139,47 @@ Haiku). El equipo revisa y marca `estado`; los `aprobado` se **promueven solos**
 Un handle propuesto una vez **no se re-propone** (dedup contra esta tabla en cualquier estado y
 contra `Referentes`): descartar es definitivo salvo alta manual.
 
+### 7. `Descartes del gate` — la banda borderline para auditar (ADR-021)
+Videos que el gate de relevancia rechazó **después de transcribirlos**, con score en la banda
+borderline (donde viven los errores del jurado). **No son Candidatos** (nunca esperaron
+calificación). El motor sube como máximo ~10 por corrida (knobs dev-only `banda_descarte_min` 0.35 /
+`banda_descarte_max` 0.6 / `cap_descartes` 10 en Config); el equipo los audita en 2 minutos y marca
+`veredicto`; el archivado cuenta los "era bueno" como **falsos negativos** en `Métricas` y **limpia
+la tabla** al cerrar la semana (no se acumulan).
+
+| Campo | Tipo | Para qué |
+|---|---|---|
+| `titulo` | texto (primario) | contexto del video (caption recortado) |
+| `script` | texto largo | el transcript que juzgó el gate (la evidencia para auditar) |
+| `referente` | texto | handle del video fuente |
+| `url_referente` | url | link al video original |
+| `proyecto` | link → `Proyectos` | contra qué criterios se juzgó |
+| `relevancia_score` | número (0-1) | el score del gate (siempre en la banda borderline) |
+| `relevancia_razon` | texto largo | por qué el gate lo rechazó |
+| `thumbnail` | attachment | portada, para escanear rápido |
+| **`veredicto`** | single select | **bien descartado / era bueno** — lo pone el equipo; "era bueno" = falso negativo |
+
+### 8. `Métricas` — el desempeño semanal, solo-lectura (ADR-021)
+**La escribe solo el archivado** (domingo, al cerrar la semana): una fila por (semana × proyecto)
+con la calidad + una fila `GLOBAL` con la salud del motor. Es una **proyección derivada y
+regenerable** — la verdad cruda vive en Supabase (`runs.metricas` + `outputs`). El equipo y el jefe
+la ven en las páginas *Métricas — Calidad* y *Métricas — Salud* (solo-lectura, a propósito). La
+"semana" es la **semana de calificación** (el ciclo que cierra el archivado), no la de entrega.
+
+| Campo | Tipo | Para qué |
+|---|---|---|
+| `clave` | texto (primario) | `YYYY-MM-DD · <proyecto \| GLOBAL>` |
+| `semana` | fecha | el domingo del cierre |
+| `ambito` | texto | nombre del proyecto, o `GLOBAL` |
+| `calificados` / `aprobados` / `descartados` | número | lo que el equipo decidió esa semana |
+| `precision` | número (0-1) | **precisión de entrega** = aprobados / calificados (la métrica norte) |
+| `score_aprobados` / `score_descartados` | número (0-1) | score medio del gate en cada grupo |
+| `separacion_gate` | número | la resta de los dos: baja = los criterios del proyecto no discriminan |
+| `entregados` / `colectados` / `pretrim` / `gate_pass` | número | el embudo de la semana (solo fila GLOBAL, suma de los runs del motor) |
+| `sin_guion` / `descartes_expuestos` / `falsos_negativos` | número | salud del contenido (GLOBAL) |
+| `runs_ok` / `runs_fallo` / `duracion_min` | número | salud del motor (GLOBAL) |
+| `supadata_llamadas` / `haiku_lotes` / `haiku_traducciones` | número | **conteo de llamadas** por servicio (GLOBAL; el costo en $ queda como multiplicador futuro) |
+
 ---
 
 ## Cómo lo usa el motor (n8n)
@@ -151,11 +194,15 @@ contra `Referentes`): descartar es definitivo salvo alta manual.
    relevancia** (Haiku) que produce `relevancia_score`/`relevancia_razon`, y **escribe** los
    candidatos (estado `nuevo`, con `idioma`, `thumbnail` y la razón) en batch (10 records/call).
    El script vive como **texto** (sin Google Doc — ADR-009); el "link" es la URL del video original.
-3. El equipo **califica** (`calificacion` + `estado`; `fecha_calificacion` se llena sola). El
-   **workflow de archivado** (cron diario) lleva los calificados a Supabase (`outputs` con
-   `calificado_en` + metadata), hace **append al Sheet "Histórico"** (exportable a Excel) y los
-   **borra de Airtable** → así no se pasa de 1.000 registros.
-4. Las selecciones acumuladas alimentan el heat-score de la próxima corrida → **el sistema aprende
+3. El motor también sube la **banda borderline de descartes del gate** a `Descartes del gate`
+   (ADR-021) — como máximo ~10 por corrida, para que el equipo audite falsos negativos.
+4. El equipo **califica** (`calificacion` + `estado`; `fecha_calificacion` se llena sola) y marca
+   `veredicto` en los descartes expuestos. El **workflow de archivado** (cron semanal, domingo 6pm)
+   lleva los calificados a Supabase (`outputs` con `calificado_en` + metadata, **incluida la
+   relevancia** — ADR-021), hace **append al Sheet "Histórico"** (exportable a Excel), los
+   **borra de Airtable** (así no se pasa de 1.000 registros), **computa la fila semanal de
+   `Métricas`** y **limpia `Descartes del gate`**.
+5. Las selecciones acumuladas alimentan el heat-score de la próxima corrida → **el sistema aprende
    qué priorizar**, por **referente** (`v_senal_seleccion`). *(La señal por keyword/tema —
    `v_senal_tema`, ADR-012 — quedó **inerte** al removerse el eje keyword, ADR-019; la vista sigue en
    Supabase sin lectores. El few-shot por voz de ADR-008 queda en pausa — ADR-009.)*
@@ -164,8 +211,9 @@ contra `Referentes`): descartar es definitivo salvo alta manual.
 
 - **Retención:** Candidatos calificados se archivan a Supabase y se limpian de Airtable. Proyectos,
   Voces y Referentes son chicos y permanentes (no crecen sin control).
-- **Batching:** toda lectura/escritura de n8n agrupa registros (10/call). Un cron diario con
-  batching entra cómodo bajo 1.000 calls/mes.
+- **Batching:** toda lectura/escritura de n8n agrupa registros (10/call). Con cadencia semanal
+  (motor lunes + archivado domingo) y batching entra cómodo bajo 1.000 calls/mes. `Métricas` crece
+  ~6 filas/semana y `Descartes del gate` se limpia cada domingo: ninguna amenaza el tope de registros.
 - **Secreto:** el Personal Access Token (PAT) de Airtable vive en n8n + gestor de contraseñas,
   jamás en git. El validador escanea el patrón `pat...`.
 
@@ -181,5 +229,5 @@ node core/scripts/setup-airtable.mjs      # crea la base y devuelve el baseId
 ```
 
 Devuelve el `baseId` (`app...`) → va a la credencial de Airtable en n8n, y siembra los defaults de
-`Ajustes`. Alternativa sin compartir token: crear las 6 tablas a mano siguiendo esta misma
+`Ajustes`. Alternativa sin compartir token: crear las 8 tablas a mano siguiendo esta misma
 especificación.

@@ -5,7 +5,10 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "cronExpression", "expression": "0 18 * * 0" }
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 0"
+            }
           ]
         }
       },
@@ -13,24 +16,55 @@
       "name": "Cron — semanal (domingo 6pm)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 200]
+      "position": [
+        0,
+        200
+      ]
     },
     {
       "id": "ejecutar-manual",
       "name": "Ejecutar manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 400]
+      "position": [
+        0,
+        400
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "a1", "name": "airtable_base_id", "value": "<<AIRTABLE_BASE_ID>>", "type": "string" },
-            { "id": "a2", "name": "supabase_url", "value": "<<SUPABASE_URL>>", "type": "string" },
-            { "id": "a3", "name": "instance_id", "value": "<<INSTANCE_ID>>", "type": "string" },
-            { "id": "a4", "name": "sheet_id", "value": "<<GOOGLE_SHEET_ID>>", "type": "string" },
-            { "id": "a5", "name": "sheet_tab", "value": "<<NOMBRE_PESTANA_SHEET>>", "type": "string" }
+            {
+              "id": "a1",
+              "name": "airtable_base_id",
+              "value": "<<AIRTABLE_BASE_ID>>",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "supabase_url",
+              "value": "<<SUPABASE_URL>>",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "instance_id",
+              "value": "<<INSTANCE_ID>>",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "sheet_id",
+              "value": "<<GOOGLE_SHEET_ID>>",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "sheet_tab",
+              "value": "<<NOMBRE_PESTANA_SHEET>>",
+              "type": "string"
+            }
           ]
         },
         "options": {}
@@ -39,7 +73,10 @@
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -50,22 +87,37 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=representation" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { instance_id: $('Config').first().json.instance_id, trigger_type: 'cron', estado: 'en_curso', params: { workflow: 'archivado' } } }}",
-        "options": { "timeout": 20000 }
+        "options": {
+          "timeout": 20000
+        }
       },
       "id": "abrir-run",
       "name": "Abrir run en el registro",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300],
+      "position": [
+        480,
+        300
+      ],
       "onError": "continueRegularOutput",
-      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
     },
     {
       "parameters": {
@@ -76,22 +128,37 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { estado: 'fallo', fin: $now.toISO(), error: 'run de archivado sin cerrar (fallo antes de Cerrar run); barrido por corrida posterior' } }}",
-        "options": { "timeout": 20000 }
+        "options": {
+          "timeout": 20000
+        }
       },
       "id": "barrer-zombies",
       "name": "Barrer runs zombie",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [600, 300],
+      "position": [
+        600,
+        300
+      ],
       "onError": "continueRegularOutput",
-      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
     },
     {
       "parameters": {
@@ -100,16 +167,48 @@
         "nodeCredentialType": "airtableTokenApi",
         "sendQuery": true,
         "queryParameters": {
-          "parameters": [ { "name": "pageSize", "value": "100" } ]
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
         },
-        "options": { "timeout": 20000, "pagination": { "pagination": { "parameters": { "parameters": [ { "type": "qs", "name": "offset", "value": "={{ $response.body.offset }}" } ] }, "paginationMode": "updateAParameterInEachRequest", "nextURL": "", "paginationCompleteWhen": "other", "completeExpression": "={{ !$response.body.offset }}", "limitPagesFetched": false } } }
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
       },
       "id": "leer-proyectos",
       "name": "Leer Proyectos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 300],
-      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
     },
     {
       "parameters": {
@@ -118,16 +217,48 @@
         "nodeCredentialType": "airtableTokenApi",
         "sendQuery": true,
         "queryParameters": {
-          "parameters": [ { "name": "pageSize", "value": "100" } ]
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
         },
-        "options": { "timeout": 20000, "pagination": { "pagination": { "parameters": { "parameters": [ { "type": "qs", "name": "offset", "value": "={{ $response.body.offset }}" } ] }, "paginationMode": "updateAParameterInEachRequest", "nextURL": "", "paginationCompleteWhen": "other", "completeExpression": "={{ !$response.body.offset }}", "limitPagesFetched": false } } }
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
       },
       "id": "leer-voces",
       "name": "Leer Voces",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 300],
-      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
     },
     {
       "parameters": {
@@ -137,29 +268,69 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "filterByFormula", "value": "NOT({estado} = 'nuevo')" },
-            { "name": "pageSize", "value": "100" }
+            {
+              "name": "filterByFormula",
+              "value": "NOT({estado} = 'nuevo')"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
           ]
         },
-        "options": { "timeout": 20000, "pagination": { "pagination": { "parameters": { "parameters": [ { "type": "qs", "name": "offset", "value": "={{ $response.body.offset }}" } ] }, "paginationMode": "updateAParameterInEachRequest", "nextURL": "", "paginationCompleteWhen": "other", "completeExpression": "={{ !$response.body.offset }}", "limitPagesFetched": false } } }
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
       },
       "id": "leer-candidatos",
       "name": "Leer Candidatos calificados",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1200, 300],
-      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "c1",
               "leftValue": "={{ ($json.records || []).length }}",
               "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ],
           "combinator": "and"
@@ -170,17 +341,23 @@
       "name": "IF — hay calificados",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1440, 300]
+      "position": [
+        1440,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "\nconst recs = $('Leer Candidatos calificados').all().flatMap((it) => (it.json && it.json.records) || []);\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst projMap = {};\n$('Leer Proyectos').all().flatMap((it) => (it.json && it.json.records) || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || ''; });\nconst vozMap = {};\n$('Leer Voces').all().flatMap((it) => (it.json && it.json.records) || []).forEach(r => { vozMap[r.id] = (r.fields || {}).nombre || ''; });\n\nconst ESTADOS = { aprobado: 'aprobado', descartado: 'descartado' };\n\nreturn recs.map(r => {\n  const f = r.fields || {};\n  const estado = ESTADOS[String(f.estado || '').toLowerCase()] || 'descartado';\n  const proyecto = Array.isArray(f.proyecto) ? (projMap[f.proyecto[0]] || '') : '';\n  const voz = Array.isArray(f.voz) ? (vozMap[f.voz[0]] || '') : '';\n  const calificado_en = f.fecha_calificacion || new Date().toISOString();\n  const output = {\n    run_id,\n    tipo: 'guion_reel',\n    titulo: f.titulo || '(sin titulo)',\n    contenido_o_link: f.script || '',\n    estado,\n    calificado_en,\n    external_id: r.id,\n    source_items: [{ platform: '', url: f.url_referente || '' }],\n    metadata: {\n      proyecto, voz, referente: f.referente || '', tema: f.tema || '', url_referente: f.url_referente || '',\n      idioma: f.idioma || '', views: f.views || 0, likes: f.likes || 0,\n      seguidores: f.seguidores || 0, engagement: f.engagement || 0,\n      heat_score: f.heat_score || 0, calificacion: f.calificacion || '', link_doc: f.link_doc || ''\n    }\n  };\n  const sheet = {\n    'FECHA CALIFICACION': calificado_en, 'PROYECTO': proyecto, 'VOZ': voz,\n    'TITULO': f.titulo || '', 'URL ORIGINAL': f.url_referente || '', 'SCRIPT': f.script || '',\n    'IDIOMA': f.idioma || '', 'VIEWS': f.views || 0, 'LIKES': f.likes || 0,\n    'SEGUIDORES': f.seguidores || 0, 'HEAT SCORE': f.heat_score || 0,\n    'CALIFICACION': f.calificacion || '', 'ESTADO': estado\n  };\n  return { json: { record_id: r.id, output, sheet } };\n});\n"
+        "jsCode": "\nconst recs = $('Leer Candidatos calificados').all().flatMap((it) => (it.json && it.json.records) || []);\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst projMap = {};\n$('Leer Proyectos').all().flatMap((it) => (it.json && it.json.records) || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || ''; });\nconst vozMap = {};\n$('Leer Voces').all().flatMap((it) => (it.json && it.json.records) || []).forEach(r => { vozMap[r.id] = (r.fields || {}).nombre || ''; });\n\nconst ESTADOS = { aprobado: 'aprobado', descartado: 'descartado' };\n\nreturn recs.map(r => {\n  const f = r.fields || {};\n  const estado = ESTADOS[String(f.estado || '').toLowerCase()] || 'descartado';\n  const proyecto = Array.isArray(f.proyecto) ? (projMap[f.proyecto[0]] || '') : '';\n  const voz = Array.isArray(f.voz) ? (vozMap[f.voz[0]] || '') : '';\n  const calificado_en = f.fecha_calificacion || new Date().toISOString();\n  const output = {\n    run_id,\n    tipo: 'guion_reel',\n    titulo: f.titulo || '(sin titulo)',\n    contenido_o_link: f.script || '',\n    estado,\n    calificado_en,\n    external_id: r.id,\n    source_items: [{ platform: '', url: f.url_referente || '' }],\n    metadata: {\n      proyecto, voz, referente: f.referente || '', tema: f.tema || '', url_referente: f.url_referente || '',\n      idioma: f.idioma || '', views: f.views || 0, likes: f.likes || 0,\n      seguidores: f.seguidores || 0, engagement: f.engagement || 0,\n      heat_score: f.heat_score || 0, calificacion: f.calificacion || '', link_doc: f.link_doc || '',\n      relevancia_score: (f.relevancia_score != null ? f.relevancia_score : null), relevancia_razon: f.relevancia_razon || ''\n    }\n  };\n  const sheet = {\n    'FECHA CALIFICACION': calificado_en, 'PROYECTO': proyecto, 'VOZ': voz,\n    'TITULO': f.titulo || '', 'URL ORIGINAL': f.url_referente || '', 'SCRIPT': f.script || '',\n    'IDIOMA': f.idioma || '', 'VIEWS': f.views || 0, 'LIKES': f.likes || 0,\n    'SEGUIDORES': f.seguidores || 0, 'HEAT SCORE': f.heat_score || 0,\n    'CALIFICACION': f.calificacion || '', 'ESTADO': estado,\n    'RELEVANCIA SCORE': (f.relevancia_score != null ? f.relevancia_score : ''), 'RELEVANCIA RAZON': f.relevancia_razon || ''\n  };\n  return { json: { record_id: r.id, output, sheet } };\n});\n"
       },
       "id": "armar-filas",
       "name": "Armar filas archivado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1680, 200]
+      "position": [
+        1680,
+        200
+      ]
     },
     {
       "parameters": {
@@ -190,7 +367,10 @@
       "name": "Preparar outputs Supabase",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1920, 200]
+      "position": [
+        1920,
+        200
+      ]
     },
     {
       "parameters": {
@@ -201,22 +381,37 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "resolution=ignore-duplicates,return=minimal" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=minimal"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json.outputs }}",
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "registrar-outputs",
       "name": "Registrar outputs (Supabase)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2160, 200],
+      "position": [
+        2160,
+        200
+      ],
       "onError": "continueRegularOutput",
-      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
     },
     {
       "parameters": {
@@ -226,7 +421,10 @@
       "name": "Preparar filas Sheet",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2400, 200]
+      "position": [
+        2400,
+        200
+      ]
     },
     {
       "parameters": {
@@ -253,19 +451,33 @@
       "name": "Append al Sheet Histórico",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [2640, 200],
+      "position": [
+        2640,
+        200
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 30000,
-      "credentials": { "googleSheetsOAuth2Api": { "name": "<<CREDENCIAL_GOOGLE_SHEETS>>" } }
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "<<CREDENCIAL_GOOGLE_SHEETS>>"
+        }
+      }
     },
     {
-      "parameters": { "mode": "append", "numberInputs": 2, "options": {} },
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 2,
+        "options": {}
+      },
       "id": "reconvergir-sheet",
       "name": "Reconvergir tras Sheet",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
-      "position": [2760, 360]
+      "position": [
+        2760,
+        360
+      ]
     },
     {
       "parameters": {
@@ -275,7 +487,10 @@
       "name": "Preparar borrado Airtable",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2880, 200]
+      "position": [
+        2880,
+        200
+      ]
     },
     {
       "parameters": {
@@ -283,17 +498,26 @@
         "url": "={{ $json.url }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
-        "options": { "timeout": 20000 }
+        "options": {
+          "timeout": 20000
+        }
       },
       "id": "borrar-airtable",
       "name": "Borrar de Airtable",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3120, 200],
+      "position": [
+        3120,
+        200
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
-      "credentials": { "airtableTokenApi": { "name": "Airtable PAT" } }
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
     },
     {
       "parameters": {
@@ -303,47 +527,445 @@
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [ { "name": "Content-Type", "value": "application/json" } ]
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { fin: $now.toISO(), estado: 'ok', costo_estimado: 0, metricas: { archivados: $('Leer Candidatos calificados').all().flatMap(it => (it.json && it.json.records) || []).length } } }}",
-        "options": { "timeout": 20000 }
+        "jsonBody": "={{ { fin: $now.toISO(), estado: 'ok', costo_estimado: 0, metricas: Object.assign({ archivados: $('Leer Candidatos calificados').all().flatMap(it => (it.json && it.json.records) || []).length }, ($('Computar métricas semana').first().json._resumen || {})) } }}",
+        "options": {
+          "timeout": 20000
+        }
       },
       "id": "cerrar-run",
       "name": "Cerrar run en el registro",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3360, 300],
+      "position": [
+        3360,
+        300
+      ],
       "onError": "continueRegularOutput",
-      "credentials": { "supabaseApi": { "name": "Supabase Registro" } }
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "id": "m1-leer-runs",
+      "name": "Leer runs de la semana",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2360,
+        500
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&inicio=gte.' + encodeURIComponent($now.minus({ days: 7 }).toISO()) + '&select=id,estado,inicio,fin,metricas&order=inicio.desc' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "m1-leer-descartes",
+      "name": "Leer Descartes del gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2560,
+        500
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Descartes del gate') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "m1-computar",
+      "name": "Computar métricas semana",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2760,
+        500
+      ],
+      "parameters": {
+        "jsCode": "\n// Computar métricas de la semana (ADR-021): calidad por proyecto (de los calificados de este cierre)\n// + salud global (runs del motor de la semana + descartes auditados). Defensivo: SIEMPRE devuelve\n// >=1 batch (aunque todo venga vacío o algún Leer haya fallado) para que la cadena llegue a Cerrar run.\nconst hoy = new Date().toISOString().slice(0, 10);\nconst projMap = {};\ntry { $('Leer Proyectos').all().flatMap(it => (it.json && it.json.records) || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || r.id; }); } catch (e) {}\nlet califs = [];\ntry { califs = $('Leer Candidatos calificados').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\nlet runs = [];\ntry { runs = $('Leer runs de la semana').all().map(i => i.json).flatMap(j => Array.isArray(j) ? j : [j]).filter(r => r && r.id && r.metricas !== undefined); } catch (e) {}\nlet descartes = [];\ntry { descartes = $('Leer Descartes del gate').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\n\nconst _mean = (arr) => arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : null;\nconst _r2 = (v) => (v == null ? undefined : Math.round(v * 100) / 100);\n\n// calidad por proyecto: precisión de entrega + separación del gate (glosario)\nconst porProj = {};\nfor (const r of califs) {\n  const f = r.fields || {};\n  const pid = Array.isArray(f.proyecto) && f.proyecto[0] ? f.proyecto[0] : '';\n  const p = (porProj[pid] = porProj[pid] || { aprobados: 0, descartados: 0, sa: [], sd: [] });\n  const ok = String(f.estado || '').toLowerCase() === 'aprobado';\n  if (ok) p.aprobados++; else p.descartados++;\n  if (typeof f.relevancia_score === 'number') (ok ? p.sa : p.sd).push(f.relevancia_score);\n}\nconst rows = [];\nfor (const pid in porProj) {\n  const p = porProj[pid]; const tot = p.aprobados + p.descartados;\n  const nom = projMap[pid] || 'sin proyecto';\n  const ma = _mean(p.sa), md = _mean(p.sd);\n  rows.push({ clave: hoy + ' · ' + nom, semana: hoy, ambito: nom,\n    calificados: tot, aprobados: p.aprobados, descartados: p.descartados,\n    precision: _r2(tot ? p.aprobados / tot : null),\n    score_aprobados: _r2(ma), score_descartados: _r2(md),\n    separacion_gate: _r2(ma != null && md != null ? ma - md : null) });\n}\n// salud global: runs del motor de la semana\nconst g = { colectados: 0, pretrim: 0, gate_pass: 0, entregados: 0, sin_guion: 0, descartes_expuestos: 0, runs_ok: 0, runs_fallo: 0, dur: [], supadata: 0, lotes: 0, trad: 0 };\nfor (const r of runs) {\n  const m = r.metricas || {};\n  if (String(r.estado) === 'ok') g.runs_ok++; else g.runs_fallo++;\n  g.colectados += Number(m.colectados || 0); g.pretrim += Number(m.pretrim || 0);\n  g.gate_pass += Number(m.gate || 0); g.entregados += Number(m.outputs || 0);\n  g.sin_guion += Number(m.sin_guion || 0); g.descartes_expuestos += Number(m.descartes_expuestos || 0);\n  const ll = m.llamadas || {};\n  g.supadata += Number(ll.supadata || 0);\n  g.lotes += Number(ll.haiku_lotes_pretrim || 0) + Number(ll.haiku_lotes_gate || 0);\n  g.trad += Number(ll.haiku_traducciones || 0);\n  if (r.inicio && r.fin) { const ms = new Date(r.fin) - new Date(r.inicio); if (ms > 0) g.dur.push(ms / 60000); }\n}\nconst falsos_negativos = descartes.filter(r => String(((r.fields || {}).veredicto) || '') === 'era bueno').length;\nconst totAprob = califs.filter(r => String(((r.fields || {}).estado) || '').toLowerCase() === 'aprobado').length;\nrows.push({ clave: hoy + ' · GLOBAL', semana: hoy, ambito: 'GLOBAL',\n  calificados: califs.length, aprobados: totAprob, descartados: califs.length - totAprob,\n  precision: _r2(califs.length ? totAprob / califs.length : null),\n  entregados: g.entregados, colectados: g.colectados, pretrim: g.pretrim, gate_pass: g.gate_pass,\n  sin_guion: g.sin_guion, descartes_expuestos: g.descartes_expuestos, falsos_negativos,\n  runs_ok: g.runs_ok, runs_fallo: g.runs_fallo, duracion_min: _r2(_mean(g.dur)),\n  supadata_llamadas: g.supadata, haiku_lotes: g.lotes, haiku_traducciones: g.trad });\n\nconst recs = rows.map(f => { const c = {}; for (const k in f) { if (f[k] !== undefined && f[k] !== null) c[k] = f[k]; } return { fields: c }; });\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nout[0].json._resumen = { falsos_negativos, filas_metricas: rows.length };\nconsole.log('[Métricas] filas: ' + rows.length + ' · falsos negativos: ' + falsos_negativos);\nreturn out;\n"
+      }
+    },
+    {
+      "id": "m1-post-metricas",
+      "name": "POST Métricas (Airtable)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        500
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Métricas') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $json.records, typecast: true } }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "m1-prep-borrado-desc",
+      "name": "Preparar borrado Descartes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3160,
+        650
+      ],
+      "parameters": {
+        "jsCode": "\n// Limpia los Descartes del gate al cerrar la semana (ADR-021): auditados o no, no se acumulan\n// (la próxima corrida trae su propia banda). El conteo de 'era bueno' ya quedó en Métricas.\nlet ids = [];\ntry { ids = $('Leer Descartes del gate').all().flatMap(it => (it.json && it.json.records) || []).map(r => r.id).filter(Boolean); } catch (e) {}\nconst base = $('Config').first().json.airtable_base_id;\nconst out = [];\nfor (let i = 0; i < ids.length; i += 10) {\n  const qs = ids.slice(i, i + 10).map(id => 'records[]=' + encodeURIComponent(id)).join('&');\n  out.push({ json: { url: 'https://api.airtable.com/v0/' + base + '/' + encodeURIComponent('Descartes del gate') + '?' + qs } });\n}\nreturn out; // [] si no hay nada que borrar: el DELETE no corre (rama lateral, no bloquea Cerrar run)\n"
+      }
+    },
+    {
+      "id": "m1-borrar-descartes",
+      "name": "Borrar Descartes del gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        650
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        }
+      }
     }
   ],
   "connections": {
-    "Cron — semanal (domingo 6pm)": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
-    "Ejecutar manual": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
-    "Config": { "main": [[{ "node": "Abrir run en el registro", "type": "main", "index": 0 }]] },
-    "Abrir run en el registro": { "main": [[{ "node": "Barrer runs zombie", "type": "main", "index": 0 }]] },
-    "Barrer runs zombie": { "main": [[{ "node": "Leer Proyectos", "type": "main", "index": 0 }]] },
-    "Leer Proyectos": { "main": [[{ "node": "Leer Voces", "type": "main", "index": 0 }]] },
-    "Leer Voces": { "main": [[{ "node": "Leer Candidatos calificados", "type": "main", "index": 0 }]] },
-    "Leer Candidatos calificados": { "main": [[{ "node": "IF — hay calificados", "type": "main", "index": 0 }]] },
-    "IF — hay calificados": {
+    "Cron — semanal (domingo 6pm)": {
       "main": [
-        [{ "node": "Armar filas archivado", "type": "main", "index": 0 }],
-        [{ "node": "Cerrar run en el registro", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Armar filas archivado": { "main": [[{ "node": "Preparar outputs Supabase", "type": "main", "index": 0 }]] },
-    "Preparar outputs Supabase": { "main": [[{ "node": "Registrar outputs (Supabase)", "type": "main", "index": 0 }]] },
-    "Registrar outputs (Supabase)": { "main": [[{ "node": "Preparar filas Sheet", "type": "main", "index": 0 }, { "node": "Reconvergir tras Sheet", "type": "main", "index": 1 }]] },
-    "Preparar filas Sheet": { "main": [[{ "node": "Append al Sheet Histórico", "type": "main", "index": 0 }]] },
-    "Append al Sheet Histórico": { "main": [[{ "node": "Reconvergir tras Sheet", "type": "main", "index": 0 }]] },
-    "Reconvergir tras Sheet": { "main": [[{ "node": "Preparar borrado Airtable", "type": "main", "index": 0 }]] },
-    "Preparar borrado Airtable": { "main": [[{ "node": "Borrar de Airtable", "type": "main", "index": 0 }]] },
-    "Borrar de Airtable": { "main": [[{ "node": "Cerrar run en el registro", "type": "main", "index": 0 }]] }
+    "Ejecutar manual": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Abrir run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abrir run en el registro": {
+      "main": [
+        [
+          {
+            "node": "Barrer runs zombie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Barrer runs zombie": {
+      "main": [
+        [
+          {
+            "node": "Leer Proyectos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Proyectos": {
+      "main": [
+        [
+          {
+            "node": "Leer Voces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Voces": {
+      "main": [
+        [
+          {
+            "node": "Leer Candidatos calificados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Candidatos calificados": {
+      "main": [
+        [
+          {
+            "node": "IF — hay calificados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — hay calificados": {
+      "main": [
+        [
+          {
+            "node": "Armar filas archivado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leer runs de la semana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar filas archivado": {
+      "main": [
+        [
+          {
+            "node": "Preparar outputs Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar outputs Supabase": {
+      "main": [
+        [
+          {
+            "node": "Registrar outputs (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar outputs (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Preparar filas Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reconvergir tras Sheet",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Preparar filas Sheet": {
+      "main": [
+        [
+          {
+            "node": "Append al Sheet Histórico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append al Sheet Histórico": {
+      "main": [
+        [
+          {
+            "node": "Reconvergir tras Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconvergir tras Sheet": {
+      "main": [
+        [
+          {
+            "node": "Preparar borrado Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar borrado Airtable": {
+      "main": [
+        [
+          {
+            "node": "Borrar de Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Borrar de Airtable": {
+      "main": [
+        [
+          {
+            "node": "Leer runs de la semana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer runs de la semana": {
+      "main": [
+        [
+          {
+            "node": "Leer Descartes del gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Descartes del gate": {
+      "main": [
+        [
+          {
+            "node": "Computar métricas semana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Computar métricas semana": {
+      "main": [
+        [
+          {
+            "node": "POST Métricas (Airtable)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Métricas (Airtable)": {
+      "main": [
+        [
+          {
+            "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Preparar borrado Descartes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar borrado Descartes": {
+      "main": [
+        [
+          {
+            "node": "Borrar Descartes del gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "pinData": {},
   "active": false
 }

@@ -38,8 +38,9 @@ const num = (name, precision = 0) => ({ name, type: "number", options: { precisi
 const check = (name) => ({ name, type: "checkbox", options: { color: "greenBright", icon: "check" } });
 const attach = (name) => ({ name, type: "multipleAttachments" });
 const sel = (name, ...opts) => ({ name, type: "singleSelect", options: { choices: opts.map((o) => ({ name: o })) } });
+const fecha = (name) => ({ name, type: "date", options: { dateFormat: { name: "iso" } } });
 
-// ── las 6 tablas (campos NO-link al crear; los links se agregan después) ──
+// ── las 8 tablas (campos NO-link al crear; los links se agregan después) ──
 const tables = [
   { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto. dias_recencia/top_n/toggles salieron a Ajustes globales (ADR-016).",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), check("activo")] },
@@ -64,6 +65,18 @@ const tables = [
              num("afinidad", 2), long("razon"), num("seguidores"), long("bio"), url("url"),
              txt("semillas"),
              sel("estado", "propuesto", "aprobado", "descartado", "promovido")] },
+  { name: "Descartes del gate", description: "Banda borderline de descartes del gate (ADR-021): el motor sube ~10 por corrida para auditar falsos negativos. El equipo marca veredicto; el archivado cuenta los 'era bueno' y limpia la tabla cada domingo.",
+    fields: [txt("titulo"), long("script"), txt("referente"), url("url_referente"),
+             num("relevancia_score", 2), long("relevancia_razon"), attach("thumbnail"),
+             sel("veredicto", "bien descartado", "era bueno")] },
+  { name: "Métricas", description: "Desempeño semanal del embudo (ADR-021): una fila por semana×proyecto + una GLOBAL. La escribe SOLO el archivado; proyección regenerable (la verdad cruda vive en Supabase). Solo-lectura para el equipo.",
+    fields: [txt("clave"), fecha("semana"), txt("ambito"),
+             num("calificados"), num("aprobados"), num("descartados"), num("precision", 2),
+             num("score_aprobados", 2), num("score_descartados", 2), num("separacion_gate", 2),
+             num("entregados"), num("colectados"), num("pretrim"), num("gate_pass"),
+             num("sin_guion"), num("descartes_expuestos"), num("falsos_negativos"),
+             num("runs_ok"), num("runs_fallo"), num("duracion_min", 1),
+             num("supadata_llamadas"), num("haiku_lotes"), num("haiku_traducciones")] },
 ];
 
 // Semillas de Ajustes: los knobs que el equipo edita en español claro. El motor (nodo "Armar plan")
@@ -105,6 +118,7 @@ const run = async () => {
     ["Referentes propuestos", "proyecto", "Proyectos"],
     ["Candidatos", "proyecto", "Proyectos"],
     ["Candidatos", "voz", "Voces"],
+    ["Descartes del gate", "proyecto", "Proyectos"],
   ];
   for (const [tabla, campo, destino] of links) {
     console.log(`→ Link ${tabla}.${campo} → ${destino}`);

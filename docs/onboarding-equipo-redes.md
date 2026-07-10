@@ -72,6 +72,8 @@ de redes.
 5. Califican (ver §6).
 6. Lo que aprueban queda guardado en el Histórico **automáticamente** y sale de la lista. Lo que no
    tocaron sigue esperando.
+7. Una vez por semana (2 min): pasan por **Descartes (auditar)** y marcan el `veredicto` (§6.1), y
+   revisan los **Referentes propuestos** (§8.1).
 
 Regla mental: **Airtable es su bandeja de entrada.** La máquina la llena, ustedes la vacían decidiendo.
 Lo que califican desaparece de pendientes y queda archivado.
@@ -85,7 +87,7 @@ Lo que califican desaparece de pendientes y queda archivado.
 
 ## 4. Airtable por dentro: las tablas
 
-Hay 6 tablas. Piénsenlas en dos grupos.
+Hay 8 tablas. Piénsenlas en tres grupos.
 
 ### Las que arman una vez (la configuración de la búsqueda)
 
@@ -105,6 +107,13 @@ Hay 6 tablas. Piénsenlas en dos grupos.
   los días).
 - **Referentes propuestos** — las cuentas nuevas que la máquina les sugiere para sumar a Referentes.
   La revisan **una vez por semana** (§8.1).
+- **Descartes del gate** — los ~10 videos más dudosos que la máquina descartó, para que auditen si se
+  equivocó. También **una vez por semana**, 2 minutos (§6.1).
+
+### La que solo miran
+
+- **Métricas** — el desempeño de cada semana (páginas *Métricas — Calidad* y *Métricas — Salud*, §6.2).
+  La llena la máquina cada domingo; **nadie escribe ahí**.
 
 En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
 el **idioma original**, la **portada**, el **link al video original**, las **métricas** (views, likes,
@@ -267,6 +276,32 @@ Hay dos cosas que marcan, y son distintas:
 Es una pantalla aparte que muestra **solo los que pusieron en `aprobado`**, ordenados del más caliente al
 más frío. **Es solo para ver**, no califican ahí. Funciona así: ustedes aprueban en la lista normal de
 Candidatos → automáticamente aparecen en esta vista. Es su "mapa de calor" de lo elegido, y se rearma solo.
+
+### 6.1 La página "Descartes (auditar)" — 2 minutos por semana
+
+La máquina también **descarta** videos antes de que lleguen a ustedes. La mayoría son basura obvia, pero
+a veces se equivoca y mata algo bueno. Para poder detectarlo, cada corrida deja en la página **Descartes
+(auditar)** los ~10 descartes más dudosos (los que casi pasan), con su transcript y **por qué** los rechazó.
+
+Lo único que hacen: mirarlos rápido una vez por semana y marcar la columna `veredicto`:
+- **bien descartado** — la máquina hizo bien (la mayoría de los casos).
+- **era bueno** — este video SÍ servía. Esta marca es oro: nos dice que los criterios de ese proyecto
+  tienen un agujero, y es el dato con el que los afinamos.
+
+El domingo la máquina cuenta los "era bueno", los registra en Métricas y **vacía la página** (no se
+acumulan; cada semana llega una tanda fresca). Si no alcanzan a revisarlos, no pasa nada, pero cada
+"era bueno" detectado mejora el filtro.
+
+### 6.2 Las páginas "Métricas — Calidad" y "Métricas — Salud" (solo para ver)
+
+Cada domingo la máquina escribe el resumen de la semana:
+- **Métricas — Calidad**: por proyecto, cuántos calificaron, cuántos aprobaron y la **precisión**
+  (de lo que llegó, qué fracción sirvió). Si la precisión de un proyecto es baja semana tras semana,
+  sus `criterios_relevancia` o sus referentes necesitan ajuste (§5.2 y §5.3).
+- **Métricas — Salud**: los números de la máquina (cuántos videos procesó, cuántos llegaron sin guion,
+  si alguna corrida falló). Esta es más para Mani, pero está a la vista de todos.
+
+Son de **solo lectura a propósito**: las llena la máquina, nadie escribe ahí.
 
 ---
 

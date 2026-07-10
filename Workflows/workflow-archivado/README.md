@@ -13,11 +13,16 @@
 Cron semanal (dom 6pm) ─┐
 Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail) ─► Barrer runs zombie
    └─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos decididos ─► IF ¿hay?
-          ├─ no ─────────────────────────────────────────────► Cerrar run
+          ├─ no ──────────────────────────────────────► (cadena de métricas)
           └─ sí ─► Armar filas ─► Registrar outputs (Supabase, continue-on-fail, TODOS)
                        └─► Append al Sheet Histórico (SOLO aprobado/publicado) ─┐
                        └────────────────────────────► Reconvergir (Merge) ◄─────┘
-                                  └─► Borrar de Airtable (TODOS) ─► Cerrar run
+                                  └─► Borrar de Airtable (TODOS) ─► (cadena de métricas)
+
+(cadena de métricas, ADR-021 — corre CON o SIN calificados:)
+Leer runs de la semana ─► Leer Descartes del gate ─► Computar métricas semana
+   ─► POST Métricas (Airtable) ─┬─► Cerrar run
+                                └─► Preparar borrado Descartes ─► Borrar Descartes del gate
 ```
 
 - **Lee** `Candidatos` ya decididos por el equipo (`filterByFormula: NOT({estado} = 'nuevo')` →
@@ -31,10 +36,17 @@ Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail
   `Proyectos` y `Voces` y mapea id→nombre (igual que el motor).
 - **Registra en Supabase** `outputs` (tipo `guion_reel`): `contenido_o_link` = **texto del script**,
   `calificado_en` = `fecha_calificacion`, `external_id` = **id del record de Airtable**,
-  `metadata` completa (proyecto, voz, referente, idioma, métricas, heat_score, `calificacion`).
-  Estos alimentan `v_historico_seleccionados`, `v_selecciones_por_dia` y `v_senal_seleccion` (003).
-- **Append al Google Sheet "Histórico"** (las 13 columnas de la vista — ver abajo).
+  `metadata` completa (proyecto, voz, referente, idioma, métricas, heat_score, `calificacion`,
+  **`relevancia_score`/`relevancia_razon`** — ADR-021). Estos alimentan `v_historico_seleccionados`,
+  `v_selecciones_por_dia` y `v_senal_seleccion` (003).
+- **Append al Google Sheet "Histórico"** (las 13 columnas de la vista — ver abajo; con las columnas
+  opcionales `RELEVANCIA SCORE`/`RELEVANCIA RAZON` si se agregan los encabezados al Sheet).
 - **Borra de Airtable** los records archivados (batch de 10 por DELETE).
+- **Computa la fila semanal de `Métricas`** (ADR-021): calidad por proyecto (precisión de entrega,
+  separación del gate) + salud global (embudo de los `runs` del motor de la semana, SIN GUION,
+  runs fallidos, llamadas por servicio, falsos negativos de los descartes auditados). Corre **con o
+  sin calificados**, todo fail-soft: si Métricas falla, el archivado de candidatos no se cae.
+- **Limpia `Descartes del gate`** (los auditados ya quedaron contados; no se acumulan).
 
 ## Orden e idempotencia (lo que importa)
 
