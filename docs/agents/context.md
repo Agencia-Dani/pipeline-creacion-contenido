@@ -59,7 +59,28 @@ Qué tanto aporta el contenido del video en sí, frente a lo viral-vacío (ganch
 
 **Criterios de relevancia**:
 Las reglas, editables por el equipo en Airtable, contra las que el motor juzga si un video sirve
-para un Proyecto (y opcionalmente una Voz). Alimentan la evaluación semántica.
+para un Proyecto (y opcionalmente una Voz). Alimentan la evaluación semántica. Un buen criterio dice
+qué sirve, qué NO sirve, y trae ejemplos reales; si no permite rechazar nada, es una descripción,
+no un criterio.
+
+**Criterios aprendidos**:
+El complemento que la máquina destila cada semana de las decisiones reales del equipo (patrones de lo
+aprobado y lo descartado, con ejemplos). Complementan los criterios de relevancia manuales, nunca los
+reemplazan; el equipo los ve y puede editarlos o borrarlos (ADR-022).
+
+**Descarte del gate**:
+Un video que el juicio de relevancia rechazó después de transcribirlo. **No es un Candidato** (nunca
+esperó calificación). Los de score intermedio se exponen al equipo para auditoría; uno que el equipo
+marca "era bueno" es un **falso negativo** y alimenta la revisión de criterios (ADR-021).
+
+**Precisión de entrega**:
+La métrica norte de calidad: de lo que el equipo calificó en la semana, qué fracción aprobó. Mide si
+lo que llega de verdad sirve (ADR-021).
+
+**Separación del gate**:
+Cuánto distingue el juicio de la máquina lo que el equipo aprueba de lo que descarta (distancia entre
+los scores medios de ambos grupos). Separación baja en un proyecto = sus criterios no discriminan
+(ADR-021).
 
 **flag_viral**:
 La marca de una cuenta muy grande (~700K+ seguidores). Marca "high-end", **no** excluye ni altera
@@ -75,5 +96,6 @@ calificar; ya no existe "publicado"). Es lo que el archivado levanta (`NOT nuevo
 el aprendizaje (`aprobado` = seleccionado; `descartado` = clase negativa).
 
 **Calificación**:
-El emoji 🔥/👍/👎 que el equipo le pone a un Candidato. Cue visual para curar y ordenar; **no**
-alimenta el aprendizaje (eso lo hace el Estado). Distinto del Estado a propósito.
+El emoji 🔥/👍/👎 que el equipo le pone a un Candidato. Cue visual para curar y ordenar. **No**
+alimenta la señal de selección (eso lo hace el Estado), pero el 🔥 **sí** prioriza qué aprobados se
+usan como ejemplos al destilar los criterios aprendidos (ADR-022). Distinto del Estado a propósito.

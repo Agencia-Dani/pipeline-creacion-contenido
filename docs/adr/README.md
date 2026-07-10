@@ -26,6 +26,8 @@
 | [ADR-018](./ADR-018-un-candidato-por-video-dedup-salida.md) | Un Candidato por video: dedup de salida del fan-out (gana la copia con mejor relevancia) | Aceptada (enmienda ADR-013) |
 | [ADR-019](./ADR-019-remocion-total-eje-keyword.md) | Remoción total del eje keyword: el motor descubre solo por referentes (enmienda ADR-015, revierte ADR-017, reduce ADR-012) | Aceptada |
 | [ADR-020](./ADR-020-motor-descubrimiento-referentes.md) | Motor de descubrimiento de referentes: sugeridos de IG + vetting Haiku + aprobación del equipo (workflow aparte; completa ADR-019) | Aceptada |
+| [ADR-021](./ADR-021-medicion-desempeno-embudo.md) | Medición de desempeño del embudo: tabla `Métricas` + descartes del gate visibles + histórico enriquecido (el archivado computa, Airtable proyecta) | Aceptada |
+| [ADR-022](./ADR-022-loop-aprendizaje-criterios.md) | Loop de aprendizaje de criterios: destilación semanal en `criterios_aprendidos` + 🔥 prioriza ejemplos + salud por referente (extiende ADR-010, completa ADR-020) | Aceptada (se construye tras verificar ADR-021) |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

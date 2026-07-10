@@ -127,6 +127,59 @@ nodes**: `Transcribir (Supadata)` + `Traducir (Claude Haiku)` (vía `this.helper
 - Calibrar: **ancho del embudo** (cuánto transcribir de más), **pesos del composite** (Haiku vs
   métricas), y el **rubric** del jurado, con data real.
 - **Hecho cuando:** Majo/Jero validan la calidad de los candidatos sobre data real.
+- *Estado 2026-07-10: la validación arrancó artesanal (auditorías de los runs 07-07 y 07-09, handoff
+  cierres 25-27). Las fases M de abajo la vuelven permanente y medida.*
+
+## Fases M — Medición y loop de aprendizaje (grilling 2026-07-10)
+
+> Continuación de Stage 5: la calibración deja de ser una auditoría manual y pasa a medirse sola cada
+> semana. El **porqué** vive en [ADR-021](../adr/ADR-021-medicion-desempeno-embudo.md) (medición) y
+> [ADR-022](../adr/ADR-022-loop-aprendizaje-criterios.md) (loop); acá el **qué-sigue** ejecutable.
+> Regla de secuencia: **cada fase se verifica con un ciclo real** (motor lunes → equipo califica →
+> archivado domingo) antes de arrancar la siguiente. Sin medición primero, no hay forma de saber si el
+> resto funcionó.
+
+### Fase M1 — Medición (ADR-021)
+- **Archivado:** copiar `relevancia_score`/`relevancia_razon` a `outputs.metadata` + Sheet; computar la
+  fila semanal de **Métricas** por proyecto (precisión de entrega, separación del gate, volumen vs
+  target) + la global de salud (embudo, % SIN GUION, runs fallidos, duración, conteo de llamadas por
+  servicio); contar falsos negativos ("era bueno") y limpiar `Descartes del gate` al cerrar la semana.
+  Todo fail-soft: si Métricas falla, el archivado de candidatos no se cae.
+- **Motor:** desglose por referente `{evaluados, gate_pass}` en `runs.metricas`; subir la banda
+  borderline de descartes del gate (score ≈0.35–0.6, cap ~10/corrida, knobs dev-only en `Config`) a la
+  tabla `Descartes del gate` con transcript/score/razón.
+- **Airtable (contrato cockpit 6→8 tablas, autorizado por ADR-021):** tablas `Métricas` y `Descartes
+  del gate` (+campo `veredicto`); páginas solo-lectura *Métricas — Calidad* y *Métricas — Salud*
+  (los charts se arman a mano una vez; la tabla es el contrato). Actualizar `airtable-cockpit.md` +
+  `setup-airtable.mjs`.
+- **Hecho cuando:** tras un ciclo real, las dos páginas muestran la semana, los números cruzan con
+  `runs.metricas`, y el equipo auditó sus primeros descartes borderline.
+
+### Fase M2 — Loop de aprendizaje (ADR-022)
+- **Archivado:** destilación semanal por proyecto → campo `criterios_aprendidos` en `Proyectos`
+  (🔥 prioriza ejemplos positivos, fallback aprobados recientes; la misma llamada Haiku hace de lint:
+  criterio vago / sin lista negativa / Voz incoherente → advertencia visible); actualizar
+  `tasa_gate`/`tasa_aprobacion`/`videos_evaluados` en `Referentes` (mínimo de muestra) + vista
+  "A revisar". La poda siempre la ejecuta el equipo.
+- **Motor:** el gate lee criterios manuales **+** `criterios_aprendidos`.
+- **Onboarding:** una línea sobre el nuevo rol del 🔥 (ahora enseña).
+- **Hecho cuando:** tras 2 ciclos con el loop activo, la precisión de entrega y la separación del gate
+  suben en las páginas de M1 (o se entiende por qué no).
+
+### Fase M3 — Criterios asistidos
+- **Onboarding §5.2:** anatomía del buen criterio (qué sirve / qué NO / 2-3 ejemplos reales de
+  aprobados y descartados) + **prompt-plantilla de entrevista** listo para pegar en Claude que
+  interroga a Majo/Jero y devuelve el texto del criterio; el jefe valida (como ya dice el doc).
+  Cero código.
+- **Hecho cuando:** los proyectos activos tienen criterios con las 4 partes y el lint de M2 no marca
+  ninguno como vago.
+
+### Anotado, no comprometido
+- **"Segunda oportunidad" de asignación** (al descartar con heat alto, preguntar en el mismo juicio si
+  encaja en otro proyecto activo): recién cuando haya >3 proyectos con criterios sanos
+  (ADR-022 §alternativas).
+- **Costo en dólares** en Métricas (multiplicadores de tarifa por servicio): cuando el conteo de
+  llamadas se quede corto para la conversación con el jefe.
 
 ## Abierto a propósito (no bloquea; se cierra con data en Stage 5)
 - El **rubric exacto** del pre-trim y del gate (qué reglas, qué tan estricto).
