@@ -27,7 +27,10 @@ Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
    de transcribir) → `Heat-score v1` (prescore métrico: percentil de views/likes/eng × boost idioma ×
    señal de selección; dedup contra `processed_items`; top_n por proyecto).
 4. **ENRIQUECER** — `Transcribir (Supadata)` → `Traducir (Claude Haiku)` (literal, solo si no está en
-   español; `lang` de Supadata como fuente primaria).
+   español; `lang` de Supadata como fuente primaria). Ambos **dedupean por video** (1 llamada por
+   `external_id`, el resultado se reparte a las copias del fan-out), y Transcribir tiene **presupuesto
+   de tiempo** (780s): si se agota, el resto de la corrida sigue sin transcript en vez de morir por el
+   watchdog de n8n (cierre 31).
 5. **CALIDAD** — `Gate de relevancia` (Haiku **estricto** sobre el transcript): juzga contra
    `criterios_relevancia` (Proyecto ⊕ Voz), dropea lo irrelevante, y compone
    `heat_score = peso_relevancia·score_haiku + (1-peso)·percentil(prescore)`. Los descartes con score

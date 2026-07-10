@@ -115,7 +115,9 @@ motor): `Propuestas por corrida` 10 (cap de propuestas semanales) · `Afinidad m
 (techo de `Resultados por cuenta de referente`; el motor usa `min(valor_equipo, cap)`) · `cap_top_n`
 100 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real)
 · `banda_descarte_min` 0.35 / `banda_descarte_max` 0.6 / `cap_descartes` 10 (la banda borderline de
-descartes que se expone al equipo — ADR-021).
+descartes que se expone al equipo — ADR-021) · `presupuesto_transcribir_s` 780 (si el loop de
+transcripción lo excede, el resto de la corrida sigue sin transcript en vez de morir por el watchdog
+de n8n).
 En Config quedan además los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y los defaults de
 los toggles (`buscar_referente_ig`/`buscar_referente_tiktok`, ambos 1). Detección de idioma: dev-only.
 
