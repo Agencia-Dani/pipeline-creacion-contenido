@@ -234,6 +234,6 @@ incremental no reprocesa · una falla simulada no tumba la entrega · los crons 
 |---|---|
 | La traducción "literal" deriva en reescritura (el LLM embellece) | Prompt con instrucción explícita + V2 compara contra la transcripción original |
 | Cuota free de Airtable (1.000 records / 1.000 calls/mes) con backfill grande | Solo el top_n por proyecto entra a Airtable; el archivado diario limpia calificados |
-| OAuth de Google (Docs/Sheets) en n8n self-host pide verificación de app | La cuenta dueña del Sheet/Docs entra como "test user" del OAuth client — documentar al hacerlo |
+| OAuth de Google (Docs/Sheets) en n8n self-host: el consent screen **External + Testing** caduca el refresh token a los **7 días** → el archivado moría cada domingo | **Resuelto (2026-07-12):** publicar la app a **Producción** (Audience → Publish app). El dueño del Sheet es un Gmail personal → "Internal" no aplica y Service Account está bloqueado (política de org `iam.disableServiceAccountKeyCreation`). Producción para uso personal (<100 usuarios) no pide verificación (solo warning de "app no verificada" al autorizar) y quita la expiración de 7 días. Tokens solo caducan tras 6 meses de inactividad; el cron semanal nunca lo está |
 | El equipo no adopta la vista de re-rank | D3: demo obligatoria al activar |
 | `fecha_calificacion` por API falla al crear la base | El script ya lo maneja: warning + creación manual documentada |

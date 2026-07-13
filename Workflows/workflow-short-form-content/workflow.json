@@ -84,7 +84,7 @@
             {
               "id": "c_capn",
               "name": "cap_top_n",
-              "value": 100,
+              "value": 30,
               "type": "number"
             },
             {

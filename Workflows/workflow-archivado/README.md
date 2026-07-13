@@ -103,8 +103,14 @@ Leer runs de la semana ─► Leer Descartes del gate ─► Computar métricas 
 | Supabase | `Supabase Registro` (`supabaseApi`, service_role) | runs + outputs |
 | Google Sheets | OAuth (`googleSheetsOAuth2Api`) | append al histórico — **única dependencia de Google del pipeline** |
 
-> OAuth de Google en n8n self-host: la cuenta dueña del Sheet entra como *test user* del OAuth
-> client (ver riesgo en ROADMAP §6). Documentar al configurarlo.
+> **El OAuth consent screen DEBE estar en Publishing status = "In production"** (no Testing). External +
+> Testing caduca el refresh token a los 7 días → el archivado moría cada domingo. La cuenta dueña del
+> Sheet es un **Gmail personal** (no Workspace), así que "Internal" no está disponible y Service Account
+> tampoco (la política de org `iam.disableServiceAccountKeyCreation` bloquea crear su key). El fix es
+> **publicar la app a Producción** (Google Auth Platform → Audience → Publish app): para uso personal
+> (<100 usuarios) NO requiere verificación, solo un warning de "app no verificada" al autorizar (se
+> salta con Advanced → proceed). Tras publicar hay que **re-autorizar la credencial una vez** en n8n
+> para emitir un token nuevo que ya no expira. (2026-07-12)
 
 ## Limitaciones conocidas (MVP)
 
