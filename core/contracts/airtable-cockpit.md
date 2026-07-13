@@ -109,15 +109,19 @@ ambos on).
 
 **Knobs del descubrimiento de referentes (ADR-020)** — los lee el workflow de descubrimiento (no el
 motor): `Propuestas por corrida` 10 (cap de propuestas semanales) · `Afinidad mínima de propuesta`
-0.6 (umbral del vetting Haiku, 0-1).
+0.6 (umbral del vetting Haiku, 0-1). **Toggles de eje del descubrimiento** (también página Global,
+como los del motor): `Descubrir en Instagram` 1 · `Descubrir en TikTok` 1 (1=on/0=off; default ambos
+on; off = ese eje no genera semillas y su rama no corre). El eje TikTok igual necesita referentes TT
+sembrados para producir algo.
 
 **Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` 30
 (techo de `Resultados por cuenta de referente`; el motor usa `min(valor_equipo, cap)`) · `cap_top_n`
 100 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real)
-· `banda_descarte_min` 0.35 / `banda_descarte_max` 0.6 / `cap_descartes` 10 (la banda borderline de
-descartes que se expone al equipo — ADR-021) · `presupuesto_transcribir_s` 780 (si el loop de
+· `cap_descartes` 10 (tope de rechazos top-K por score que se
+exponen al equipo — ADR-021, enmienda 2026-07-13) · `presupuesto_transcribir_s` 780 (si el loop de
 transcripción lo excede, el resto de la corrida sigue sin transcript en vez de morir por el watchdog
-de n8n).
+de n8n) · `cap_lookalikes_tt` 15 (techo de lookalikes TikTok por corrida en el descubrimiento; control
+de costo, $0.20/resultado — ADR-020).
 En Config quedan además los **IDs** (`airtable_base_id`/`supabase_url`/`instance_id`) y los defaults de
 los toggles (`buscar_referente_ig`/`buscar_referente_tiktok`, ambos 1). Detección de idioma: dev-only.
 
@@ -141,11 +145,13 @@ Haiku). El equipo revisa y marca `estado`; los `aprobado` se **promueven solos**
 Un handle propuesto una vez **no se re-propone** (dedup contra esta tabla en cualquier estado y
 contra `Referentes`): descartar es definitivo salvo alta manual.
 
-### 7. `Descartes del gate` — la banda borderline para auditar (ADR-021)
-Videos que el gate de relevancia rechazó **después de transcribirlos**, con score en la banda
-borderline (donde viven los errores del jurado). **No son Candidatos** (nunca esperaron
-calificación). El motor sube como máximo ~10 por corrida (knobs dev-only `banda_descarte_min` 0.35 /
-`banda_descarte_max` 0.6 / `cap_descartes` 10 en Config); el equipo los audita en 2 minutos y marca
+### 7. `Descartes del gate` — los rechazos más "cerca de pasar" para auditar (ADR-021)
+Videos que el gate de relevancia rechazó **después de transcribirlos**. Se exponen los **top-K por
+score de Haiku** (los near-miss: los que más cerca estuvieron de pasar = los más probables falsos
+negativos). *(Enmienda 2026-07-13: la banda fija `[0.35,0.6]` nunca se poblaba porque Haiku rechaza
+decisivo/bimodal; se reemplazó por top-K.)* **No son Candidatos** (nunca esperaron
+calificación). El motor sube como máximo ~10 por corrida (knob dev-only `cap_descartes` 10 en Config);
+el equipo los audita en 2 minutos y marca
 `veredicto`; el archivado cuenta los "era bueno" como **falsos negativos** en `Métricas` y **limpia
 la tabla** al cerrar la semana (no se acumulan).
 

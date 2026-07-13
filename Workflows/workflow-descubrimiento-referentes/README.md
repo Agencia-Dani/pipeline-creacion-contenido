@@ -1,4 +1,4 @@
-# Descubrimiento de referentes — sugeridos IG → propuestos
+# Descubrimiento de referentes — sugeridos IG + TikTok → propuestos
 
 El workflow que **amplía el banco de referentes** (Etapa A del embudo: descubrir creadores ≠ curar
 contenido). Desde ADR-019 el motor de reels se alimenta solo de `Referentes`; este workflow es el
@@ -38,13 +38,20 @@ menos resultados (los errores quedan en `console.log`).
 - **Escribe:** `Referentes propuestos`, `Referentes` (solo promoción de aprobados), `runs`.
 - **NO toca el motor de reels** ni la tabla `Candidatos`: nada entra al stream de candidatos sin
   aprobación humana.
-- **Solo Instagram en v1** (el actor TikTok en uso no expone cuentas sugeridas).
+- **Instagram + TikTok** (ADR-020 §8). IG expande vía `relatedProfiles`; TikTok con el actor
+  `dataovercoffee~tiktok-lookalike-search` (rama paralela, gate `IF — hay semillas TT` que idlea
+  gratis con 0 referentes TT). El lookalike TT no atribuye por-semilla ni trae captions: el proyecto
+  lo asigna el vetting Haiku por criterios y el juicio es solo sobre bio + métricas. Cap de costo
+  `cap_lookalikes_tt` (default 15; $0.20/resultado). Requiere sembrar 3-5 referentes TT a mano para
+  arrancar. El equipo prende/apaga cada eje con los toggles `Descubrir en Instagram` / `Descubrir en
+  TikTok` en Ajustes (página Global; default ambos on).
 
 ## Operación
 
 Importar `workflow.json` en n8n, completar el nodo `Config` (`<<AIRTABLE_BASE_ID>>`,
-`<<SUPABASE_URL>>`, `<<INSTANCE_ID>>`) y la `<ANTHROPIC_API_KEY>` del nodo `Vetting relevancia
-(Haiku)`, mapear credenciales (Airtable PAT, Supabase Registro, apifyApi). Cron: lunes 9:00
+`<<SUPABASE_URL>>`, `<<INSTANCE_ID>>`) y la `<ANTHROPIC_API_KEY>` en **ambos** code de vetting
+(`Vetting relevancia (Haiku)` y `Vetting TikTok (Haiku)`), mapear credenciales (Airtable PAT,
+Supabase Registro, apifyApi). Cron: lunes 9:00
 `America/Bogota` (1h después del motor, con la señal fresca del archivado del domingo). El resto
 del runbook (test incluido) está en [workflow.yaml](./workflow.yaml).
 

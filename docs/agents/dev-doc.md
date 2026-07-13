@@ -40,12 +40,13 @@
 > mano (checklist ADR-019). Las menciones keyword en las filas de abajo quedan como histórico; el JSON
 > manda.
 >
-> ⚠️ **Nuevo 2026-07-10 (ADR-020) — workflow de descubrimiento de referentes (24 nodos).** Tercer
-> workflow del sistema; propone cuentas nuevas cada semana y promueve las aprobadas. Documentado
-> nodo por nodo en §3.
+> ⚠️ **Nuevo 2026-07-10 (ADR-020) — workflow de descubrimiento de referentes (27 nodos).** Tercer
+> workflow del sistema; propone cuentas nuevas cada semana y promueve las aprobadas. **Enmienda
+> 2026-07-13 (ADR-020 §8): eje TikTok** (actor dataovercoffee lookalike, rama paralela, 24→27 nodos +
+> 2 toggles `Descubrir en IG/TikTok`). Documentado nodo por nodo en §3.
 >
 > ⚠️ **Fase M1 2026-07-10 (ADR-021) — medición: motor 30 → 33 nodos, archivado 18 → 24 nodos.**
-> El motor expone la **banda borderline de descartes del gate** a la tabla `Descartes del gate`
+> El motor expone los **top-K rechazos del gate por score** a la tabla `Descartes del gate`
 > (nodos 23b/23c) y arma `runs.metricas` completas en un nodo propio (`Resumen del run`, 26b:
 > embudo + `sin_guion` + llamadas estimadas + desglose `por_referente`). El archivado copia
 > `relevancia_score`/`relevancia_razon` al histórico, computa la fila semanal de la tabla
@@ -68,7 +69,7 @@
 | Workflow | Trigger | Cadencia | Nodos | Qué hace |
 |---|---|---|---|---|
 | **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 33 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** + los descartes borderline (**Descartes del gate**, ADR-021) en Airtable + registra la corrida en Supabase. §2. |
-| **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 24 | Promueve a `Referentes` los propuestos que el equipo marcó `aprobado` → busca cuentas nuevas parecidas a las que funcionan (sugeridos de IG, 2 pasadas Apify) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **Referentes propuestos**. §3. |
+| **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 27 | Promueve a `Referentes` los propuestos que el equipo marcó `aprobado` → busca cuentas nuevas parecidas a las que funcionan (IG: sugeridos, 2 pasadas Apify; TikTok: lookalike, rama paralela — ADR-020 §8) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **Referentes propuestos**. §3. |
 | **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 24 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`, con relevancia — ADR-021) + append al **Sheet Histórico** → los borra de Airtable → **computa la fila semanal de `Métricas`** (calidad + salud) y limpia `Descartes del gate`. §4. |
 
 Los tres comparten el patrón `Config → Abrir run → Barrer runs zombie → … → Cerrar run`: la corrida
@@ -113,7 +114,7 @@ manual                                              Armar plan ◄─ Leer Ajust
                                     Gate de relevancia
                                           │         │
                                           ▼         └──────► Preparar batch Descartes ─► POST Airtable Descartes
-                                   Armar candidato                    (banda borderline, ADR-021)
+                                   Armar candidato                    (top-K rechazos, ADR-021)
                                           │
                         ┌─────────────────┴─────────────────┐
                         ▼                                    ▼
@@ -148,7 +149,7 @@ Notas de orden que muerden si las ignorás:
   solo persiste `$json.metricas`). El motor **ya no escribe filas por-item a `outputs`** (ADR-014);
   `Cerrar run` conserva `executeOnce: true`.
 - **`Gate de relevancia` emite dos clases de items:** los que pasan (van a `Armar candidato`) y los
-  descartes borderline marcados **`_descarte: true`** (ADR-021). `Armar candidato` filtra los
+  descartes top-K marcados **`_descarte: true`** (ADR-021). `Armar candidato` filtra los
   `_descarte`; la rama `Preparar batch Descartes → POST Airtable Descartes` los sube a la tabla
   `Descartes del gate` (continue-on-fail: si Airtable rechaza, la corrida sigue — los descartes son
   nice-to-have, los Candidatos no).
@@ -176,7 +177,7 @@ Notas de orden que muerden si las ignorás:
 |---|---|---|---|
 | 1 | Cron — semanal (lunes 8am) | scheduleTrigger | Dispara la corrida los lunes 8am (`weeks`, día 1, hora 8). |
 | 2 | Ejecutar manual | manualTrigger | Execute Workflow a mano (las V-runs). |
-| 3 | Config | set | Define los **IDs** (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`), los **defaults de knobs** que el equipo puede pisar desde Ajustes (`resultados_referente` 20, `top_n` 100, `dias_recencia` 7, toggles `buscar_referente_ig`/`buscar_referente_tiktok` 1) , los **caps dev-only** que NADIE pisa desde Ajustes (`cap_resultados_referente` 30, `cap_top_n` **30** — bajado de 100 el 2026-07-12 para acotar el gasto Supadata del free tier; es el techo de videos transcritos/corrida, `piso_referente` 5, `banda_descarte_min` 0.35 / `banda_descarte_max` 0.6 / `cap_descartes` 10 — ADR-021, `presupuesto_transcribir_s` 780 — cierre 31) y los **defaults de scoring** (`peso_views` .4, `peso_likes` .4, `peso_eng` .2, `peso_relevancia` .7, `boost_idioma` .3, `umbral_viral` 700000). Los Ajustes de Airtable caen **encima** de los defaults, nunca de los caps. |
+| 3 | Config | set | Define los **IDs** (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`), los **defaults de knobs** que el equipo puede pisar desde Ajustes (`resultados_referente` 20, `top_n` 100, `dias_recencia` 7, toggles `buscar_referente_ig`/`buscar_referente_tiktok` 1) , los **caps dev-only** que NADIE pisa desde Ajustes (`cap_resultados_referente` 50, `cap_top_n` **100** — subido de 30 el 2026-07-13 ahora que Apify/Supadata son pagos; es el techo de videos transcritos/corrida, `piso_referente` 5, `cap_descartes` 10 — ADR-021 (top-K por score, enmienda 2026-07-13), `presupuesto_transcribir_s` 780 — cierre 31) y los **defaults de scoring** (`peso_views` .4, `peso_likes` .4, `peso_eng` .2, `peso_relevancia` .7, `boost_idioma` .3, `umbral_viral` 700000). Los Ajustes de Airtable caen **encima** de los defaults, nunca de los caps. |
 | 4 | Abrir run en el registro | http POST | `POST runs` (`instance_id`, `trigger_type:'cron'`, `estado:'en_curso'`, `params:{workflow:'motor'}`), `Prefer: return=representation` → devuelve `id`. continue-on-fail. El tag `workflow:'motor'` es lo que scopea el barredor (4b). |
 | 4b | Barrer runs zombie | http PATCH | **Auto-sanador del motor (ADR-017), entre `Abrir run` y `Leer Proyectos`.** `PATCH runs` → marca `fallo` los runs de motor anteriores colgados `en_curso` (scoped `params->>workflow=eq.motor` + `id=neq.<run actual>`). Espejo del nodo homónimo del archivado. continue-on-fail. |
 | 5 | Leer Proyectos | http GET | Airtable `Proyectos` con `filterByFormula={activo}`. **Pagina** (`options.pagination` sigue el `offset` → todas las páginas, #4). |
@@ -197,7 +198,7 @@ Notas de orden que muerden si las ignorás:
 | 20 | Heat-score v1 | code | **Prescore métrico** = `peso_views·pct(views) + peso_likes·pct(likes) + peso_eng·pct(eng)` por proyecto; × `(1+boost_idioma)` si `guessLang(caption+bio)≠es`; × `(1+sel)` con `sel` = señal por referente (`v_senal_seleccion`; mono-eje desde ADR-019). **Piso duro** `min_views`/`min_likes` y **dedup** (`!seen`); `cap_top_n` recorta por videos distintos. Emite `heat_score`, `idioma_guess`, `viral_por_tamano`. Lee 17, 18, 19 + Config⊕ajustes. |
 | 21 | Transcribir (Supadata) | code | Transcribe cada **video distinto** del top_n UNA vez (dedup por `external_id`, reparte a las copias del fan-out; Supadata `&text=true&mode=auto`), throttle 1s, trunca 6000 chars. `idioma_detectado` = `lang` de Supadata (primario) → fallback `guessLang(transcript)` → `idioma_guess`. **Presupuesto de tiempo** (`presupuesto_transcribir_s` 780, cierre 31): si el loop lo excede, corta y el resto pasa sin transcript — evita que el watchdog de 900s mate el nodo y el run. **Fail-open** (sin transcript, sigue). `<SUPADATA_API_KEY>`. |
 | 22 | Traducir (Claude Haiku) | code | Traduce **literal** al español **solo si** `idioma_detectado≠es` (sin reescribir/resumir/embellecer). **Dedup intra-corrida** (cierre 31, espejo de Transcribir): 1 llamada por video distinto, el script se reparte a todas las copias del fan-out. **Fail-open**: si falla, `script = transcript`. Emite `script`, `idioma`. `claude-haiku-4-5`. |
-| 23 | Gate de relevancia | code + Haiku | **Jurado estricto** (precision) contra `criterios`, sobre el `script` (o el caption como **fallback** si no hubo transcript). **Juzga en chunks de 25 videos por llamada** (cierre 31: el JSON de ~100 juicios excedía `max_tokens` → parse fallaba → el fail-open dejaba pasar todo sin score; un chunk caído solo apaga su tanda). Dropea `relevante:false` y `score < min_relevancia`. Recalcula `heat_score` **composite** = `peso_relevancia·sHaiku + (1-peso)·percentil(prescore_metrico)`. Marca `[SIN TRANSCRIPT: …]` en `relevancia_razon`. Emite `prescore_metrico`, `relevancia_score`, `relevancia_razon`, `heat_score`. **Además emite los descartes borderline** (ADR-021): score en `[banda_descarte_min, banda_descarte_max]` → item marcado `_descarte: true` (mejores primero, cap `cap_descartes` global/corrida). **Fail-open** (Haiku caído = pasan todos y 0 descartes). Logea: `[Gate] DESCARTE …` + `[Gate] descartes borderline expuestos: n/m`. |
+| 23 | Gate de relevancia | code + Haiku | **Jurado estricto** (precision) contra `criterios`, sobre el `script` (o el caption como **fallback** si no hubo transcript). **Juzga en chunks de 25 videos por llamada** (cierre 31: el JSON de ~100 juicios excedía `max_tokens` → parse fallaba → el fail-open dejaba pasar todo sin score; un chunk caído solo apaga su tanda). Dropea `relevante:false` y `score < min_relevancia`. Recalcula `heat_score` **composite** = `peso_relevancia·sHaiku + (1-peso)·percentil(prescore_metrico)`. Marca `[SIN TRANSCRIPT: …]` en `relevancia_razon`. Emite `prescore_metrico`, `relevancia_score`, `relevancia_razon`, `heat_score`. **Además emite los descartes top-K** (ADR-021, enmienda 2026-07-13): de los rechazos con score numérico toma los `cap_descartes` con **mayor score** (near-miss, los más probables falsos negativos) → item marcado `_descarte: true`. *(Reemplaza la banda fija `[0.35,0.6]`, que nunca se poblaba porque Haiku rechaza bimodal.)* **Fail-open** (Haiku caído = pasan todos y 0 descartes). Logea: `[Gate] DESCARTE …` + `[Gate] descartes top-K expuestos: n/m`. |
 | 23b | Preparar batch Descartes | code | Toma los `_descarte` del gate y arma `records[]` para la tabla **`Descartes del gate`** (`titulo` del caption, `script`, `referente`, `url_referente`, `relevancia_score/razon`, link `proyecto`, `thumbnail`), batches de 10, `typecast`. Sin borderline → `[]` (la rama muere sin ruido). |
 | 23c | POST Airtable Descartes | http POST | `POST Descartes del gate` (URL-encoded). **continue-on-fail** (los descartes son auditoría, no entrega). |
 | 24 | Armar candidato | code | **Filtra los `_descarte` del gate** (ADR-021: no son candidatos). Luego **corte final a `top_n` videos distintos** (ADR-016) **con piso por cuenta** (`piso_referente`, ADR-017): ordena por heat, hace round-robin hasta `piso` videos por cuenta fuente, rellena el resto por heat global (fail-open con piso=0). **Emite UNA copia por video (ADR-018):** del fan-out gana la de mayor `relevancia_score` (empate: heat); items sin `external_id` se conservan. Luego reconstruye el objeto candidato final (lista explícita — ver §8): `titulo` del caption (80 chars; **prefijo `⚠️ SIN GUION |` si `script` vacío**, decisión #6 cierre 27), `script`, `idioma`, proyecto/voz, `referente`(=username), `url_referente`(=url), métricas, `heat_score`, `viral_por_tamano`, `external_id`, `relevancia_*`, `thumbnail_url`. |
@@ -219,13 +220,15 @@ límites: ADR-010 + handoff §Mejoras #13/#18.
 
 ---
 
-## 3. Descubrimiento de referentes (`descubrimiento-referentes`) — 24 nodos
+## 3. Descubrimiento de referentes (`descubrimiento-referentes`) — 27 nodos
 
 > **Nuevo por [ADR-020](../adr/ADR-020-motor-descubrimiento-referentes.md) (2026-07-10).** Propone
 > cuentas nuevas parecidas a los referentes que mejor convierten, y promueve a `Referentes` las que
-> el equipo aprobó. **Solo Instagram en v1** (el actor TikTok no expone sugeridos). **NO toca el
-> motor ni `Candidatos`**: nada entra al stream sin aprobación humana. El qué-de-producto está en su
-> [README](../../Workflows/workflow-descubrimiento-referentes/README.md); el porqué en el ADR.
+> el equipo aprobó. **Instagram + TikTok** (ADR-020 §8, enmienda 2026-07-13): IG por `relatedProfiles`;
+> TikTok por el actor `dataovercoffee~tiktok-lookalike-search` en una **rama paralela** que idlea gratis
+> con 0 referentes TT. Cada eje se prende/apaga con un toggle del equipo (`descubrir_ig`/`descubrir_tt`).
+> **NO toca el motor ni `Candidatos`**: nada entra al stream sin aprobación humana. El qué-de-producto
+> está en su [README](../../Workflows/workflow-descubrimiento-referentes/README.md); el porqué en el ADR.
 
 ### 3.1 Orden de ejecución (cadena lineal, sin fan-out)
 
@@ -248,11 +251,26 @@ Ejecutar manual        ┘                                │
                                                                 │
                   Apify — Perfiles semilla ─► Agregar sugeridos ─► Apify — Detalle sugeridos
                                                                             │
-                          Vetting relevancia (Haiku) ─► Armar propuestas ─► IF — hay propuestas
-                                                       (sí) │                      │ (no)
-                                                            ▼                      │
-                                              POST Airtable Propuestos ──────────► Cerrar run
+                                              Vetting relevancia (Haiku)  [rama IG]
+                                                            │
+                                              IF — hay semillas TT
+                              (sí) │                        │ (no)
+                                  ▼                         │
+              Apify — Lookalikes TikTok                     │
+                                  ▼                         │
+              Vetting TikTok (Haiku)  [rama TT] ───────────►│
+                                                            ▼
+                          Armar propuestas (junta IG + TT) ─► IF — hay propuestas
+                                                       (sí) │            │ (no)
+                                                            ▼            │
+                                              POST Airtable Propuestos ─► Cerrar run
 ```
+
+La rama TT es **paralela y aparte** para no tocar la cadena IG: el lookalike mezcla las semillas y no
+atribuye por-semilla → el proyecto lo asigna su propio vetting Haiku; y juzga sobre bio + métricas (sin
+captions). `Armar propuestas` lee **ambos** vettings por nombre, así cada fila arrastra su `plataforma`
+y su `proyecto`. Con 0 semillas TT (toggle off o 0 referentes TT), el `IF — hay semillas TT` corta y la
+rama no corre (costo 0).
 
 Notas de diseño que muerden si las ignorás:
 - **La promoción corre AL INICIO**, antes de buscar nada: los `aprobado` de la semana pasada se
@@ -266,7 +284,7 @@ Notas de diseño que muerden si las ignorás:
   lote NO se propone (acá el riesgo es inundar al equipo de ruido, no perder contenido). Para que la
   cadena no muera con 0 vetteados, el nodo emite un item `_vacio` que `Armar propuestas` filtra — el
   run siempre llega a `Cerrar run`.
-- **TODO fail-soft:** los 2 Apify llevan `alwaysOutputData` + continue-on-fail; las lecturas de
+- **TODO fail-soft:** los 3 Apify llevan `alwaysOutputData` + continue-on-fail; las lecturas de
   Ajustes/señal/Propuestos son continue-on-fail; `Cerrar run` evalúa las métricas con `try/catch`
   por nodo → el run cierra `ok` aunque toda pata externa haya fallado (con 0 propuestas).
 - **Las 4 lecturas grandes de Airtable paginan** (Proyectos/Voces/Referentes/Propuestos — clave:
@@ -278,7 +296,7 @@ Notas de diseño que muerden si las ignorás:
 |---|---|---|---|
 | 1 | Cron — semanal (lunes 9am) | scheduleTrigger | Lunes 9am (1h después del motor: señal fresca del archivado del domingo). |
 | 2 | Ejecutar manual | manualTrigger | Execute a mano. |
-| 3 | Config | set | IDs (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`) + defaults/caps: `cap_semillas` 8, `cap_perfiles_detalle` 20 (dev-only), `propuestas_max` 10, `afinidad_minima` 0.6 (pisables desde Ajustes). |
+| 3 | Config | set | IDs (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`) + defaults/caps: `cap_semillas` 8, `cap_perfiles_detalle` 20, `cap_lookalikes_tt` 15 (dev-only), `propuestas_max` 10, `afinidad_minima` 0.6, toggles `descubrir_ig`/`descubrir_tt` 1 (pisables desde Ajustes). |
 | 4 | Abrir run en el registro | http POST | `POST runs` con `params:{workflow:'descubrimiento'}`, `return=representation`. continue-on-fail. |
 | 5 | Barrer runs zombie | http PATCH | Marca `fallo` los runs de descubrimiento previos colgados `en_curso` (scoped `params->>workflow=eq.descubrimiento` + `id=neq.<run actual>`). continue-on-fail. |
 | 6–8 | Leer Proyectos / Voces / Referentes | http GET | Airtable; Proyectos con `{activo}`, Voces y Referentes completas (Referentes SIN filtro `{activo}`: el dedup necesita también los inactivos). **Paginan.** |
@@ -287,24 +305,28 @@ Notas de diseño que muerden si las ignorás:
 | 11 | IF — hay aprobados | if | `crear.length > 0` → rama de promoción; si no → directo a `Leer Ajustes`. |
 | 12 | POST Referentes (promoción) | http POST | `POST Referentes` con `crear`, `typecast:true`. **stop-on-fail** (si la siembra falla, no marcar `promovido`). |
 | 13 | PATCH Propuestos promovidos | http PATCH | `PATCH Referentes propuestos` con `marcar` → los aprobados quedan `promovido`. Reconverge a `Leer Ajustes`. |
-| 14 | Leer Ajustes | http GET | Airtable `Ajustes` — 2 knobs propios vía `AJUSTE_MAP`: `Propuestas por corrida`→`propuestas_max`, `Afinidad mínima de propuesta`→`afinidad_minima`. continue-on-fail → defaults de Config. |
+| 14 | Leer Ajustes | http GET | Airtable `Ajustes` — 4 knobs propios vía `AJUSTE_MAP`: `Propuestas por corrida`→`propuestas_max`, `Afinidad mínima de propuesta`→`afinidad_minima`, `Descubrir en Instagram`→`descubrir_ig`, `Descubrir en TikTok`→`descubrir_tt`. continue-on-fail → defaults de Config. |
 | 15 | Leer señal selección | http GET | Supabase `v_senal_seleccion` (`referente`, `tasa_seleccion`, `calificados`). continue-on-fail → fail-open (sin señal, todas las semillas valen igual). |
-| 16 | Armar plan de descubrimiento | code | El cerebro: **semillas** = referentes IG activos de proyectos activos, rankeados por `tasa_seleccion` (desempate `calificados`), corte a `cap_semillas`; **`conocidos`** = set de dedup (Referentes todos + Propuestos todos); `projects{}` con criterios Proyecto⊕Voz (ADR-010); knobs con `pick` (Ajustes > Config). Emite `{semillas, seed_to_proj, conocidos, projects, propuestas_max, afinidad_minima, cap_detalle}`. |
+| 16 | Armar plan de descubrimiento | code | El cerebro: **semillas IG** y **semillas TT** = referentes activos de proyectos activos de esa plataforma, rankeados por `tasa_seleccion` (desempate `calificados`), corte a `cap_semillas`, gateados por su toggle (`descubrir_ig`/`descubrir_tt`: off ⇒ semillas = []); **dedup por (plataforma, handle)**: `conocidos_ig`/`conocidos_tt` (Referentes todos + Propuestos todos, separados por plataforma); `projects{}` con criterios Proyecto⊕Voz (ADR-010); `tt_project_ids` (proyectos con semilla TT); knobs con `pick` (Ajustes > Config). Emite `{semillas, seed_to_proj, conocidos_ig, conocidos_tt, projects, propuestas_max, afinidad_minima, cap_detalle, tt_semillas, seed_to_proj_tt, tt_project_ids, cap_detalle_tt}`. |
 | 17 | Apify — Perfiles semilla | apify | Actor `apify~instagram-profile-scraper`, `usernames = semillas`. **1ª pasada paga:** trae cada perfil semilla con sus `relatedProfiles` (~20 sugeridos del propio algoritmo de IG por cuenta). alwaysOutputData + continue-on-fail. |
-| 18 | Agregar sugeridos | code | Junta los `relatedProfiles` de todas las semillas: fuera privados (`is_private`), fuera `conocidos`; rankea por **frecuencia** (sugerido por N semillas > por 1) y corta a `cap_perfiles_detalle` ANTES de pagar el detalle. Emite `{usernames, candidatos{}, unicos}` (con qué semillas y proyectos reclama cada uno). |
+| 18 | Agregar sugeridos | code | Junta los `relatedProfiles` de todas las semillas: fuera privados (`is_private`), fuera `conocidos_ig`; rankea por **frecuencia** (sugerido por N semillas > por 1) y corta a `cap_perfiles_detalle` ANTES de pagar el detalle. Emite `{usernames, candidatos{}, unicos}` (con qué semillas y proyectos reclama cada uno). |
 | 19 | Apify — Detalle sugeridos | apify | Mismo actor, `usernames = top del 18`. **2ª pasada paga:** bio + `followersCount` + captions de `latestPosts` de cada sugerido. alwaysOutputData + continue-on-fail. |
 | 20 | Vetting relevancia (Haiku) | code + Haiku | **Jurado estricto FAIL-CLOSED** por proyecto reclamante: bio (300c) + captions (8×180c) contra criterios Proyecto⊕Voz. Si una cuenta la reclaman varios proyectos, gana el mayor `afin` (acumula los proyectos). Si Haiku falla o no hay criterios → ese lote NO se propone. Emite `{username, afin, razon, proyectos, seguidores, bio, url, semillas, freq}` por cuenta (o `_vacio` para que la cadena siga). Throttle 1s entre proyectos. `claude-haiku-4-5`, `<ANTHROPIC_API_KEY>`. |
-| 21 | Armar propuestas | code | Filtra `afin >= afinidad_minima` (0.6), ordena por afin (desempate freq), corta a `propuestas_max` (10) → `records[]` de `Referentes propuestos` (`estado:'propuesto'`, afinidad redondeada a 2 dec, razón 500c, bio 500c, semillas) en batches de 10. Emite `{hay_propuestas, records, propuestos}`. |
-| 22 | IF — hay propuestas | if | `records.length > 0` → POST; si no → directo a Cerrar run. |
-| 23 | POST Airtable Propuestos | http POST | `POST Referentes propuestos`, `typecast:true`. **stop-on-fail** (es la entrega real). |
-| 24 | Cerrar run en el registro | http PATCH | `PATCH runs` con `fin`, `estado:'ok'`, `metricas:{semillas, sugeridos_unicos, detalle, vetteados, propuestos, promovidos}` — cada métrica se evalúa con `try/catch` (funciona aunque un nodo upstream no haya ejecutado). continue-on-fail. |
+| 21 | IF — hay semillas TT | if | `tt_semillas.length > 0` → rama TikTok; si no (toggle off o 0 referentes TT) → directo a `Armar propuestas` (rama TT no corre, costo 0). |
+| 22 | Apify — Lookalikes TikTok | apify | Actor `dataovercoffee~tiktok-lookalike-search`, `seed_usernames = tt_semillas`, `exclude_usernames = conocidos_tt` (dedup en la fuente), `limit = cap_lookalikes_tt` (15). **1 sola pasada paga** ($0.20/resultado): devuelve lookalikes con `score` de similitud, `signature` (bio), `follower_count`, `recent_avg_*`. alwaysOutputData + continue-on-fail. |
+| 23 | Vetting TikTok (Haiku) | code + Haiku | **Jurado estricto FAIL-CLOSED** sobre bio + métricas (**sin captions** — el lookalike no los expone; prompt más conservador). Juzga cada cuenta contra los criterios de cada proyecto con semilla TT (`tt_project_ids`) y **adjunta solo el proyecto donde `afin ≥ afinidad_minima`** (así la sugerencia lleva el proyecto correcto). Dedup extra contra `conocidos_tt`. Emite `{username, plataforma:'tiktok', afin, razon, proyectos, seguidores, bio, url, semillas, freq}` (o `_vacio`). Throttle 1s entre proyectos. `claude-haiku-4-5`, `<ANTHROPIC_API_KEY>`. |
+| 24 | Armar propuestas | code | Lee **ambos** vettings por nombre (`Vetting relevancia (Haiku)` IG + `Vetting TikTok (Haiku)` TT, con try/catch), junta, filtra `afin >= afinidad_minima` (0.6), ordena por afin (desempate freq), corta a `propuestas_max` (10, cap **global** IG+TT) → `records[]` de `Referentes propuestos` (`plataforma` de cada fila, `estado:'propuesto'`, afinidad 2 dec, razón/bio 500c, semillas) en batches de 10. Emite `{hay_propuestas, records, propuestos}`. |
+| 25 | IF — hay propuestas | if | `records.length > 0` → POST; si no → directo a Cerrar run. |
+| 26 | POST Airtable Propuestos | http POST | `POST Referentes propuestos`, `typecast:true`. **stop-on-fail** (es la entrega real). |
+| 27 | Cerrar run en el registro | http PATCH | `PATCH runs` con `fin`, `estado:'ok'`, `metricas:{semillas, sugeridos_unicos, detalle, vetteados, propuestos, promovidos}` — sumas globales IG+TT (semillas = IG+TT, sugeridos/detalle suman los lookalikes, vetteados suma ambos vettings). Cada métrica con `try/catch`. continue-on-fail. |
 
 ### 3.3 El embudo en una frase
 
-`semillas (≤8, las que mejor convierten) → sugeridos de IG (~20/semilla) → dedup contra todo lo
-conocido → top 20 por frecuencia → detalle (bio+posts) → vetting Haiku por criterios → propuestas
-(afinidad ≥0.6, ≤10) → el equipo aprueba → la corrida siguiente las siembra sola`. Costo acotado
-por diseño: 2 llamadas Apify por corrida (≤8 + ≤20 perfiles), 1 llamada Haiku por proyecto.
+`semillas (≤8/eje, las que mejor convierten) → IG: sugeridos (~20/semilla) → dedup → top 20 por
+frecuencia → detalle (bio+posts); TT: lookalikes (≤15, con score) → dedup → vetting Haiku por criterios
+(IG con captions, TT solo bio+métricas) → propuestas IG+TT (afinidad ≥0.6, ≤10 total) → el equipo
+aprueba → la corrida siguiente las siembra sola`. Costo acotado por diseño: IG 2 Apify (≤8 + ≤20
+perfiles), TT 1 Apify (≤15 lookalikes, $0.20 c/u; $0 sin semillas TT), 1 Haiku por proyecto por eje.
 
 ---
 
@@ -490,11 +512,11 @@ De dónde sale y a dónde llega cada campo que importa:
 
 - **API keys** (en los Code nodes, como strings): motor → `<ANTHROPIC_API_KEY>` (×3: Pre-trim,
   Traducir, Gate) + `<SUPADATA_API_KEY>` (×1: Transcribir); descubrimiento → `<ANTHROPIC_API_KEY>`
-  (×1: Vetting).
+  (**×2: Vetting relevancia (Haiku) IG + Vetting TikTok (Haiku)**).
 - **IDs** (en el nodo `Config`, como `<<…>>`): `<<AIRTABLE_BASE_ID>>`, `<<SUPABASE_URL>>`,
   `<<INSTANCE_ID>>` (los tres workflows); el archivado suma `<<GOOGLE_SHEET_ID>>`,
   `<<NOMBRE_PESTANA_SHEET>>`.
 - **Credenciales nativas de n8n:** `airtableTokenApi` ("Airtable PAT"), `supabaseApi` ("Supabase
-  Registro"), `apifyApi` (2 nodos Apify del motor + 2 del descubrimiento), Google Sheets **OAuth2**
+  Registro"), `apifyApi` (2 nodos Apify del motor + 3 del descubrimiento — la misma cred sirve para el actor TikTok dataovercoffee), Google Sheets **OAuth2**
   (solo el archivado).
 - Nada de esto se commitea. Listar placeholders: ver el snippet en el CLAUDE.md del motor.

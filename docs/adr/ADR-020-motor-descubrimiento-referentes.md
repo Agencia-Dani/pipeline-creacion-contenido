@@ -45,9 +45,15 @@
      `estado=aprobado` se **promueven**: se crea el `Referente` (activo ✓, notas con la razón y la
      fecha) y la fila propuesta pasa a `promovido`. El equipo solo marca un select; nunca copia a
      mano (máx. 10 promociones por corrida, el resto cae a la siguiente).
-  8. **Solo Instagram en v1.** El actor de TikTok en uso (clockworks) no expone cuentas sugeridas y
-     hoy hay 0 referentes TikTok sembrados. Cuando exista fuente confiable de similares TT, se
-     agrega por enmienda.
+  8. **Instagram + TikTok.** IG expande vía `relatedProfiles`. TikTok se agregó (2026-07-13, enmienda
+     de esta decisión) con el actor `dataovercoffee~tiktok-lookalike-search`: toma las semillas TT y
+     devuelve lookalikes con `score` de similitud, bio y métricas en una sola pasada (el `clockworks`
+     del motor no expone similares). Diferencias con IG, por eso es rama aparte: (a) el lookalike
+     **mezcla** todas las semillas y no atribuye por-semilla → el proyecto lo asigna el vetting Haiku
+     contra los criterios de cada proyecto con semillas TT; (b) no trae captions, solo bio + métricas
+     → vetting más conservador; (c) cuesta $0.20/resultado (cap `cap_lookalikes_tt`, default 15).
+     **Bootstrap:** con 0 referentes TT no hay semillas y la rama idlea gratis (gate `IF — hay
+     semillas TT`); necesita que el equipo siembre a mano las primeras 3-5 cuentas TT.
 - **Alternativas descartadas:**
   - *Hashtag-search como fuente (el #35 original):* era el diseño previo a los datos; ADR-019 probó
     que el descubrimiento ciego por hashtag no da calidad (3% aprovechable) y las keywords ya no

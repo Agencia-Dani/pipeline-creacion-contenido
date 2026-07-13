@@ -58,3 +58,17 @@
     indicativa, no exacta. Aceptado: alcanza para detectar criterios que matan contenido bueno.
 - **Toca `core/`:** sí — contrato cockpit (2 tablas nuevas) y este ADR es su autorización. El plan
   ejecutable vive en [refactor-relevancia.md](../agents/refactor-relevancia.md) (Fase M1).
+
+## Enmienda 2026-07-13 — de banda fija a top-K por score
+
+**Contexto:** el primer ciclo real de M1 mostró que la banda `[0.35, 0.6]` **nunca se pobló**: 40
+rechazos históricos, 0 en la banda. Haiku no juzga con incertidumbre gradual — es **bimodal**:
+aprueba en 0.8–0.9 y rechaza en 0.0–0.3. "Rechazo con score intermedio" es un conjunto vacío por
+construcción, así que la página *Descartes (auditar)* quedaba muerta y el loop de falsos negativos
+nunca arrancaba.
+
+**Decisión (Mani):** se reemplaza la banda por **los top-K rechazos por score de Haiku** (los
+near-miss: los que más cerca estuvieron de pasar = los candidatos más probables a falso negativo).
+Garantiza que la muestra se pueble y apunta justo a lo auditable. Los knobs `banda_descarte_min` /
+`banda_descarte_max` quedan **deprecados** (el gate ya no los lee); sobrevive `cap_descartes` como K.
+El resto del ADR (semántica de la tabla, veredicto, limpieza semanal, falsos negativos) no cambia.

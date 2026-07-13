@@ -1,5 +1,5 @@
 {
-  "name": "Descubrimiento de referentes — sugeridos IG → propuestos (ADR-020)",
+  "name": "Descubrimiento de referentes — sugeridos IG + TikTok → propuestos (ADR-020)",
   "nodes": [
     {
       "parameters": {
@@ -79,6 +79,24 @@
               "id": "c7",
               "name": "afinidad_minima",
               "value": 0.6,
+              "type": "number"
+            },
+            {
+              "id": "c8",
+              "name": "cap_lookalikes_tt",
+              "value": 15,
+              "type": "number"
+            },
+            {
+              "id": "c9",
+              "name": "descubrir_ig",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "c10",
+              "name": "descubrir_tt",
+              "value": 1,
               "type": "number"
             }
           ]
@@ -523,7 +541,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Armar plan de descubrimiento (ADR-020) — semillas rankeadas por señal + set de dedup + knobs.\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst _nrm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();\nconst cfg0 = $('Config').first().json;\n// Knobs del equipo (Ajustes) sobre defaults de Config; caps de costo solo en Config (patrón ADR-011/016).\nconst AJUSTE_MAP = { 'propuestas por corrida': 'propuestas_max', 'afinidad minima de propuesta': 'afinidad_minima' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const k = AJUSTE_MAP[_nrm(f.clave)]; if (k && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[k] = Number(f.valor); });\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst propuestas_max = Math.max(1, Number(pick('propuestas_max', 10)));\nconst afinidad_minima = Number(pick('afinidad_minima', 0.6));\nconst cap_semillas = Math.max(1, Number(cfg0.cap_semillas || 8));\nconst cap_detalle = Math.max(1, Number(cfg0.cap_perfiles_detalle || 20));\n\n// Proyectos activos con criterios Proyecto ⊕ Voz (mismo modelo que el gate del motor, ADR-010).\nconst voces = {};\nrecs('Leer Voces').forEach(v => { const f = v.fields || {}; voces[v.id] = (f.criterios_relevancia || '').toString().trim(); });\nconst projects = {};\nrecs('Leer Proyectos').forEach(p => { const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = { id: p.id, nombre: f.nombre || '', criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: (vozId && voces[vozId]) || '' };\n});\n\n// Dedup: cualquier handle ya conocido no se re-propone (Referentes activo o no + Propuestos en cualquier estado).\nconst conocidos = new Set();\nconst referentes = recs('Leer Referentes');\nreferentes.forEach(r => { const h = String(((r.fields || {}).handle) || '').trim().replace(/^@+/, '').toLowerCase(); if (h) conocidos.add(h); });\nrecs('Leer Propuestos').forEach(r => { const h = String(((r.fields || {}).handle) || '').trim().replace(/^@+/, '').toLowerCase(); if (h) conocidos.add(h); });\n\n// Semillas: referentes IG activos de proyectos activos, rankeados por tasa de selección (fail-open sin señal).\nconst senal = {};\n$('Leer señal selección').all().forEach(it => { const s = it.json || {}; if (s.referente) senal[String(s.referente).toLowerCase()] = { tasa: Number(s.tasa_seleccion || 0), cal: Number(s.calificados || 0) }; });\nconst semMap = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('insta') < 0) return; // v1 solo IG (ADR-020)\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMap[k] = semMap[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMap[k].proyectos.add(id));\n});\nconst semillas = Object.entries(semMap)\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj = {};\nsemillas.forEach(s => { seed_to_proj[s.handle.toLowerCase()] = s.proyectos; });\nconsole.log('[Descubrimiento] semillas (' + semillas.length + '): ' + semillas.map(s => s.handle + '(' + s.tasa.toFixed(2) + ')').join(', '));\nreturn [{ json: { semillas: semillas.map(s => s.handle), seed_to_proj, conocidos: [...conocidos], projects, propuestas_max, afinidad_minima, cap_detalle } }];"
+        "jsCode": "// Armar plan de descubrimiento (ADR-020) — semillas rankeadas por señal + set de dedup + knobs.\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst _nrm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();\nconst cfg0 = $('Config').first().json;\n// Knobs del equipo (Ajustes) sobre defaults de Config; caps de costo solo en Config (patrón ADR-011/016).\nconst AJUSTE_MAP = { 'propuestas por corrida': 'propuestas_max', 'afinidad minima de propuesta': 'afinidad_minima', 'descubrir en instagram': 'descubrir_ig', 'descubrir en tiktok': 'descubrir_tt' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const k = AJUSTE_MAP[_nrm(f.clave)]; if (k && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[k] = Number(f.valor); });\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst propuestas_max = Math.max(1, Number(pick('propuestas_max', 10)));\nconst afinidad_minima = Number(pick('afinidad_minima', 0.6));\nconst cap_semillas = Math.max(1, Number(cfg0.cap_semillas || 8));\nconst cap_detalle = Math.max(1, Number(cfg0.cap_perfiles_detalle || 20));\n// Toggles de eje del descubrimiento (equipo, Ajustes > Config; default ON). Off = ese eje no genera semillas.\nconst DESCUBRIR_IG = Number(pick('descubrir_ig', 1)) > 0;\nconst DESCUBRIR_TT = Number(pick('descubrir_tt', 1)) > 0;\n\n// Proyectos activos con criterios Proyecto ⊕ Voz (mismo modelo que el gate del motor, ADR-010).\nconst voces = {};\nrecs('Leer Voces').forEach(v => { const f = v.fields || {}; voces[v.id] = (f.criterios_relevancia || '').toString().trim(); });\nconst projects = {};\nrecs('Leer Proyectos').forEach(p => { const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = { id: p.id, nombre: f.nombre || '', criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: (vozId && voces[vozId]) || '' };\n});\n\n// Dedup: cualquier handle ya conocido no se re-propone (Referentes activo o no + Propuestos en cualquier estado).\n// Dedup por (plataforma, handle): TikTok e Instagram son namespaces distintos, no se cruzan.\nconst conocidos_ig = new Set(); const conocidos_tt = new Set();\nconst referentes = recs('Leer Referentes');\nconst _dedup = (r) => { const f = r.fields || {}; const h = String(f.handle || '').trim().replace(/^@+/, '').toLowerCase(); if (!h) return; (String(f.plataforma || '').toLowerCase().indexOf('tik') >= 0 ? conocidos_tt : conocidos_ig).add(h); };\nreferentes.forEach(_dedup);\nrecs('Leer Propuestos').forEach(_dedup);\nconst conocidos = new Set([...conocidos_ig, ...conocidos_tt]);\n\n// Semillas: referentes IG activos de proyectos activos, rankeados por tasa de selección (fail-open sin señal).\nconst senal = {};\n$('Leer señal selección').all().forEach(it => { const s = it.json || {}; if (s.referente) senal[String(s.referente).toLowerCase()] = { tasa: Number(s.tasa_seleccion || 0), cal: Number(s.calificados || 0) }; });\nconst semMap = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('insta') < 0) return; // v1 solo IG (ADR-020)\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMap[k] = semMap[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMap[k].proyectos.add(id));\n});\nconst semillas = (DESCUBRIR_IG ? Object.entries(semMap) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj = {};\nsemillas.forEach(s => { seed_to_proj[s.handle.toLowerCase()] = s.proyectos; });\nconsole.log('[Descubrimiento] semillas IG (' + semillas.length + '): ' + semillas.map(s => s.handle + '(' + s.tasa.toFixed(2) + ')').join(', '));\n\n// Semillas TikTok (ADR-020 extendido): referentes TT activos, rankeados por señal. El lookalike actor\n// (dataovercoffee) mezcla todas las semillas y devuelve un ranking global con score; la atribución a\n// proyecto la resuelve el vetting Haiku contra los criterios de cada proyecto con semillas TT.\nconst semMapTT = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('tik') < 0) return;\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMapTT[k] = semMapTT[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMapTT[k].proyectos.add(id));\n});\nconst semillasTT = (DESCUBRIR_TT ? Object.entries(semMapTT) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj_tt = {}; const ttProjIds = new Set();\nsemillasTT.forEach(s => { seed_to_proj_tt[s.handle.toLowerCase()] = s.proyectos; s.proyectos.forEach(p => ttProjIds.add(p)); });\nconst cap_detalle_tt = Math.max(1, Number(cfg0.cap_lookalikes_tt || 15));\nconsole.log('[Descubrimiento] semillas TT (' + semillasTT.length + '): ' + semillasTT.map(s => s.handle).join(', '));\n\nreturn [{ json: { semillas: semillas.map(s => s.handle), seed_to_proj, conocidos: [...conocidos], conocidos_ig: [...conocidos_ig], conocidos_tt: [...conocidos_tt], projects, propuestas_max, afinidad_minima, cap_detalle, tt_semillas: semillasTT.map(s => s.handle), seed_to_proj_tt, tt_project_ids: [...ttProjIds], cap_detalle_tt } }];"
       },
       "name": "Armar plan de descubrimiento",
       "type": "n8n-nodes-base.code",
@@ -555,7 +573,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Agregar sugeridos — junta relatedProfiles de todas las semillas, dedup y rankea por frecuencia\n// (sugerido por N semillas > sugerido por 1). Corta a cap_perfiles_detalle antes de pagar el detalle.\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst conocidos = new Set(plan.conocidos || []);\nconst seedToProj = plan.seed_to_proj || {};\nconst cand = {};\nfor (const it of $input.all()) {\n  const d = it.json || {};\n  const seed = String(d.username || '').toLowerCase();\n  const proys = seedToProj[seed] || [];\n  for (const rp of (Array.isArray(d.relatedProfiles) ? d.relatedProfiles : [])) {\n    const u = String((rp && rp.username) || '').trim().replace(/^@+/, ''); if (!u) continue;\n    if (rp.is_private) continue;\n    const k = u.toLowerCase(); if (conocidos.has(k)) continue;\n    const c = (cand[k] = cand[k] || { username: u, freq: 0, proyectos: new Set(), semillas: new Set() });\n    c.freq++; proys.forEach(p => c.proyectos.add(p)); if (seed) c.semillas.add(seed);\n  }\n}\nconst top = Object.values(cand).sort((a, b) => b.freq - a.freq).slice(0, Number(plan.cap_detalle || 20));\nconst candidatos = {};\ntop.forEach(c => { candidatos[c.username.toLowerCase()] = { username: c.username, freq: c.freq, proyectos: [...c.proyectos], semillas: [...c.semillas] }; });\nconsole.log('[Descubrimiento] sugeridos únicos nuevos: ' + Object.keys(cand).length + ' → pasan a detalle: ' + top.length);\nreturn [{ json: { usernames: top.map(c => c.username), candidatos, unicos: Object.keys(cand).length } }];"
+        "jsCode": "// Agregar sugeridos — junta relatedProfiles de todas las semillas, dedup y rankea por frecuencia\n// (sugerido por N semillas > sugerido por 1). Corta a cap_perfiles_detalle antes de pagar el detalle.\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst conocidos = new Set(plan.conocidos_ig || plan.conocidos || []);\nconst seedToProj = plan.seed_to_proj || {};\nconst cand = {};\nfor (const it of $input.all()) {\n  const d = it.json || {};\n  const seed = String(d.username || '').toLowerCase();\n  const proys = seedToProj[seed] || [];\n  for (const rp of (Array.isArray(d.relatedProfiles) ? d.relatedProfiles : [])) {\n    const u = String((rp && rp.username) || '').trim().replace(/^@+/, ''); if (!u) continue;\n    if (rp.is_private) continue;\n    const k = u.toLowerCase(); if (conocidos.has(k)) continue;\n    const c = (cand[k] = cand[k] || { username: u, freq: 0, proyectos: new Set(), semillas: new Set() });\n    c.freq++; proys.forEach(p => c.proyectos.add(p)); if (seed) c.semillas.add(seed);\n  }\n}\nconst top = Object.values(cand).sort((a, b) => b.freq - a.freq).slice(0, Number(plan.cap_detalle || 20));\nconst candidatos = {};\ntop.forEach(c => { candidatos[c.username.toLowerCase()] = { username: c.username, freq: c.freq, proyectos: [...c.proyectos], semillas: [...c.semillas] }; });\nconsole.log('[Descubrimiento] sugeridos únicos nuevos: ' + Object.keys(cand).length + ' → pasan a detalle: ' + top.length);\nreturn [{ json: { usernames: top.map(c => c.username), candidatos, unicos: Object.keys(cand).length } }];"
       },
       "name": "Agregar sugeridos",
       "type": "n8n-nodes-base.code",
@@ -600,7 +618,73 @@
     },
     {
       "parameters": {
-        "jsCode": "// Armar propuestas — umbral de afinidad + cap por corrida (Ajustes) → batches de 10 para Airtable.\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst MAX = Math.max(1, Number(plan.propuestas_max || 10));\nconst items = $input.all().map(i => i.json).filter(d => d && d.username && !d._vacio);\nconst elegidos = items.filter(d => Number(d.afin || 0) >= MIN)\n  .sort((a, b) => (b.afin - a.afin) || ((b.freq || 0) - (a.freq || 0))).slice(0, MAX);\nif (!elegidos.length) { console.log('[Descubrimiento] 0 propuestas sobre el umbral ' + MIN); return [{ json: { hay_propuestas: false, propuestos: 0 } }]; }\nconst records = elegidos.map(d => ({ fields: {\n  handle: '@' + d.username, plataforma: 'instagram', proyecto: d.proyectos || [],\n  afinidad: Math.round(Number(d.afin) * 100) / 100, razon: String(d.razon || '').slice(0, 500),\n  seguidores: Number(d.seguidores || 0), bio: String(d.bio || '').slice(0, 500), url: d.url,\n  semillas: d.semillas || '', estado: 'propuesto'\n} }));\nconsole.log('[Descubrimiento] proponiendo ' + records.length + ': ' + elegidos.map(d => d.username + '(' + d.afin + ')').join(', '));\nconst out = [];\nfor (let i = 0; i < records.length; i += 10) out.push({ json: { hay_propuestas: true, records: records.slice(i, i + 10), propuestos: records.length } });\nreturn out;"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ($('Armar plan de descubrimiento').first().json.tt_semillas || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — hay semillas TT",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "id": "if-hay-semillas-tt",
+      "position": [
+        1290,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "apifyApi",
+        "resource": "Actors",
+        "operation": "Run actor and get dataset",
+        "actorId": "dataovercoffee~tiktok-lookalike-search",
+        "customBody": "={{ { seed_usernames: $('Armar plan de descubrimiento').first().json.tt_semillas, exclude_usernames: $('Armar plan de descubrimiento').first().json.conocidos_tt, limit: $('Armar plan de descubrimiento').first().json.cap_detalle_tt } }}"
+      },
+      "name": "Apify — Lookalikes TikTok",
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "apify-lookalikes-tiktok",
+      "position": [
+        1500,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vetting TikTok (Haiku) — jurado estricto sobre bio + métricas (el lookalike actor no expone captions),\n// por proyecto con semillas TT (criterios Proyecto ⊕ Voz, ADR-010). FAIL-CLOSED como IG (ADR-020):\n// solo adjunta el proyecto donde la afinidad supera el umbral, así la sugerencia lleva el proyecto correcto.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst projects = plan.projects || {};\nconst ttProjectIds = plan.tt_project_ids || [];\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst conocidosTT = new Set(plan.conocidos_tt || []);\nconst semillasTxt = (plan.tt_semillas || []).join(', ');\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\n\nconst detalle = {};\nfor (const it of $input.all()) {\n  const d = it.json || {};\n  const u = String(d.unique_id || '').trim().replace(/^@+/, ''); if (!u) continue;\n  const k = u.toLowerCase(); if (conocidosTT.has(k) || detalle[k]) continue;\n  detalle[k] = { username: u, bio: String(d.signature || '').trim(), seguidores: Number(d.follower_count || 0), score: Number(d.score || 0), url: String(d.tiktok_url || ('https://www.tiktok.com/@' + u)), avg_views: Number(d.recent_avg_play_count || 0), avg_likes: Number(d.recent_avg_like_count || 0) };\n}\nconst lista = Object.values(detalle);\nif (!lista.length) { console.log('[Vetting TT] 0 lookalikes'); return [{ json: { _vacio: true } }]; }\n\nconst juicio = {}; // username → { afin, razon, proyectos }\nlet firstCall = true;\nfor (const pid of ttProjectIds) {\n  const p = projects[pid]; if (!p) continue;\n  const criterios = [p.criterios ? 'CRITERIOS DE TEMA (principal):\\n' + p.criterios : '', p.voz_criterios ? 'AJUSTE DE VOZ (complementa, no manda):\\n' + p.voz_criterios : ''].filter(Boolean).join('\\n\\n');\n  if (!criterios) { console.log('[Vetting TT] proyecto sin criterios, se salta (fail-closed): ' + p.nombre); continue; }\n  const lote = lista.map(d => ({ id: d.username, bio: d.bio.slice(0, 300), seguidores: d.seguidores, avg_views: d.avg_views, avg_likes: d.avg_likes }));\n  if (!firstCall) await sleep(1000); firstCall = false;\n  const sys = 'Sos un jurado ESTRICTO que evalua CUENTAS de TikTok como posibles referentes de contenido para un proyecto. Te doy el tema del proyecto, sus criterios, y una lista de cuentas (id + bio + metricas: seguidores, vistas y likes promedio). OJO: no tenes el texto de los videos, solo bio y metricas, asi que se conservador. Para cada cuenta decidi que tan AFIN es el contenido a los criterios (importa el tema, no la fama). Ante la duda, score bajo. Devolve UNICAMENTE un JSON {\"juicio\":[{\"id\":\"...\",\"afin\":0.0,\"razon\":\"breve, en espanol\"}]}. afin 0..1.';\n  const usr = 'TEMA: ' + (p.nombre || '') + '\\n' + criterios + '\\n\\nCUENTAS:\\n' + JSON.stringify(lote);\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n      body: { model: 'claude-haiku-4-5', max_tokens: 4000, system: sys, messages: [{ role: 'user', content: usr }] },\n      json: true, timeout: 60000\n    });\n    let txt = ''; (resp.content || []).forEach(b => { if (b && b.type === 'text') txt += b.text; });\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    const j = m ? JSON.parse(m[0]) : null;\n    ((j && j.juicio) || []).forEach(x => {\n      const u = String(x.id || '').toLowerCase(); if (!detalle[u]) return;\n      const afin = Math.max(0, Math.min(1, Number(x.afin || 0)));\n      if (afin < MIN) return; // solo se adjunta el proyecto donde la cuenta es relevante\n      const prev = juicio[u];\n      if (!prev) juicio[u] = { afin, razon: String(x.razon || ''), proyectos: [pid] };\n      else { if (afin > prev.afin) { prev.afin = afin; prev.razon = String(x.razon || ''); } if (prev.proyectos.indexOf(pid) < 0) prev.proyectos.push(pid); }\n    });\n  } catch (e) { console.log('[Vetting TT] Haiku falló para ' + p.nombre + ' — FAIL-CLOSED: ' + (e.message || e)); }\n}\n\nconst out = [];\nfor (const u in juicio) { const d = detalle[u];\n  out.push({ json: { username: d.username, plataforma: 'tiktok', afin: juicio[u].afin, razon: juicio[u].razon, proyectos: juicio[u].proyectos, seguidores: d.seguidores, bio: d.bio, url: d.url, semillas: semillasTxt, freq: Math.round((d.score || 0) * 100) } });\n}\nconsole.log('[Vetting TT] cuentas afines: ' + out.length);\nif (!out.length) return [{ json: { _vacio: true } }]; // la cadena sigue hasta Armar propuestas\nreturn out;"
+      },
+      "name": "Vetting TikTok (Haiku)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "id": "vetting-tiktok-haiku",
+      "position": [
+        1710,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Armar propuestas — junta IG + TikTok (leídos por nombre, cada fila trae su plataforma y proyecto),\n// umbral de afinidad + cap por corrida (Ajustes) → batches de 10 para Airtable.\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst MAX = Math.max(1, Number(plan.propuestas_max || 10));\nconst grab = (n) => { try { return $(n).all().map(i => i.json); } catch (e) { return []; } };\nconst items = [...grab('Vetting relevancia (Haiku)'), ...grab('Vetting TikTok (Haiku)')].filter(d => d && d.username && !d._vacio);\nconst elegidos = items.filter(d => Number(d.afin || 0) >= MIN)\n  .sort((a, b) => (b.afin - a.afin) || ((b.freq || 0) - (a.freq || 0))).slice(0, MAX);\nif (!elegidos.length) { console.log('[Descubrimiento] 0 propuestas sobre el umbral ' + MIN); return [{ json: { hay_propuestas: false, propuestos: 0 } }]; }\nconst records = elegidos.map(d => ({ fields: {\n  handle: '@' + d.username, plataforma: d.plataforma || 'instagram', proyecto: d.proyectos || [],\n  afinidad: Math.round(Number(d.afin) * 100) / 100, razon: String(d.razon || '').slice(0, 500),\n  seguidores: Number(d.seguidores || 0), bio: String(d.bio || '').slice(0, 500), url: d.url,\n  semillas: d.semillas || '', estado: 'propuesto'\n} }));\nconsole.log('[Descubrimiento] proponiendo ' + records.length + ': ' + elegidos.map(d => d.username + '(' + (d.plataforma || 'ig') + ' ' + d.afin + ')').join(', '));\nconst out = [];\nfor (let i = 0; i < records.length; i += 10) out.push({ json: { hay_propuestas: true, records: records.slice(i, i + 10), propuestos: records.length } });\nreturn out;"
       },
       "name": "Armar propuestas",
       "type": "n8n-nodes-base.code",
@@ -696,7 +780,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (function(){\nvar g = function(n, f){ try { return f($(n)); } catch (e) { return null; } };\nvar plan = g('Armar plan de descubrimiento', function(x){ return x.first().json; }) || {};\nvar ag = g('Agregar sugeridos', function(x){ return x.first().json; }) || {};\nvar vet = g('Vetting relevancia (Haiku)', function(x){ return x.all().map(function(i){ return i.json; }).filter(function(d){ return d && d.username; }); }) || [];\nvar ap = g('Armar propuestas', function(x){ return x.first().json; }) || {};\nvar prom = g('Preparar promoción', function(x){ return x.first().json; }) || {};\nreturn { fin: $now.toISO(), estado: 'ok', metricas: { semillas: (plan.semillas || []).length, sugeridos_unicos: ag.unicos || 0, detalle: (ag.usernames || []).length, vetteados: vet.length, propuestos: ap.propuestos || 0, promovidos: (prom.crear || []).length } };\n})() }}",
+        "jsonBody": "={{ (function(){\nvar g = function(n, f){ try { return f($(n)); } catch (e) { return null; } };\nvar plan = g('Armar plan de descubrimiento', function(x){ return x.first().json; }) || {};\nvar ag = g('Agregar sugeridos', function(x){ return x.first().json; }) || {};\nvar vet = g('Vetting relevancia (Haiku)', function(x){ return x.all().map(function(i){ return i.json; }).filter(function(d){ return d && d.username; }); }) || [];\nvar vetTT = g('Vetting TikTok (Haiku)', function(x){ return x.all().map(function(i){ return i.json; }).filter(function(d){ return d && d.username; }); }) || [];\nvar look = g('Apify — Lookalikes TikTok', function(x){ return x.all().map(function(i){ return i.json; }).filter(function(d){ return d && d.unique_id; }); }) || [];\nvar ap = g('Armar propuestas', function(x){ return x.first().json; }) || {};\nvar prom = g('Preparar promoción', function(x){ return x.first().json; }) || {};\nreturn { fin: $now.toISO(), estado: 'ok', metricas: { semillas: (plan.semillas || []).length + (plan.tt_semillas || []).length, sugeridos_unicos: (ag.unicos || 0) + look.length, detalle: (ag.usernames || []).length + look.length, vetteados: vet.length + vetTT.length, propuestos: ap.propuestos || 0, promovidos: (prom.crear || []).length } };\n})() }}",
         "options": {
           "timeout": 15000
         }
@@ -939,7 +1023,7 @@
       "main": [
         [
           {
-            "node": "Armar propuestas",
+            "node": "IF — hay semillas TT",
             "type": "main",
             "index": 0
           }
@@ -980,6 +1064,46 @@
         [
           {
             "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — hay semillas TT": {
+      "main": [
+        [
+          {
+            "node": "Apify — Lookalikes TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Armar propuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify — Lookalikes TikTok": {
+      "main": [
+        [
+          {
+            "node": "Vetting TikTok (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vetting TikTok (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Armar propuestas",
             "type": "main",
             "index": 0
           }

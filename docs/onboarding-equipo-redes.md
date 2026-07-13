@@ -195,9 +195,11 @@ Cada fila es una cuenta de la que la máquina trae videos. **Es la fuente más i
 > **No llenen `seguidores` ni `viral_por_tamano`.** Esas las completa la máquina sola. El flag de viral solo
 > **marca** las cuentas muy grandes (+700K); no las excluye.
 >
-> **🟠 Falta sembrar TikTok.** Hoy casi todos los Referentes cargados son de Instagram. La máquina **sí sigue
-> cuentas de TikTok** (el eje está prendido), pero si no cargan cuentas de TikTok, ese eje corre vacío. **Hace
-> falta que agreguen cuentas de TikTok** para aprovecharlo.
+> **🟠 Falta sembrar TikTok.** Hoy casi todos los Referentes cargados son de Instagram. Para que la máquina
+> traiga videos de TikTok hacen falta **dos cosas**: cargar cuentas de TikTok acá **y** que el toggle
+> **"Buscar por referentes en TikTok"** esté prendido (§5.5). Sin cuentas de TikTok cargadas, ese eje corre
+> vacío. Cargar unas cuantas cuentas buenas de TikTok también le da semillas al buscador de cuentas nuevas
+> (§8.1) para que empiece a proponer más TikTok solo.
 
 ### 5.4 `Candidatos` — NO se llena a mano
 
@@ -242,12 +244,19 @@ los proyectos):
   backfill).
 - **Resultados por cuenta de referente** — cuántos videos baja por cada cuenta de Referentes (más = más costo).
 
-**Los dos ejes de búsqueda (prender/apagar, 1 = prendido / 0 = apagado; por defecto ambos prendidos):**
-- **Buscar por referentes en Instagram** — cuentas de IG en Referentes.
-- **Buscar por referentes en TikTok** — cuentas de TikTok en Referentes.
+**Traer videos — los dos ejes del motor semanal (1 = prendido / 0 = apagado; por defecto ambos prendidos):**
+- **Buscar por referentes en Instagram** — trae videos de las cuentas de IG en Referentes.
+- **Buscar por referentes en TikTok** — trae videos de las cuentas de TikTok en Referentes.
 
-> Usen los toggles para **apagar una plataforma** si no la están usando (ej: si todavía no cargaron cuentas
-> de TikTok, no pasa nada por dejarla prendida: corre vacía). No hace falta tocarlos para el día a día.
+**Proponer cuentas nuevas — los dos ejes del buscador (§8.1) (1 = prendido / 0 = apagado; por defecto ambos prendidos):**
+- **Descubrir en Instagram** — el buscador propone cuentas nuevas de Instagram.
+- **Descubrir en TikTok** — el buscador propone cuentas nuevas de TikTok (necesita que ya tengan
+  cuentas de TikTok cargadas en Referentes; ver §8.1).
+
+> Ojo con la diferencia: **"Buscar por referentes en X"** trae *videos* de las cuentas que ya tienen;
+> **"Descubrir en X"** propone *cuentas nuevas* para sumar. Son independientes. Usen los toggles para
+> **apagar una plataforma** si no la están usando (si todavía no cargaron cuentas de TikTok, no pasa nada
+> por dejarlos prendidos: corren vacíos). No hace falta tocarlos para el día a día.
 
 El resto de las perillas (pesos de orden, bonus de idioma, mínimos) son **avanzadas** y viven en la página
 **Ajustes Dev-Only**. **No las toquen sin avisarnos la primera vez.** Igual, todas tienen un tope de
@@ -347,8 +356,8 @@ más/mejor → curen esa tabla.**
 
 Para que la lista de Referentes no se agote, hay un segundo robot que corre **los lunes a la mañana**
 y les propone cuentas nuevas. Cómo las encuentra: toma sus referentes que **mejor están funcionando**
-(los que más aprueban ustedes), mira qué cuentas sugiere Instagram como "parecidas", filtra las que ya
-conocen y las que no pegan con los temas, y les deja **hasta 10 por semana** en la tabla
+(los que más aprueban ustedes), busca cuentas **parecidas** en Instagram **y en TikTok**, filtra las
+que ya conocen y las que no pegan con los temas, y les deja **hasta 10 por semana** en la tabla
 **Referentes propuestos**.
 
 Cada propuesta llega con todo para decidir sin salir de Airtable:
@@ -371,7 +380,10 @@ Cada propuesta llega con todo para decidir sin salir de Airtable:
   (si se arrepienten, siempre pueden agregarla a mano en Referentes).
 
 Tres cosas para saber:
-- **Solo propone cuentas de Instagram** por ahora. Las de TikTok las siguen sembrando ustedes a mano.
+- **Propone Instagram y TikTok.** Para TikTok necesita que ya tengan **algunas cuentas de TikTok
+  cargadas** en Referentes: de esas semillas saca las parecidas. Las primeras de TikTok las siembran
+  ustedes a mano (§5.3); de ahí el buscador las multiplica solo. Sin ninguna cuenta de TikTok, ese eje
+  no propone nada (no se rompe, solo no aporta).
 - **No reemplaza su criterio.** Nada entra a Referentes sin que ustedes lo aprueben. Sigue valiendo
   agregar cuentas a mano cuando encuentren una buena.
 - Mientras mejor califiquen los Candidatos durante la semana, mejores semillas usa el buscador →
@@ -386,8 +398,9 @@ Honestidad por adelantado, para que no se sorprendan:
 - **La traducción es literal, no adaptada.** El script es el video tal cual, traducido al español. La
   adaptación a la voz/marca la hacen ustedes.
 - **Los videos salen solo de sus Referentes.** Si la lista es floja, lo que llega es flojo. El
-  buscador de cuentas nuevas (§8.1) ayuda a reponerla, pero solo propone: la decisión de qué cuenta
-  entra sigue siendo de ustedes (y en TikTok todavía siembran a mano).
+  buscador de cuentas nuevas (§8.1) ayuda a reponerla en Instagram y TikTok, pero solo propone: la
+  decisión de qué cuenta entra sigue siendo de ustedes (y las primeras cuentas de TikTok las siembran
+  ustedes a mano para que el buscador tenga de dónde partir).
 - **A veces un video llega sin transcripción** (§5.4): mírenlo y decidan a mano. Esos llegan con el
   título marcado **⚠️ SIN GUION** en el feed.
 - **El empujón por idioma es parejo para todos los idiomas no-español.** No premia más el inglés que el

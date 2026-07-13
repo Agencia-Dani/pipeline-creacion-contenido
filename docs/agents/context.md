@@ -28,9 +28,10 @@ Una cuenta de Instagram o TikTok de la que el motor trae videos. **La única fue
 promovidas desde los Referentes propuestos (ADR-020).
 
 **Referente propuesto**:
-Una cuenta candidata a Referente que el **workflow de descubrimiento** (ADR-020) propone cada semana:
-sugeridos del propio Instagram a partir de las **semillas** (los referentes activos que mejor
-convierten según la señal de selección), veteados con Haiku contra los criterios del proyecto. Vive en
+Una cuenta candidata a Referente que el **workflow de descubrimiento** (ADR-020) propone cada semana a
+partir de las **semillas** (los referentes activos que mejor convierten según la señal de selección):
+en Instagram los sugeridos del propio IG (`relatedProfiles`), en TikTok los lookalikes del actor
+dataovercoffee (ADR-020 §8, rama paralela). Veteados con Haiku contra los criterios del proyecto. Vive en
 la tabla `Referentes propuestos`; el equipo la marca aprobado/descartado y los aprobados se promueven
 solos a `Referentes`. Un handle propuesto no se re-propone (descartar es definitivo).
 

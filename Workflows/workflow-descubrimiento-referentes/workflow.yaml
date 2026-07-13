@@ -6,11 +6,12 @@
 contract_version: 1
 
 id: descubrimiento-referentes
-name: "Descubrimiento de referentes — sugeridos IG → propuestos"
+name: "Descubrimiento de referentes — sugeridos IG + TikTok → propuestos"
 description: >
-  Corre semanal: toma los referentes IG activos que mejor convierten (v_senal_seleccion), pide a
-  Instagram sus cuentas sugeridas (relatedProfiles vía Apify), las vetea con Haiku contra los
-  criterios de cada proyecto y escribe propuestas en la tabla "Referentes propuestos" del cockpit.
+  Corre semanal: toma los referentes activos que mejor convierten (v_senal_seleccion), pide sus
+  cuentas similares (Instagram relatedProfiles vía Apify; TikTok vía dataovercoffee lookalike,
+  rama paralela), las vetea con Haiku contra los criterios de cada proyecto y escribe propuestas en
+  la tabla "Referentes propuestos" del cockpit. La rama TikTok idlea gratis sin referentes TT.
   Al inicio de cada corrida promueve a Referentes las propuestas que el equipo marcó aprobado.
 engine: n8n
 status: draft                     # construido (ADR-020); sin importar aún en la instancia n8n
@@ -35,6 +36,16 @@ inputs:
       scope: client
       default: 0.6
       desc: "Umbral del vetting Haiku (fila 'Afinidad mínima de propuesta' en Ajustes)"
+    - key: descubrir_ig
+      type: number
+      scope: client
+      default: 1
+      desc: "Toggle eje Instagram (fila 'Descubrir en Instagram' en Ajustes; 1=on/0=off, Mostrar al equipo)"
+    - key: descubrir_tt
+      type: number
+      scope: client
+      default: 1
+      desc: "Toggle eje TikTok (fila 'Descubrir en TikTok' en Ajustes; 1=on/0=off, Mostrar al equipo)"
     - key: cap_semillas
       type: number
       scope: client
@@ -45,16 +56,21 @@ inputs:
       scope: client
       default: 20
       desc: "Tope dev-only de perfiles sugeridos que pagan la 2ª llamada Apify (Config)"
+    - key: cap_lookalikes_tt
+      type: number
+      scope: client
+      default: 15
+      desc: "Tope dev-only de lookalikes TikTok por corrida — control de costo ($0.20/resultado) (Config)"
   credentials:
     - airtable_token              # credencial n8n 'Airtable PAT' (airtableTokenApi)
     - supabase_service_role       # credencial n8n 'Supabase Registro' (supabaseApi)
     - apify_token                 # credencial n8n 'apifyApi' (community node @apify)
-    - anthropic_api_key           # placeholder <ANTHROPIC_API_KEY> en el Code node de vetting
+    - anthropic_api_key           # placeholder <ANTHROPIC_API_KEY> en AMBOS code de vetting (IG y TikTok)
 
 stages:                           # las 8 etapas canónicas; acá la "pieza" es una CUENTA, no un video
-  colectar: "Apify instagram-profile-scraper 2 pasadas: perfiles semilla → relatedProfiles; detalle de sugeridos (bio, followers, latestPosts)."
-  normalizar: "Agregar sugeridos: flatten de relatedProfiles, dedup contra Referentes + Propuestos, ranking por frecuencia entre semillas."
-  filtrar_scorear: "Vetting Haiku (FAIL-CLOSED): afinidad 0..1 contra criterios Proyecto⊕Voz sobre bio + captions; umbral y cap de Ajustes."
+  colectar: "IG: Apify instagram-profile-scraper 2 pasadas (semillas → relatedProfiles; detalle bio/followers/latestPosts). TikTok: Apify dataovercoffee lookalike 1 pasada (semillas → similares con score/bio/métricas), gateado por IF — hay semillas TT."
+  normalizar: "Agregar sugeridos (IG): flatten de relatedProfiles, dedup por (plataforma, handle), ranking por frecuencia. TikTok: dedup por (plataforma, handle) contra conocidos_tt."
+  filtrar_scorear: "Vetting Haiku por eje (FAIL-CLOSED): IG sobre bio + captions; TikTok sobre bio + métricas (sin captions). Ambos: afinidad 0..1 contra criterios Proyecto⊕Voz, umbral y cap de Ajustes. Armar propuestas junta IG + TikTok."
   enriquecer: n/a
   generar: n/a
   calidad: n/a
@@ -67,7 +83,7 @@ outputs:
     registered: yes               # runs con params.workflow='descubrimiento' + metricas del embudo
 
 runbook:
-  setup: "Importar workflow.json en n8n → completar nodo Config (base_id, supabase_url, instance_id) y <ANTHROPIC_API_KEY> en 'Vetting relevancia (Haiku)' → mapear credenciales (Airtable PAT, Supabase Registro, apifyApi). Requiere la tabla 'Referentes propuestos' + 2 filas de Ajustes en la base (contrato airtable-cockpit.md)."
+  setup: "Importar workflow.json en n8n → completar nodo Config (base_id, supabase_url, instance_id) y <ANTHROPIC_API_KEY> en AMBOS code de vetting ('Vetting relevancia (Haiku)' y 'Vetting TikTok (Haiku)') → mapear credenciales (Airtable PAT, Supabase Registro, apifyApi — la misma cred apifyApi sirve para el actor TikTok dataovercoffee). Requiere la tabla 'Referentes propuestos' + 2 filas de Ajustes en la base (contrato airtable-cockpit.md)."
   start: "Activar el workflow en n8n (cron lunes 9am, validar timezone America/Bogota)."
   stop: "Desactivar el workflow en n8n."
   test: "Execute Workflow manual → verificar: run 'descubrimiento' cerrado ok en Supabase con metricas {semillas, sugeridos_unicos, detalle, vetteados, propuestos, promovidos}; filas nuevas estado=propuesto en 'Referentes propuestos' sin repetir handles de Referentes/Propuestos; marcar una propuesta como aprobado y re-ejecutar → aparece en Referentes (activo) y la fila queda promovido."
@@ -75,4 +91,4 @@ runbook:
     - README.md
     - ../../docs/adr/ADR-020-motor-descubrimiento-referentes.md
 
-cost_per_run: "~$0.10 — ~28 perfiles Apify (~$0.07) + 1-2 llamadas Haiku; sin Supadata."
+cost_per_run: "IG ~$0.10 (~28 perfiles Apify ~$0.07 + 1-2 Haiku). TikTok +~$3 cuando hay semillas TT (cap_lookalikes_tt=15 × $0.20) + Haiku por proyecto; $0 sin referentes TT (rama gateada). Sin Supadata."
