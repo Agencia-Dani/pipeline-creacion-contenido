@@ -4,9 +4,10 @@
 > dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
 > falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
 >
-> *Actualizado: 2026-07-10. Refleja el motor en producción buscando **solo por referentes**
-> (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron: no traían calidad — y el
-> **buscador de cuentas nuevas** (§8.1): la máquina ahora también les propone referentes.*
+> *Actualizado: 2026-07-14. Refleja el sistema ya estabilizado: el motor busca **solo por
+> referentes** (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron porque no
+> traían calidad —, el **buscador de cuentas nuevas** les propone referentes (§8.1), y hay
+> **páginas de métricas** que muestran cómo viene funcionando (§6.2).*
 
 ---
 
@@ -47,6 +48,21 @@ El trabajo de ustedes no es buscar ni escribir. Es **decidir**: entrar a la list
 sirven. La máquina **aprende** de lo que eligen y va mejorando lo que les trae.
 
 En una frase: **la máquina encuentra y ordena; ustedes eligen y adaptan.**
+
+### 1.1 Las tres máquinas (qué corre solo y cuándo)
+
+Por detrás no hay una sola máquina, son tres robots que corren solos en el momento justo. **No
+tienen que hacer nada para que arranquen** — es plomería. Sirve saber que existen para entender de
+dónde sale cada cosa que ven en Airtable:
+
+| Robot | Cuándo corre | Qué hace | Qué ven ustedes después |
+|---|---|---|---|
+| **El motor** | Lunes 8:00 am | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Calificar** + los dudosos en **Descartes (auditar)**. |
+| **El buscador de cuentas** | Lunes 9:00 am | Mira sus mejores Referentes y busca cuentas **parecidas** para sumar. | Sugerencias en **Referentes propuestos**. |
+| **El archivador** | Domingo 6:00 pm | Se lleva al Histórico todo lo que ya calificaron, limpia la lista y cuenta el desempeño de la semana. | La lista queda limpia + se actualizan las **Métricas**. |
+
+Regla mental de la semana: **el lunes llega trabajo, durante la semana ustedes califican, el domingo
+se archiva y se mide.** Todo lo demás es automático.
 
 ---
 
@@ -114,6 +130,30 @@ Hay 8 tablas. Piénsenlas en tres grupos.
 
 - **Métricas** — el desempeño de cada semana (páginas *Métricas — Calidad* y *Métricas — Salud*, §6.2).
   La llena la máquina cada domingo; **nadie escribe ahí**.
+
+### 4.1 El layout que ven: el menú del "Cockpit Redes"
+
+Cuando entran a Airtable no ven las tablas crudas: ven una interfaz llamada **Cockpit Redes** con un
+menú de páginas a la izquierda. Cada página es una vista limpia de una tabla, con solo lo que hace
+falta. Este es el menú completo y qué pueden tocar en cada uno:
+
+| Página (lo que ven en el menú) | Para qué | Qué editan ahí |
+|---|---|---|
+| **Calificar (feed)** | Su bandeja diaria de videos a calificar | `calificacion`, `estado`, `notas_equipo` |
+| **Referentes propuestos (aprobar)** | Cuentas nuevas que sugiere el buscador (§8.1) | `estado` (aprobado / descartado) |
+| **Descartes (auditar)** | Los ~10 descartes dudosos de la semana (§6.1) | `veredicto` |
+| **Referentes** | El banco de cuentas de IG y TikTok que se rastrean | todo (arman la lista) |
+| **Proyectos** | Los temas que se buscan | todo (arman los temas) |
+| **Voces** | Para quién se selecciona | todo |
+| **Configuración Global** | Las perillas del día a día (§5.5) | solo el `valor` de cada perilla |
+| **Ajustes Dev-Only** | Las perillas avanzadas | **nada — solo lectura** (avisen antes de tocar) |
+| **Métricas — Calidad** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
+| **Métricas — Salud** | Los números de la máquina (§6.2) | **nada — solo lectura** |
+
+> **Ojo con los nombres.** Algunas páginas se llaman distinto a la tabla que muestran: *Calificar
+> (feed)* es la tabla **Candidatos**; *Configuración Global* es la tabla **Ajustes**. Guíense por el
+> nombre del **menú**, no por el de la tabla. También hay un formulario **"Nuevo Proyecto"** para
+> crear un proyecto llenando un formulario en vez de una fila.
 
 En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
 el **idioma original**, la **portada**, el **link al video original**, las **métricas** (views, likes,
