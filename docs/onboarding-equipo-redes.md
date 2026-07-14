@@ -7,7 +7,8 @@
 > *Actualizado: 2026-07-14. Refleja el sistema ya estabilizado: el motor busca **solo por
 > referentes** (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron porque no
 > traían calidad —, el **buscador de cuentas nuevas** les propone referentes (§8.1), y hay
-> **páginas de métricas** que muestran cómo viene funcionando (§6.2).*
+> **páginas de métricas** que muestran cómo viene funcionando (§6.2), ahora con la columna
+> **`diagnostico`** que les dice en una frase qué criterio conviene ajustar (§6.2).*
 
 ---
 
@@ -321,6 +322,10 @@ Hay dos cosas que marcan, y son distintas:
 > **¿Cuál es más importante?** El `estado`. La máquina aprende sobre todo de aprobado vs descartado. La
 > `calificacion` (🔥/👍/👎) es una ayuda visual para ustedes y una señal más fina. Lo ideal: pongan **las dos**.
 
+> **No dejen candidatos colgando.** Un candidato que queda en `nuevo` sin calificar por **más de 20
+> días** se borra solo (para que la pestaña "Nuevos" no se llene de cosas viejas que nadie miró). Si no
+> lo calificaron, se pierde sin pasar por el Histórico. Traten de vaciar la bandeja cada semana.
+
 ### La vista "🔥 Seleccionados"
 Es una pantalla aparte que muestra **solo los que pusieron en `aprobado`**, ordenados del más caliente al
 más frío. **Es solo para ver**, no califican ahí. Funciona así: ustedes aprueban en la lista normal de
@@ -345,12 +350,18 @@ acumulan; cada semana llega una tanda fresca). Si no alcanzan a revisarlos, no p
 
 Cada domingo la máquina escribe el resumen de la semana:
 - **Métricas — Calidad**: por proyecto, cuántos calificaron, cuántos aprobaron y la **precisión**
-  (de lo que llegó, qué fracción sirvió). Si la precisión de un proyecto es baja semana tras semana,
-  sus `criterios_relevancia` o sus referentes necesitan ajuste (§5.2 y §5.3).
+  (de lo que llegó, qué fracción sirvió). La columna **`diagnostico`** les traduce en una frase si el
+  criterio de ese proyecto está funcionando, con un semáforo:
+  - 🟢 **sano** — el filtro distingue bien lo que ustedes quieren. No toquen nada.
+  - 🟡 **mejorable** — separa, pero poco. Un retoque a `criterios_relevancia` (§5.2) lo sube.
+  - 🔴 **flojo o invertido** — el filtro casi no distingue lo que aprueban de lo que descartan (o, peor,
+    está al revés). **Acá sí conviene reescribir el `criterios_relevancia`** del proyecto: sumen qué SÍ
+    y qué NO cuenta como relevante, con un par de ejemplos. Es la señal más útil de esta página.
 - **Métricas — Salud**: los números de la máquina (cuántos videos procesó, cuántos llegaron sin guion,
   si alguna corrida falló). Esta es más para Mani, pero está a la vista de todos.
 
-Son de **solo lectura a propósito**: las llena la máquina, nadie escribe ahí.
+Son de **solo lectura a propósito**: las llena la máquina, nadie escribe ahí. *(Guarda 12 semanas de
+historia visible; lo más viejo queda archivado por fuera.)*
 
 ---
 
@@ -414,10 +425,12 @@ Cada propuesta llega con todo para decidir sin salir de Airtable:
 **Su trabajo (una vez por semana, 5 minutos):** revisar las filas en `propuesto` y cambiar el
 `estado`:
 - **aprobado** — la quieren. **No hay que hacer nada más**: el lunes siguiente la máquina la crea
-  sola en Referentes (activa, con la razón en las notas) y la marca `promovido`. Empieza a traer
-  videos en esa misma corrida.
+  sola en Referentes (activa, con la razón en las notas). Empieza a traer videos en esa misma corrida.
 - **descartado** — no va. **Ojo: es definitivo** — esa cuenta no se les vuelve a proponer nunca
   (si se arrepienten, siempre pueden agregarla a mano en Referentes).
+
+Apenas marcan una fila (aprobado o descartado), **desaparece de la lista**: la página muestra solo las
+que están en `propuesto`, o sea lo que les falta revisar. No se borró, solo se fue de la bandeja.
 
 Tres cosas para saber:
 - **Propone Instagram y TikTok.** Para TikTok necesita que ya tengan **algunas cuentas de TikTok

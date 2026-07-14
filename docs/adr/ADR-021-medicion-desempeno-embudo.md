@@ -72,3 +72,29 @@ near-miss: los que más cerca estuvieron de pasar = los candidatos más probable
 Garantiza que la muestra se pueble y apunta justo a lo auditable. Los knobs `banda_descarte_min` /
 `banda_descarte_max` quedan **deprecados** (el gate ya no los lee); sobrevive `cap_descartes` como K.
 El resto del ADR (semántica de la tabla, veredicto, limpieza semanal, falsos negativos) no cambia.
+
+## Enmienda 2026-07-14 — diagnóstico legible + dos barridos de higiene
+
+**Contexto (audit con Mani, dejar el pipeline listo para el equipo):** tres huecos operativos. (1) La
+separación del gate ya vive en `Métricas` pero como decimal que nadie interpreta — la señal de "este
+criterio no discrimina" existe (Trading Psychology 0.04, Storytelling 0.08 en el ciclo 07-13) y no
+llega a nadie. (2) El archivado solo borra Candidatos *decididos*; los `nuevo` que nadie califica se
+apilan en la pestaña "Nuevos". (3) `Métricas` es la única tabla que crece monótona (~7 filas/semana);
+sin cota, es la fuga lenta hacia el tope de 1.000 registros del plan free.
+
+**Decisión (Mani):**
+1. **Columna `diagnostico` en `Métricas`** (solo filas de proyecto): el archivado traduce
+   `separacion_gate`+`precision` a 🟢 sano / 🟡 mejorable / 🔴 flojo o invertido + qué hacer. **Regla,
+   sin IA** (cero costo, cero latencia). Es el semáforo de *outcome* y **precede** al *lint de forma*
+   con IA de [ADR-022](./ADR-022-loop-aprendizaje-criterios.md)/M2 (criterio vago / sin lista negativa
+   / Voz incoherente): conviven — uno mira si el criterio discriminó esta semana, el otro si está bien
+   escrito.
+2. **Barrido de Candidatos `nuevo` > 20 días:** se purgan sin archivar (nunca hubo decisión humana que
+   guardar). Umbral 20 días fijado por Mani. Mantiene limpia la pestaña "Nuevos".
+3. **Cap de `Métricas` a 12 semanas (84 días):** historia *visible* en el cockpit; la verdad larga y
+   canónica queda en Supabase (`runs.metricas`+`outputs`) y el Sheet, de donde `Métricas` es
+   regenerable. Cap subible si el jefe quiere más trend.
+
+Los dos barridos cuelgan de `Cerrar run` con `onError:continue` (el run ya cerró — no lo bloquean; si
+fallan, reintentan el domingo siguiente), mismo patrón de lote-de-10 que `Borrar Descartes del gate`.
+Archivado 24 → 30 nodos. No cambia el resto del ADR.

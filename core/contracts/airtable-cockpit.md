@@ -183,6 +183,7 @@ la ven en las páginas *Métricas — Calidad* y *Métricas — Salud* (solo-lec
 | `precision` | número (0-1) | **precisión de entrega** = aprobados / calificados (la métrica norte) |
 | `score_aprobados` / `score_descartados` | número (0-1) | score medio del gate en cada grupo |
 | `separacion_gate` | número | la resta de los dos: baja = los criterios del proyecto no discriminan |
+| `diagnostico` | texto largo | **lectura legible del criterio** (solo filas de proyecto): 🟢 sano / 🟡 mejorable / 🔴 flojo o invertido + qué hacer, derivado de `separacion_gate`+`precision`. La escribe el archivado (regla, sin IA — enmienda ADR-021 2026-07-14). Es el semáforo de outcome; el *lint de forma* (criterio vago / sin lista negativa / Voz incoherente, con IA) llega en ADR-022/M2 y convive con este |
 | `entregados` / `colectados` / `pretrim` / `gate_pass` | número | el embudo de la semana (solo fila GLOBAL, suma de los runs del motor) |
 | `sin_guion` / `descartes_expuestos` / `falsos_negativos` | número | salud del contenido (GLOBAL) |
 | `runs_ok` / `runs_fallo` / `duracion_min` | número | salud del motor (GLOBAL) |
@@ -218,10 +219,19 @@ la ven en las páginas *Métricas — Calidad* y *Métricas — Salud* (solo-lec
 ## Reglas para no salir del plan free
 
 - **Retención:** Candidatos calificados se archivan a Supabase y se limpian de Airtable. Proyectos,
-  Voces y Referentes son chicos y permanentes (no crecen sin control).
+  Voces y Referentes son chicos y permanentes (no crecen sin control). **Dos barridos del archivado
+  cierran fugas lentas** (enmienda 2026-07-14, colgados de `Cerrar run`, fail-soft — no bloquean el
+  cierre del run):
+  - **Candidatos `nuevo` sin calificar > 20 días:** el archivado solo borraba los *decididos*; los
+    `nuevo` que nadie calificó se apilaban en el feed. Se purgan a los 20 días (no van al histórico:
+    nunca hubo decisión). Mantiene limpia la pestaña "Nuevos".
+  - **`Métricas` > 12 semanas (84 días):** la tabla crece ~7 filas/semana (única tabla monótona). Se
+    capa a 12 semanas de historia *visible*; el histórico largo y canónico queda en Supabase
+    (`runs.metricas` + `outputs`) y el Sheet, de donde `Métricas` es regenerable. Subir el cap si el
+    jefe quiere más trend en el cockpit.
 - **Batching:** toda lectura/escritura de n8n agrupa registros (10/call). Con cadencia semanal
-  (motor lunes + archivado domingo) y batching entra cómodo bajo 1.000 calls/mes. `Métricas` crece
-  ~6 filas/semana y `Descartes del gate` se limpia cada domingo: ninguna amenaza el tope de registros.
+  (motor lunes + archivado domingo) y batching entra cómodo bajo 1.000 calls/mes. Con los dos
+  barridos, ninguna tabla amenaza el tope de 1.000 registros.
 - **Secreto:** el Personal Access Token (PAT) de Airtable vive en n8n + gestor de contraseñas,
   jamás en git. El validador escanea el patrón `pat...`.
 

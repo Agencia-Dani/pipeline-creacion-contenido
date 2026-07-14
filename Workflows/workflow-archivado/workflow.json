@@ -634,7 +634,7 @@
         500
       ],
       "parameters": {
-        "jsCode": "\n// Computar métricas de la semana (ADR-021): calidad por proyecto (de los calificados de este cierre)\n// + salud global (runs del motor de la semana + descartes auditados). Defensivo: SIEMPRE devuelve\n// >=1 batch (aunque todo venga vacío o algún Leer haya fallado) para que la cadena llegue a Cerrar run.\nconst hoy = new Date().toISOString().slice(0, 10);\nconst projMap = {};\ntry { $('Leer Proyectos').all().flatMap(it => (it.json && it.json.records) || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || r.id; }); } catch (e) {}\nlet califs = [];\ntry { califs = $('Leer Candidatos calificados').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\nlet runs = [];\ntry { runs = $('Leer runs de la semana').all().map(i => i.json).flatMap(j => Array.isArray(j) ? j : [j]).filter(r => r && r.id && r.metricas !== undefined); const _vis = new Set(); runs = runs.filter(r => { const k = String(r.id); if (_vis.has(k)) return false; _vis.add(k); return true; }); } catch (e) {}\nlet descartes = [];\ntry { descartes = $('Leer Descartes del gate').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\n\nconst _mean = (arr) => arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : null;\nconst _r2 = (v) => (v == null ? undefined : Math.round(v * 100) / 100);\n\n// calidad por proyecto: precisión de entrega + separación del gate (glosario)\nconst porProj = {};\nfor (const r of califs) {\n  const f = r.fields || {};\n  const pid = Array.isArray(f.proyecto) && f.proyecto[0] ? f.proyecto[0] : '';\n  const p = (porProj[pid] = porProj[pid] || { aprobados: 0, descartados: 0, sa: [], sd: [] });\n  const ok = String(f.estado || '').toLowerCase() === 'aprobado';\n  if (ok) p.aprobados++; else p.descartados++;\n  if (typeof f.relevancia_score === 'number') (ok ? p.sa : p.sd).push(f.relevancia_score);\n}\nconst rows = [];\nfor (const pid in porProj) {\n  const p = porProj[pid]; const tot = p.aprobados + p.descartados;\n  const nom = projMap[pid] || 'sin proyecto';\n  const ma = _mean(p.sa), md = _mean(p.sd);\n  rows.push({ clave: hoy + ' · ' + nom, semana: hoy, ambito: nom,\n    calificados: tot, aprobados: p.aprobados, descartados: p.descartados,\n    precision: _r2(tot ? p.aprobados / tot : null),\n    score_aprobados: _r2(ma), score_descartados: _r2(md),\n    separacion_gate: _r2(ma != null && md != null ? ma - md : null) });\n}\n// salud global: runs del motor de la semana\nconst g = { colectados: 0, pretrim: 0, gate_pass: 0, entregados: 0, sin_guion: 0, descartes_expuestos: 0, runs_ok: 0, runs_fallo: 0, dur: [], supadata: 0, lotes: 0, trad: 0 };\nfor (const r of runs) {\n  const m = r.metricas || {};\n  if (String(r.estado) === 'ok') g.runs_ok++; else g.runs_fallo++;\n  g.colectados += Number(m.colectados || 0); g.pretrim += Number(m.pretrim || 0);\n  g.gate_pass += Number(m.gate || 0); g.entregados += Number(m.outputs || 0);\n  g.sin_guion += Number(m.sin_guion || 0); g.descartes_expuestos += Number(m.descartes_expuestos || 0);\n  const ll = m.llamadas || {};\n  g.supadata += Number(ll.supadata || 0);\n  g.lotes += Number(ll.haiku_lotes_pretrim || 0) + Number(ll.haiku_lotes_gate || 0);\n  g.trad += Number(ll.haiku_traducciones || 0);\n  if (r.inicio && r.fin) { const ms = new Date(r.fin) - new Date(r.inicio); if (ms > 0) g.dur.push(ms / 60000); }\n}\nconst falsos_negativos = descartes.filter(r => String(((r.fields || {}).veredicto) || '') === 'era bueno').length;\nconst totAprob = califs.filter(r => String(((r.fields || {}).estado) || '').toLowerCase() === 'aprobado').length;\nrows.push({ clave: hoy + ' · GLOBAL', semana: hoy, ambito: 'GLOBAL',\n  calificados: califs.length, aprobados: totAprob, descartados: califs.length - totAprob,\n  precision: _r2(califs.length ? totAprob / califs.length : null),\n  entregados: g.entregados, colectados: g.colectados, pretrim: g.pretrim, gate_pass: g.gate_pass,\n  sin_guion: g.sin_guion, descartes_expuestos: g.descartes_expuestos, falsos_negativos,\n  runs_ok: g.runs_ok, runs_fallo: g.runs_fallo, duracion_min: _r2(_mean(g.dur)),\n  supadata_llamadas: g.supadata, haiku_lotes: g.lotes, haiku_traducciones: g.trad });\n\nconst recs = rows.map(f => { const c = {}; for (const k in f) { if (f[k] !== undefined && f[k] !== null) c[k] = f[k]; } return { fields: c }; });\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nout[0].json._resumen = { falsos_negativos, filas_metricas: rows.length };\nconsole.log('[Métricas] filas: ' + rows.length + ' · falsos negativos: ' + falsos_negativos);\nreturn out;\n"
+        "jsCode": "\n// Computar métricas de la semana (ADR-021): calidad por proyecto (de los calificados de este cierre)\n// + salud global (runs del motor de la semana + descartes auditados). Defensivo: SIEMPRE devuelve\n// >=1 batch (aunque todo venga vacío o algún Leer haya fallado) para que la cadena llegue a Cerrar run.\nconst hoy = new Date().toISOString().slice(0, 10);\nconst projMap = {};\ntry { $('Leer Proyectos').all().flatMap(it => (it.json && it.json.records) || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || r.id; }); } catch (e) {}\nlet califs = [];\ntry { califs = $('Leer Candidatos calificados').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\nlet runs = [];\ntry { runs = $('Leer runs de la semana').all().map(i => i.json).flatMap(j => Array.isArray(j) ? j : [j]).filter(r => r && r.id && r.metricas !== undefined); const _vis = new Set(); runs = runs.filter(r => { const k = String(r.id); if (_vis.has(k)) return false; _vis.add(k); return true; }); } catch (e) {}\nlet descartes = [];\ntry { descartes = $('Leer Descartes del gate').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\n\nconst _mean = (arr) => arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : null;\nconst _r2 = (v) => (v == null ? undefined : Math.round(v * 100) / 100);\n\n// calidad por proyecto: precisión de entrega + separación del gate (glosario)\nconst porProj = {};\nfor (const r of califs) {\n  const f = r.fields || {};\n  const pid = Array.isArray(f.proyecto) && f.proyecto[0] ? f.proyecto[0] : '';\n  const p = (porProj[pid] = porProj[pid] || { aprobados: 0, descartados: 0, sa: [], sd: [] });\n  const ok = String(f.estado || '').toLowerCase() === 'aprobado';\n  if (ok) p.aprobados++; else p.descartados++;\n  if (typeof f.relevancia_score === 'number') (ok ? p.sa : p.sd).push(f.relevancia_score);\n}\nconst rows = [];\nfor (const pid in porProj) {\n  const p = porProj[pid]; const tot = p.aprobados + p.descartados;\n  const nom = projMap[pid] || 'sin proyecto';\n  const ma = _mean(p.sa), md = _mean(p.sd);\n  const sep = (ma != null && md != null) ? ma - md : null;\n  const prec = tot ? p.aprobados / tot : null;\n  // Diagnostico legible del criterio (ADR-022): convierte separacion_gate/precision en accion.\n  let diagnostico = '';\n  if (sep == null) diagnostico = 'Sin datos de relevancia esta semana (nada que evaluar).';\n  else if (sep < 0) diagnostico = '\\ud83d\\udd34 Criterio invertido: el filtro puntua mejor lo que el equipo DESCARTO que lo que aprobo. Reescribi criterios_relevancia de este proyecto.';\n  else if (sep < 0.10) diagnostico = '\\ud83d\\udd34 Criterio flojo: el filtro casi no distingue lo aprobado de lo descartado. Afina criterios_relevancia (que SI y que NO cuenta como relevante).';\n  else if (sep < 0.20) diagnostico = '\\ud83d\\udfe1 Criterio mejorable: separa, pero poco. Un ajuste de criterios_relevancia lo subiria.';\n  else diagnostico = '\\ud83d\\udfe2 Criterio sano: el filtro distingue bien lo que el equipo quiere.';\n  if (sep != null && sep >= 0.10 && prec != null && prec < 0.4) diagnostico += ' Aun asi llega mucho ruido (precision ' + Math.round(prec * 100) + '%): considera subir la Relevancia minima en Ajustes.';\n  rows.push({ clave: hoy + ' · ' + nom, semana: hoy, ambito: nom,\n    calificados: tot, aprobados: p.aprobados, descartados: p.descartados,\n    precision: _r2(prec),\n    score_aprobados: _r2(ma), score_descartados: _r2(md),\n    separacion_gate: _r2(sep), diagnostico });\n}\n// salud global: runs del motor de la semana\nconst g = { colectados: 0, pretrim: 0, gate_pass: 0, entregados: 0, sin_guion: 0, descartes_expuestos: 0, runs_ok: 0, runs_fallo: 0, dur: [], supadata: 0, lotes: 0, trad: 0 };\nfor (const r of runs) {\n  const m = r.metricas || {};\n  if (String(r.estado) === 'ok') g.runs_ok++; else g.runs_fallo++;\n  g.colectados += Number(m.colectados || 0); g.pretrim += Number(m.pretrim || 0);\n  g.gate_pass += Number(m.gate || 0); g.entregados += Number(m.outputs || 0);\n  g.sin_guion += Number(m.sin_guion || 0); g.descartes_expuestos += Number(m.descartes_expuestos || 0);\n  const ll = m.llamadas || {};\n  g.supadata += Number(ll.supadata || 0);\n  g.lotes += Number(ll.haiku_lotes_pretrim || 0) + Number(ll.haiku_lotes_gate || 0);\n  g.trad += Number(ll.haiku_traducciones || 0);\n  if (r.inicio && r.fin) { const ms = new Date(r.fin) - new Date(r.inicio); if (ms > 0) g.dur.push(ms / 60000); }\n}\nconst falsos_negativos = descartes.filter(r => String(((r.fields || {}).veredicto) || '') === 'era bueno').length;\nconst totAprob = califs.filter(r => String(((r.fields || {}).estado) || '').toLowerCase() === 'aprobado').length;\nrows.push({ clave: hoy + ' · GLOBAL', semana: hoy, ambito: 'GLOBAL',\n  calificados: califs.length, aprobados: totAprob, descartados: califs.length - totAprob,\n  precision: _r2(califs.length ? totAprob / califs.length : null),\n  entregados: g.entregados, colectados: g.colectados, pretrim: g.pretrim, gate_pass: g.gate_pass,\n  sin_guion: g.sin_guion, descartes_expuestos: g.descartes_expuestos, falsos_negativos,\n  runs_ok: g.runs_ok, runs_fallo: g.runs_fallo, duracion_min: _r2(_mean(g.dur)),\n  supadata_llamadas: g.supadata, haiku_lotes: g.lotes, haiku_traducciones: g.trad });\n\nconst recs = rows.map(f => { const c = {}; for (const k in f) { if (f[k] !== undefined && f[k] !== null) c[k] = f[k]; } return { fields: c }; });\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nout[0].json._resumen = { falsos_negativos, filas_metricas: rows.length };\nconsole.log('[Métricas] filas: ' + rows.length + ' · falsos negativos: ' + falsos_negativos);\nreturn out;\n"
       }
     },
     {
@@ -690,6 +690,174 @@
       "position": [
         3360,
         650
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "m2-leer-nuevos-viejos",
+      "name": "Leer Candidatos nuevos viejos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3560,
+        200
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Candidatos') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "AND({estado}='nuevo',IS_BEFORE({fecha},DATEADD(NOW(),-20,'days')))"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "m2-prep-barrido-nuevos",
+      "name": "Preparar barrido nuevos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3760,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Arma los DELETE en lotes de 10 (mismo patron que 'Preparar borrado Descartes').\nlet ids = [];\ntry { ids = $('Leer Candidatos nuevos viejos').all().flatMap(it => (it.json && it.json.records) || []).map(r => r.id).filter(Boolean); } catch (e) {}\nconst base = $('Config').first().json.airtable_base_id;\nconst out = [];\nfor (let i = 0; i < ids.length; i += 10) {\n  const qs = ids.slice(i, i + 10).map(id => 'records[]=' + encodeURIComponent(id)).join('&');\n  out.push({ json: { url: 'https://api.airtable.com/v0/' + base + '/' + encodeURIComponent('Candidatos') + '?' + qs } });\n}\nreturn out; // [] si no hay nada: el DELETE no corre\n"
+      }
+    },
+    {
+      "id": "m2-barrer-nuevos",
+      "name": "Barrer Candidatos nuevos viejos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3960,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "m2-leer-metricas-viejas",
+      "name": "Leer Metricas viejas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3560,
+        400
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Métricas') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "IS_BEFORE({semana},DATEADD(NOW(),-84,'days'))"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "m2-prep-barrido-metricas",
+      "name": "Preparar barrido Metricas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3760,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Arma los DELETE en lotes de 10 (mismo patron que 'Preparar borrado Descartes').\nlet ids = [];\ntry { ids = $('Leer Metricas viejas').all().flatMap(it => (it.json && it.json.records) || []).map(r => r.id).filter(Boolean); } catch (e) {}\nconst base = $('Config').first().json.airtable_base_id;\nconst out = [];\nfor (let i = 0; i < ids.length; i += 10) {\n  const qs = ids.slice(i, i + 10).map(id => 'records[]=' + encodeURIComponent(id)).join('&');\n  out.push({ json: { url: 'https://api.airtable.com/v0/' + base + '/' + encodeURIComponent('Métricas') + '?' + qs } });\n}\nreturn out; // [] si no hay nada: el DELETE no corre\n"
+      }
+    },
+    {
+      "id": "m2-barrer-metricas",
+      "name": "Barrer Metricas viejas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3960,
+        400
       ],
       "onError": "continueRegularOutput",
       "parameters": {
@@ -957,6 +1125,66 @@
         [
           {
             "node": "Borrar Descartes del gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerrar run en el registro": {
+      "main": [
+        [
+          {
+            "node": "Leer Candidatos nuevos viejos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Leer Metricas viejas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Candidatos nuevos viejos": {
+      "main": [
+        [
+          {
+            "node": "Preparar barrido nuevos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar barrido nuevos": {
+      "main": [
+        [
+          {
+            "node": "Barrer Candidatos nuevos viejos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Metricas viejas": {
+      "main": [
+        [
+          {
+            "node": "Preparar barrido Metricas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar barrido Metricas": {
+      "main": [
+        [
+          {
+            "node": "Barrer Metricas viejas",
             "type": "main",
             "index": 0
           }
