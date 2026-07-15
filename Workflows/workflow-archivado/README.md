@@ -22,7 +22,8 @@ Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail
 (cadena de métricas, ADR-021 — corre CON o SIN calificados:)
 Leer runs de la semana ─► Leer Descartes del gate ─► Computar métricas semana
    ─► POST Métricas (Airtable) ─┬─► Cerrar run ─┬─► Leer nuevos viejos ─► Preparar barrido ─► Barrer nuevos
-                                │               └─► Leer Métricas viejas ─► Preparar barrido ─► Barrer Métricas
+     (routea por $json._tabla:   │               └─► Leer Métricas viejas ─► Preparar barrido ─► Barrer Métricas
+      Global vs Proyectos)       │                  (barre solo 'Métricas Proyectos'; Global no crece)
                                 └─► Preparar borrado Descartes ─► Borrar Descartes del gate
 ```
 
@@ -43,10 +44,13 @@ Leer runs de la semana ─► Leer Descartes del gate ─► Computar métricas 
 - **Append al Google Sheet "Histórico"** (las 13 columnas de la vista — ver abajo; con las columnas
   opcionales `RELEVANCIA SCORE`/`RELEVANCIA RAZON` si se agregan los encabezados al Sheet).
 - **Borra de Airtable** los records archivados (batch de 10 por DELETE).
-- **Computa la fila semanal de `Métricas`** (ADR-021): calidad por proyecto (precisión de entrega,
-  separación del gate) + salud global (embudo de los `runs` del motor de la semana, SIN GUION,
-  runs fallidos, llamadas por servicio, falsos negativos de los descartes auditados). Corre **con o
-  sin calificados**, todo fail-soft: si Métricas falla, el archivado de candidatos no se cae.
+- **Computa las filas semanales de Métricas** (ADR-021; split en 2 tablas 2026-07-15): calidad por
+  proyecto → **`Métricas Proyectos`** (precisión de entrega, separación del gate); salud global +
+  costos → **`Métricas Global`** (filas GLOBAL/DESCUBRIMIENTO: embudo de los `runs` del motor de la
+  semana, SIN GUION, runs fallidos, llamadas por servicio, falsos negativos de los descartes
+  auditados). El nodo `Computar métricas semana` etiqueta cada batch con `_tabla` y el POST routea
+  a la tabla correcta. Corre **con o sin calificados**, todo fail-soft: si Métricas falla, el
+  archivado de candidatos no se cae.
   Escribe además `diagnostico`: la lectura legible del criterio por proyecto (🟢/🟡/🔴 según
   `separacion_gate`+`precision`, regla sin IA — enmienda ADR-021 2026-07-14). El *lint de forma* con
   IA llega en ADR-022/M2.
@@ -54,8 +58,9 @@ Leer runs de la semana ─► Leer Descartes del gate ─► Computar métricas 
 - **Dos barridos de higiene** (enmienda 2026-07-14, colgados de `Cerrar run`, `onError:continue` — el
   run ya cerró, si fallan reintentan el domingo siguiente): purga **Candidatos `nuevo` > 20 días**
   (los que nadie calificó; no van al histórico, solo despejan la pestaña "Nuevos") y **filas de
-  `Métricas` > 12 semanas** (la única tabla que crece monótona; el histórico largo vive en Supabase,
-  de donde `Métricas` es regenerable). Ambos leen por `filterByFormula` y borran en lotes de 10, mismo
+  `Métricas Proyectos` > 12 semanas** (la tabla que crece ~7 filas/semana; el histórico largo vive en
+  Supabase, de donde es regenerable). `Métricas Global` no se barre: crece ~2 filas/semana (GLOBAL +
+  DESCUBRIMIENTO) y conviene guardar más trend de costos/salud. Ambos leen por `filterByFormula` y borran en lotes de 10, mismo
   patrón que `Borrar Descartes del gate`.
 
 ## Orden e idempotencia (lo que importa)

@@ -159,16 +159,27 @@ nodes**: `Transcribir (Supadata)` + `Traducir (Claude Haiku)` (vía `this.helper
   verificado) + 3 páginas publicadas (Métricas — Calidad / Métricas — Salud / Descartes (auditar)).
   **Falta:** re-import de motor y archivado en n8n (ver handoff) y el primer ciclo real.*
 
-### Fase M2 — Loop de aprendizaje (ADR-022)
+### 🔧 Fase M2 — Loop de aprendizaje (ADR-022) — CÓDIGO ✅ 2026-07-14, falta la corrida en vivo
 - **Archivado:** destilación semanal por proyecto → campo `criterios_aprendidos` en `Proyectos`
   (🔥 prioriza ejemplos positivos, fallback aprobados recientes; la misma llamada Haiku hace de lint:
-  criterio vago / sin lista negativa / Voz incoherente → advertencia visible); actualizar
+  criterio vago / sin lista negativa / Voz incoherente → `advertencia_criterios`); actualizar
   `tasa_gate`/`tasa_aprobacion`/`videos_evaluados` en `Referentes` (mínimo de muestra) + vista
   "A revisar". La poda siempre la ejecuta el equipo.
 - **Motor:** el gate lee criterios manuales **+** `criterios_aprendidos`.
 - **Onboarding:** una línea sobre el nuevo rol del 🔥 (ahora enseña).
 - **Hecho cuando:** tras 2 ciclos con el loop activo, la precisión de entrega y la separación del gate
   suben en las páginas de M1 (o se entiende por qué no).
+- *Estado 2026-07-14: código completo. **Motor** (33 nodos): `Armar plan` carga `criterios_aprendidos`,
+  el `Gate` concatena manuales ⊕ aprendidos en el rubric (sin nodos nuevos). **Archivado** (30→36 nodos):
+  2 sub-cadenas fail-soft colgadas de `Cerrar run` — `Destilar criterios` + `PATCH Proyectos criterios`,
+  y `Leer señal selección` → `Leer Referentes` → `Computar salud referentes` → `PATCH Referentes salud`;
+  2 knobs dev-only en Config (`min_muestra_destilar`=4, `min_muestra_referente`=10). Contrato cockpit +
+  `setup-airtable.mjs` con los 5 campos; **campos creados en la base viva** (Proyectos:
+  `criterios_aprendidos`/`advertencia_criterios`; Referentes: `tasa_gate`/`tasa_aprobacion`/`videos_evaluados`).
+  Validador 1194/0, 25/25 jsCode compilan, grafo del archivado 0 refs rotas / 0 huérfanos. **Falta:**
+  re-import de motor + archivado en n8n (mapear cred `Airtable PAT` a los 3 nodos Airtable nuevos +
+  `Supabase Registro` al `Leer señal selección`; `<ANTHROPIC_API_KEY>` en `Destilar criterios`), la
+  vista "A revisar" en Referentes (UI, no sale por API) y 2 ciclos reales.*
 
 ### Fase M3 — Criterios asistidos
 - **Onboarding §5.2:** anatomía del buen criterio (qué sirve / qué NO / 2-3 ejemplos reales de

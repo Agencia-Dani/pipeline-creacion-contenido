@@ -49,9 +49,10 @@
 > El motor expone los **top-K rechazos del gate por score** a la tabla `Descartes del gate`
 > (nodos 23b/23c) y arma `runs.metricas` completas en un nodo propio (`Resumen del run`, 26b:
 > embudo + `sin_guion` + llamadas estimadas + desglose `por_referente`). El archivado copia
-> `relevancia_score`/`relevancia_razon` al histórico, computa la fila semanal de la tabla
-> **`Métricas`** (calidad por proyecto + salud global) y limpia los descartes auditados (nodos
-> 17b–17f). Cockpit 6 → 8 tablas; páginas nuevas *Métricas — Calidad*, *Métricas — Salud* y
+> `relevancia_score`/`relevancia_razon` al histórico, computa las filas semanales de
+> **`Métricas Proyectos`** (calidad) y **`Métricas Global`** (salud + costos) — split 2026-07-15,
+> routea por `_tabla` — y limpia los descartes auditados (nodos
+> 17b–17f). Cockpit 6 → 9 tablas; páginas *Métricas — Calidad*, *Métricas — Salud*, *Costos* y
 > *Descartes (auditar)*.
 >
 > Pies de página: el motor en
@@ -70,7 +71,7 @@
 |---|---|---|---|---|
 | **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 33 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** + los descartes borderline (**Descartes del gate**, ADR-021) en Airtable + registra la corrida en Supabase. §2. |
 | **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 27 | Promueve a `Referentes` los propuestos que el equipo marcó `aprobado` → busca cuentas nuevas parecidas a las que funcionan (IG: sugeridos, 2 pasadas Apify; TikTok: lookalike, rama paralela — ADR-020 §8) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **Referentes propuestos**. §3. |
-| **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 24 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`, con relevancia — ADR-021) + append al **Sheet Histórico** → los borra de Airtable → **computa la fila semanal de `Métricas`** (calidad + salud) y limpia `Descartes del gate`. §4. |
+| **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 24 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`, con relevancia — ADR-021) + append al **Sheet Histórico** → los borra de Airtable → **computa las filas semanales de `Métricas Proyectos` + `Métricas Global`** (calidad / salud+costos, routea por `_tabla`) y limpia `Descartes del gate`. §4. |
 
 Los tres comparten el patrón `Config → Abrir run → Barrer runs zombie → … → Cerrar run`: la corrida
 se registra en la tabla `runs` de Supabase (abre `en_curso` con `params.workflow` propio, cierra `ok`
@@ -420,7 +421,7 @@ borran en lotes de 10 vía un code node de `Preparar barrido`, mismo patrón que
 | 17b | Leer runs de la semana | http GET | Supabase `runs` del motor de los últimos 7 días (`params->>workflow=eq.motor` + `inicio=gte.<now-7d>`, timestamp URL-encodeado), `select=id,estado,inicio,fin,metricas`. **Fail-soft** (`alwaysOutputData` + continue). |
 | 17c | Leer Descartes del gate | http GET | Airtable `Descartes del gate` (todos; pagina). **Fail-soft.** |
 | 17d | Computar métricas semana | code | **El cómputo de ADR-021.** Calidad por proyecto (de los calificados de este cierre): `precision` = aprobados/calificados, `score_aprobados/descartados`, `separacion_gate`. Salud global (de los runs del motor): embudo sumado, `sin_guion`, `descartes_expuestos`, `runs_ok/fallo`, `duracion_min`, llamadas por servicio; + `falsos_negativos` = descartes con `veredicto='era bueno'`. Emite batches de `records[]` para `Métricas` (fila por proyecto + fila GLOBAL); el 1er batch lleva `_resumen` para Cerrar run. **Defensivo:** try/catch por lectura, SIEMPRE ≥1 batch. La "semana" = semana de calificación (este cierre). |
-| 17e | POST Métricas (Airtable) | http POST | `POST Métricas` (`typecast`). **continue-on-fail** (las métricas no bloquean el cierre). Sale a 2 ramas: Cerrar run + Preparar borrado Descartes. |
+| 17e | POST Métricas (Airtable) | http POST | POST a la tabla del batch (`$json._tabla`: `Métricas Proyectos` o `Métricas Global` — split 2026-07-15) con `typecast`. **continue-on-fail** (las métricas no bloquean el cierre). Sale a 2 ramas: Cerrar run + Preparar borrado Descartes. |
 | 17f | Preparar borrado Descartes → Borrar Descartes del gate | code + http DELETE | Limpia `Descartes del gate` (batches de 10) — auditados o no, no se acumulan; el conteo de falsos negativos ya quedó en Métricas. Rama lateral, **continue-on-fail**, sin nada aguas abajo. |
 | 18 | Cerrar run en el registro | http PATCH | `PATCH runs` con `fin`, `estado:'ok'`, `metricas:{archivados, falsos_negativos, filas_metricas}` (los últimos 2 del `_resumen` de 17d). **El conteo `archivados` se hace sobre `Leer Candidatos calificados`** (corre en ambas ramas del IF) → robusto en el caso 0 calificados. continue-on-fail. |
 

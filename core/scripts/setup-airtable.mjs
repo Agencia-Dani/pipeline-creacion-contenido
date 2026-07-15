@@ -40,15 +40,17 @@ const attach = (name) => ({ name, type: "multipleAttachments" });
 const sel = (name, ...opts) => ({ name, type: "singleSelect", options: { choices: opts.map((o) => ({ name: o })) } });
 const fecha = (name) => ({ name, type: "date", options: { dateFormat: { name: "iso" } } });
 
-// ── las 8 tablas (campos NO-link al crear; los links se agregan después) ──
+// ── las 9 tablas (campos NO-link al crear; los links se agregan después) ──
 const tables = [
   { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto. dias_recencia/top_n/toggles salieron a Ajustes globales (ADR-016).",
-    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"), check("activo")] },
+    fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"),
+             long("criterios_aprendidos"), long("advertencia_criterios"), check("activo")] },
   { name: "Voces", description: "Eje organizativo (para quién se selecciona). Separado del proyecto.",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia")] },
-  { name: "Referentes", description: "Banco de perfiles referentes (la única fuente de descubrimiento — ADR-019).",
+  { name: "Referentes", description: "Banco de perfiles referentes (la única fuente de descubrimiento — ADR-019). Salud por referente (tasa_gate/tasa_aprobacion/videos_evaluados) la escribe el archivado — ADR-022/M2.",
     fields: [txt("handle"), sel("plataforma", "instagram", "tiktok"),
-             check("activo"), long("notas")] },
+             check("activo"), long("notas"),
+             num("tasa_gate", 2), num("tasa_aprobacion", 2), num("videos_evaluados")] },
   { name: "Candidatos", description: "Scripts (transcripción/traducción literal — ADR-009) a calificar por el equipo.",
     fields: [txt("titulo"), long("script"), sel("idioma", "es", "en", "pt", "it", "fr", "otro"),
              attach("thumbnail"), txt("referente"), url("url_referente"),
@@ -69,13 +71,23 @@ const tables = [
     fields: [txt("titulo"), long("script"), txt("referente"), url("url_referente"),
              num("relevancia_score", 2), long("relevancia_razon"), attach("thumbnail"),
              sel("veredicto", "bien descartado", "era bueno")] },
-  { name: "Métricas", description: "Desempeño semanal del embudo (ADR-021): una fila por semana×proyecto + una GLOBAL. La escribe SOLO el archivado; proyección regenerable (la verdad cruda vive en Supabase). Solo-lectura para el equipo.",
+  // Métricas partida en 2 tablas (split 2026-07-15): calidad por proyecto vs salud+costos global.
+  // Cada página del cockpit lee su tabla → dejan de compartir campos. La escribe SOLO el archivado
+  // (routea por _tabla); proyección regenerable (la verdad cruda vive en Supabase). Solo-lectura.
+  { name: "Métricas Proyectos", description: "Calidad semanal por proyecto (ADR-021, split 2026-07-15): una fila por semana×proyecto. La escribe SOLO el archivado; proyección regenerable. Solo-lectura. Salud + costos → tabla Métricas Global.",
     fields: [txt("clave"), fecha("semana"), txt("ambito"),
              num("calificados"), num("aprobados"), num("descartados"), num("precision", 2),
              num("score_aprobados", 2), num("score_descartados", 2), num("separacion_gate", 2),
+             long("diagnostico")] },
+  { name: "Métricas Global", description: "Salud del sistema + costos, semanal (ADR-021, split 2026-07-15): filas GLOBAL (motor) y DESCUBRIMIENTO (buscador). La escribe SOLO el archivado; proyección regenerable. Solo-lectura. Calidad por proyecto → tabla Métricas Proyectos.",
+    fields: [txt("clave"), fecha("semana"), txt("ambito"),
+             num("calificados"), num("aprobados"), num("descartados"), num("precision", 2),
              num("entregados"), num("colectados"), num("pretrim"), num("gate_pass"),
+             num("apify_ig"), num("apify_tt"),
              num("sin_guion"), num("descartes_expuestos"), num("falsos_negativos"),
              num("runs_ok"), num("runs_fallo"), num("duracion_min", 1),
+             num("semillas"), num("sugeridos_unicos"), num("propuestos"), num("promovidos"),
+             num("perfiles_semilla"), num("detalle_sugeridos"), num("lookalikes_tt"),
              num("supadata_llamadas"), num("haiku_lotes"), num("haiku_traducciones")] },
 ];
 
@@ -124,6 +136,30 @@ const run = async () => {
     console.log(`→ Link ${tabla}.${campo} → ${destino}`);
     await api("POST", `/bases/${baseId}/tables/${id(tabla)}/fields`, {
       name: campo, type: "multipleRecordLinks", options: { linkedTableId: id(destino) },
+    });
+  }
+
+  // ── columnas de costo en Métricas (ADR-021 bis): fórmula tarifa × conteo, editable en la UI ──
+  // La tarifa vive baked en la fórmula (aprox., editable sin re-import). Se crean después porque
+  // referencian los campos de conteo por nombre. La precisión decimal ($ con 2 dígitos) NO se puede
+  // fijar por API en campos-fórmula — ajustala a mano en la UI (Customize field → Formatting).
+  // Tarifas confirmadas por Mani 2026-07-14 (ADR-021 bis). costo_total suma todo → correcto por fila
+  // (GLOBAL suma motor: Supadata/Haiku/Apify IG+TT; DESCUBRIMIENTO suma su Apify).
+  const costFormulas = [
+    ["costo_supadata",             "{supadata_llamadas} * 0.009"],   // $/crédito Supadata (1 transcript = 1 crédito)
+    ["costo_haiku_lotes",          "{haiku_lotes} * 0.004"],         // $/llamada de lote pre-trim/gate
+    ["costo_haiku_traducciones",   "{haiku_traducciones} * 0.005"],  // $/traducción
+    ["costo_apify_ig",             "{apify_ig} * 0.0023"],           // instagram-scraper (motor)
+    ["costo_apify_tt",             "{apify_tt} * 0.005"],            // free-tiktok-scraper (motor)
+    ["costo_perfiles_semilla",     "{perfiles_semilla} * 0.0023"],   // instagram-profile-scraper (descubrimiento)
+    ["costo_detalle_sugeridos",    "{detalle_sugeridos} * 0.0023"],  // instagram-profile-scraper (descubrimiento)
+    ["costo_lookalikes_tt",        "{lookalikes_tt} * 0.20"],        // tiktok-lookalike-search (descubrimiento)
+    ["costo_total",                "{costo_supadata} + {costo_haiku_lotes} + {costo_haiku_traducciones} + {costo_apify_ig} + {costo_apify_tt} + {costo_perfiles_semilla} + {costo_detalle_sugeridos} + {costo_lookalikes_tt}"],
+  ];
+  for (const [name, formula] of costFormulas) {
+    console.log(`→ Fórmula Métricas Global.${name}`);
+    await api("POST", `/bases/${baseId}/tables/${id("Métricas Global")}/fields`, {
+      name, type: "formula", options: { formula },
     });
   }
 

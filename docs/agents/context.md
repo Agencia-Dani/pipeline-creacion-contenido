@@ -18,9 +18,10 @@ lo trajo, y solo si pasa el juicio de relevancia de cada uno (ADR-013, ADR-015).
 **una sola Voz**; una Voz puede servir a varios Proyectos.
 
 **Voz**:
-El personaje o marca para quien se cura contenido. Organiza la selección y el histórico, y **afina el
-filtro de relevancia por encima del tema del Proyecto** (el Proyecto es la base, la Voz el enfoque del
-cliente — ADR-010). En el MVP no genera guiones (scripts literales — ADR-009).
+El personaje o marca para quien se cura contenido. Organiza la selección y el histórico, y le da al
+gate el **contexto de persona/audiencia** (quién es, a quién le habla) — **no un criterio de filtro**:
+el que discrimina el tema es el Proyecto (revisión de ADR-010, 2026-07-14). En el MVP no genera
+guiones (scripts literales — ADR-009).
 
 **Referente**:
 Una cuenta de Instagram o TikTok de la que el motor trae videos. **La única fuente de descubrimiento**
@@ -60,14 +61,21 @@ Qué tanto aporta el contenido del video en sí, frente a lo viral-vacío (ganch
 
 **Criterios de relevancia**:
 Las reglas, editables por el equipo en Airtable, contra las que el motor juzga si un video sirve
-para un Proyecto (y opcionalmente una Voz). Alimentan la evaluación semántica. Un buen criterio dice
-qué sirve, qué NO sirve, y trae ejemplos reales; si no permite rechazar nada, es una descripción,
-no un criterio.
+para un **Proyecto**. Alimentan la evaluación semántica. Un buen criterio dice qué sirve, qué NO
+sirve, y trae ejemplos reales; si no permite rechazar nada, es una descripción, no un criterio. La
+Voz no aporta criterio sino **contexto de persona** (revisión de ADR-010, 2026-07-14).
 
 **Criterios aprendidos**:
 El complemento que la máquina destila cada semana de las decisiones reales del equipo (patrones de lo
 aprobado y lo descartado, con ejemplos). Complementan los criterios de relevancia manuales, nunca los
-reemplazan; el equipo los ve y puede editarlos o borrarlos (ADR-022).
+reemplazan; el equipo los ve y puede editarlos o borrarlos (ADR-022). La misma destilación deja una
+**advertencia de criterios** (lint de forma: criterio vago / sin lista negativa / Voz incoherente),
+visible al equipo pero que el gate no lee.
+
+**Salud por referente**:
+Tres números que el archivado escribe por cuenta cada semana — `tasa_gate` (qué fracción de sus videos
+pasó el gate), `tasa_aprobacion` (qué fracción terminó aprobando el equipo) y `videos_evaluados` — con
+mínimo de muestra. Señalan qué fuente **podar**; la poda siempre la ejecuta el equipo (ADR-022).
 
 **Descarte del gate**:
 Un video que el juicio de relevancia rechazó después de transcribirlo. **No es un Candidato** (nunca

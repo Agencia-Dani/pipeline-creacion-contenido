@@ -58,7 +58,7 @@ dónde sale cada cosa que ven en Airtable:
 
 | Robot | Cuándo corre | Qué hace | Qué ven ustedes después |
 |---|---|---|---|
-| **El motor** | Lunes 8:00 am | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Calificar** + los dudosos en **Descartes (auditar)**. |
+| **El motor** | Lunes 8:00 am | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Feed de Calificación** + los dudosos en **Descartes**. |
 | **El buscador de cuentas** | Lunes 9:00 am | Mira sus mejores Referentes y busca cuentas **parecidas** para sumar. | Sugerencias en **Referentes propuestos**. |
 | **El archivador** | Domingo 6:00 pm | Se lleva al Histórico todo lo que ya calificaron, limpia la lista y cuenta el desempeño de la semana. | La lista queda limpia + se actualizan las **Métricas**. |
 
@@ -89,7 +89,7 @@ de redes.
 5. Califican (ver §6).
 6. Lo que aprueban queda guardado en el Histórico **automáticamente** y sale de la lista. Lo que no
    tocaron sigue esperando.
-7. Una vez por semana (2 min): pasan por **Descartes (auditar)** y marcan el `veredicto` (§6.1), y
+7. Una vez por semana (2 min): pasan por **Descartes** y marcan el `veredicto` (§6.1), y
    revisan los **Referentes propuestos** (§8.1).
 
 Regla mental: **Airtable es su bandeja de entrada.** La máquina la llena, ustedes la vacían decidiendo.
@@ -129,7 +129,7 @@ Hay 8 tablas. Piénsenlas en tres grupos.
 
 ### La que solo miran
 
-- **Métricas** — el desempeño de cada semana (páginas *Métricas — Calidad* y *Métricas — Salud*, §6.2).
+- **Métricas** — el desempeño de cada semana (páginas *Métricas de Calidad* y *Salud del Sistema*, §6.2).
   La llena la máquina cada domingo; **nadie escribe ahí**.
 
 ### 4.1 El layout que ven: el menú del "Cockpit Redes"
@@ -140,21 +140,23 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 
 | Página (lo que ven en el menú) | Para qué | Qué editan ahí |
 |---|---|---|
-| **Calificar (feed)** | Su bandeja diaria de videos a calificar | `calificacion`, `estado`, `notas_equipo` |
-| **Referentes propuestos (aprobar)** | Cuentas nuevas que sugiere el buscador (§8.1) | `estado` (aprobado / descartado) |
-| **Descartes (auditar)** | Los ~10 descartes dudosos de la semana (§6.1) | `veredicto` |
+| **Feed de Calificación** | Su bandeja diaria de videos a calificar | `calificacion`, `estado`, `notas_equipo` |
+| **Referentes Buscados** | Cuentas nuevas que sugiere el buscador (§8.1) | `estado` (aprobado / descartado) |
+| **Descartes** | Los ~10 descartes dudosos de la semana (§6.1) | `veredicto` |
 | **Referentes** | El banco de cuentas de IG y TikTok que se rastrean | todo (arman la lista) |
 | **Proyectos** | Los temas que se buscan | todo (arman los temas) |
 | **Voces** | Para quién se selecciona | todo |
 | **Configuración Global** | Las perillas del día a día (§5.5) | solo el `valor` de cada perilla |
 | **Ajustes Dev-Only** | Las perillas avanzadas | **nada — solo lectura** (avisen antes de tocar) |
-| **Métricas — Calidad** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
-| **Métricas — Salud** | Los números de la máquina (§6.2) | **nada — solo lectura** |
+| **Métricas de Calidad** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
+| **Salud del Sistema** | Los números de la máquina (§6.2) | **nada — solo lectura** |
 
-> **Ojo con los nombres.** Algunas páginas se llaman distinto a la tabla que muestran: *Calificar
-> (feed)* es la tabla **Candidatos**; *Configuración Global* es la tabla **Ajustes**. Guíense por el
-> nombre del **menú**, no por el de la tabla. También hay un formulario **"Nuevo Proyecto"** para
-> crear un proyecto llenando un formulario en vez de una fila.
+> **Ojo con los nombres.** Algunas páginas se llaman distinto a la tabla que muestran: *Feed de
+> Calificación* es la tabla **Candidatos**; *Configuración Global* es la tabla **Ajustes**; *Referentes
+> Buscados* es la tabla **Referentes propuestos**; *Métricas de Calidad* y *Salud del Sistema* son las
+> dos vistas de la tabla **Métricas**. Guíense por el nombre del **menú**, no por el de la tabla.
+> También hay un formulario **"Nuevo Proyecto"** para crear un proyecto llenando un formulario en vez
+> de una fila.
 
 En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
 el **idioma original**, la **portada**, el **link al video original**, las **métricas** (views, likes,
@@ -235,6 +237,11 @@ Cada fila es una cuenta de la que la máquina trae videos. **Es la fuente más i
 
 > **No llenen `seguidores` ni `viral_por_tamano`.** Esas las completa la máquina sola. El flag de viral solo
 > **marca** las cuentas muy grandes (+700K); no las excluye.
+>
+> **La máquina califica sus cuentas.** Cada domingo actualiza tres columnas por cuenta (las llena sola):
+> `tasa_gate` (qué fracción de sus videos pasa el filtro), `tasa_aprobacion` (qué fracción terminan
+> aprobando) y `videos_evaluados`. Una vista **"A revisar"** junta las de números bajos. **La máquina
+> nunca desactiva una cuenta sola** — solo la señala; podarla (destildar `activo`) es decisión de ustedes.
 >
 > **🟠 Falta sembrar TikTok.** Hoy casi todos los Referentes cargados son de Instagram. Para que la máquina
 > traiga videos de TikTok hacen falta **dos cosas**: cargar cuentas de TikTok acá **y** que el toggle
@@ -322,6 +329,11 @@ Hay dos cosas que marcan, y son distintas:
 > **¿Cuál es más importante?** El `estado`. La máquina aprende sobre todo de aprobado vs descartado. La
 > `calificacion` (🔥/👍/👎) es una ayuda visual para ustedes y una señal más fina. Lo ideal: pongan **las dos**.
 
+> **El 🔥 ahora enseña.** Cada domingo la máquina destila lo que aprobaron y descartaron en patrones
+> (el campo `criterios_aprendidos` del Proyecto) para afinar sola su criterio, y usa los **🔥 como el
+> ejemplo ideal** de "esto es exactamente lo que quiero". Poner 🔥 en lo mejor no es solo estético:
+> le está enseñando a la máquina qué buscar.
+
 > **No dejen candidatos colgando.** Un candidato que queda en `nuevo` sin calificar por **más de 20
 > días** se borra solo (para que la pestaña "Nuevos" no se llene de cosas viejas que nadie miró). Si no
 > lo calificaron, se pierde sin pasar por el Histórico. Traten de vaciar la bandeja cada semana.
@@ -331,7 +343,7 @@ Es una pantalla aparte que muestra **solo los que pusieron en `aprobado`**, orde
 más frío. **Es solo para ver**, no califican ahí. Funciona así: ustedes aprueban en la lista normal de
 Candidatos → automáticamente aparecen en esta vista. Es su "mapa de calor" de lo elegido, y se rearma solo.
 
-### 6.1 La página "Descartes (auditar)" — 2 minutos por semana
+### 6.1 La página "Descartes" — 2 minutos por semana
 
 La máquina también **descarta** videos antes de que lleguen a ustedes. La mayoría son basura obvia, pero
 a veces se equivoca y mata algo bueno. Para poder detectarlo, cada corrida deja en la página **Descartes
@@ -346,10 +358,10 @@ El domingo la máquina cuenta los "era bueno", los registra en Métricas y **vac
 acumulan; cada semana llega una tanda fresca). Si no alcanzan a revisarlos, no pasa nada, pero cada
 "era bueno" detectado mejora el filtro.
 
-### 6.2 Las páginas "Métricas — Calidad" y "Métricas — Salud" (solo para ver)
+### 6.2 Las páginas "Métricas de Calidad" y "Salud del Sistema" (solo para ver)
 
 Cada domingo la máquina escribe el resumen de la semana:
-- **Métricas — Calidad**: por proyecto, cuántos calificaron, cuántos aprobaron y la **precisión**
+- **Métricas de Calidad**: por proyecto, cuántos calificaron, cuántos aprobaron y la **precisión**
   (de lo que llegó, qué fracción sirvió). La columna **`diagnostico`** les traduce en una frase si el
   criterio de ese proyecto está funcionando, con un semáforo:
   - 🟢 **sano** — el filtro distingue bien lo que ustedes quieren. No toquen nada.
@@ -357,7 +369,7 @@ Cada domingo la máquina escribe el resumen de la semana:
   - 🔴 **flojo o invertido** — el filtro casi no distingue lo que aprueban de lo que descartan (o, peor,
     está al revés). **Acá sí conviene reescribir el `criterios_relevancia`** del proyecto: sumen qué SÍ
     y qué NO cuenta como relevante, con un par de ejemplos. Es la señal más útil de esta página.
-- **Métricas — Salud**: los números de la máquina (cuántos videos procesó, cuántos llegaron sin guion,
+- **Salud del Sistema**: los números de la máquina (cuántos videos procesó, cuántos llegaron sin guion,
   si alguna corrida falló). Esta es más para Mani, pero está a la vista de todos.
 
 Son de **solo lectura a propósito**: las llena la máquina, nadie escribe ahí. *(Guarda 12 semanas de

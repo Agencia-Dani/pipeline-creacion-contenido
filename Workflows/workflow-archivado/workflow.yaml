@@ -37,7 +37,7 @@ stages:                           # las 8 etapas canónicas; este es un wf de ma
   enriquecer: n/a
   generar: n/a
   calidad: n/a
-  entregar: "Inserta en Supabase outputs (histórico + señal de aprendizaje, schema 003/004; metadata incluye relevancia_score/razon — ADR-021) + append al Sheet Histórico + borra el record de Airtable + computa la fila semanal de la tabla Métricas (calidad por proyecto + salud global, fail-soft) y limpia 'Descartes del gate'. Supabase es sumidero (continue-on-fail); el Sheet NO es continue-on-fail (si falla, corta antes de borrar → no se pierde curación)."
+  entregar: "Inserta en Supabase outputs (histórico + señal de aprendizaje, schema 003/004; metadata incluye relevancia_score/razon — ADR-021) + append al Sheet Histórico + borra el record de Airtable + computa las filas semanales de Métricas — routea por _tabla a 'Métricas Proyectos' (calidad por proyecto) y 'Métricas Global' (salud global + costos, filas GLOBAL/DESCUBRIMIENTO), split 2026-07-15, fail-soft y limpia 'Descartes del gate'. Supabase es sumidero (continue-on-fail); el Sheet NO es continue-on-fail (si falla, corta antes de borrar → no se pierde curación)."
   notificar: n/a
 
 outputs:

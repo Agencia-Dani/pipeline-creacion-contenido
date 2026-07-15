@@ -15,7 +15,7 @@
 | [ADR-007](./ADR-007-convergencia-gradual-motor-unico.md) | Convergencia gradual a motor de research único | Aceptada (como dirección) |
 | [ADR-008](./ADR-008-airtable-cockpit-equipo-redes.md) | Airtable como cockpit del equipo de redes (revisa D4) | Aceptada |
 | [ADR-009](./ADR-009-scripts-literales-y-aprendizaje-en-scoring.md) | Scripts literales (transcribir/traducir) y aprendizaje en el scoring (revisa ADR-008) | Aceptada |
-| [ADR-010](./ADR-010-scoring-semantico-y-etapa-calidad.md) | Scoring semántico con LLM + etapa CALIDAD (revisa ADR-009) | Aceptada |
+| [ADR-010](./ADR-010-scoring-semantico-y-etapa-calidad.md) | Scoring semántico con LLM + etapa CALIDAD (revisa ADR-009; enmienda 2026-07-14: Voz = contexto, no criterio) | Aceptada |
 | [ADR-011](./ADR-011-tabla-ajustes-knobs-no-code.md) | Tabla `Ajustes`: knobs del scoring editables por el equipo sin código | Aceptada |
 | [ADR-012](./ADR-012-senal-de-aprendizaje-bi-eje.md) | Señal de aprendizaje bi-eje (por referente Y por keyword/tema) | Aceptada (reducida por ADR-019: queda solo la señal por referente) |
 | [ADR-013](./ADR-013-atribucion-multiproyecto-fan-out.md) | Atribución multi-proyecto: fan-out de un video a cada proyecto que lo reclama (grado 1, MVP) | Aceptada (solo por referente desde ADR-019; emisión deduplicada por ADR-018) |
@@ -26,7 +26,7 @@
 | [ADR-018](./ADR-018-un-candidato-por-video-dedup-salida.md) | Un Candidato por video: dedup de salida del fan-out (gana la copia con mejor relevancia) | Aceptada (enmienda ADR-013) |
 | [ADR-019](./ADR-019-remocion-total-eje-keyword.md) | Remoción total del eje keyword: el motor descubre solo por referentes (enmienda ADR-015, revierte ADR-017, reduce ADR-012) | Aceptada |
 | [ADR-020](./ADR-020-motor-descubrimiento-referentes.md) | Motor de descubrimiento de referentes: sugeridos de IG + vetting Haiku + aprobación del equipo (workflow aparte; completa ADR-019) | Aceptada |
-| [ADR-021](./ADR-021-medicion-desempeno-embudo.md) | Medición de desempeño del embudo: tabla `Métricas` + descartes del gate visibles + histórico enriquecido (el archivado computa, Airtable proyecta) | Aceptada |
+| [ADR-021](./ADR-021-medicion-desempeno-embudo.md) | Medición de desempeño del embudo: tabla `Métricas` + descartes del gate visibles + histórico enriquecido (el archivado computa, Airtable proyecta; enmiendas 2026-07-13 top-K, 2026-07-14 diagnóstico+barridos, 2026-07-14 bis descubrimiento+costo+páginas, 2026-07-15 split en `Métricas Proyectos` + `Métricas Global`) | Aceptada |
 | [ADR-022](./ADR-022-loop-aprendizaje-criterios.md) | Loop de aprendizaje de criterios: destilación semanal en `criterios_aprendidos` + 🔥 prioriza ejemplos + salud por referente (extiende ADR-010, completa ADR-020) | Aceptada (se construye tras verificar ADR-021) |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,

@@ -45,3 +45,28 @@
   - **Revisa el punto "heat-score" de ADR-009** (la fórmula cambia). El resto de ADR-009 sigue
     vigente: scripts literales, prioridad multiidioma, aprendizaje → scoring. La ejecución va por
     stages en [refactor-relevancia.md](../agents/refactor-relevancia.md).
+
+## Enmienda 2026-07-14 — la Voz aporta contexto, no criterio
+
+**Contexto (audit con Mani sobre la data viva):** el punto 1 de la decisión dejó `Voces.criterios_relevancia`
+como refinamiento **opcional** del criterio del Proyecto. En la práctica, las 3 Voces activas tienen ese
+campo lleno con **bios** (quién es la voz: "reconocido especialista en finanzas…", "comunicación
+consciente…"), no con criterios que permitan rechazar un video. Por el propio glosario, eso es una
+descripción, no un criterio. Y los criterios del **Proyecto** ya discriminan bien el tema (traen
+RELEVANTE / NO RELEVANTE + ejemplos). A escala MVP (pocos proyectos, una Voz por proyecto) un criterio
+de Voz separado duplica el del Proyecto sin agregar señal.
+
+**Decisión (Mani):** la Voz aporta al gate **contexto de persona/audiencia** (quién es, a quién le
+habla), **no un criterio de filtro**. El **Proyecto es el único criterio que discrimina** el tema. El
+gate sigue combinando Proyecto ⊕ Voz en una sola llamada Haiku; lo que cambia es el **rol** de la Voz.
+Consecuencia: no se agrega `diagnostico` ni `criterios_aprendidos` por-Voz — la atribución de calidad
+vive a nivel Proyecto; el lint de "Voz incoherente" de [ADR-022](./ADR-022-loop-aprendizaje-criterios.md)/M2
+queda como el único feedback a nivel Voz. El campo `criterios_relevancia` de `Voces` se re-etiqueta
+como contexto en la página Voces (para que el equipo no crea que ahí va una regla).
+
+**Alternativas descartadas:** *Voz-como-criterio + reescribir las 3 bios + `diagnostico` por-Voz* —
+duplica a esta escala. *Sacar la Voz del gate del todo* — pierde el contexto de persona cuando una Voz
+sirve a varios proyectos con matices distintos.
+
+**Glosario actualizado:** términos *Voz* y *Criterios de relevancia* en
+[context.md](../agents/context.md).

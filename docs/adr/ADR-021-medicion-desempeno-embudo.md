@@ -98,3 +98,73 @@ sin cota, es la fuga lenta hacia el tope de 1.000 registros del plan free.
 Los dos barridos cuelgan de `Cerrar run` con `onError:continue` (el run ya cerró — no lo bloquean; si
 fallan, reintentan el domingo siguiente), mismo patrón de lote-de-10 que `Borrar Descartes del gate`.
 Archivado 24 → 30 nodos. No cambia el resto del ADR.
+
+## Enmienda 2026-07-14 (bis) — visibilidad del descubrimiento, costo en $ y curación de las páginas
+
+**Contexto (audit de métricas con Mani, sobre la base viva):** tres cosas. (1) Las dos páginas
+*Métricas de Calidad* y *Salud del Sistema* muestran **el mismo set de campos** (calidad) y **ninguna**
+expone el embudo/costo del punto 2 de la decisión — la fila GLOBAL tiene `colectados`/`gate_pass`/
+`runs_ok`/llamadas pero no salen en ningún lado; la página de "salud" no muestra salud. (2) El equipo
+lee decimales crudos (`separacion_gate` 0.04, `score_aprobados` 0.8) que no sabe interpretar. (3) El
+workflow de descubrimiento (ADR-020) loguea su embudo en `runs.metricas` de Supabase pero **nada llega
+al cockpit**: nadie ve si el banco de referentes crece — hueco que conecta con "¿recomendamos
+contenido exitoso?".
+
+**Decisión (Mani):**
+1. **Fila `DESCUBRIMIENTO` en `Métricas`** (tercer ámbito, junto a proyecto y GLOBAL): el archivado
+   proyecta el embudo del buscador de Supabase (semillas→sugeridos→propuestos→aprobados→promovidos),
+   mismo patrón "el archivado computa, Airtable proyecta". Extiende el contrato del cockpit (`core/`).
+2. **Costo en $**: se activa el "multiplicador opcional futuro" que v1 dejó pendiente (punto 2). Se
+   implementa como **columnas-fórmula en Airtable** (`tarifa × conteo` sobre `supadata_llamadas` /
+   `haiku_lotes` / `haiku_traducciones`), no en n8n: aproximado por-llamada, editable sin re-import.
+3. **Curación por audiencia (tres páginas, cada una para su público):**
+   - *Métricas de Calidad* (equipo): counts + `precision` como **%** + `diagnostico`. Se **ocultan**
+     los decimales crípticos (`score_aprobados`, `score_descartados`, `separacion_gate`) y los campos
+     GLOBAL-only que salen vacíos en filas de proyecto. `diagnostico` pasa a ser la señal principal.
+   - *Salud del Sistema* (jefe): headline (`entregados`, precisión GLOBAL, `runs_ok`/`fallo`) +
+     embudo. Los decimales se **calculan pero no se muestran** al equipo; la traducción a lenguaje es
+     `diagnostico`.
+   - *Costos* (jefe, **página dedicada** — decisión de Mani 2026-07-15): las columnas-fórmula `costo_*`
+     en $, separadas de la salud operativa para que el gasto se lea solo. El costo **no** va como
+     sección de *Salud del Sistema*.
+   Las páginas se editan en la UI de Airtable (el MCP no configura layouts/filtros de interfaz).
+
+**Alternativas descartadas:** *Fusionar las dos páginas de Métricas en una* — mezcla audiencias y deja
+columnas vacías por fila (el embudo solo existe en GLOBAL, la precisión solo en proyecto). *Visibilidad
+del descubrimiento solo contando `Referentes propuestos` en Airtable* — responde "¿el equipo aprueba?"
+pero pierde la eficiencia del buscador (cuántos sugeridos por propuesta útil), que es justo lo que dice
+si el motor de descubrimiento sirve.
+
+**Secuencia:** la fila `DESCUBRIMIENTO` es código nuevo en el archivado → va al **siguiente** lote de
+re-import, después de aterrizar el re-import pendiente y verificar M1 (incluido `diagnostico`, hoy
+vacío) en una corrida real. Las columnas-fórmula de costo y la curación de páginas se pueden hacer ya
+en la UI. **Toca `core/`:** sí (contrato cockpit — tercer ámbito de `Métricas` + columnas de costo);
+este ADR es su autorización.
+
+## Enmienda 2026-07-15 — `Métricas` se parte en dos tablas físicas
+
+**Contexto (Mani):** la curación de la enmienda anterior (ocultar campos por página) no bastó: en la
+UI de Airtable, cuando *Métricas de Calidad* y *Salud del Sistema* leen la **misma** tabla, terminan
+mostrando el mismo set de campos y se pisan al configurarlas. El fondo es un *smell* de modelo: una
+sola tabla mezcla **dos entidades** — calidad por proyecto vs. salud/costos de sistema — y ~30 de sus
+40 campos solo se llenan en las filas GLOBAL/DESCUBRIMIENTO.
+
+**Decisión (Mani 2026-07-15):** partir `Métricas` en dos tablas, una entidad cada una:
+- **`Métricas Proyectos`** — filas de proyecto (calidad): `precision`, scores, `separacion_gate`,
+  `diagnostico`. La lee *Métricas de Calidad*.
+- **`Métricas Global`** — filas `GLOBAL` + `DESCUBRIMIENTO` (embudo, runs, salud del contenido, conteos
+  y **las 9 columnas-fórmula de costo**). La leen *Salud del Sistema* y *Costos*.
+
+Se reusa la tabla existente como `Métricas Global` (renombrada) para no recrear las fórmulas de costo.
+El archivado (nodo *Computar métricas semana*) etiqueta cada batch con `_tabla` y el **único** nodo POST
+routea a la tabla correcta por `$json._tabla` — sin duplicar nodos. El barrido de retención >12 semanas
+apunta solo a `Métricas Proyectos` (la que crece ~7 filas/semana); `Métricas Global` (~2 filas/semana)
+no se barre y así guarda más trend de costos/salud.
+
+**Revierte** la "alternativa descartada" de fusionar en una: el problema real no era fusión, era que
+una tabla servía a dos entidades. Partir es lo contrario de fusionar.
+
+**Toca `core/`:** sí (contrato cockpit + `setup-airtable.mjs` + workflow de archivado). **Aplica al
+re-importar** el archivado en n8n. La precisión decimal de las 5 columnas Apify (`costo_apify_*`,
+`costo_perfiles_semilla`, `costo_detalle_sugeridos`, `costo_lookalikes_tt`) sigue en 0 y hay que
+subirla a 2 a mano en la UI (la API no toca precisión de fórmulas).

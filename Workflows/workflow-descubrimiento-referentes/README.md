@@ -31,6 +31,36 @@ métricas `{semillas, sugeridos_unicos, detalle, vetteados, propuestos, promovid
 workflow es **fail-soft**: cualquier pata externa que falle deja la corrida cerrar en `ok` con
 menos resultados (los errores quedan en `console.log`).
 
+## Cómo se puntúa una propuesta (qué es `afinidad`)
+
+`afinidad` (0–1) es **solo el juicio semántico de Haiku** sobre qué tan del-tema es lo que publica la
+cuenta, contra los `criterios_relevancia` (Proyecto⊕Voz). **No es un blend de similitud + métricas.**
+Cada señal juega un rol separado:
+
+- **Similitud** → *genera* los candidatos (IG `relatedProfiles`, TikTok lookalike), no los puntúa. En IG
+  la **frecuencia** (sugerido por N semillas) decide cuáles ~20 pagan el detalle; en TikTok el `score`
+  de similitud se guarda solo como **desempate** (`freq`) cuando dos cuentas empatan en `afin`.
+- **Métricas (seguidores, views/likes)** → se recolectan y se guardan en la fila para que el equipo las
+  vea, pero **el score las ignora a propósito**: ambos prompts le dicen a Haiku *"importa lo que publica,
+  no su fama"*. El prescore por métricas es trabajo del **motor** (per-video), no del descubrimiento.
+
+Por qué así: un referente es una **fuente permanente**; la calidad/viralidad de cada video la re-juzga
+el motor aguas abajo (heat-score + gate). En el descubrimiento solo importa "¿esta cuenta postea del
+tema consistentemente?". El score además **no viaja al motor**: sus únicos trabajos son filtrar (≥0.6)
+y ordenar el top-10; una vez aprobada, la cuenta es un `Referente` común.
+
+**Límites conocidos (por si el score sorprende):**
+- **TikTok se juzga casi a ciegas.** El lookalike no expone captions → Haiku puntúa solo con bio +
+  métricas (el prompt lo compensa siendo más conservador). Un `afin` TT es menos confiable que uno IG.
+- **IG y TT comparten un solo ranking + un cap de 10.** `Armar propuestas` mezcla ambos y toma el top
+  por `afin` — pero un 0.7 de IG (con captions) y uno de TT (bio sola) no son la misma confianza.
+- **No hay piso de seguidores.** Al excluir métricas, una cuenta chica muy del-tema entra con el mismo
+  peso que una grande. Deseable para nichos; si se quisieran solo fuentes con alcance, haría falta un
+  `min_seguidores` (no existe hoy).
+
+*Mejora anotada (ADR-020 §8):* una 2ª pasada `clockworks` para traer descripciones de TikTok pondría al
+TT a juzgar sobre contenido como IG. Un piso de seguidores sería un knob de una línea si el alcance importa.
+
 ## Qué toca y qué no
 
 - **Lee:** Proyectos/Voces/Referentes/Ajustes/`Referentes propuestos` (Airtable),

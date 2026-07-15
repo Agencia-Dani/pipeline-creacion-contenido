@@ -14,7 +14,7 @@
 
 ---
 
-## Las 8 tablas
+## Las 9 tablas
 
 ### 1. `Proyectos` — la unidad de búsqueda (qué se busca)
 Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunicación, Ventas, Liderazgo.
@@ -24,6 +24,8 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 | `nombre` | texto (primario) | "Comunicación", "Ventas"… |
 | `descripcion` | texto largo | qué cubre el proyecto |
 | `criterios_relevancia` | texto largo | **qué hace relevante a un video para este proyecto** — lo edita el equipo, lo lee el motor para juzgar relevancia (no solo virales). Ver ADR-010 + [refactor-relevancia](../../docs/agents/refactor-relevancia.md) |
+| `criterios_aprendidos` | texto largo | **patrones destilados de las decisiones reales del equipo** (2-3 de lo que sí / lo que no, con ejemplos) — los escribe el archivado cada semana con Haiku, priorizando los 🔥; el gate los lee **junto a** los manuales. La máquina **nunca pisa** `criterios_relevancia`; el equipo puede editar o borrar este campo (ADR-022/M2) |
+| `advertencia_criterios` | texto largo | **lint de los criterios manuales** (criterio vago / sin lista negativa / Voz incoherente) — lo escribe la **misma** llamada de destilación; visible al equipo, el gate **NO lo lee** (ADR-022/M2) |
 | `voz_default` | link → `Voces` | la **única** voz del proyecto (un proyecto = una voz; una voz puede servir a varios proyectos). Afina el filtro de relevancia por encima del tema (ADR-010) |
 | `activo` | checkbox | si entra en las corridas |
 
@@ -52,6 +54,14 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `proyecto` | link → `Proyectos` | a qué proyecto alimenta |
 | `activo` | checkbox | si se rastrea |
 | `notas` | texto largo | por qué se agregó |
+| `tasa_gate` | número (0-1) | **salud de la fuente**: gate_pass / evaluados del desglose por referente de `runs.metricas` de la semana. La escribe el archivado con mínimo de muestra (ADR-022/M2) |
+| `tasa_aprobacion` | número (0-1) | seleccionados / calificados acumulado (de `v_senal_seleccion`). La escribe el archivado con mínimo de muestra (ADR-022/M2) |
+| `videos_evaluados` | número | cuántos videos distintos de esta cuenta evaluó el gate esta semana (denominador de `tasa_gate`) |
+
+> **Salud por referente (ADR-022/M2):** el archivado actualiza los 3 campos de arriba cada semana
+> (mínimo de muestra `min_muestra_referente`=10 para no juzgar con pocos videos). Una vista **"A revisar"**
+> (filtro `tasa_gate` o `tasa_aprobacion` bajas + `videos_evaluados` ≥ mínimo) señala cuentas a podar.
+> **La poda es siempre del equipo** (destildar `activo`) — simetría con la promoción de ADR-020.
 
 ### 4. `Candidatos` — los scripts a calificar (donde el equipo cura)
 | Campo | Tipo | Para qué |
@@ -167,27 +177,70 @@ la tabla** al cerrar la semana (no se acumulan).
 | `thumbnail` | attachment | portada, para escanear rápido |
 | **`veredicto`** | single select | **bien descartado / era bueno** — lo pone el equipo; "era bueno" = falso negativo |
 
-### 8. `Métricas` — el desempeño semanal, solo-lectura (ADR-021)
-**La escribe solo el archivado** (domingo, al cerrar la semana): una fila por (semana × proyecto)
-con la calidad + una fila `GLOBAL` con la salud del motor. Es una **proyección derivada y
-regenerable** — la verdad cruda vive en Supabase (`runs.metricas` + `outputs`). El equipo y el jefe
-la ven en las páginas *Métricas — Calidad* y *Métricas — Salud* (solo-lectura, a propósito). La
-"semana" es la **semana de calificación** (el ciclo que cierra el archivado), no la de entrega.
+### 8. `Métricas Proyectos` + `Métricas Global` — el desempeño semanal, solo-lectura (ADR-021)
+**Las escribe solo el archivado** (domingo, al cerrar la semana), routeando cada fila por `_tabla`.
+**Split 2026-07-15:** antes era una sola tabla `Métricas` y las dos páginas del cockpit (*Métricas de
+Calidad* y *Salud del Sistema*) la compartían, así que no podían mostrar campos distintos sin pisarse.
+Ahora son dos tablas, una entidad cada una:
+
+- **`Métricas Proyectos`** — una fila por (semana × proyecto) con la **calidad**. La lee la página *Métricas de Calidad*.
+- **`Métricas Global`** — una fila `GLOBAL` (salud del motor) + una `DESCUBRIMIENTO` (embudo del buscador,
+  ADR-021 bis) + **todos los costos**. La leen *Salud del Sistema* y *Costos*.
+
+Ambas son **proyección derivada y regenerable** — la verdad cruda vive en Supabase (`runs.metricas` +
+`outputs`), solo-lectura a propósito. La página *Costos* **existe como borrador sin publicar**
+(`pagjPe0IcSIx5TGXh`) y lee `Métricas Global`. La "semana" es la **semana de calificación** (el ciclo
+que cierra el archivado), no la de entrega.
+
+**`Métricas Proyectos`:**
 
 | Campo | Tipo | Para qué |
 |---|---|---|
-| `clave` | texto (primario) | `YYYY-MM-DD · <proyecto \| GLOBAL>` |
-| `semana` | fecha | el domingo del cierre |
-| `ambito` | texto | nombre del proyecto, o `GLOBAL` |
+| `clave` | texto (primario) | `YYYY-MM-DD · <proyecto>` |
+| `semana` | fecha | el lunes de la semana de calificación |
+| `ambito` | texto | nombre del proyecto |
 | `calificados` / `aprobados` / `descartados` | número | lo que el equipo decidió esa semana |
 | `precision` | número (0-1) | **precisión de entrega** = aprobados / calificados (la métrica norte) |
 | `score_aprobados` / `score_descartados` | número (0-1) | score medio del gate en cada grupo |
 | `separacion_gate` | número | la resta de los dos: baja = los criterios del proyecto no discriminan |
-| `diagnostico` | texto largo | **lectura legible del criterio** (solo filas de proyecto): 🟢 sano / 🟡 mejorable / 🔴 flojo o invertido + qué hacer, derivado de `separacion_gate`+`precision`. La escribe el archivado (regla, sin IA — enmienda ADR-021 2026-07-14). Es el semáforo de outcome; el *lint de forma* (criterio vago / sin lista negativa / Voz incoherente, con IA) llega en ADR-022/M2 y convive con este |
-| `entregados` / `colectados` / `pretrim` / `gate_pass` | número | el embudo de la semana (solo fila GLOBAL, suma de los runs del motor) |
+| `diagnostico` | texto largo | **lectura legible del criterio**: 🟢 sano / 🟡 mejorable / 🔴 flojo o invertido + qué hacer, derivado de `separacion_gate`+`precision` (regla, sin IA — enmienda ADR-021 2026-07-14). El *lint de forma* con IA llega en ADR-022/M2 y convive con este |
+
+**`Métricas Global`:**
+
+| Campo | Tipo | Para qué |
+|---|---|---|
+| `clave` | texto (primario) | `YYYY-MM-DD · <GLOBAL \| DESCUBRIMIENTO>` |
+| `semana` | fecha | el lunes del cierre |
+| `ambito` | texto | `GLOBAL` o `DESCUBRIMIENTO` |
+| `calificados` / `aprobados` / `descartados` / `precision` | número | totales de la semana (fila GLOBAL) |
+| `entregados` / `colectados` / `pretrim` / `gate_pass` | número | el embudo de la semana (fila GLOBAL, suma de los runs del motor) |
+| `apify_ig` / `apify_tt` | número | **resultados crudos de Apify por plataforma** en el motor (`instagram-scraper` / `free-tiktok-scraper`); GLOBAL. Alimentan el costo Apify |
 | `sin_guion` / `descartes_expuestos` / `falsos_negativos` | número | salud del contenido (GLOBAL) |
-| `runs_ok` / `runs_fallo` / `duracion_min` | número | salud del motor (GLOBAL) |
-| `supadata_llamadas` / `haiku_lotes` / `haiku_traducciones` | número | **conteo de llamadas** por servicio (GLOBAL; el costo en $ queda como multiplicador futuro) |
+| `runs_ok` / `runs_fallo` / `duracion_min` | número | salud del motor (GLOBAL; `runs_ok`/`runs_fallo` también en DESCUBRIMIENTO) |
+| `semillas` / `sugeridos_unicos` / `propuestos` / `promovidos` | número | **embudo del descubrimiento** (fila DESCUBRIMIENTO — ADR-020/021 bis) |
+| `perfiles_semilla` / `detalle_sugeridos` / `lookalikes_tt` | número | **resultados crudos de Apify por actor** en el descubrimiento (`instagram-profile-scraper` ×2 + `tiktok-lookalike-search`); DESCUBRIMIENTO. Alimentan el costo Apify |
+| `supadata_llamadas` / `haiku_lotes` / `haiku_traducciones` | número | **conteo de llamadas** por servicio (GLOBAL), que alimentan las columnas de costo |
+| `costo_supadata` / `costo_haiku_lotes` / `costo_haiku_traducciones` / `costo_apify_ig` / `costo_apify_tt` / `costo_perfiles_semilla` / `costo_detalle_sugeridos` / `costo_lookalikes_tt` / `costo_total` | fórmula ($) | **costo en $ de la semana** = `tarifa × conteo` (ADR-021 bis). La tarifa vive **baked en la fórmula**, editable en la UI sin re-import. `costo_total` suma todo y es correcto **por fila** (GLOBAL suma motor; DESCUBRIMIENTO suma su Apify). Tarifas (Mani 2026-07-14): Supadata `$0.009`/crédito, Haiku lote `$0.004`, Haiku traducción `$0.005`, Apify IG/perfiles `$0.0023`, Apify TikTok `$0.005`, lookalikes TikTok `$0.20`. *(La precisión decimal se fija a mano en la UI — la API no la setea en fórmulas. Las 5 columnas Apify quedaron en precisión 0: subir a 2.)* |
+
+### Tarifas de Apify por actor
+
+Apify se factura **por resultado**. Los 4 actores en uso en el pipeline (verificado en los `workflow.json`; tarifas confirmadas por Mani 2026-07-14):
+
+| Actor (`actorId`) | Nodo · workflow | Tarifa |
+|---|---|---|
+| `apify~instagram-scraper` | `Apify — IG Reels` · motor de reels | `$2.30`/1.000 = **$0.0023**/result |
+| `clockworks~free-tiktok-scraper` | `Apify — TikTok Perfil` · motor de reels | `$5`/1.000 = **$0.005**/item |
+| `apify~instagram-profile-scraper` | `Apify — Perfiles semilla` + `Apify — Detalle sugeridos` · descubrimiento | `$2.30`/1.000 = **$0.0023**/result |
+| `dataovercoffee~tiktok-lookalike-search` | `Apify — Lookalikes TikTok` · descubrimiento | **$0.20**/result |
+
+> **Contadores de Apify (implementado 2026-07-14, aplica al re-importar):** el motor cuenta los
+> resultados crudos de cada actor en `runs.metricas` (`apify_ig` / `apify_tt`); el descubrimiento cuenta
+> los suyos (`perfiles_semilla` / `detalle_sugeridos` / `lookalikes_tt`) y ya proyecta su embudo a la
+> fila `DESCUBRIMIENTO`. El archivado (nodo *Computar métricas semana* + lectura *Leer runs
+> descubrimiento*) los lleva a las columnas de `Métricas Global`, que alimentan las columnas-fórmula de costo
+> Apify. **Los 3 `workflow.json` cambiaron → los valores aparecen recién tras re-importar** los tres
+> workflows en n8n y correr un ciclo (motor + descubrimiento + archivado). Hasta entonces las columnas
+> Apify quedan vacías (costo $0).
 
 ---
 
@@ -196,8 +249,9 @@ la ven en las páginas *Métricas — Calidad* y *Métricas — Salud* (solo-lec
 1. **Lee** (inicio de corrida): Proyectos activos + sus Referentes/Voz +
    `criterios_relevancia`, **y la tabla `Ajustes`** (nodo `Leer Ajustes`). Batch (1 page por tabla)
    para no gastar API calls. Los `criterios` y los `ajustes` viajan en el plan de corrida (nodo
-   `Armar plan`); los criterios alimentan el gate de relevancia (Haiku, ADR-010) y los ajustes caen
-   sobre los defaults de Config en `Heat-score v1` y `Gate de relevancia`.
+   `Armar plan`); los criterios (manuales **+** `criterios_aprendidos`, ADR-022/M2) alimentan el gate
+   de relevancia (Haiku, ADR-010) y los ajustes caen sobre los defaults de Config en `Heat-score v1`
+   y `Gate de relevancia`.
 2. **Transcribe y traduce** cada item que pasa el heat-score (Supadata transcribe; Claude detecta
    idioma y traduce al español solo si hace falta — literal, sin reescribir), pasa por el **gate de
    relevancia** (Haiku) que produce `relevancia_score`/`relevancia_razon`, y **escribe** los
@@ -209,8 +263,11 @@ la ven en las páginas *Métricas — Calidad* y *Métricas — Salud* (solo-lec
    `veredicto` en los descartes expuestos. El **workflow de archivado** (cron semanal, domingo 6pm)
    lleva los calificados a Supabase (`outputs` con `calificado_en` + metadata, **incluida la
    relevancia** — ADR-021), hace **append al Sheet "Histórico"** (exportable a Excel), los
-   **borra de Airtable** (así no se pasa de 1.000 registros), **computa la fila semanal de
-   `Métricas`** y **limpia `Descartes del gate`**.
+   **borra de Airtable** (así no se pasa de 1.000 registros), **computa las filas semanales de
+   `Métricas Proyectos` + `Métricas Global`** (routea por `_tabla`) y **limpia `Descartes del gate`**. Además (ADR-022/M2, dos sub-cadenas fail-soft):
+   **destila** los calificados de cada proyecto a `criterios_aprendidos` + `advertencia_criterios`
+   (Haiku, prioriza los 🔥), y **actualiza la salud por referente** (`tasa_gate`/`tasa_aprobacion`/
+   `videos_evaluados`). Ambos escritos nunca pisan lo que el equipo edita a mano.
 5. Las selecciones acumuladas alimentan el heat-score de la próxima corrida → **el sistema aprende
    qué priorizar**, por **referente** (`v_senal_seleccion`). *(La señal por keyword/tema —
    `v_senal_tema`, ADR-012 — quedó **inerte** al removerse el eje keyword, ADR-019; la vista sigue en
@@ -225,9 +282,10 @@ la ven en las páginas *Métricas — Calidad* y *Métricas — Salud* (solo-lec
   - **Candidatos `nuevo` sin calificar > 20 días:** el archivado solo borraba los *decididos*; los
     `nuevo` que nadie calificó se apilaban en el feed. Se purgan a los 20 días (no van al histórico:
     nunca hubo decisión). Mantiene limpia la pestaña "Nuevos".
-  - **`Métricas` > 12 semanas (84 días):** la tabla crece ~7 filas/semana (única tabla monótona). Se
+  - **`Métricas Proyectos` > 12 semanas (84 días):** crece ~7 filas/semana (la tabla monótona). Se
     capa a 12 semanas de historia *visible*; el histórico largo y canónico queda en Supabase
-    (`runs.metricas` + `outputs`) y el Sheet, de donde `Métricas` es regenerable. Subir el cap si el
+    (`runs.metricas` + `outputs`) y el Sheet, de donde es regenerable. `Métricas Global` **no se barre**
+    (crece ~2 filas/semana: GLOBAL + DESCUBRIMIENTO; conviene guardar más trend de costos/salud). Subir el cap si el
     jefe quiere más trend en el cockpit.
 - **Batching:** toda lectura/escritura de n8n agrupa registros (10/call). Con cadencia semanal
   (motor lunes + archivado domingo) y batching entra cómodo bajo 1.000 calls/mes. Con los dos
@@ -247,5 +305,5 @@ node core/scripts/setup-airtable.mjs      # crea la base y devuelve el baseId
 ```
 
 Devuelve el `baseId` (`app...`) → va a la credencial de Airtable en n8n, y siembra los defaults de
-`Ajustes`. Alternativa sin compartir token: crear las 8 tablas a mano siguiendo esta misma
+`Ajustes`. Alternativa sin compartir token: crear las 9 tablas a mano siguiendo esta misma
 especificación.
