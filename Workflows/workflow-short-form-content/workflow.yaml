@@ -5,7 +5,7 @@
 # Haiku + heat-score métrico + dedup → transcribe/traduce (2 Code nodes) → GATE Haiku (CALIDAD) →
 # candidatos a Airtable + registro en Supabase. Sin Google en el motor.
 # CALIDAD ya no es hueco: la llena el Gate de relevancia (Haiku) sobre el transcript. El doble gate
-# (pre-trim recall + gate precision) y el heat-score composite viven en docs/agents/refactor-relevancia.md.
+# (pre-trim recall + gate precision) y el heat-score composite están decididos en ADR-010.
 contract_version: 1
 
 id: short-form-content
@@ -85,6 +85,5 @@ runbook:
     - README.md
     - CLAUDE.md
     - ../../ROADMAP.md
-    - ../../docs/agents/refactor-relevancia.md
 
 cost_per_run: "por medir (B3): Apify x2 actors + ~top_n transcripciones Supadata + solo las traducciones no-español vía Claude Haiku (claude-haiku-4-5, $1/$5 por Mtok). ADR-010 suma 2 llamadas Haiku batch (pre-trim + gate)."

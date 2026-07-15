@@ -55,5 +55,4 @@
   - (−) El archivado suma otra responsabilidad (ya señalado en ADR-021); sigue fail-soft.
   - (−) El equipo debe saber que el 🔥 ahora enseña (una línea en el onboarding).
 - **Toca `core/`:** sí — contrato cockpit (campos nuevos en `Proyectos` y `Referentes`); este ADR es
-  su autorización. El plan ejecutable vive en
-  [refactor-relevancia.md](../agents/refactor-relevancia.md) (Fase M2).
+  su autorización. El plan ejecutable (Fase M2) ya se completó (histórico en git).

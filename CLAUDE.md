@@ -19,7 +19,6 @@ en §Agent skills; acá solo se ubican.
 - [docs/agents/handoff.md](docs/agents/handoff.md) — estado vivo del repo (leelo al empezar la sesión).
 - [docs/agents/context.md](docs/agents/context.md) — glosario de dominio (lenguaje ubicuo).
 - [docs/agents/dev-doc.md](docs/agents/dev-doc.md) — los 2 workflows nodo por nodo + mapa de datos.
-- [docs/agents/refactor-relevancia.md](docs/agents/refactor-relevancia.md) — plan por stages del refactor de relevancia (origen del scoring actual).
 
 **Decisiones**
 - [docs/adr/](docs/adr/) — ADRs 001–012, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).

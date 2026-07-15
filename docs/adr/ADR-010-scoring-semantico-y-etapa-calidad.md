@@ -1,7 +1,7 @@
 # ADR-010 — Scoring semántico con LLM + etapa CALIDAD (revisa el scoring de ADR-009)
 
 - **Estado:** aceptada — 2026-06-16 (sesión de grilling con Mani tras la primera corrida real V1;
-  plan de ejecución por stages en [docs/agents/refactor-relevancia.md](../agents/refactor-relevancia.md)).
+  ejecución por stages ya completada, histórico en git).
 - **Contexto:** V1 corrió end-to-end y pobló `Candidatos`, pero el ranking deja pasar contenido
   **viral-pero-irrelevante** (hashtag farming, viral sin razón). El heat-score de ADR-009 juzga la
   relevancia tópica con un **match por substring** de las keywords del Proyecto sobre la
@@ -43,8 +43,8 @@
     se batchea, y el pre-trim **baja el volumen de transcripción** (ahorra Supadata).
   - (−) Un LLM entra al camino de selección. Mitigado por **fail-open** (invariante #1).
   - **Revisa el punto "heat-score" de ADR-009** (la fórmula cambia). El resto de ADR-009 sigue
-    vigente: scripts literales, prioridad multiidioma, aprendizaje → scoring. La ejecución va por
-    stages en [refactor-relevancia.md](../agents/refactor-relevancia.md).
+    vigente: scripts literales, prioridad multiidioma, aprendizaje → scoring. La ejecución fue por
+    stages (histórico en git).
 
 ## Enmienda 2026-07-14 — la Voz aporta contexto, no criterio
 

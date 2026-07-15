@@ -57,7 +57,7 @@
   - (−) La banda borderline capada es una **muestra**, no un censo: la tasa de falsos negativos es
     indicativa, no exacta. Aceptado: alcanza para detectar criterios que matan contenido bueno.
 - **Toca `core/`:** sí — contrato cockpit (2 tablas nuevas) y este ADR es su autorización. El plan
-  ejecutable vive en [refactor-relevancia.md](../agents/refactor-relevancia.md) (Fase M1).
+  ejecutable (Fase M1) ya se completó (histórico en git).
 
 ## Enmienda 2026-07-13 — de banda fija a top-K por score
 

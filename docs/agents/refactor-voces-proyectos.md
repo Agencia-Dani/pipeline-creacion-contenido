@@ -73,8 +73,10 @@ relevantes, califica, y el sistema aprende de esa elección — todo **sin ayuda
 
 **Los contratos (las interfaces que no se improvisan):**
 
-- **Contrato de disparo** (el sync duro entre los 2 carriles, §5): la superficie entrega al motor
-  `{ project_id, N }`; el motor responde `{ run_id, estado }`. Se fija en el ADR de B.2.
+- **Contrato de disparo** (el sync duro entre los 2 carriles, §5): **señal desnuda** — un botón en
+  Airtable dispara un webhook de n8n ("correr ahora", sin payload) y **el motor lee Airtable** (toggles
+  + N por proyecto) para saber qué corre. Una corrida = todos los proyectos activos, cada uno a su N.
+  Fijado en [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md).
 - **Contrato de datos** (schema, componente E): `Voces(activo)` · `Proyectos(voz, activo, criterios)` ·
   `Referentes(proyecto, activo)` · el mecanismo de disparo (`Corridas(proyecto, N, estado)` o equivalente).
   Fuente: [airtable-cockpit.md](../../core/contracts/airtable-cockpit.md).
@@ -117,8 +119,8 @@ Buena parte del andamiaje ya está. Verificado contra
 | Referentes independientes entre voces | ✅ implícito (referente → 1 proyecto → 1 voz) | confirmar en la auditoría |
 | Proyecto toggleable | ✅ `Proyectos.activo` | — |
 | **Voz toggleable** | ❌ no hay `Voces.activo` | campo nuevo + el motor lo respeta |
-| **N por corrida, por proyecto** | ❌ N es **global** (`Candidatos por corrida`=100; ADR-016 lo sacó del proyecto a propósito) | revertir en parte ADR-016: N pasa a parámetro de corrida (ADR) |
-| **Disparo on-demand con selección** | 🟡 el motor tiene *Execute manual*, pero corre **todos** los proyectos activos en una pasada | mecanismo para elegir Voz+Proyecto+N y disparar (§3, ADR) |
+| **N por proyecto** | ❌ N es **global** (`Candidatos por corrida`=100; ADR-016 lo sacó del proyecto a propósito) | ADR-024 (cerrado): N vuelve a `Proyectos`, global = default, corte por proyecto |
+| **Disparo on-demand** | 🟡 el motor tiene *Execute manual*, pero corre **todos** los proyectos activos en una pasada | ADR-023 (cerrado): botón Airtable → webhook single-flight; sigue corriendo "los activos", ahora on-demand |
 | `Mínimo likes/vistas` global | 🟡 ya existen en `Ajustes` (seed 0), **sin** `Mostrar al equipo` | marcarlos team-facing |
 | Métricas + Costos | 🟡 tablas y página *Costos* (borrador) existen; falta re-import + publicar | cerrar (arrastre cierres 37-39) |
 
@@ -160,17 +162,17 @@ Airtable salvo que la auditoría pruebe lo contrario.
 
 ## 4. Los componentes
 
-> Orden: **A (auditoría) es precondición de todo** — no se redibuja nada sin el mapa vivo, y además
-> destraba la decisión de herramienta (§3). B/C/D/E se pueden repartir entre 2 devs una vez cerrada A
-> (ver §5). Lo intrusivo en `workflow.json` (builder Node, validar por re-import + Execute) está en C y D.
+> Orden (ver §5): **A.1 + A.2 primero, juntos** (de-riesgan el motor). Después **split de A** — el motor
+> (C/D/E, tool-agnóstico) arranca en paralelo mientras Dev 1 termina A.3–A.5 + la decisión §3, que sólo
+> gobierna la forma de B. El contrato de disparo ya está cerrado (ADR-023), así que no hay que esperarlo.
+> Lo intrusivo en `workflow.json` (builder Node, validar por re-import + Execute) está en C y D.
 
 ### A. Auditoría del pipeline vivo *(cross-cutting, precondición)*
 
 **Qué es:** el mapa verificado y sin puntos ciegos de los 3 workflows y del cockpit — cada nodo, cómo
 se alimenta cada tabla/vista, para qué sirve cada campo, y que **no haya componentes sin propósito o con
 uso no visto**. Es lo que Mani pidió explícito, y lo que destraba §3. Punto de partida (no arrancar de
-cero): [guia-reunion-redes.md](guia-reunion-redes.md) + [dev-doc.md](dev-doc.md) → **verificar contra el
-JSON vivo, extender, flagear huérfanos**.
+cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, flagear huérfanos**.
 
 - [ ] **A.1** Verificar los 3 `workflow.json` contra dev-doc/guía: cada nodo existe, hace lo dicho, y
       está cableado (0 refs rotas, 0 huérfanos — reusar el chequeo de grafo de cierres 34/36).
@@ -199,10 +201,11 @@ correr) y la **racionalización de campos** que salga de la auditoría.
 - [ ] **B.1** Definir el **flujo de una corrida efectiva** de punta a punta: cómo el equipo elige Voz,
       ve sus proyectos, prende/apaga referentes, fija N, dispara, y ve el resultado. Este flujo es el
       contrato que B.2 y el componente C (motor) implementan.
-- [ ] **B.2** **Mecanismo de disparo** (ADR): cómo el operador selecciona Voz+Proyecto+N y fira. En
-      Airtable, la opción recomendada es una **tabla `Corridas`** (fila con Proyecto+N+"correr ✓") que un
-      cron corto del motor levanta. En dashboard propio, es un botón que pega a un webhook/API de n8n.
-      Define qué recibe el motor: `project_id` + `N`.
+- [ ] **B.2** **Mecanismo de disparo** ([ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md), cerrado):
+      **botón nativo de Airtable → "Run automation" → webhook de Producción de n8n**. Señal desnuda
+      ("correr ahora", sin payload); el motor lee Airtable. Una corrida = todos los proyectos activos, cada
+      uno a su N. Webhook **single-flight** (no arranca si ya hay una corrida). La N por proyecto y los
+      toggles son la selección. (Descartado: tabla `Corridas` + cron-poll — quema cuota y deja estado colgado.)
 - [ ] **B.3** **Racionalización de campos** (sale de A.2): quitar/estandarizar los campos que la
       auditoría marque innecesarios o inconsistentes; dejar la superficie coherente para el equipo.
 - [ ] **B.4** `Mínimo likes/vistas` **team-facing**: marcar `Mostrar al equipo ✓` en esas 2 filas de
@@ -221,15 +224,19 @@ disparar una corrida, y ver Métricas/Costos reales — con una superficie de ca
 proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pipeline del motor
 (transcribir → traducir → gate → entregar → registrar) **no se toca**.
 
-- [ ] **C.1** **N por corrida** (enmienda ADR-016): N deja de ser global fijo, pasa a parámetro de la
-      corrida por proyecto; el global queda como default. `cap_top_n` sigue siendo el gobernador de
-      créditos duro (no se toca — protege el backfill).
+- [ ] **C.1** **N por proyecto** ([ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md)): N vuelve a
+      ser campo de `Proyectos`; el global `Candidatos por corrida` pasa a **default por proyecto**. Misma
+      semántica en cron y on-demand. El **corte final pasa a ser por proyecto** (cada uno a su N por heat
+      compuesto, después del gate). `cap_top_n` sigue siendo el gobernador duro (no se toca — protege el backfill).
 - [ ] **C.2** **Respetar `Voces.activo`**: un proyecto cuya voz está apagada no corre (aunque el proyecto
       esté `activo`). Toca `Leer Proyectos` / `Armar plan`.
-- [ ] **C.3** **Trigger + entrada por proyecto**: nuevo trigger (según B.2) que entrega `project_id`+`N`;
-      `Leer Proyectos`/`Config`/`Armar plan` pasan de "todos los activos" a "el proyecto pedido" (con su
-      voz, referentes prendidos, criterios). Construir con builder Node, no a mano.
-- [ ] **C.4** Decidir el futuro del **cron semanal**: coexiste (barrido de respaldo) o se retira.
+- [ ] **C.3** **Webhook trigger** (según [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)): nuevo
+      trigger de Producción con guard **single-flight**, en paralelo al cron. El motor **sigue leyendo "los
+      activos"** (no gana un modo "solo este proyecto"); lo único nuevo es respetar `Voces.activo` (C.2) y la
+      N por proyecto (C.1). Construir con builder Node, no a mano.
+- [ ] **C.4** ~~Decidir el futuro del cron~~ **Resuelto: el cron semanal coexiste** (barrido autónomo de
+      respaldo + mantiene el ritmo semanal de Métricas/salud por referente). El on-demand se suma (ROADMAP §1
+      enmendado, ADR-023). Falta: confirmar que dedup (`processed_items`) hace la coexistencia limpia.
 
 **Hecho cuando:** una corrida disparada a mano para un solo proyecto con N=20 deja ~20 candidatos de
 **ese** proyecto en Airtable + rastro en Supabase, sin tocar los demás. Validado por re-import + Execute.
@@ -267,26 +274,34 @@ en A.
 
 ## 5. Cómo se reparte entre 2 devs
 
-**Primero, juntos: componente A (auditoría) + cerrar §3.** Es la base compartida y la decisión que
-gobierna el resto — no tiene sentido dividir antes. Salida de A: el mapa + el ADR de herramienta.
+**Primero, juntos y corto: A.1 (verificar workflows) + A.2 (mapa campo×tabla).** Son las tajadas de la
+auditoría que **de-riesgan el motor**; no hace falta terminar toda A antes de construir. El contrato de
+disparo ya está cerrado ([ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)), así que los dos
+carriles pueden arrancar en cuanto A.1/A.2 estén.
 
-Después, dos carriles paralelos con un solo punto de sync (el contrato de disparo, B.2/C.3):
+**Split de A — el motor arranca temprano:** la decisión de herramienta §3 (A.5) sólo gobierna la **forma
+de B** (la superficie); C/D/E son **tool-agnósticas** (el motor lee Airtable en cualquier caso). Así que
+Dev 1 termina la auditoría + §3 mientras Dev 2 ya construye el carril del motor.
 
 | Carril | Componentes | Foco |
 |---|---|---|
-| **Dev 1 — Superficie** | B (dashboard) + E (schema) | flujo del operador, campos, disparo desde la UI, Métricas/Costos |
-| **Dev 2 — Motor** | C (motor) + D (archivado) | corrida por proyecto, N, `Voces.activo`, que el archivado no se rompa |
+| **Dev 1 — Superficie + auditoría** | A.3–A.5 + B (dashboard) + E (schema) | mapa de páginas, decisión §3, flujo del operador, campos, botón de disparo, Métricas/Costos |
+| **Dev 2 — Motor** | C (motor) + D (archivado) | N por proyecto, `Voces.activo`, corte por proyecto, webhook single-flight, que el archivado no se rompa |
 
-**Sync duro:** el **contrato de disparo** (qué manda la UI, qué recibe el motor: `project_id`+`N`) —
-B.2 y C.3 tienen que acordarlo antes de construir en paralelo. Se fija en el ADR de B.2.
+**Sync duro:** el **contrato de disparo** — ya fijado en ADR-023: señal desnuda (webhook "correr ahora")
++ el motor lee Airtable (toggles + N por proyecto). No hay payload que acordar; el punto de sync es que
+ambos carriles respeten ese contrato.
 
 ## 6. ADRs que nacen de esto
 
-- **Herramienta del cockpit** (A.5) — Airtable vs. dashboard propio; supera/enmienda el invariante de
-  ROADMAP §1 si se va por dashboard propio. **Gate de todo.**
-- **Mecanismo de disparo on-demand** (B.2) — cómo se selecciona y dispara; contrato de entrada del motor.
-- **Enmienda ADR-016** (C.1) — N vuelve a ser por-corrida (por proyecto); el global pasa a default.
-- El ADR de A.5 autoriza los cambios de `core/` de E (`Voces.activo`, tabla de disparo).
+- ✅ **[ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)** — mecanismo de disparo on-demand
+  (botón Airtable → automation → webhook, señal desnuda, coexiste con cron). **Cerrado.**
+- ✅ **[ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md)** — N vuelve por proyecto, global =
+  default, corte final por proyecto; `cap_top_n` intacto. **Cerrado.**
+- ⬜ **Herramienta del cockpit** (A.5) — Airtable vs. dashboard propio. **Acotado por ADR-023:** el eje
+  operativo se queda en Airtable; la pregunta queda sólo para lo analítico read-only (Métricas/Costos).
+  Se cierra al terminar la auditoría, con ADR.
+- El ADR de A.5 autoriza los cambios de `core/` de E que no cubran ya ADR-023/024.
 
 ## 7. Lo que NO cambia (invariantes a respetar)
 
@@ -296,5 +311,8 @@ B.2 y C.3 tienen que acordarlo antes de construir en paralelo. Se fija en el ADR
   **no se toca**: este refactor es sobre *qué corre, cómo se dispara y dónde se maneja*, no sobre *cómo
   se procesa un video*.
 - **`core/` solo cambia con ADR.**
-- ⚠️ **El invariante "Airtable es la puerta única" (ROADMAP §1) está bajo revisión** en §3/A.5 — es el
-  único invariante que este refactor puede llegar a mover, y solo vía ADR.
+- ⚠️ **El invariante "Airtable es la puerta única" (ROADMAP §1)** — **acotado por ADR-023:** el eje
+  **operativo** (disparo, toggles, N) se queda en Airtable; sólo lo **analítico** read-only
+  (Métricas/Costos sobre Supabase) sigue bajo revisión en §3/A.5 como candidato a dashboard propio.
+  Es el único invariante que este refactor puede mover, y solo vía ADR.
+- **Norte enmendado (ADR-023):** "corre sola" pasa a "corre sola **y** a demanda" — el cron coexiste.

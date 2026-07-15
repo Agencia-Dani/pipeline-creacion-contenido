@@ -21,13 +21,15 @@
 | [ADR-013](./ADR-013-atribucion-multiproyecto-fan-out.md) | Atribución multi-proyecto: fan-out de un video a cada proyecto que lo reclama (grado 1, MVP) | Aceptada (solo por referente desde ADR-019; emisión deduplicada por ADR-018) |
 | [ADR-014](./ADR-014-outputs-historico-canonico-archivado.md) | `outputs` = histórico canónico; lo escribe solo el archivado (el motor reporta solo `runs`) | Aceptada |
 | [ADR-015](./ADR-015-busqueda-solo-referente-retiro-keywords.md) | Búsqueda solo por referente; eje TikTok-keyword dormante por flag (IG-keyword retirado) | Aceptada (cerrada por ADR-019: el eje keyword se remueve del todo) |
-| [ADR-016](./ADR-016-knobs-de-ejecucion-globales-y-tope-de-costo.md) | Knobs de ejecución globales (top_n, recencia, resultados por referente) + tope de costo | Aceptada (extendida por ADR-017: piso por cuenta) |
+| [ADR-016](./ADR-016-knobs-de-ejecucion-globales-y-tope-de-costo.md) | Knobs de ejecución globales (top_n, recencia, resultados por referente) + tope de costo | Aceptada (extendida por ADR-017: piso por cuenta; enmendada por ADR-024: N vuelve por proyecto) |
 | [ADR-017](./ADR-017-reactivar-keyword-tiktok-y-toggles-de-eje.md) | Reactivar eje keyword TikTok como toggle + 3 toggles de eje + knob/cap por keyword + piso por cuenta | Aceptada (revertida por ADR-019 en lo keyword; toggles de referente y piso quedan) |
 | [ADR-018](./ADR-018-un-candidato-por-video-dedup-salida.md) | Un Candidato por video: dedup de salida del fan-out (gana la copia con mejor relevancia) | Aceptada (enmienda ADR-013) |
 | [ADR-019](./ADR-019-remocion-total-eje-keyword.md) | Remoción total del eje keyword: el motor descubre solo por referentes (enmienda ADR-015, revierte ADR-017, reduce ADR-012) | Aceptada |
 | [ADR-020](./ADR-020-motor-descubrimiento-referentes.md) | Motor de descubrimiento de referentes: sugeridos de IG + vetting Haiku + aprobación del equipo (workflow aparte; completa ADR-019) | Aceptada |
 | [ADR-021](./ADR-021-medicion-desempeno-embudo.md) | Medición de desempeño del embudo: tabla `Métricas` + descartes del gate visibles + histórico enriquecido (el archivado computa, Airtable proyecta; enmiendas 2026-07-13 top-K, 2026-07-14 diagnóstico+barridos, 2026-07-14 bis descubrimiento+costo+páginas, 2026-07-15 split en `Métricas Proyectos` + `Métricas Global`) | Aceptada |
 | [ADR-022](./ADR-022-loop-aprendizaje-criterios.md) | Loop de aprendizaje de criterios: destilación semanal en `criterios_aprendidos` + 🔥 prioriza ejemplos + salud por referente (extiende ADR-010, completa ADR-020) | Aceptada (se construye tras verificar ADR-021) |
+| [ADR-023](./ADR-023-disparo-on-demand-boton-airtable.md) | Disparo on-demand: botón Airtable → automation → webhook n8n; señal desnuda, el motor lee Airtable; una corrida = todos los activos; coexiste con el cron | Aceptada |
+| [ADR-024](./ADR-024-enmienda-adr016-n-por-proyecto.md) | Enmienda ADR-016: la N vuelve por proyecto (global = default), corte final por proyecto; `cap_top_n` intacto | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

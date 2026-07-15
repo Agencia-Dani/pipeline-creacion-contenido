@@ -19,11 +19,17 @@
 
 ## 1. El norte (lo que pidió el jefe)
 
-**El objetivo en una frase:** una máquina que corre sola — busca videos de referentes
-(priorizando otros idiomas), los ordena de caliente a frío, entrega cada uno
+**El objetivo en una frase:** una máquina que corre sola **y también a demanda** — busca videos de
+referentes (priorizando otros idiomas), los ordena de caliente a frío, entrega cada uno
 **transcrito/traducido al español** con link al original y al script, deja que el equipo de
 redes (**Majo y Jero**) elija en Airtable — y **aprende de esa elección** mientras todo queda en
 un **histórico exportable a Sheets**.
+
+> **Enmienda 2026-07-15 (refactor Voces→Proyectos):** el cron semanal autónomo **coexiste** con un
+> disparo **on-demand** (el equipo prende los proyectos que quiere, fija la N de cada uno, y corre con
+> un botón en Airtable — [ADR-023](./docs/adr/ADR-023-disparo-on-demand-boton-airtable.md),
+> [ADR-024](./docs/adr/ADR-024-enmienda-adr016-n-por-proyecto.md)). El on-demand se **suma**; no retira
+> al cron. Es el único punto del norte que este refactor mueve, y va con ADR.
 
 ✅ Visto bueno dado · ✅ flag viral confirmado como concepto (~700K marca "high-end", no excluye)
 · ✅ división por proyectos/voces confirmada · ⬜ voz/proyecto inicial: aún no la dan — **y no

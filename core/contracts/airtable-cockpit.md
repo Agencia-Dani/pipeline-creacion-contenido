@@ -23,7 +23,7 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 |---|---|---|
 | `nombre` | texto (primario) | "Comunicación", "Ventas"… |
 | `descripcion` | texto largo | qué cubre el proyecto |
-| `criterios_relevancia` | texto largo | **qué hace relevante a un video para este proyecto** — lo edita el equipo, lo lee el motor para juzgar relevancia (no solo virales). Ver ADR-010 + [refactor-relevancia](../../docs/agents/refactor-relevancia.md) |
+| `criterios_relevancia` | texto largo | **qué hace relevante a un video para este proyecto** — lo edita el equipo, lo lee el motor para juzgar relevancia (no solo virales). Ver ADR-010 |
 | `criterios_aprendidos` | texto largo | **patrones destilados de las decisiones reales del equipo** (2-3 de lo que sí / lo que no, con ejemplos) — los escribe el archivado cada semana con Haiku, priorizando los 🔥; el gate los lee **junto a** los manuales. La máquina **nunca pisa** `criterios_relevancia`; el equipo puede editar o borrar este campo (ADR-022/M2) |
 | `advertencia_criterios` | texto largo | **lint de los criterios manuales** (criterio vago / sin lista negativa / Voz incoherente) — lo escribe la **misma** llamada de destilación; visible al equipo, el gate **NO lo lee** (ADR-022/M2) |
 | `voz_default` | link → `Voces` | la **única** voz del proyecto (un proyecto = una voz; una voz puede servir a varios proyectos). Afina el filtro de relevancia por encima del tema (ADR-010) |

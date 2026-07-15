@@ -99,6 +99,14 @@ el heat-score (ADR-009).
 El texto de un candidato: la transcripción del video tal cual, traducida al español solo si el
 original no lo está. Sin reescritura ni adaptación a voz (ADR-009).
 
+**Corrida**:
+Una ejecución del motor. Dos modos que **coexisten**: el **cron semanal** (autónomo, barre los
+proyectos activos — el norte "corre sola" de ROADMAP §1) y la **corrida on-demand** (el equipo
+prende los proyectos que quiere, fija la `N` de cada uno, y dispara con un botón que corre
+**todos los proyectos activos** — la selección se expresa con los toggles, no con un payload).
+El on-demand se suma; no retira al cron (decisión 2026-07-15). Cada corrida deja rastro en
+`runs`/`outputs`.
+
 **Estado**:
 El campo canónico de "decidido" de un Candidato: **nuevo → aprobado | descartado** (binario tras
 calificar; ya no existe "publicado"). Es lo que el archivado levanta (`NOT nuevo`) y lo que alimenta
