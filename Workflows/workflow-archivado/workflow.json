@@ -64,6 +64,18 @@
               "name": "sheet_tab",
               "value": "<<NOMBRE_PESTANA_SHEET>>",
               "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "min_muestra_referente",
+              "value": "10",
+              "type": "string"
+            },
+            {
+              "id": "a7",
+              "name": "min_muestra_destilar",
+              "value": "4",
+              "type": "string"
             }
           ]
         },
@@ -869,6 +881,183 @@
           "timeout": 20000
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Destilar criterios (ADR-022 / M2): por proyecto, Haiku resume los calificados de la semana en\n// patrones (lo que SI / lo que NO) priorizando los 🔥 como ejemplos positivos (fallback aprobados);\n// la MISMA llamada evalua los criterios manuales y deja una advertencia de forma (lint). Escribe\n// criterios_aprendidos + advertencia_criterios en Proyectos — NUNCA pisa criterios_relevancia manual.\n// Fail-soft: cuelga de Cerrar run (onError:continue); si Haiku falla, ese proyecto se salta.\nconst KEY = '<ANTHROPIC_API_KEY>';\nconst MIN = Number($('Config').first().json.min_muestra_destilar || 4); // no destila con < MIN calificados/proyecto\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\nlet proyectos = [];\ntry { proyectos = $('Leer Proyectos').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\nlet voces = [];\ntry { voces = $('Leer Voces').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\nlet califs = [];\ntry { califs = $('Leer Candidatos calificados').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\n\nconst vozCrit = {};\nvoces.forEach(v => { vozCrit[v.id] = ((v.fields || {}).criterios_relevancia || '').toString().trim(); });\nconst projMeta = {};\nproyectos.forEach(r => { const f = r.fields || {}; const vid = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null; projMeta[r.id] = { nombre: f.nombre || r.id, criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: vid ? (vozCrit[vid] || '') : '' }; });\n\nconst byProj = {};\nfor (const r of califs) {\n  const f = r.fields || {};\n  const pid = Array.isArray(f.proyecto) && f.proyecto[0] ? f.proyecto[0] : '';\n  if (!pid || !projMeta[pid]) continue;\n  (byProj[pid] = byProj[pid] || []).push(f);\n}\n\nconst _snip = (f) => ({ titulo: String(f.titulo || '').slice(0, 80), texto: String(f.script || '').replace(/\\s+/g, ' ').trim().slice(0, 500) });\nconst recs = [];\nlet first = true;\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  if (arr.length < MIN) continue; // poca senal: no aprende de una semana chica (mitiga la (-) del ADR)\n  const meta = projMeta[pid];\n  const fuego = arr.filter(f => String(f.calificacion || '').indexOf('🔥') >= 0);\n  const aprob = arr.filter(f => String(f.estado || '').toLowerCase() === 'aprobado');\n  const desc = arr.filter(f => String(f.estado || '').toLowerCase() === 'descartado');\n  const positivos = (fuego.length ? fuego : aprob).slice(0, 6).map(_snip); // 🔥 prioriza; fallback aprobados\n  const negativos = desc.slice(0, 6).map(_snip);\n  if (!positivos.length && !negativos.length) continue;\n  const sys = 'Sos un analista que destila criterios de curacion de contenido para un jurado automatico. Te doy los criterios manuales de un proyecto (TEMA) y su VOZ, y ejemplos reales que el equipo APROBO (los mejores marcados) y DESCARTO. Devolve UNICAMENTE JSON {\"criterios_aprendidos\":\"...\",\"advertencia\":\"...\"}. criterios_aprendidos: 2-3 patrones concretos en espanol de que SI y que NO hace relevante un video para este proyecto, con mini-ejemplos, redactados como guia para el jurado. advertencia: evalua los criterios manuales - permiten RECHAZAR (tienen lista negativa)? son especificos o vagos? la voz es coherente con el tema? Si estan sanos, devolve \"\". Se breve.';\n  const usr = 'TEMA: ' + meta.nombre + '\\nCRITERIOS MANUALES (tema):\\n' + (meta.criterios || '(vacio)') + '\\nCRITERIOS DE VOZ:\\n' + (meta.voz_criterios || '(vacio)') + '\\n\\nAPROBADOS' + (fuego.length ? ' (los 🔥 son ideales)' : '') + ':\\n' + JSON.stringify(positivos) + '\\n\\nDESCARTADOS:\\n' + JSON.stringify(negativos);\n  try {\n    if (!first) await sleep(1000); first = false;\n    const resp = await this.helpers.httpRequest({\n      method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n      body: { model: 'claude-haiku-4-5', max_tokens: 1000, system: sys, messages: [{ role: 'user', content: usr }] },\n      json: true, timeout: 60000\n    });\n    let txt = '';\n    try { txt = (resp.content && resp.content[0] && resp.content[0].text) || ''; } catch (e) {}\n    const mm = String(txt).match(/\\{[\\s\\S]*\\}/);\n    if (!mm) continue;\n    const parsed = JSON.parse(mm[0]);\n    const fields = {};\n    if (parsed.criterios_aprendidos) fields.criterios_aprendidos = String(parsed.criterios_aprendidos).slice(0, 2000);\n    fields.advertencia_criterios = parsed.advertencia ? String(parsed.advertencia).slice(0, 1000) : '';\n    if (fields.criterios_aprendidos || fields.advertencia_criterios) recs.push({ id: pid, fields });\n  } catch (e) { /* fail-soft por proyecto */ }\n}\nconsole.log('[Destilar] proyectos actualizados: ' + recs.length);\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out; // [] si nada: el PATCH no corre\n"
+      },
+      "id": "m2-destilar",
+      "name": "Destilar criterios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3560,
+        600
+      ]
+    },
+    {
+      "id": "m2-patch-proyectos",
+      "name": "PATCH Proyectos criterios",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3760,
+        600
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Proyectos') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $json.records, typecast: true } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
+    },
+    {
+      "id": "m2-leer-senal",
+      "name": "Leer señal selección (archivado)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3560,
+        800
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,idioma,seleccionados,calificados' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "id": "m2-leer-referentes",
+      "name": "Leer Referentes (archivado)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3760,
+        800
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Referentes') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationMode": "updateAParameterInEachRequest",
+              "nextURL": "",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Computar salud por referente (ADR-022 / M2): tasa_gate (gate_pass/evaluados del desglose por\n// referente de runs.metricas de la semana) + tasa_aprobacion (acumulada de v_senal_seleccion) +\n// videos_evaluados. Minimo de muestra para no juzgar con pocos videos. Matchea por handle normalizado\n// (sin @, minuscula). Fail-soft: cuelga de Cerrar run.\nconst MIN = Number($('Config').first().json.min_muestra_referente || 10);\nconst _nrm = (s) => String(s || '').toLowerCase().replace(/^@/, '').trim();\n// 1) desglose por referente de los runs del motor de la semana (evaluados/gate_pass en videos distintos)\nconst week = {};\nlet runs = [];\ntry { runs = $('Leer runs de la semana').all().map(i => i.json).flatMap(j => Array.isArray(j) ? j : [j]).filter(r => r && r.id && r.metricas); const vis = new Set(); runs = runs.filter(r => { const k = String(r.id); if (vis.has(k)) return false; vis.add(k); return true; }); } catch (e) {}\nfor (const r of runs) {\n  const pr = (r.metricas || {}).por_referente || {};\n  for (const u in pr) { const k = _nrm(u); const w = (week[k] = week[k] || { evaluados: 0, gate_pass: 0 }); w.evaluados += Number(pr[u].evaluados || 0); w.gate_pass += Number(pr[u].gate_pass || 0); }\n}\n// 2) senal de aprobacion acumulada (v_senal_seleccion, agregada sobre idiomas)\nconst sel = {};\nlet senal = [];\ntry { senal = $('Leer señal selección (archivado)').all().map(i => i.json).flatMap(j => Array.isArray(j) ? j : [j]).filter(x => x && x.referente); } catch (e) {}\nfor (const s of senal) { const k = _nrm(s.referente); const acc = (sel[k] = sel[k] || { seleccionados: 0, calificados: 0 }); acc.seleccionados += Number(s.seleccionados || 0); acc.calificados += Number(s.calificados || 0); }\n// 3) referentes de Airtable -> id por handle normalizado\nconst refById = {};\nlet refs = [];\ntry { refs = $('Leer Referentes (archivado)').all().flatMap(it => (it.json && it.json.records) || []); } catch (e) {}\nrefs.forEach(r => { const h = _nrm((r.fields || {}).handle); if (h) refById[h] = r.id; });\nconst _r2 = (v) => Math.round(v * 100) / 100;\nconst recs = [];\nconst keys = new Set([...Object.keys(week), ...Object.keys(sel)]);\nfor (const k of keys) {\n  const id = refById[k]; if (!id) continue; // handle sin Referente activo en Airtable\n  const fields = {};\n  const w = week[k]; const acc = sel[k];\n  if (w && w.evaluados) { fields.videos_evaluados = w.evaluados; if (w.evaluados >= MIN) fields.tasa_gate = _r2(w.gate_pass / w.evaluados); }\n  if (acc && acc.calificados >= MIN) fields.tasa_aprobacion = _r2(acc.seleccionados / acc.calificados);\n  if (Object.keys(fields).length) recs.push({ id, fields });\n}\nconsole.log('[Salud referentes] actualizados: ' + recs.length + ' (min muestra ' + MIN + ')');\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out;\n"
+      },
+      "id": "m2-salud-referentes",
+      "name": "Computar salud referentes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3960,
+        800
+      ]
+    },
+    {
+      "id": "m2-patch-referentes",
+      "name": "PATCH Referentes salud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4160,
+        800
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/' + encodeURIComponent('Referentes') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $json.records, typecast: true } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      }
     }
   ],
   "connections": {
@@ -1143,6 +1332,16 @@
             "node": "Leer Metricas viejas",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Destilar criterios",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Leer señal selección (archivado)",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -1185,6 +1384,50 @@
         [
           {
             "node": "Barrer Metricas viejas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Destilar criterios": {
+      "main": [
+        [
+          {
+            "node": "PATCH Proyectos criterios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer señal selección (archivado)": {
+      "main": [
+        [
+          {
+            "node": "Leer Referentes (archivado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Referentes (archivado)": {
+      "main": [
+        [
+          {
+            "node": "Computar salud referentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Computar salud referentes": {
+      "main": [
+        [
+          {
+            "node": "PATCH Referentes salud",
             "type": "main",
             "index": 0
           }
