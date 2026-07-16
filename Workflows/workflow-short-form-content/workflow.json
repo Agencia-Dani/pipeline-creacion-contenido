@@ -106,6 +106,12 @@
               "type": "number"
             },
             {
+              "id": "c_ventana",
+              "name": "ventana_corrida_min",
+              "value": 120,
+              "type": "number"
+            },
+            {
               "id": "c_ref_ig",
               "name": "buscar_referente_ig",
               "value": 1,
@@ -715,7 +721,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"cron\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"motor\" } }",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Disparo on-demand (webhook)').isExecuted ? 'on_demand' : ($('Ejecutar manual').isExecuted ? 'manual' : 'cron') }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"motor\" } }",
         "options": {
           "timeout": 15000
         }
@@ -726,7 +732,7 @@
       "typeVersion": 4.2,
       "position": [
         9240,
-        400
+        880
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -783,7 +789,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&estado=eq.en_curso&inicio=lt.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -801,7 +807,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { estado: 'fallo', fin: $now.toISO(), error: 'run de motor sin cerrar (fallo antes de Cerrar run); barrido por corrida posterior' } }}",
+        "jsonBody": "={{ { estado: 'fallo', fin: $now.toISO(), error: 'run de motor sin cerrar (en_curso mas viejo que ventana_corrida_min); barrido por corrida posterior' } }}",
         "options": {
           "timeout": 20000
         }
@@ -812,7 +818,7 @@
       "typeVersion": 4.2,
       "position": [
         9240,
-        560
+        400
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -878,6 +884,93 @@
       "parameters": {
         "jsCode": "\n// Resumen del run (ADR-021) — arma runs.metricas: embudo + sin_guion + llamadas estimadas por\n// servicio + desglose por referente (evaluados/gate_pass en videos DISTINTOS; habilita la higiene\n// de fuentes de ADR-022). Cerrar run persiste $json.metricas tal cual.\nconst gateAll = $('Gate de relevancia').all();\nconst gateKept = gateAll.filter(i => !i.json._descarte);\nconst outputs = $('Armar candidato').all();\nconst gateIn = $('Traducir (Claude Haiku)').all();\nconst _distinct = (items) => new Set(items.map(i => String(i.json.external_id || '')).filter(Boolean)).size;\nconst _lotes = (items) => new Set(items.map(i => String(i.json.proyecto_id || '')).filter(Boolean)).size;\n// llamadas estimadas: Supadata = videos distintos transcritos (dedup intra-corrida, ADR-016);\n// Haiku: pre-trim = 1 lote/proyecto (cota superior: exentos/sin-criterios no llaman), gate = chunks\n// de a 25 por proyecto (cierre 31), traducciones = videos DISTINTOS no-ES (Traducir dedupea, cierre 31).\nconst _lotesChunk = (items, chunk) => { const by = {}; items.forEach(i => { const p = String(i.json.proyecto_id || ''); if (p) by[p] = (by[p] || 0) + 1; }); return Object.values(by).reduce((a, n) => a + Math.ceil(n / chunk), 0); };\nconst llamadas = {\n  supadata: _distinct($('Transcribir (Supadata)').all()),\n  haiku_lotes_pretrim: _lotes($('Asignar proyecto+voz').all()),\n  haiku_lotes_gate: _lotesChunk(gateIn, 25),\n  haiku_traducciones: new Set(gateIn.filter(i => String(i.json.transcripcion || '').trim() && (i.json.idioma || 'es') !== 'es').map(i => String(i.json.external_id || i.json.url || '')).filter(Boolean)).size\n};\nconst por_referente = {};\nconst _mark = (items, key) => { const seen = new Set(); for (const it of items) { const u = String(it.json.username || '').toLowerCase(); const id = String(it.json.external_id || ''); if (!u || !id) continue; const k = u + '|' + id; if (seen.has(k)) continue; seen.add(k); (por_referente[u] = por_referente[u] || { evaluados: 0, gate_pass: 0 })[key]++; } };\n_mark(gateIn, 'evaluados');\n_mark(gateKept, 'gate_pass');\nconst _n = (name) => { try { return $(name).all().length; } catch (e) { return 0; } };\nconst metricas = {\n  colectados: $('Merge scrapes').all().length,\n  apify_ig: _n('Apify — IG Reels'),\n  apify_tt: _n('Apify — TikTok Perfil'),\n  asignados: $('Asignar proyecto+voz').all().length,\n  pretrim: $('Pre-trim relevancia').all().length,\n  filtrados: $('Heat-score v1').all().length,\n  gate: gateKept.length,\n  outputs: outputs.length,\n  sin_guion: outputs.filter(i => !String(i.json.script || '').trim()).length,\n  descartes_expuestos: gateAll.length - gateKept.length,\n  llamadas, por_referente\n};\nconsole.log('[Resumen] ' + JSON.stringify(metricas));\nreturn [{ json: { metricas } }];\n"
       }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<<WEBHOOK_PATH_MOTOR>>",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "disparo-on-demand-webhook",
+      "name": "Disparo on-demand (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&estado=eq.en_curso&inicio=gte.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) + '&select=id,inicio,trigger_type&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "leer-corridas-vivas",
+      "name": "Leer corridas vivas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9240,
+        560
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "guard-libre",
+              "leftValue": "={{ Boolean($json.id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "guard-single-flight",
+      "name": "Guard single-flight",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        9240,
+        720
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "bloqueada-corrida-viva",
+      "name": "Bloqueada: ya hay corrida viva",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        9460,
+        880
+      ]
     }
   ],
   "pinData": {},
@@ -908,7 +1001,7 @@
       "main": [
         [
           {
-            "node": "Abrir run en el registro",
+            "node": "Barrer runs zombie",
             "type": "main",
             "index": 0
           }
@@ -919,7 +1012,7 @@
       "main": [
         [
           {
-            "node": "Barrer runs zombie",
+            "node": "Leer Proyectos",
             "type": "main",
             "index": 0
           }
@@ -1192,7 +1285,7 @@
       "main": [
         [
           {
-            "node": "Leer Proyectos",
+            "node": "Leer corridas vivas",
             "type": "main",
             "index": 0
           }
@@ -1215,6 +1308,46 @@
         [
           {
             "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disparo on-demand (webhook)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer corridas vivas": {
+      "main": [
+        [
+          {
+            "node": "Guard single-flight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard single-flight": {
+      "main": [
+        [
+          {
+            "node": "Abrir run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bloqueada: ya hay corrida viva",
             "type": "main",
             "index": 0
           }

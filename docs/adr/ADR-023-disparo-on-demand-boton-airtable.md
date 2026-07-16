@@ -56,3 +56,23 @@
 - **Toca `core/`:** `core/contracts/airtable-cockpit.md` (campo Button en la superficie + la
   automation; documentar el webhook como entrada del motor). El motor: nuevo **Webhook trigger** de
   Producción con guard de single-flight, en paralelo al cron. No toca el pipeline de procesamiento.
+- **Enmienda (2026-07-16, C.3 — el "cómo" del guard, decidido con Mani):**
+  1. **El guard aplica a los 3 triggers** (webhook, cron y manual), no solo al webhook. Sin eso, el
+     cron del lunes 8am podía arrancar encima de una corrida on-demand viva: el barredor zombie la
+     marcaba `fallo` y las dos corrían en paralelo (doble Apify). Costo aceptado: si hay corrida viva
+     a la hora del cron, esa semana el barrido automático se saltea (recuperable con el botón).
+  2. **Vivo vs. zombie lo decide `ventana_corrida_min`** (knob del Config, 120): un run `en_curso`
+     más joven que la ventana es corrida viva (el guard bloquea); más viejo es zombie. El barredor
+     zombie se movió **antes** del guard y solo barre los más viejos que la ventana → un zombie
+     nunca deja el motor trabado.
+  3. **El guard es check-then-act** (GET corridas vivas → IF → POST Abrir run): queda una ventana
+     residual de ~1-2 s entre dos clicks casi simultáneos. Aceptada a conciencia. Peor caso si dos
+     corridas pasan juntas: costo doble (scrape + transcripción) y candidatos duplicados en el feed
+     esa vez (ambas leen `processed_items` antes de que la otra escriba); la tabla de dedup en sí no
+     se ensucia (`unique(platform, external_id)` + `ignore-duplicates`) y la corrida siguiente ya no
+     los repite. Se descartó el lock atómico por unique index parcial en Supabase (migración nueva +
+     manejo de 409 que complica el fail-open).
+  4. **Fail-open** (invariante #1): con Supabase caído el guard deja pasar. Un click bloqueado
+     **no** abre run (no ensucia `runs_fallo` ni la salud); el webhook responde 200 inmediato y el
+     veredicto se ve en n8n/`runs`. `Abrir run` ahora registra el `trigger_type` real
+     (`on_demand`/`manual`/`cron` — antes todo se registraba `cron`).

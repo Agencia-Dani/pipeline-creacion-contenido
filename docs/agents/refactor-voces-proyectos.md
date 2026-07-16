@@ -290,13 +290,28 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       (0.35) y `banda_descarte_max` (0.6), muertos desde la enmienda del 2026-07-13 (banda fija → top-K
       `cap_descartes`). Config: 21 → **19 knobs**. Verificado que ningún nodo los lee. Cero cambio de
       conducta. Se arrastra con el re-import de C.
-- [ ] **C.3** **Webhook trigger** (según [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)): nuevo
-      trigger de Producción con guard **single-flight**, en paralelo al cron. El motor **sigue leyendo "los
-      activos"** (no gana un modo "solo este proyecto"); lo único nuevo es respetar `Voces.activo` (C.2) y la
-      N por proyecto (C.1). Construir con builder Node, no a mano.
-- [ ] **C.4** ~~Decidir el futuro del cron~~ **Resuelto: el cron semanal coexiste** (barrido autónomo de
+- [x] **C.3** ✅ **Webhook trigger** ([ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)) —
+      hecho en el `workflow.json` (2026-07-16, builder Node): nodo `Disparo on-demand (webhook)` (POST,
+      path `<<WEBHOOK_PATH_MOTOR>>`, responde 200 inmediato) en paralelo al cron/manual. **El "cómo" del
+      guard quedó en la enmienda C.3 del ADR** (decidido con Mani): guard **para los 3 triggers** (si no,
+      el cron del lunes pisa una on-demand viva = doble Apify); vivo vs. zombie por `ventana_corrida_min`
+      (Config, 120); el barredor zombie se movió **antes** del guard (un zombie nunca traba el motor) y
+      gana umbral de edad; check-then-act con ventana residual de ~1-2 s aceptada; fail-open con Supabase
+      caído; click bloqueado no abre run (no ensucia `runs_fallo`). Bonus: `Abrir run` registra el
+      `trigger_type` real (`on_demand`/`manual`/`cron` — antes todo era `'cron'`). Motor 33 → **37 nodos**.
+      Grafo 0 problemas, `test-nodos.mjs` verde, validador OK. **Sin re-importar** (va con el re-import
+      de C). El motor **sigue leyendo "los activos"** (no ganó un modo "solo este proyecto").
+- [x] **C.4** ~~Decidir el futuro del cron~~ **Resuelto: el cron semanal coexiste** (barrido autónomo de
       respaldo + mantiene el ritmo semanal de Métricas/salud por referente). El on-demand se suma (ROADMAP §1
-      enmendado, ADR-023). Falta: confirmar que dedup (`processed_items`) hace la coexistencia limpia.
+      enmendado, ADR-023). ✅ **Dedup confirmado a nivel repo (2026-07-16):** la coexistencia secuencial es
+      limpia por diseño — `unique(platform, external_id)` en `processed_items` (002) + `Prefer:
+      ignore-duplicates` + `Leer procesados`/`Heat-score v1` descartan lo visto sin importar el trigger
+      (quien corre primero se lleva el video). El archivado tampoco filtra por `trigger_type` ⇒ las
+      corridas on-demand entran solas a Métricas (adelanto de D.2). **2 matices documentados:** un
+      segundo click re-paga scrape+pre-trim aunque entregue poco (contrato §Disparo) · dentro de la
+      ventana residual de ~1-2 s del guard la salida puede duplicarse esa vez (enmienda ADR-023).
+      ⚠️ La confirmación **en vivo** llega con la V-run post re-import (corrida botón + cron de la
+      misma semana sin candidatos repetidos).
 
 **Hecho cuando:** una corrida disparada a mano para un solo proyecto con N=20 deja ~20 candidatos de
 **ese** proyecto en Airtable + rastro en Supabase, sin tocar los demás. Validado por re-import + Execute.
@@ -342,7 +357,12 @@ se computan igual de bien que con el barrido semanal.
       de C.2 filtra server-side por `{activo}`, desplegarlo así habría dejado **cero voces activas ⇒ el
       motor entregando nada**. Se prendieron las 3 voces vivas a mano por MCP en la misma pasada. Un
       campo nuevo + un filtro nuevo = **siempre poblar el dato antes**.
-- [ ] **E.2** Tabla/campos de disparo según B.2 (ej. `Corridas`, o campos de N+trigger en `Proyectos`).
+- [x] **E.2** ✅ en su mitad-repo (2026-07-16): con la **señal desnuda** de ADR-023 no hay tabla
+      `Corridas` ni campos de datos nuevos — el disparo son el botón + la automation, documentados en
+      [airtable-cockpit.md §Disparo on-demand](../../core/contracts/airtable-cockpit.md) (y el checklist
+      de `setup-airtable.mjs`). **Lo que queda es manual y de superficie** (la API no crea botones ni
+      automations): crear en la base viva el botón "▶ Correr ahora" + la automation con el POST al
+      webhook → va con **B.2** (carril de Mani), después del re-import de C.
 - [ ] **E.3** Aplicar la racionalización de campos de B.3 en el contrato + schema.
 
 **Hecho cuando:** el schema soporta Voz toggleable, N por corrida y el mecanismo de disparo, y el

@@ -26,6 +26,10 @@ triggers:
     schedule: "0 8 * * 1"         # lunes 8:00 AM (semanal — acota el gasto de Apify free)
     timezone: America/Bogota      # validar interpretación al activar (D1 del ROADMAP)
   - type: manual                  # "Execute Workflow" en n8n para corridas de prueba
+  - type: webhook                 # ADR-023: botón Airtable → automation → POST de Producción (señal
+                                  # desnuda, sin payload; el motor lee Airtable). Guard single-flight
+                                  # en TODOS los triggers: si hay corrida viva (<ventana_corrida_min),
+                                  # no arranca otra. Path = placeholder <<WEBHOOK_PATH_MOTOR>>.
   # (El Form Trigger del template viejo se eliminó: Airtable es la única superficie de config.)
 
 inputs:
@@ -48,10 +52,10 @@ inputs:
     - { key: umbral_viral,     type: number, scope: client, default: 700000 }
     - { key: ig_results_limit, type: number, scope: client, default: 8 }
     - { key: tt_results_limit, type: number, scope: client, default: 30 }
-    # descartes visibles (ADR-021) — dev-only en Config, no editables desde Ajustes
-    - { key: banda_descarte_min, type: number, scope: client, default: 0.35, desc: "Piso de la banda borderline de descartes del gate que se expone al equipo (ADR-021)" }
-    - { key: banda_descarte_max, type: number, scope: client, default: 0.6,  desc: "Techo de la banda borderline (ADR-021)" }
-    - { key: cap_descartes,      type: number, scope: client, default: 10,   desc: "Máximo de descartes borderline subidos a 'Descartes del gate' por corrida (ADR-021)" }
+    # descartes visibles (ADR-021, enmienda top-K 2026-07-13) — dev-only en Config, no editables desde Ajustes
+    # (banda_descarte_min/max salieron con la enmienda; podados del Config en C.5, 2026-07-16)
+    - { key: cap_descartes,      type: number, scope: client, default: 10,   desc: "Máximo de descartes top-K subidos a 'Descartes del gate' por corrida (ADR-021)" }
+    - { key: ventana_corrida_min, type: number, scope: client, default: 120, desc: "Single-flight (ADR-023): un run 'en_curso' más joven que esto es corrida viva (el guard bloquea); más viejo es zombie (el barredor lo marca fallo)" }
     - { key: presupuesto_transcribir_s, type: number, scope: client, default: 780, desc: "Presupuesto de tiempo del loop de transcripción: al excederlo, el resto pasa SIN transcript (fail-open) en vez de morir por el watchdog de 900s. 0 = sin presupuesto" }
   credentials:                    # SOLO NOMBRES — los valores viven en n8n / gestor, JAMÁS en git
     - apify_token                 # placeholder <APIFY_TOKEN> / credencial apifyApi en los 2 nodos Apify
@@ -77,7 +81,7 @@ outputs:
     registered: yes               # reporta al registro central (Supabase outputs; contenido_o_link = texto del script — ADR-009 nota 2026-06-14)
 
 runbook:
-  setup: "Importar workflow.json en n8n → editar nodo Config (base_id, supabase_url, instance_id) → pegar API keys/credenciales (B4) → importar error-workflow-registro.json como Error Workflow."
+  setup: "Importar workflow.json en n8n → editar nodo Config (base_id, supabase_url, instance_id) → reemplazar <<WEBHOOK_PATH_MOTOR>> en el nodo webhook por un path aleatorio (la URL de Producción resultante va a la automation de Airtable y al gestor, JAMÁS a git) → pegar API keys/credenciales (B4) → importar error-workflow-registro.json como Error Workflow."
   start: "Activar el cron en n8n (validar timezone). Para probar: Execute Workflow manual."
   stop: "Desactivar el workflow en n8n."
   test: "Corrida manual de backfill (dias_recencia alto en el proyecto provisional) → candidatos en Airtable con script en español + idioma; processed_items poblada; runs/outputs en Supabase (V1–V6)."

@@ -290,6 +290,33 @@ Apify se factura **por resultado**. Los 4 actores en uso en el pipeline (verific
    `v_senal_tema`, ADR-012 — quedó **inerte** al removerse el eje keyword, ADR-019; la vista sigue en
    Supabase sin lectores. El few-shot por voz de ADR-008 queda en pausa — ADR-009.)*
 
+## Disparo on-demand — botón → automation → webhook del motor (ADR-023)
+
+El equipo puede disparar una corrida **a demanda** sin esperar el cron. La cadena, fijada en
+[ADR-023](../../docs/adr/ADR-023-disparo-on-demand-boton-airtable.md):
+
+1. **Botón en Airtable** ("▶ Correr ahora") → acción **"Run automation"**. La ubicación exacta del
+   botón la fija B.2 del refactor (superficie del operador); lo que este contrato fija es el
+   mecanismo, no el lugar.
+2. **La automation hace un POST** (script `fetch`, sin body) al **webhook de Producción del motor**
+   (nodo `Disparo on-demand (webhook)`, path `<<WEBHOOK_PATH_MOTOR>>` reemplazado al importar). La
+   URL dispara corridas **pagas** → vive en el gestor de contraseñas y dentro de la automation,
+   jamás en git.
+3. **Señal desnuda:** el POST no lleva payload. El motor lee Airtable para saber qué corre — la
+   selección se expresa con `Voces.activo` + `Proyectos.activo` + `Proyectos.N`. Una corrida =
+   todos los proyectos activos (de voces activas), cada uno a su N.
+   ⚠️ **Correr dos veces seguidas no repite videos** (dedup `processed_items`): la segunda corrida
+   entrega solo lo nuevo — que puede ser nada — pero **igual paga** el scrape de Apify y el pre-trim
+   (el dedup corta después). El botón no es gratis aunque no entregue.
+4. **Single-flight** (enmienda C.3 del ADR): si ya hay una corrida viva (`runs` de Supabase con
+   `estado=en_curso` más joven que `ventana_corrida_min`, 120 min), el motor no arranca otra — y el
+   guard aplica también al cron y al Execute manual. El click bloqueado responde 200 igual (la
+   respuesta es "señal recibida", no el veredicto).
+
+⚠️ **Nada de esto lo crea `setup-airtable.mjs`:** la API de Airtable no crea campos button ni
+automations. El botón y la automation se configuran **a mano** en la base viva (carril de
+superficie, B.2); en una base nueva son parte del checklist manual post-setup.
+
 ## Reglas para no salir del plan free
 
 - **Retención:** Candidatos calificados se archivan a Supabase y se limpian de Airtable. Proyectos,

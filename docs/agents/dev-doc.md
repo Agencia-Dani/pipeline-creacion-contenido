@@ -109,29 +109,40 @@
 
 | Workflow | Trigger | Cadencia | Nodos | Qué hace |
 |---|---|---|---|---|
-| **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 33 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** + los descartes borderline (**Descartes del gate**, ADR-021) en Airtable + registra la corrida en Supabase. §2. |
+| **Motor** (`short-form-content`) | Cron + Execute manual + **webhook on-demand (ADR-023)** | **Semanal**, lunes 8am + a demanda (botón Airtable) | 37 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** + los descartes borderline (**Descartes del gate**, ADR-021) en Airtable + registra la corrida en Supabase. §2. |
 | **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 27 | Promueve a `Referentes` los propuestos que el equipo marcó `aprobado` → busca cuentas nuevas parecidas a las que funcionan (IG: sugeridos, 2 pasadas Apify; TikTok: lookalike, rama paralela — ADR-020 §8) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **Referentes propuestos**. §3. |
 | **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 37 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`, con relevancia — ADR-021) + append al **Sheet Histórico** → los borra de Airtable → **computa las filas semanales de `Métricas Proyectos` + `Métricas Global`** (calidad / salud+costos, routea por `_tabla`), limpia `Descartes del gate`, y **destila criterios aprendidos + salud por referente** (ADR-022). §4. |
 
-Los tres comparten el patrón `Config → Abrir run → Barrer runs zombie → … → Cerrar run`: la corrida
-se registra en la tabla `runs` de Supabase (abre `en_curso` con `params.workflow` propio, cierra `ok`
-con métricas; el barredor marca `fallo` los zombies de su propio workflow). Todos los nodos de
-Supabase son **continue-on-fail** (invariante: si el registro falla, el trabajo útil igual se
-entrega). Cadencia semanal encadenada a propósito: **domingo 6pm** archiva la curación de la semana →
-**lunes 8am** el motor trae la tanda nueva → **lunes 9am** el descubrimiento propone cuentas con la
-señal fresca del archivado.
+Los tres comparten el patrón de registro `runs` en Supabase (abre `en_curso` con `params.workflow`
+propio, cierra `ok` con métricas; el barredor marca `fallo` los zombies de su propio workflow).
+Archivado y descubrimiento: `Config → Abrir run → Barrer runs zombie → …`. El **motor** (desde C.3,
+ADR-023) reordena el arranque a `Config → Barrer runs zombie → Leer corridas vivas → Guard
+single-flight → Abrir run → …`: el barrido pasa **antes** de abrir el run (así ya no excluye su
+propio id) y solo barre `en_curso` más viejos que `ventana_corrida_min` (120); el guard bloquea la
+corrida si hay otra **viva** (más joven que la ventana) — aplica a los 3 triggers, no solo al
+webhook. Todos los nodos de Supabase son **continue-on-fail** (invariante: si el registro falla, el
+trabajo útil igual se entrega; el guard con Supabase caído **deja pasar** — fail-open). Cadencia
+semanal encadenada a propósito: **domingo 6pm** archiva la curación de la semana → **lunes 8am** el
+motor trae la tanda nueva → **lunes 9am** el descubrimiento propone cuentas con la señal fresca del
+archivado.
 
 ---
 
-## 2. Motor (`short-form-content`) — 33 nodos
+## 2. Motor (`short-form-content`) — 37 nodos
 
 ### 2.1 Orden de ejecución (topología real)
 
 ```
-Cron semanal ┐
-             ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer Proyectos ─► Leer Voces
-Ejecutar     ┘                                                                     │
-manual                                              Armar plan ◄─ Leer Ajustes ◄─ Leer Referentes
+Cron semanal ─┐
+Ejecutar      ├─► Config ─► Barrer runs zombie ─► Leer corridas vivas ─► Guard single-flight
+manual        │              (solo en_curso                                  │           │
+Disparo       │               > ventana)                              (libre)▼           ▼(hay corrida viva)
+on-demand ────┘                                                         Abrir run    Bloqueada (NoOp, fin)
+(webhook,                                                                    │
+ ADR-023)                                                                    ▼
+                                                    Leer Proyectos ─► Leer Voces
+                                                                          │
+                                            Armar plan ◄─ Leer Ajustes ◄─ Leer Referentes
                                                         │  (fan-out a 2 ramas Apify)
                              ┌──────────────────────────┴───────────────┐
                              ▼                                          ▼
@@ -165,10 +176,20 @@ manual                                              Armar plan ◄─ Leer Ajust
 ```
 
 Notas de orden que muerden si las ignorás:
-- **`Abrir run` va EN SERIE** entre `Config` y `Leer Proyectos`, no colgado en paralelo. `Cerrar run`
+- **El guard single-flight (C.3, ADR-023) aplica a los 3 triggers**, no solo al webhook (decisión de
+  Mani, 2026-07-16): así el cron del lunes no puede pisar una corrida on-demand viva (doble Apify).
+  Vivo vs. zombie lo decide `ventana_corrida_min` (Config, 120): `en_curso` más joven = corrida viva
+  (el guard bloquea → rama `Bloqueada`, la ejecución termina sin abrir run — un click bloqueado NO
+  suma a `runs_fallo`); más viejo = zombie (el barredor lo marca `fallo` **antes** del guard, así un
+  zombie jamás deja el motor trabado). Con Supabase caído el guard **deja pasar** (fail-open,
+  invariante #1). Queda una ventana check-then-act de ~1-2s entre dos clicks casi simultáneos:
+  aceptada a conciencia (peor caso: costo doble + candidatos duplicados en el feed esa vez;
+  `processed_items` no se ensucia y la corrida siguiente ya no los repite).
+- **`Abrir run` va EN SERIE** entre el guard y `Leer Proyectos`, no colgado en paralelo. `Cerrar run`
   lo referencia por nombre (`$('Abrir run…')`); n8n corre las ramas en orden de conexión, así que si
   `Abrir run` cuelga en paralelo, corre **después** del pipeline y la referencia rompe (`hasn't been
-  executed`). (Bug ya pisado, cierre 3.)
+  executed`). (Bug ya pisado, cierre 3.) Desde C.3 registra el `trigger_type` real
+  (`on_demand`/`manual`/`cron` vía `isExecuted` del trigger — antes todo se registraba `cron`).
 - **Las 4 lecturas de Airtable son una cadena serial** (Proyectos→Voces→Referentes→Ajustes→
   Armar plan), no un fan-out. **Paginan** (cierre 15, #4): `options.pagination` sigue el `offset` de
   Airtable hasta agotar páginas → no se truncan a 100 records.
@@ -218,9 +239,12 @@ Notas de orden que muerden si las ignorás:
 |---|---|---|---|
 | 1 | Cron — semanal (lunes 8am) | scheduleTrigger | Dispara la corrida los lunes 8am (`weeks`, día 1, hora 8). |
 | 2 | Ejecutar manual | manualTrigger | Execute Workflow a mano (las V-runs). |
-| 3 | Config | set | Define los **IDs** (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`), los **defaults de knobs** que el equipo puede pisar desde Ajustes (`resultados_referente` 20, `top_n` 100, `dias_recencia` 7, toggles `buscar_referente_ig`/`buscar_referente_tiktok` 1) , los **caps dev-only** que NADIE pisa desde Ajustes (`cap_resultados_referente` 50, `cap_top_n` **100** — subido de 30 el 2026-07-13 ahora que Apify/Supadata son pagos; es el techo de videos transcritos/corrida, `piso_referente` 5, `cap_descartes` 10 — ADR-021 (top-K por score, enmienda 2026-07-13), `presupuesto_transcribir_s` 780 — cierre 31; **`banda_descarte_min`/`max` podados 2026-07-16, C.5**) y los **defaults de scoring** (`peso_views` .4, `peso_likes` .4, `peso_eng` .2, `peso_relevancia` .7, `boost_idioma` .3, `umbral_viral` 700000). Los Ajustes de Airtable caen **encima** de los defaults, nunca de los caps. |
-| 4 | Abrir run en el registro | http POST | `POST runs` (`instance_id`, `trigger_type:'cron'`, `estado:'en_curso'`, `params:{workflow:'motor'}`), `Prefer: return=representation` → devuelve `id`. continue-on-fail. El tag `workflow:'motor'` es lo que scopea el barredor (4b). |
-| 4b | Barrer runs zombie | http PATCH | **Auto-sanador del motor (ADR-017), entre `Abrir run` y `Leer Proyectos`.** `PATCH runs` → marca `fallo` los runs de motor anteriores colgados `en_curso` (scoped `params->>workflow=eq.motor` + `id=neq.<run actual>`). Espejo del nodo homónimo del archivado. continue-on-fail. |
+| 2b | Disparo on-demand (webhook) | webhook | **ADR-023 (C.3):** POST de Producción, path = `<<WEBHOOK_PATH_MOTOR>>` (se reemplaza al importar; la URL va a la automation de Airtable y al gestor, jamás a git). **Señal desnuda:** sin payload; el motor lee Airtable (toggles + N). Responde 200 inmediato (`onReceived`) — el veredicto del guard se ve en la ejecución de n8n y en `runs`, no en la respuesta. |
+| 3 | Config | set | Define los **IDs** (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`), los **defaults de knobs** que el equipo puede pisar desde Ajustes (`resultados_referente` 20, `top_n` 100, `dias_recencia` 7, toggles `buscar_referente_ig`/`buscar_referente_tiktok` 1) , los **caps dev-only** que NADIE pisa desde Ajustes (`cap_resultados_referente` 50, `cap_top_n` **100** — subido de 30 el 2026-07-13 ahora que Apify/Supadata son pagos; es el techo de videos transcritos/corrida, `piso_referente` 5, `cap_descartes` 10 — ADR-021 (top-K por score, enmienda 2026-07-13), `presupuesto_transcribir_s` 780 — cierre 31; `ventana_corrida_min` 120 — C.3/ADR-023, frontera vivo/zombie del single-flight; **`banda_descarte_min`/`max` podados 2026-07-16, C.5**) y los **defaults de scoring** (`peso_views` .4, `peso_likes` .4, `peso_eng` .2, `peso_relevancia` .7, `boost_idioma` .3, `umbral_viral` 700000). Los Ajustes de Airtable caen **encima** de los defaults, nunca de los caps. |
+| 4 | Barrer runs zombie | http PATCH | **Auto-sanador del motor (ADR-017; reordenado en C.3), entre `Config` y el guard.** `PATCH runs` → marca `fallo` los runs de motor `en_curso` **más viejos que `ventana_corrida_min`** (scoped `params->>workflow=eq.motor`; corre antes de `Abrir run`, así ya no necesita excluir su propio id). Barrer ANTES del guard es lo que garantiza que un zombie nunca bloquee el single-flight. continue-on-fail. |
+| 4b | Leer corridas vivas | http GET | **Guard single-flight, mitad lectura (C.3, ADR-023).** `GET runs` con `estado=en_curso` + `inicio>=now−ventana_corrida_min`, `limit=1` → si devuelve fila, hay corrida viva. `alwaysOutputData` + continue-on-fail (Supabase caído = item sin `id` = pasa, fail-open). |
+| 4c | Guard single-flight | if | Evalúa `Boolean($json.id)`: **false** (no hay corrida viva) → `Abrir run` y la corrida sigue; **true** → `Bloqueada: ya hay corrida viva` (NoOp) y la ejecución muere ahí — **sin abrir run**, así un click bloqueado no ensucia `runs_fallo` ni las métricas de salud. Aplica a los 3 triggers (decisión Mani 2026-07-16). |
+| 4d | Abrir run en el registro | http POST | `POST runs` (`instance_id`, **`trigger_type` real: `on_demand`/`manual`/`cron`** vía `isExecuted` del trigger — C.3; antes siempre `'cron'`), `estado:'en_curso'`, `params:{workflow:'motor'}`, `Prefer: return=representation` → devuelve `id`. continue-on-fail. El tag `workflow:'motor'` es lo que scopea el barredor (4) y el guard (4b). |
 | 5 | Leer Proyectos | http GET | Airtable `Proyectos` con `filterByFormula={activo}`. **Pagina** (`options.pagination` sigue el `offset` → todas las páginas, #4). |
 | 6 | Leer Voces | http GET | Airtable `Voces` con `filterByFormula={activo}` (**C.2, 2026-07-16** — antes traía todas). Da el id→nombre y `criterios_relevancia`; lo que **no** llega está apagado y sus proyectos se saltean en `Armar plan`. Pagina (#4). |
 | 7 | Leer Referentes | http GET | Airtable `Referentes` con `{activo}`. Pagina (#4). |
@@ -593,7 +617,9 @@ De dónde sale y a dónde llega cada campo que importa:
   (**×2: Vetting relevancia (Haiku) IG + Vetting TikTok (Haiku)**).
 - **IDs** (en el nodo `Config`, como `<<…>>`): `<<AIRTABLE_BASE_ID>>`, `<<SUPABASE_URL>>`,
   `<<INSTANCE_ID>>` (los tres workflows); el archivado suma `<<GOOGLE_SHEET_ID>>`,
-  `<<NOMBRE_PESTANA_SHEET>>`.
+  `<<NOMBRE_PESTANA_SHEET>>`; el motor suma `<<WEBHOOK_PATH_MOTOR>>` (en el nodo webhook, no en
+  Config: path aleatorio del disparo on-demand, ADR-023 — la URL de Producción resultante es
+  cuasi-secreto: dispara corridas pagas, va al gestor y a la automation de Airtable, jamás a git).
 - **Credenciales nativas de n8n:** `airtableTokenApi` ("Airtable PAT"), `supabaseApi` ("Supabase
   Registro"), `apifyApi` (2 nodos Apify del motor + 3 del descubrimiento — la misma cred sirve para el actor TikTok dataovercoffee), Google Sheets **OAuth2**
   (solo el archivado).

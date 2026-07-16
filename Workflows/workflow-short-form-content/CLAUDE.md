@@ -7,7 +7,8 @@ el contrato en [workflow.yaml](./workflow.yaml), el uso en [README.md](./README.
 
 ## Qué es
 
-Un único workflow de **n8n** (`workflow.json`, 33 nodos, 2 entradas: cron semanal + Execute manual)
+Un único workflow de **n8n** (`workflow.json`, 37 nodos, 3 entradas: cron semanal + Execute manual +
+webhook on-demand con guard single-flight — ADR-023)
 que es el **motor de reels** del MVP. Lee la config del equipo en **Airtable** (Proyectos, Voces,
 Referentes) → descubre reels IG + TikTok (Apify, solo por referentes — ADR-019) → prescore métrico (`Heat-score v1`) →
 transcribe (Supadata) → **traduce literal al español con Claude Haiku solo si no está en español** →
@@ -33,9 +34,11 @@ ADR-009); el "link" es la URL del video original.
   tocar la API de Anthropic, consultá el skill `claude-api`.
 - **Apify por community node** `@apify/n8n-nodes-apify.apify` (op "Run actor and get dataset", sin tope
   de 5 min). NO `httpRequest` sync. Credencial `apifyApi`.
-- **Orden de ejecución:** `Abrir run en el registro` va **en serie** entre `Config` y `Leer Proyectos`
-  (no en paralelo), porque `Preparar outputs Supabase` lo referencia por nombre y n8n ejecuta las ramas
-  en orden de conexión. Si lo ponés en paralelo, corre **después** del pipeline y la referencia rompe
+- **Orden de ejecución:** el arranque es `Config → Barrer runs zombie → Leer corridas vivas → Guard
+  single-flight → Abrir run → Leer Proyectos` (C.3, ADR-023): el barrido va antes del guard (un zombie
+  jamás traba el motor) y el guard aplica a los 3 triggers. `Abrir run en el registro` va **en serie**
+  (no en paralelo), porque `Cerrar run` lo referencia por nombre y n8n ejecuta las ramas en orden de
+  conexión. Si lo ponés en paralelo, corre **después** del pipeline y la referencia rompe
   ("hasn't been executed").
 - **Gates fail-open:** si Haiku/Supadata fallan, el item pasa (invariante #1). No conviertas un fallo
   externo en dependencia de ejecución.

@@ -213,6 +213,9 @@ const run = async () => {
   console.log("     (incluí referentes en EN/PT/IT/FR — prioridad del jefe, ADR-009).");
   console.log("   → Creá a mano la vista '🔥 Seleccionados' en Candidatos: filtro estado=aprobado,");
   console.log("     orden heat_score desc (el re-rank de seleccionados — las vistas no salen por API).");
+  console.log("   → Creá a mano el disparo on-demand (ADR-023): botón '▶ Correr ahora' → automation");
+  console.log("     con script fetch(POST, sin body) a la URL de Producción del webhook del motor");
+  console.log("     (la URL vive en el gestor, jamás en git). La API no crea botones ni automations.");
   if (pendientes.length) {
     console.warn(`\n🚨 ${pendientes.length} campo(s) que la API rechazó — CREALOS A MANO ANTES DE CORRER NADA:`);
     pendientes.forEach((p) => console.warn("   • " + p));

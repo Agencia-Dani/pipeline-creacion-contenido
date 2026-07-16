@@ -14,7 +14,7 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 
 ---
 
-## Qué hace (33 nodos, 2 entradas)
+## Qué hace (37 nodos, 3 entradas: cron + manual + webhook on-demand)
 
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 
@@ -98,14 +98,20 @@ nodo `Config` al importar (placeholders `<<...>>`), no se commitean.
 1. Importá `workflow.json` en n8n.
 2. Asigná las credenciales nativas (Apify, Airtable PAT, Supabase Registro).
 3. Llená en el nodo `Config`: `airtable_base_id`, `supabase_url`, `instance_id`.
-4. Pegá las API keys: 3× `<ANTHROPIC_API_KEY>` (pre-trim, gate, traductor) + 1× `<SUPADATA_API_KEY>`.
-5. **Execute Workflow** para una corrida manual (la primera con `dias_recencia` alto = backfill), o
-   dejá el cron semanal.
+4. Reemplazá `<<WEBHOOK_PATH_MOTOR>>` en el nodo `Disparo on-demand (webhook)` por un path aleatorio
+   largo. La URL de Producción resultante dispara corridas **pagas**: va al gestor de contraseñas y a
+   la automation de Airtable (ADR-023), jamás a git.
+5. Pegá las API keys: 3× `<ANTHROPIC_API_KEY>` (pre-trim, gate, traductor) + 1× `<SUPADATA_API_KEY>`.
+6. **Execute Workflow** para una corrida manual (la primera con `dias_recencia` alto = backfill),
+   dejá el cron semanal, o disparo on-demand por el botón de Airtable (webhook).
 
-> El registro a Supabase (`Abrir run` / `Reportar outputs` / `Cerrar run`) es **continue-on-fail**:
-> sin Supabase el motor entrega igual a Airtable, solo no reporta. `Abrir run` corre **primero, en
-> serie** (Config → Abrir run → Leer Proyectos): así `Preparar outputs Supabase` puede referenciar el
-> `run_id` (si quedara en paralelo, n8n lo ejecutaría después y la referencia rompe).
+> El registro a Supabase (`Abrir run` / `Cerrar run`) es **continue-on-fail**: sin Supabase el motor
+> entrega igual a Airtable, solo no reporta — y el guard single-flight **deja pasar** (fail-open).
+> El arranque va **en serie**: `Config → Barrer runs zombie → Leer corridas vivas → Guard
+> single-flight → Abrir run → Leer Proyectos`. El guard (ADR-023) bloquea si hay una corrida viva
+> (`en_curso` más joven que `ventana_corrida_min`, 120 min) y aplica a los 3 triggers; el barrido
+> corre antes, así un zombie nunca deja el motor trabado. `Abrir run` en serie es lo que permite que
+> `Cerrar run` referencie el `run_id` (en paralelo, n8n lo ejecutaría después y la referencia rompe).
 
 ---
 
