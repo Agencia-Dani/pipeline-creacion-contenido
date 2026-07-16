@@ -104,21 +104,27 @@ independencia entre voces es una **convención del equipo, no una garantía del 
 un referente cruce voces. Importa para el norte Netflix ("las voces son universos separados"). **Decidir
 en B.1/E:** o se documenta como permitido, o el schema lo restringe. No lo toques sin decidir.
 
-## 3. Pasada única de `setup-airtable.mjs` + contrato (acumulada)
+## 3. Pasada única de `setup-airtable.mjs` + contrato — ✅ 3 de 4 hechas
 
-Cuatro cosas esperan **una sola pasada** sobre `core/scripts/setup-airtable.mjs` +
-[airtable-cockpit.md](../../core/contracts/airtable-cockpit.md), para no tocar campos adyacentes cuatro
-veces (decisión de cierre 40, extendida acá). `core/` solo cambia con ADR → **autorizado por ADR-024 +
-el ADR de A.5**:
+La pasada juntaba 4 cosas para no tocar campos adyacentes cuatro veces (decisión de cierre 40). **Se
+desagrupó el 2026-07-16 (Mani):** las 3 decididas se hicieron ya — dejarlas esperando obligaba al
+contrato a mentir (el motor pasó a leer `Proyectos.N` en C.1) y la cuarta depende de A.5, que no tiene
+fecha. El motivo del bundle casi no aplicaba entre ellas: 1/2/4 tocan `Proyectos`/`Ajustes`/`Candidatos`
+y (3) toca `Métricas Global` + links + `Voces`. `core/` solo cambia con ADR → **autorizado por ADR-024**.
 
-1. **N por proyecto** (ADR-024): el script y el contrato todavía describen N como global. *(Pendiente
-   desde cierre 40.)*
-2. **Los 2 toggles del descubrimiento** faltantes en `ajustesSeed` (§2.3).
-3. **La racionalización de campos** que salga de B.3 (los huérfanos de §2.1).
-4. **`Candidatos.fecha` es load-bearing y hoy es un paso manual** (§4.3): el archivado barre los `nuevo`
-   viejos con `IS_BEFORE({fecha}, -20 días)`. La API no crea campos computados, así que el script solo
-   lo **pide por consola** — una base nueva sale sin `fecha` y ese barrido falla en silencio. Al menos
-   subir el aviso a error duro / verificarlo post-creación. Misma clase que (2): muerde en **F5**.
+1. ✅ **N por proyecto** (ADR-024): `setup-airtable.mjs` crea `Proyectos.N` (número, precision 0) y el
+   contrato lo documenta; `Candidatos por corrida` pasó de *N total* a **default por proyecto** (en la
+   descripción del seed y en el contrato). **Creado también en la base viva** por MCP el 2026-07-16
+   (`fld9MCZ5y2pSWRxHc`) — vacío en todos los proyectos, o sea: conducta de hoy hasta que el equipo le
+   ponga valores.
+2. ✅ **Los 2 toggles del descubrimiento** (`Descubrir en Instagram`/`en TikTok`) sumados a `ajustesSeed`
+   con `Mostrar al equipo ✓` (§2.3). La base viva ya los tenía a mano; ahora una base nueva también.
+3. ⬜ **La racionalización de campos** que salga de B.3 (los huérfanos de §2.1) — **espera A.5**.
+4. ✅ **`Candidatos.fecha`** (§4.3): resultó que la API **sí** crea campos computados (el script ya venía
+   creando `fecha_calificacion`, un `lastModifiedTime`), así que ahora el script **intenta crear `fecha`**
+   (`createdTime`) en vez de pedirlo por consola. Si la API lo rechaza va a una lista `pendientes` que se
+   imprime fuerte al final **y sale con exit code 1** — antes era un `console.log` entre otros seis, y sin
+   ese campo el barrido de `nuevo` viejos falla en silencio.
 
 ## 4. El mapa campo por campo
 
@@ -141,6 +147,7 @@ vista del cockpit, ningún workflow).
 | `advertencia_criterios` | **ARCH** (misma llamada) | **equipo** | ✅ Lint para el humano; el gate **no** lo lee (por contrato). |
 | `activo` | equipo | MOTOR + DESC (`filterByFormula={activo}` en `Leer Proyectos`) | ✅ Gate operativo real. **ARCH no lo filtra** (archiva calificados de proyectos apagados) — correcto: no querés perder lo ya calificado. |
 | `voz_default` (link) | equipo | MOTOR · ARCH · DESC (los 3 resuelven la voz por este link) | ✅ **1 sola voz por proyecto** (los 3 leen `[0]` e ignoran el resto). |
+| `N` | equipo | MOTOR (`Armar plan` → `Armar candidato` corta a esta N) | ✅ **Nuevo 2026-07-16** (ADR-024/C.1). Vacío o 0 → cae al global `Candidatos por corrida`. Existe en el repo **y en la base viva**; el motor lo usa **recién tras el re-import de C**. |
 | `Referentes` · `Candidatos` · `Referentes propuestos` · `Descartes del gate` (links inversos) | Airtable | nadie | 🟡 Auto-creados, el equipo los ve → **B.3** (§2.1). |
 
 ### 4.2 `Voces`

@@ -28,10 +28,17 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 | `advertencia_criterios` | texto largo | **lint de los criterios manuales** (criterio vago / sin lista negativa / Voz incoherente) — lo escribe la **misma** llamada de destilación; visible al equipo, el gate **NO lo lee** (ADR-022/M2) |
 | `voz_default` | link → `Voces` | la **única** voz del proyecto (un proyecto = una voz; una voz puede servir a varios proyectos). Afina el filtro de relevancia por encima del tema (ADR-010) |
 | `activo` | checkbox | si entra en las corridas |
+| `N` | número (entero) | **cuántos candidatos entrega ESTE proyecto en una corrida** (ADR-024). Vacía o 0 → usa el global `Candidatos por corrida` de `Ajustes` como default. El corte final va **por proyecto**, cada uno a su N, por heat compuesto tras el gate. Nunca supera `cap_top_n` (techo duro de transcripción **total**: si muerde antes, algún proyecto queda por debajo de su N — el cap manda) |
 
 > **Cambio ADR-015/016:** `dias_recencia`, `top_n` y los 4 toggles de eje salieron del Proyecto. La
-> ventana, el N por corrida y los resultados por referente son ahora **globales** (tabla `Ajustes`); la
-> plataforma de búsqueda la da `Referente.plataforma` y el descubrimiento es solo por referente.
+> ventana y los resultados por referente son **globales** (tabla `Ajustes`); la plataforma de búsqueda
+> la da `Referente.plataforma` y el descubrimiento es solo por referente.
+>
+> **Enmienda ADR-024 (2026-07-15):** el **N vuelve al Proyecto** (campo `N` arriba) — ADR-016 lo había
+> sacado a propósito para que el costo de la corrida fuera predecible; la reunión con redes del
+> 2026-07-15 dio información nueva (el flujo on-demand es por proyecto) y reabrió la decisión. El global
+> `Candidatos por corrida` pasa de *N total* a **default por proyecto**. Trade aceptado a conciencia: se
+> cambió costo-predecible por control por proyecto, con `cap_top_n` de cinturón.
 
 ### 2. `Voces` — el eje organizativo (para quién se selecciona)
 Separado del proyecto a propósito. **Nota ADR-009:** el MVP no genera en voz (scripts literales),
@@ -109,9 +116,10 @@ filtra) · `Mínimo de vistas` 0 / `Mínimo de likes` 0 (**piso duro**; 0 = nada
 mínima` 0 (**umbral** del gate; 0 = nada corta).
 
 **Knobs de ejecución globales (ADR-016)** — los que el equipo edita en la **página Global** del
-dashboard: `Candidatos por corrida` 100 (**N total por corrida**, contados como videos distintos; el
-corte final va por heat compuesto tras el gate) · `Días de recencia` 7 (ventana única de fetch) ·
-`Resultados por cuenta de referente` 20 (videos por cuenta de referente por corrida).
+dashboard: `Candidatos por corrida` 100 (**default por proyecto** desde ADR-024 — ya **no** es N total
+por corrida: es cuántos entrega un proyecto que no tiene su propia `N`; contados como videos distintos,
+el corte va por heat compuesto tras el gate, **por proyecto**) · `Días de recencia` 7 (ventana única de
+fetch) · `Resultados por cuenta de referente` 20 (videos por cuenta de referente por corrida).
 
 **Toggles de eje (ADR-017; el eje keyword se removió — ADR-019)** — también en la página Global:
 `Buscar por referentes en Instagram` 1 · `Buscar por referentes en TikTok` 1 (1=on/0=off; default

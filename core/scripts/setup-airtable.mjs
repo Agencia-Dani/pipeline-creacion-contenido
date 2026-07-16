@@ -42,9 +42,10 @@ const fecha = (name) => ({ name, type: "date", options: { dateFormat: { name: "i
 
 // ── las 9 tablas (campos NO-link al crear; los links se agregan después) ──
 const tables = [
-  { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto. dias_recencia/top_n/toggles salieron a Ajustes globales (ADR-016).",
+  { name: "Proyectos", description: "Unidad de búsqueda (qué se busca). Resultados aislados por proyecto. dias_recencia/toggles salieron a Ajustes globales (ADR-016); la N volvió al proyecto (ADR-024).",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia"),
-             long("criterios_aprendidos"), long("advertencia_criterios"), check("activo")] },
+             long("criterios_aprendidos"), long("advertencia_criterios"), check("activo"),
+             num("N")] },
   { name: "Voces", description: "Eje organizativo (para quién se selecciona). Separado del proyecto.",
     fields: [txt("nombre"), long("descripcion"), long("criterios_relevancia")] },
   { name: "Referentes", description: "Banco de perfiles referentes (la única fuente de descubrimiento — ADR-019). Salud por referente (tasa_gate/tasa_aprobacion/videos_evaluados) la escribe el archivado — ADR-022/M2.",
@@ -106,7 +107,7 @@ const ajustesSeed = [
   { clave: "Relevancia mínima",               valor: 0,      descripcion: "Descarta candidatos con relevancia por debajo de esto (0 a 1). 0 = no descarta nada." },
   // Knobs de ejecución globales (ADR-016) — visibles al equipo en la "página Global" del dashboard
   // ("Mostrar al equipo": true filtra esa página; sin el flag van solo a "Ajustes Dev-Only").
-  { clave: "Candidatos por corrida",          valor: 100,    descripcion: "Cuántos videos distintos trae la corrida en total (no por proyecto). El corte va por el score final.", "Mostrar al equipo": true },
+  { clave: "Candidatos por corrida",          valor: 100,    descripcion: "Cuántos videos trae un proyecto que no tiene su propia N (es el default). Para cambiar uno solo, ponele N a ese proyecto. El corte va por el score final.", "Mostrar al equipo": true },
   { clave: "Días de recencia",                valor: 7,      descripcion: "Ventana de búsqueda: solo videos publicados en los últimos N días.", "Mostrar al equipo": true },
   { clave: "Resultados por cuenta de referente", valor: 20,  descripcion: "Cuántos videos baja por cada cuenta de referente (más = más costo). Tope dev: 30.", "Mostrar al equipo": true },
   // Toggles de eje (ADR-017; el eje keyword se removió — ADR-019) — también en la "página Global".
@@ -115,6 +116,11 @@ const ajustesSeed = [
   // Knobs del workflow de descubrimiento de referentes (ADR-020). Mapa propio en su "Armar plan de descubrimiento".
   { clave: "Propuestas por corrida",             valor: 10,  descripcion: "Cuántos referentes nuevos propone el descubrimiento por semana, como máximo.", "Mostrar al equipo": true },
   { clave: "Afinidad mínima de propuesta",       valor: 0.6, descripcion: "Qué tan afín a los criterios del proyecto debe ser una cuenta para proponerse (0 a 1).", "Mostrar al equipo": true },
+  // Toggles de eje del descubrimiento (ADR-020 §8). Faltaban acá: la base viva los tiene creados a mano
+  // (2026-07-13) pero una base nueva salía sin ellos y el equipo no podía apagar un eje. La lectura es
+  // fail-open (defaults de Config = 1), así que la ausencia no rompía nada — solo quitaba el control.
+  { clave: "Descubrir en Instagram",             valor: 1,   descripcion: "Activa el eje de descubrimiento por Instagram (cuentas relacionadas). 1 = sí, 0 = no.", "Mostrar al equipo": true },
+  { clave: "Descubrir en TikTok",                valor: 1,   descripcion: "Activa el eje de descubrimiento por TikTok (lookalikes). 1 = sí, 0 = no.", "Mostrar al equipo": true },
 ];
 
 const run = async () => {
@@ -122,6 +128,7 @@ const run = async () => {
   const base = await api("POST", "/bases", { name: "Reels Cockpit", workspaceId: WORKSPACE, tables });
   const baseId = base.id;
   const id = (t) => base.tables.find((x) => x.name === t).id;
+  const pendientes = []; // lo que la API no pudo crear y hay que hacer a mano; se lista fuerte al final
 
   // ── links (se agregan después: referencian ids que no existían al crear) ──
   const links = [
@@ -163,10 +170,13 @@ const run = async () => {
     });
   }
 
+  // Los 2 campos de fecha de Candidatos. Ambos son computados; si la API los rechaza hay que crearlos
+  // a mano, así que el warning tiene que ser fuerte: NO son cosméticos, el archivado depende de ellos.
+  const cand = base.tables.find((t) => t.name === "Candidatos");
+
   // fecha_calificacion: cuándo calificó el equipo (tracking de selecciones — ADR-009).
-  // lastModifiedTime atado SOLO al campo 'calificacion'. Si la API lo rechaza, se crea a mano.
+  // lastModifiedTime atado SOLO al campo 'calificacion'. El archivado lo copia a outputs.calificado_en.
   try {
-    const cand = base.tables.find((t) => t.name === "Candidatos");
     const calif = cand.fields.find((f) => f.name === "calificacion");
     await api("POST", `/bases/${baseId}/tables/${cand.id}/fields`, {
       name: "fecha_calificacion", type: "lastModifiedTime",
@@ -174,8 +184,17 @@ const run = async () => {
     });
     console.log("→ Campo Candidatos.fecha_calificacion (last modified de 'calificacion')");
   } catch (e) {
-    console.warn("⚠ No se pudo crear 'fecha_calificacion' por API — crealo a mano en Candidatos:");
-    console.warn("  tipo 'Last modified time' → track solo el campo 'calificacion'. (" + e.message + ")");
+    pendientes.push("Candidatos.fecha_calificacion → tipo 'Last modified time', track SOLO el campo 'calificacion'. Sin él, outputs.calificado_en cae a la fecha del archivado (impreciso, no fatal). (" + e.message + ")");
+  }
+
+  // fecha: cuándo llegó el candidato (created time). LOAD-BEARING: el archivado barre los 'nuevo'
+  // viejos con IS_BEFORE({fecha}, -20 días). Si el campo no existe, ese filterByFormula falla y los
+  // candidatos sin calificar se acumulan para siempre — en silencio.
+  try {
+    await api("POST", `/bases/${baseId}/tables/${cand.id}/fields`, { name: "fecha", type: "createdTime" });
+    console.log("→ Campo Candidatos.fecha (created time)");
+  } catch (e) {
+    pendientes.push("Candidatos.fecha → tipo 'Created time'. ⚠️ SIN ESTE CAMPO el archivado NO puede barrer los candidatos 'nuevo' viejos (filtra por {fecha}) y se acumulan en silencio. (" + e.message + ")");
   }
 
   // ── semillas de Ajustes (API de datos, no meta) ──
@@ -192,10 +211,13 @@ const run = async () => {
   console.log("   → Dale acceso de editor a Majo y Jero (Share → hasta 5 en el plan free).");
   console.log("   → Cargá los datos semilla: Proyectos, Voces y Referentes iniciales");
   console.log("     (incluí referentes en EN/PT/IT/FR — prioridad del jefe, ADR-009).");
-  console.log("   → Creá a mano en Candidatos el campo 'fecha' tipo 'Created time' (cuándo llegó");
-  console.log("     el candidato — la API no crea campos computados).");
   console.log("   → Creá a mano la vista '🔥 Seleccionados' en Candidatos: filtro estado=aprobado,");
-  console.log("     orden heat_score desc (el re-rank de seleccionados).");
+  console.log("     orden heat_score desc (el re-rank de seleccionados — las vistas no salen por API).");
+  if (pendientes.length) {
+    console.warn(`\n🚨 ${pendientes.length} campo(s) que la API rechazó — CREALOS A MANO ANTES DE CORRER NADA:`);
+    pendientes.forEach((p) => console.warn("   • " + p));
+    process.exitCode = 1; // que no pase por verde en CI ni en un ojo distraído
+  }
 };
 
 run().catch((e) => { console.error("\n✗ " + e.message); process.exit(1); });
