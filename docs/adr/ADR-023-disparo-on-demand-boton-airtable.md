@@ -76,3 +76,28 @@
      **no** abre run (no ensucia `runs_fallo` ni la salud); el webhook responde 200 inmediato y el
      veredicto se ve en n8n/`runs`. `Abrir run` ahora registra el `trigger_type` real
      (`on_demand`/`manual`/`cron` — antes todo se registraba `cron`).
+- **Enmienda (2026-07-16, autenticación del webhook — decidida con Mani):** el ADR original **nunca
+  decidió cómo se autentica el webhook**, y la implementación de C.3 quedó sin auth: el endpoint POST
+  respondía a cualquiera. Eso dejaba el **path haciendo de bearer token** por omisión, no por elección
+  — quien consiguiera la URL podía disparar corridas **pagas** (Apify + Supadata + Haiku) a voluntad.
+  El guard single-flight acota el daño de un click repetido a una corrida viva por vez, pero no impide
+  el abuso sostenido.
+  - **Decisión: Header Auth** en el nodo webhook (credencial n8n `httpHeaderAuth` — *Webhook Motor
+    Header*). El `fetch` de la automation de Airtable manda ese header; sin él, n8n responde **403 y
+    el workflow ni arranca** (la auth es del trigger, así que un POST no autorizado no abre run, no
+    consume el guard y no ensucia `runs`).
+  - **Qué cambia el modelo de amenaza:** el path deja de ser secreto y pasa a ser un identificador.
+    El secreto es el header, que **no viaja en la URL** (no queda en logs de proxy, historiales ni
+    referers, que es donde una URL se filtra sola). Igual conviene un path aleatorio: es defensa en
+    profundidad barata, no la defensa.
+  - **Alternativas descartadas:** *Basic Auth* (equivalente en fuerza, pero el par usuario/clave no
+    aporta nada sobre un header y se confunde con una identidad de usuario) · *JWT* (n8n lo soporta,
+    pero exige emitir y rotar tokens desde un script de Airtable: complejidad sin beneficio para un
+    único llamador máquina-a-máquina) · *sin auth, path largo* (el statu quo — se rechaza justamente
+    porque hace secreta a la URL, que es lo que se comparte y se loguea).
+  - **Costo aceptado:** una credencial más que crear al re-importar y **un lugar más donde el
+    re-import puede fallar en silencio**: si el header de la automation y el de n8n no coinciden, el
+    botón responde error y nadie se entera hasta que alguien pregunta por qué no corrió. Va al
+    checklist de re-import del handoff, no a la memoria de nadie.
+  - **No cambia** el cron ni el Execute manual: son triggers internos de n8n, no pasan por HTTP. La
+    auth protege solo la puerta de calle.

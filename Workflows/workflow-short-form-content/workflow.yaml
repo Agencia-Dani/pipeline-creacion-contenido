@@ -30,6 +30,8 @@ triggers:
                                   # desnuda, sin payload; el motor lee Airtable). Guard single-flight
                                   # en TODOS los triggers: si hay corrida viva (<ventana_corrida_min),
                                   # no arranca otra. Path = placeholder <<WEBHOOK_PATH_MOTOR>>.
+                                  # Header Auth (enmienda auth de ADR-023): credencial 'Webhook Motor
+                                  # Header'. El path dejó de ser el secreto; sin el header, 403.
   # (El Form Trigger del template viejo se eliminó: Airtable es la única superficie de config.)
 
 inputs:
@@ -63,6 +65,9 @@ inputs:
     - supadata_api_key            # placeholder <SUPADATA_API_KEY> en el Code node Transcribir (Supadata)
     - airtable_token              # credencial n8n 'Airtable PAT' (airtableTokenApi)
     - supabase_service_role       # credencial n8n 'Supabase Registro' (supabaseApi)
+    - webhook_motor_header        # credencial n8n 'Webhook Motor Header' (httpHeaderAuth) — protege el
+                                  # trigger webhook (enmienda auth de ADR-023). El MISMO par
+                                  # nombre/valor va en el header del fetch de la automation Airtable.
     # NINGUNA credencial de Google.
 
 stages:                           # las 8 etapas canónicas de PLAN §2.4 (sin vacíos; n/a si no aplica)
@@ -81,7 +86,7 @@ outputs:
     registered: yes               # reporta al registro central (Supabase outputs; contenido_o_link = texto del script — ADR-009 nota 2026-06-14)
 
 runbook:
-  setup: "Importar workflow.json en n8n → editar nodo Config (base_id, supabase_url, instance_id) → reemplazar <<WEBHOOK_PATH_MOTOR>> en el nodo webhook por un path aleatorio (la URL de Producción resultante va a la automation de Airtable y al gestor, JAMÁS a git) → pegar API keys/credenciales (B4) → importar error-workflow-registro.json como Error Workflow."
+  setup: "Importar workflow.json en n8n → editar nodo Config (base_id, supabase_url, instance_id) → reemplazar <<WEBHOOK_PATH_MOTOR>> en el nodo webhook por un path aleatorio (la URL de Producción resultante va a la automation de Airtable y al gestor, JAMÁS a git) → crear la credencial httpHeaderAuth 'Webhook Motor Header' (nombre+valor de header aleatorios; el mismo par va en el fetch de la automation) → pegar API keys/credenciales (B4) → importar error-workflow-registro.json como Error Workflow → ACTIVAR (el webhook de Producción solo escucha activo)."
   start: "Activar el cron en n8n (validar timezone). Para probar: Execute Workflow manual."
   stop: "Desactivar el workflow en n8n."
   test: "Corrida manual de backfill (dias_recencia alto en el proyecto provisional) → candidatos en Airtable con script en español + idioma; processed_items poblada; runs/outputs en Supabase (V1–V6)."

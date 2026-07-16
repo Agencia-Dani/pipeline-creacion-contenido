@@ -890,7 +890,8 @@
         "httpMethod": "POST",
         "path": "<<WEBHOOK_PATH_MOTOR>>",
         "responseMode": "onReceived",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "disparo-on-demand-webhook",
       "name": "Disparo on-demand (webhook)",
@@ -899,7 +900,12 @@
       "position": [
         0,
         400
-      ]
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Webhook Motor Header"
+        }
+      }
     },
     {
       "parameters": {

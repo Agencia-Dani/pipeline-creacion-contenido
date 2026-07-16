@@ -299,9 +299,21 @@ El equipo puede disparar una corrida **a demanda** sin esperar el cron. La caden
    botón la fija B.2 del refactor (superficie del operador); lo que este contrato fija es el
    mecanismo, no el lugar.
 2. **La automation hace un POST** (script `fetch`, sin body) al **webhook de Producción del motor**
-   (nodo `Disparo on-demand (webhook)`, path `<<WEBHOOK_PATH_MOTOR>>` reemplazado al importar). La
-   URL dispara corridas **pagas** → vive en el gestor de contraseñas y dentro de la automation,
-   jamás en git.
+   (nodo `Disparo on-demand (webhook)`, path `<<WEBHOOK_PATH_MOTOR>>` reemplazado al importar), **con
+   el header de autenticación** (enmienda auth de ADR-023: credencial n8n `httpHeaderAuth` *Webhook
+   Motor Header*). Sin el header, n8n responde **403 y el motor ni arranca**. El par nombre/valor del
+   header y la URL viven en el gestor de contraseñas y dentro de la automation, jamás en git.
+
+   ```js
+   // Airtable → Automations → acción "Run script"
+   await fetch('https://<instancia-n8n>/webhook/<path>', {
+     method: 'POST',
+     headers: { '<nombre-del-header>': '<valor-del-header>' },  // debe coincidir EXACTO con la credencial de n8n
+   });
+   ```
+
+   ⚠️ **El header es el secreto, no la URL.** El path es un identificador: si se filtra, no alcanza
+   para disparar nada. Aun así se genera aleatorio (defensa en profundidad).
 3. **Señal desnuda:** el POST no lleva payload. El motor lee Airtable para saber qué corre — la
    selección se expresa con `Voces.activo` + `Proyectos.activo` + `Proyectos.N`. Una corrida =
    todos los proyectos activos (de voces activas), cada uno a su N.
