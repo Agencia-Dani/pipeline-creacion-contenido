@@ -25,11 +25,19 @@
 > Lo que está **en el repo pero NO aplicado en n8n / la base viva**. Es el eslabón débil de siempre:
 > los fixes del repo no son live hasta re-importar (ver memoria `reimport-eslabon-debil`).
 
-- 🟠 **Re-import del motor pendiente (C.1 + C.5, cierre 45).** El `workflow.json` del motor cambió en el
-  repo: N por proyecto (`Armar plan` + `Armar candidato`) y 2 knobs podados del `Config`. **No es
-  urgente ni riesgoso:** el campo `Proyectos.N` está vacío en todos los proyectos, así que el motor nuevo
-  cae al global y se comporta **igual que el de hoy**. Re-importar cuando C esté completo (C.2/C.3), así
-  el re-import carga solo lo de C y un fallo apunta a un culpable (lección del cierre 42).
+- 🟠 **Re-import del motor pendiente (C.1 + C.2 + C.5, cierres 45–46).** El `workflow.json` del motor
+  cambió en el repo: N por proyecto (`Armar plan` + `Armar candidato`), gate por `Voces.activo`
+  (`Leer Voces` + `Armar plan`) y 2 knobs podados del `Config`. **Hoy no cambia conducta:** `Proyectos.N`
+  está vacía en los 6 proyectos (⇒ cae al global) y las 3 voces están prendidas (⇒ no saltea a nadie).
+  Conviene re-importar **cuando C.3 esté**, así el re-import carga solo lo de C y un fallo apunta a un
+  culpable (lección del cierre 42). **Antes de re-importar: `node Workflows/workflow-short-form-content/test-nodos.mjs`.**
+- 🔴 **Dato sucio, decisión pendiente: 2 proyectos tienen 2 voces linkeadas** (cierre 46) —
+  *Comunicación para lideres* y *Comunicación en empresas* → `voz_default = [Milena Morales, Rosario
+  Gomez]`. El motor usa **solo la primera** (Milena): esos proyectos vienen aplicando el ajuste de voz de
+  Milena y archivando `voz: "Milena Morales"`; Rosario nunca hizo nada. **Con C.2 se suma:** apagar a
+  Milena los apaga aunque Rosario esté prendida. Es dato, no código: o se limpia el link de más, o
+  multi-voz entra al modelo (y cambian gate, criterios y archivado). Detalle en
+  [mapa-campos §2.5](./mapa-campos.md).
 
 > ✅ **Re-import de los 3 `workflow.json` + rotación de credenciales: HECHOS por Mani el 2026-07-16**
 > (cierre 42). Cae el bloqueante que arrastraba desde el cierre 37: M1, M2/ADR-022, costos $, contadores
@@ -79,14 +87,55 @@ El detalle de cada componente y el "hecho cuando" viven en
 |---|---|---|---|
 | **A** Auditoría del pipeline vivo | mapa nodo/campo/página + reconciliar repo↔live + decisión §3 (ADR) | Dev 1 | 🔧 **A.1 ✅ · A.2 ✅ · A.3 ✅ · A.4 ✅** · **A.5 ⬜** (la decisión §3) — pero antes **B.6(2)**, ver abajo |
 | **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | ⬜ **B.6 destrabado y priorizado** por A.3 (3 hallazgos 🔴) |
-| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | 🔧 **C.1 ✅ · C.5 ✅** (en el repo, **sin re-importar**) · C.2 ⬜ (espera `Voces.activo`/E.1) · C.3 ⬜ (webhook) · C.4 ⬜ |
+| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | 🔧 **C.1 ✅ · C.2 ✅ · C.5 ✅** (en el repo, **sin re-importar**) · **C.3 ⬜ siguiente** (webhook single-flight) · C.4 ⬜ (confirmar dedup en la coexistencia) |
 | **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | ⬜ |
-| **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización (autorizado por el ADR de A.5) | Dev 1 | ⬜ |
+| **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización (autorizado por el ADR de A.5) | Dev 1 | 🔧 **E.1 ✅** (`Voces.activo` vivo) · E.2 ⬜ (campos de disparo, va con C.3) · E.3 ⬜ (espera B.3/A.5) |
 
 ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)
 (disparo on-demand), [ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md) (N por proyecto).
 
+## Para la próxima sesión — arrancá por acá
+
+> Escrito al cerrar el 2026-07-16 (cierres 43–46, todos del mismo día). **Los dos carriles del refactor
+> están andando en paralelo:** Mani en la superficie (Airtable, a mano), el agente en el motor.
+
+**Carril motor (el agente) — lo único abierto es C.3.** C.1/C.2/C.5 están hechos, probados y en el
+repo, **sin re-importar**. Lo siguiente:
+
+1. **C.3 — webhook single-flight** ([ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)):
+   trigger de Producción en paralelo al cron, con guard **single-flight** (no arranca si ya hay corrida).
+   El plan pide **construirlo con builder Node, no a mano**. Va con **E.2** (los campos de disparo).
+   Ojo con el guard: ya existe `Barrer runs zombie` (marca `fallo` los `en_curso` colgados) — el
+   single-flight tiene que convivir con eso, no pelearse.
+2. **C.4** — confirmar que el dedup (`processed_items`) hace limpia la coexistencia cron + on-demand.
+   Es *confirmar, no asumir*: probablemente ya funcione.
+3. **Recién ahí: re-import del motor** (§Pendiente vivo). Antes:
+   `node Workflows/workflow-short-form-content/test-nodos.mjs`.
+
+**Carril superficie (Mani) — los fixes de UI de B.6**, con diagnóstico preciso en
+[mapa-campos §5.1](./mapa-campos.md). **B.6(2) (curar *Salud del Sistema*) es precondición de A.5**: sin
+eso, la decisión Airtable-vs-dashboard se toma contra un Airtable mal configurado. Y **B.5**: mostrarle
+`Voces.activo` al equipo en la página *Voces* (el campo ya existe y el motor ya lo respeta).
+
+**3 decisiones abiertas que no debe tomar un agente solo** (están todas documentadas donde corresponde):
+
+| Qué | Dónde | Por qué importa |
+|---|---|---|
+| **2 proyectos con 2 voces linkeadas** | §Pendiente vivo · [mapa-campos §2.5](./mapa-campos.md) | dato sucio vivo; con C.2 apagar una voz apaga proyectos que "no son de ella" |
+| **El descubrimiento no respeta `Voces.activo`** | [plan §Descubrimiento](./refactor-voces-proyectos.md) | fix de 1 línea, pero puede ser deseable como está |
+| **`notas_equipo` + `viral_por_tamano` se destruyen** | D.3 del plan · [mapa-campos §2.2](./mapa-campos.md) | la señal más rica del equipo no entra al loop de aprendizaje |
+
+**Contexto que ahorra media hora de re-derivar:**
+- El mapa de la superficie ya está completo: **[mapa-campos.md](./mapa-campos.md)** (§4 campos, §5 páginas).
+  **No re-derives nada de ahí** — y leé §1 antes de grepear: el grep de campos **no sirve** en este repo.
+- Hay **tests** del motor ahora: `test-nodos.mjs`. Si tocás `Armar plan` o `Armar candidato`, corrélos.
+- **Un campo nuevo + un filtro nuevo = poblar el dato antes** (casi dejamos el motor en cero; cierre 46).
+- El **primer ciclo completo post-re-import cierra el 26/07** (§Ciclo): el archivado del 19/07 sale
+  parcial **por diseño**. No lo leas como veredicto.
+
 ## Log de avance (más reciente arriba)
+
+**2026-07-16 (cierre 46) — E.1 + C.2 (`Voces.activo` vivo y respetado) + tests de verdad para el motor + un dato sucio que apareció solo (Mani + Claude).** Cierra el bloque de C que no depende del webhook. **E.1:** `Voces.activo` creado en contrato + `setup-airtable.mjs` + **la base viva** por MCP (`fldqekbuBxhzgOSG1`). **🚨 El gotcha del cierre, vale para E.2 y para cualquier toggle futuro:** crear un checkbox en Airtable deja **todos los records existentes destildados**, y como C.2 filtra server-side por `{activo}`, desplegar así habría dejado **cero voces activas ⇒ el motor entregando nada**. Se prendieron las 3 voces a mano en la misma pasada. **Campo nuevo + filtro nuevo = poblar el dato ANTES, siempre.** **C.2:** `Leer Voces` del motor (solo el motor) filtra `filterByFormula={activo}`; `Armar plan` saltea los proyectos cuya voz no llegó y **loguea cuál**. **Por qué server-side y no en el code node** (esto es lo que hay que entender antes de tocarlo): Airtable **omite los checkbox destildados** del payload, así que en el code node `activo` ausente es indistinguible de *el campo no existe* → no hay fail-open posible sin ambigüedad. El filtro lo resuelve en el server, y **es el mismo patrón que ya usaba `Leer Proyectos`** — no inventamos nada. Proyecto **sin** voz: no gateado. Bonus verificado: el gate corta **antes del scrape**, así que un proyecto salteado **no se paga en Apify**. **🔴 Lo que apareció solo mirando el dato vivo (lo más importante del cierre):** **2 de 6 proyectos tienen 2 voces linkeadas** — *Comunicación para lideres* y *Comunicación en empresas* → `[Milena Morales, Rosario Gomez]`. El código lee `voz_default[0]` ⇒ gana Milena y **Rosario se ignora en silencio**: esos proyectos vienen aplicando el ajuste de voz de Milena y archivando `voz: "Milena Morales"` mientras alguien linkeó a Rosario esperando algo. **Corrige un error mío del cierre 43:** el mapa decía que *"1 proyecto = 1 voz está garantizado por el código"* — media verdad: el código elige una, pero **el dato tiene dos** y nada lo impedía. Con C.2 se agrava (apagar Milena apaga esos proyectos aunque Rosario esté prendida). **Decisión de qué hacer: NO la tomé** — es dato, no código: o se limpia el link de más y el contrato se hace cumplir, o multi-voz entra al modelo (y cambian gate, criterios y archivado). Lo que **sí** hice: el motor **avisa por log** (`[Plan] ⚠️ … tiene 2 voces linkeadas`) en vez de tragárselo. Documentado en [mapa-campos §2.5](./mapa-campos.md), el contrato y el §Pendiente vivo. **Tests — cambia el feedback loop del repo:** nuevo [`Workflows/workflow-short-form-content/test-nodos.mjs`](../../Workflows/workflow-short-form-content/test-nodos.mjs), node pelado sin dependencias, que saca el `jsCode` del JSON y lo corre con un `$` de n8n mockeado. **23 casos verdes** sobre `Armar plan de corrida` y `Armar candidato`: gate por voz, proyecto sin voz, el multi-voz, Apify no pagado, N por proyecto + fallback + N=0 + el global de Ajustes, corte por proyecto, el orden dedup→corte con el video disputado, PISO, `_descarte`, `normLang`, ⚠️ SIN GUION. **Por qué vale la pena:** el motor corre en n8n, así que sin esto la lógica se verifica recién en producción una semana después, quemando Apify/Supadata/Haiku. `CLAUDE.md` §Feedback loops actualizado (el validador ya **no** es la única verificación). **Sin decidir, anotado:** el **descubrimiento no respeta `Voces.activo`** → una voz apagada no corre en el motor pero **sí recibe propuestas de referentes** cada semana. Fix de 1 línea, pero cambia conducta y puede ser deseable (tener referentes listos para cuando la prendas) → plan §Descubrimiento. **Validador 1221/0**, tests 23/23, secretos limpios. **Estado de C:** C.1/C.2/C.5 hechos en el repo, **sin re-importar** (hoy no cambian conducta: N vacía en los 6 proyectos, las 3 voces prendidas). **Próximo paso: C.3** — el webhook single-flight de ADR-023, que es el que falta para cerrar C y disparar el re-import. Ver §Para la próxima sesión abajo.
 
 **2026-07-16 (cierre 45) — C.1 + C.5 en el motor (N por proyecto, probado) + la pasada única de `core/` desagrupada: 3 de 4 hechas (Mani + Claude).** Primer código del refactor. Split del plan §5 en vivo: Mani toma los fixes de UI de Airtable (la API no los hace), Claude el motor. **C.5:** podados `banda_descarte_min`/`max` del `Config` (21 → **19 knobs**), muertos desde la enmienda top-K del 07-13. **C.1 (ADR-024):** `Armar plan de corrida` lee `Proyectos.N` con fallback al global; `Armar candidato` **corta por proyecto**. `cap_top_n` intacto (ya muerde antes, en `Heat-score v1`). **La decisión de diseño del cierre — el ADR-024 no la fijaba:** el **orden** entre el corte y el dedup de ADR-018. Estaba corte→dedup; lo invertí a **dedup→corte**. Con el orden viejo, 2 proyectos que pescan el mismo video colisionan y **los dos** quedan cortos (el dedup solo resta después de cortar) ⇒ N sería un techo, no una entrega; con dedup primero cada video queda en un solo proyecto (gana el que lo juzgó más relevante) y cada proyecto rellena hasta **su** N exacto. **Revisable si Mani no coincide, es un cambio chico.** **Probado de verdad, no solo validador:** test fuera de n8n con el `$` de n8n mockeado (script en scratchpad) — 10 casos verdes: N por proyecto, fallback al global, el video disputado (una sola copia + el perdedor no queda corto), PISO round-robin dentro del proyecto, `_descarte` sin consumir cupo, N que no inventa candidatos, + regresiones de `normLang` y ⚠️ SIN GUION. Más el chequeo de grafo de siempre (0 refs colgadas, 0 conexiones rotas, sintaxis OK en los 33 code nodes) y que nadie lea los knobs podados. **`core/` — la pasada única se DESAGRUPÓ (decisión de Mani):** dejarla esperando obligaba al contrato a mentir (el motor ya lee `Proyectos.N`) y la 4ª parte depende de A.5, que no tiene fecha. Además el motivo del bundle casi no aplicaba: 1/2/4 tocan `Proyectos`/`Ajustes`/`Candidatos`, (3) toca `Métricas Global`+links+`Voces`. **Hechas 3 de 4:** (1) `Proyectos.N` en el script + contrato, `Candidatos por corrida` pasa de *N total* a **default por proyecto**; (2) los 2 toggles del descubrimiento en `ajustesSeed`; (4) **`Candidatos.fecha`** — resultó que la API **sí** crea computados (el script ya creaba `fecha_calificacion`, un `lastModifiedTime`), así que ahora **intenta crear `fecha`** y si falla lo tira a una lista `pendientes` que se imprime fuerte **y sale con exit 1**, en vez de un `console.log` entre otros seis. Queda solo (3), esperando A.5. **Base viva:** creado `Proyectos.N` por MCP (`fld9MCZ5y2pSWRxHc`, number precision 0, con descripción para el equipo), **vacío en todos los proyectos** = conducta de hoy. **Corrección de un error mío del cierre 43:** reporté las "lecturas fantasma" `tema`/`link_doc` como hallazgo 🔴 nuevo — **ya estaban documentadas** como vestigiales deliberadas ([dev-doc §8](./dev-doc.md): *`tema` `''` fail-safe*, *`link_doc` vestigial siempre `''`*) y en `core/schema/004`. Bajado a 🟡 y D.4 pasa a poda opcional/cosmética. **También corregido del 44:** `veredicto` read-only **no es** decisión de diseño — Airtable no deja configurar el permiso del campo con la página vacía (*Mani*); el fix es el de B.6 y la ventana abre tras la corrida del lunes. **🟠 Re-import del motor pendiente** (§Pendiente vivo): no urgente ni riesgoso (con `N` vacía el motor nuevo = el de hoy); conviene hacerlo cuando C esté completo, así carga solo lo de C. Validador **1221/0**, secretos limpios. **Próximo paso:** C.2 (`Voces.activo`) está bloqueado por **E.1** (el campo no existe) — se puede codear fail-open igual, o crear E.1 primero por MCP y hacer los dos juntos. Después C.3 (webhook single-flight, ADR-023, con builder Node) y C.4 (confirmar que el dedup hace limpia la coexistencia cron+on-demand). En el carril de Mani: los fixes de UI de B.6, con B.6(2) como precondición de A.5.
 

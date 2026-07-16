@@ -96,13 +96,28 @@ explícito: *"podés linkear varios"*), y `Armar plan de corrida` **itera el arr
 handle a **cada** proyecto linkeado. Un mismo referente puede alimentar proyectos de **dos voces
 distintas**.
 
-Contraste útil: `Proyectos.voz_default` también es multi-link, pero los 3 workflows leen `[0]` e ignoran
-el resto → **1 proyecto = 1 voz** sí está garantizado por el código.
-
 → **No es un bug** (el fan-out por proyecto es deliberado, ADR-013) y hoy no rompe nada. Pero la
 independencia entre voces es una **convención del equipo, no una garantía del schema**: nada impide que
 un referente cruce voces. Importa para el norte Netflix ("las voces son universos separados"). **Decidir
 en B.1/E:** o se documenta como permitido, o el schema lo restringe. No lo toques sin decidir.
+
+**⚠️ Corrección (2026-07-16, cierre 46): `voz_default` tiene el mismo problema y ya se materializó.**
+Esta sección decía que *"1 proyecto = 1 voz sí está garantizado por el código"* porque los 3 workflows
+leen `voz_default[0]`. **Media verdad:** el código elige una, pero el **dato tiene dos** y nadie lo
+impedía. En la base viva, **2 de 6 proyectos tienen 2 voces linkeadas**:
+
+| Proyecto | `voz_default` | Qué pasa de verdad |
+|---|---|---|
+| Comunicación para lideres | [Milena Morales, **Rosario Gomez**] | usa Milena; **Rosario se ignora en silencio** |
+| Comunicación en empresas | [Milena Morales, **Rosario Gomez**] | idem |
+
+Consecuencia real: esos 2 proyectos vienen aplicando en el gate el *ajuste de voz* de **Milena** y
+archivando `outputs.metadata.voz = "Milena Morales"`, mientras alguien del equipo linkeó a Rosario
+esperando algo. Con **C.2** se suma: si apagás Milena, esos proyectos se apagan **aunque Rosario esté
+prendida**; si apagás Rosario, no pasa nada. **El motor ahora lo avisa por log** en vez de tragárselo
+(`[Plan] ⚠️ … tiene 2 voces linkeadas; se usa solo la primera`). **Está sin resolver:** es dato, no
+código — o se limpia el link de más (y el contrato se hace cumplir), o multi-voz pasa a ser parte del
+modelo (y entonces cambian el gate, los criterios y el archivado). **Va a B.1/E con lo de arriba.**
 
 ## 3. Pasada única de `setup-airtable.mjs` + contrato — ✅ 3 de 4 hechas
 
@@ -146,7 +161,7 @@ vista del cockpit, ningún workflow).
 | `criterios_aprendidos` | **ARCH** (`Destilar criterios`) | MOTOR (`Armar plan` + `Gate`) | ✅ El loop de ADR-022 cierra. |
 | `advertencia_criterios` | **ARCH** (misma llamada) | **equipo** | ✅ Lint para el humano; el gate **no** lo lee (por contrato). |
 | `activo` | equipo | MOTOR + DESC (`filterByFormula={activo}` en `Leer Proyectos`) | ✅ Gate operativo real. **ARCH no lo filtra** (archiva calificados de proyectos apagados) — correcto: no querés perder lo ya calificado. |
-| `voz_default` (link) | equipo | MOTOR · ARCH · DESC (los 3 resuelven la voz por este link) | ✅ **1 sola voz por proyecto** (los 3 leen `[0]` e ignoran el resto). |
+| `voz_default` (link) | equipo | MOTOR · ARCH · DESC (los 3 resuelven la voz por este link) | ⚠️ Los 3 leen `[0]`, pero es **multi-link** y **2 proyectos vivos tienen 2 voces** → la segunda se ignora (§2.5). El motor lo avisa por log; el dato está sin limpiar. |
 | `N` | equipo | MOTOR (`Armar plan` → `Armar candidato` corta a esta N) | ✅ **Nuevo 2026-07-16** (ADR-024/C.1). Vacío o 0 → cae al global `Candidatos por corrida`. Existe en el repo **y en la base viva**; el motor lo usa **recién tras el re-import de C**. |
 | `Referentes` · `Candidatos` · `Referentes propuestos` · `Descartes del gate` (links inversos) | Airtable | nadie | 🟡 Auto-creados, el equipo los ve → **B.3** (§2.1). |
 
@@ -158,7 +173,7 @@ vista del cockpit, ningún workflow).
 | `descripcion` | equipo | **nadie** | 🟡 Mismo caso que `Proyectos.descripcion`: contexto humano, no influye. Y la **descripción de la tabla** sigue pre-ADR-009 (§2.3) → **B.3**. |
 | `criterios_relevancia` | equipo | MOTOR (`Gate`, como *ajuste de voz* que complementa al tema) · DESC (ambos `Vetting`) · ARCH (`Destilar`) | ✅ ADR-010: Proyecto ⊕ Voz. |
 | `Proyectos` · `Candidatos` (links inversos) | Airtable | nadie | 🟡 → **B.3**. |
-| **`activo`** | — | — | 🔴 **No existe.** Lo crea **E.1**; lo respeta **C.2**. |
+| `activo` | equipo | **MOTOR** (`Leer Voces` filtra `{activo}` server-side → `Armar plan` saltea los proyectos de una voz apagada) | ✅ **Nuevo 2026-07-16** (E.1 + C.2). En el repo **y** en la base viva (`fldqekbuBxhzgOSG1`), las 3 voces prendidas. **ARCH no lo filtra** (necesita todas las voces para resolver nombres al archivar) y **DESC tampoco** — decisión abierta. Vivo tras el re-import de C. Falta **B.5**: que el equipo lo vea en la página *Voces*. |
 
 ### 4.3 `Candidatos`
 

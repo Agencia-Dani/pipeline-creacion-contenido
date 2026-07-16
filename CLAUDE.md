@@ -65,7 +65,11 @@ módulos), `/handoff` (compactar una sesión).
 
 - **Test / validar:** `cd core/scripts && npm run validate` — valida el contrato del manifest de
   workflows ([core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md)) y escanea
-  secretos. Es la única verificación automática del repo.
+  secretos. Corre siempre, sobre todo el repo.
+- **Test de los code nodes del motor:** `node Workflows/workflow-short-form-content/test-nodos.mjs` —
+  ejercita `Armar plan de corrida` y `Armar candidato` fuera de n8n con un `$` mockeado (N por proyecto,
+  gate por `Voces.activo`, orden dedup→corte, piso, y las regresiones que ya nos mordieron). **Corrélo
+  antes de re-importar** si tocaste esos nodos. Sin dependencias: es node pelado.
 - **Typecheck / lint:** no hay — los scripts son ESM `.mjs` plano, sin TS ni linter.
 - **Run:** el motor **corre en n8n**, no localmente: se importa el `workflow.json` (una instancia,
   editada a mano en el nodo `Config`) y se dispara con *Execute Workflow* (manual) o el cron semanal.

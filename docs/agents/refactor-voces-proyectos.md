@@ -278,9 +278,14 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       ⚠️ **Falta para que sirva de verdad:** (a) crear el campo `N` en `Proyectos` (base viva + la pasada
       única de `core/`, §3 de [mapa-campos](./mapa-campos.md)) y (b) **re-importar**. El motor **tolera que
       `N` no exista** (cae al global = conducta de hoy), así que el re-import no depende de (a).
-- [ ] **C.2** **Respetar `Voces.activo`**: un proyecto cuya voz está apagada no corre (aunque el proyecto
-      esté `activo`). Toca `Leer Proyectos` / `Armar plan`. *(A.2 confirmó por MCP que `Voces.activo`
-      **no existe** en la base viva — el campo lo crea E.1.)*
+- [x] **C.2** ✅ **Respetar `Voces.activo`** (2026-07-16): `Leer Voces` del motor filtra **server-side**
+      (`filterByFormula={activo}`, mismo patrón que `Leer Proyectos`) y `Armar plan` saltea los proyectos
+      cuya voz no llegó, logueando cuál. Proyecto **sin** voz: no gateado. **Server-side y no en el code
+      node porque Airtable omite los checkbox destildados** del payload → ahí "destildado" y "el campo no
+      existe" son indistinguibles. El gate corta **antes del scrape** (un proyecto salteado no se paga en
+      Apify — probado). Probado con [test-nodos.mjs](../../Workflows/workflow-short-form-content/test-nodos.mjs).
+      **Abre una decisión:** el **descubrimiento** no respeta `Voces.activo` → hoy propondría referentes
+      para proyectos de una voz apagada. Barato pero incoherente. Ver §Descubrimiento.
 - [x] **C.5** ✅ **Podados los 2 knobs muertos del `Config` del motor** (2026-07-16): `banda_descarte_min`
       (0.35) y `banda_descarte_max` (0.6), muertos desde la enmienda del 2026-07-13 (banda fija → top-K
       `cap_descartes`). Config: 21 → **19 knobs**. Verificado que ningún nodo los lee. Cero cambio de
@@ -331,7 +336,12 @@ se computan igual de bien que con el barrido semanal.
 
 **Qué es:** los campos/tablas nuevos que habilitan lo de arriba. `core/`, autorizado por el ADR de A.5.
 
-- [ ] **E.1** `Voces.activo` (checkbox) — contrato + `setup-airtable.mjs`; crear en base viva por MCP.
+- [x] **E.1** ✅ `Voces.activo` (checkbox) — contrato + `setup-airtable.mjs` + **creado en la base viva**
+      por MCP (`fldqekbuBxhzgOSG1`, 2026-07-16). **Gotcha que casi muerde y vale para E.2/cualquier
+      toggle nuevo:** crear un checkbox deja **todos los records existentes destildados**, y como el gate
+      de C.2 filtra server-side por `{activo}`, desplegarlo así habría dejado **cero voces activas ⇒ el
+      motor entregando nada**. Se prendieron las 3 voces vivas a mano por MCP en la misma pasada. Un
+      campo nuevo + un filtro nuevo = **siempre poblar el dato antes**.
 - [ ] **E.2** Tabla/campos de disparo según B.2 (ej. `Corridas`, o campos de N+trigger en `Proyectos`).
 - [ ] **E.3** Aplicar la racionalización de campos de B.3 en el contrato + schema.
 
@@ -342,8 +352,16 @@ contrato ([airtable-cockpit.md](../../core/contracts/airtable-cockpit.md)) refle
 
 El workflow de descubrimiento (ADR-020) no cambia por este refactor: propone referentes por proyecto,
 que ya viven bajo una voz. Solo se **audita** (parte de A) para confirmar que no queda huérfano y que
-respeta la jerarquía. Si `Voces.activo` debiera influir en qué proyectos reciben propuestas, se decide
-en A.
+respeta la jerarquía.
+
+⚠️ **Decisión abierta que dejó C.2 (2026-07-16):** `Voces.activo` ya existe y **el motor lo respeta**,
+pero el **descubrimiento no** — su `Leer Voces` sigue trayendo todas y su `Leer Proyectos` filtra solo
+por `Proyectos.activo`. O sea: una voz apagada **no corre en el motor pero sí recibe propuestas de
+referentes** cada semana. Es barato (el descubrimiento no es lo caro) pero incoherente con "la voz se
+prende/apaga como unidad". **El fix es 1 línea** (copiar el `filterByFormula={activo}` en su `Leer
+Voces` y saltear igual que `Armar plan de corrida`), pero cambia conducta y hay que decidirlo, no
+asumirlo: quizá quieras seguir descubriendo referentes para una voz pausada, justamente para tenerlos
+listos cuando la prendas.
 
 ## 5. Cómo se reparte entre 2 devs
 

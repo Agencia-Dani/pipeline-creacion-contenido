@@ -50,6 +50,17 @@
 > en `Heat-score v1`. **El motor tolera que `Proyectos.N` no exista** (cae al global) → se puede
 > re-importar antes de crear el campo. Misma semántica en cron y on-demand. *(C.1 del refactor.)*
 >
+> ⚠️ **Enmienda 2026-07-16 (C.2) — el motor respeta `Voces.activo`.** `Leer Voces` del **motor** (solo
+> el motor) pasa a filtrar **server-side** con `filterByFormula={activo}`, igual que `Leer Proyectos`.
+> **Por qué server-side y no en el code node:** Airtable **omite los checkbox destildados** del payload,
+> así que ahí `activo` ausente es indistinguible de *el campo no existe* → no hay forma de decidir
+> fail-open sin ambigüedad. `Armar plan de corrida` saltea todo proyecto cuyo `voz_default[0]` no esté
+> entre las voces que llegaron (= voz apagada), y lo **loguea**. Un proyecto **sin** voz no está gateado.
+> El gate corta **antes del scrape**: los referentes de un proyecto salteado no se pagan en Apify.
+> **El archivado y el descubrimiento NO lo respetan** — el archivado necesita todas las voces para
+> resolver nombres al archivar (correcto); el descubrimiento es una **decisión abierta** (hoy propondría
+> referentes para proyectos de una voz apagada; ver plan §Descubrimiento). *(E.1 creó el campo.)*
+>
 > ⚠️ **Enmienda 2026-07-16 (C.5) — podados 2 knobs muertos del `Config` del motor:**
 > `banda_descarte_min` (0.35) y `banda_descarte_max` (0.6). Nadie los leía desde la enmienda
 > 2026-07-13 que reemplazó la banda fija por el top-K (`cap_descartes`). Config: 21 → **19 knobs**.
@@ -211,10 +222,10 @@ Notas de orden que muerden si las ignorás:
 | 4 | Abrir run en el registro | http POST | `POST runs` (`instance_id`, `trigger_type:'cron'`, `estado:'en_curso'`, `params:{workflow:'motor'}`), `Prefer: return=representation` → devuelve `id`. continue-on-fail. El tag `workflow:'motor'` es lo que scopea el barredor (4b). |
 | 4b | Barrer runs zombie | http PATCH | **Auto-sanador del motor (ADR-017), entre `Abrir run` y `Leer Proyectos`.** `PATCH runs` → marca `fallo` los runs de motor anteriores colgados `en_curso` (scoped `params->>workflow=eq.motor` + `id=neq.<run actual>`). Espejo del nodo homónimo del archivado. continue-on-fail. |
 | 5 | Leer Proyectos | http GET | Airtable `Proyectos` con `filterByFormula={activo}`. **Pagina** (`options.pagination` sigue el `offset` → todas las páginas, #4). |
-| 6 | Leer Voces | http GET | Airtable `Voces` (todas — el id→nombre y `criterios_relevancia`). Pagina (#4). |
+| 6 | Leer Voces | http GET | Airtable `Voces` con `filterByFormula={activo}` (**C.2, 2026-07-16** — antes traía todas). Da el id→nombre y `criterios_relevancia`; lo que **no** llega está apagado y sus proyectos se saltean en `Armar plan`. Pagina (#4). |
 | 7 | Leer Referentes | http GET | Airtable `Referentes` con `{activo}`. Pagina (#4). |
 | 8 | Leer Ajustes | http GET | Airtable `Ajustes` (todas). Pagina (#4). continue-on-fail → fail-open: sin tabla, usa los defaults de Config. |
-| 9 | Armar plan de corrida | code | El cerebro de la config. Construye `projects{}` (con `criterios`, `voz_criterios`, **`n`** = `Proyectos.N` con fallback al global `top_n` — ADR-024), las listas de descubrimiento (`ig_urls` de referentes, `tt_profiles`), los mapas `*_owner_to_proj`, los knobs globales (`top_n`, `dias_recencia`, `resultados_referente` con su cap) y `ajustes` (traduce la `clave` española → key interna vía **`AJUSTE_MAP`**). Gatea cada plataforma por su toggle (`buscar_referente_ig`/`buscar_referente_tiktok`). Los consumidores de las lecturas 5–8 agregan todas las páginas (`flatMap` sobre `.records`). **Solo referentes** (ADR-019): no arma hashtags ni mapas de keyword. |
+| 9 | Armar plan de corrida | code | El cerebro de la config. Construye `projects{}` (con `criterios`, `voz_criterios`, **`n`** = `Proyectos.N` con fallback al global `top_n` — ADR-024), **saltea los proyectos con la voz apagada** (C.2; loguea cuál) y **avisa si un proyecto tiene >1 voz linkeada** (usa la primera). Arma las listas de descubrimiento (`ig_urls` de referentes, `tt_profiles`), los mapas `*_owner_to_proj`, los knobs globales (`top_n`, `dias_recencia`, `resultados_referente` con su cap) y `ajustes` (traduce la `clave` española → key interna vía **`AJUSTE_MAP`**). Gatea cada plataforma por su toggle (`buscar_referente_ig`/`buscar_referente_tiktok`). Los consumidores de las lecturas 5–8 agregan todas las páginas (`flatMap` sobre `.records`). **Solo referentes** (ADR-019): no arma hashtags ni mapas de keyword. |
 | 10 | Split IG referentes | code | Emite **1 item por referente IG** → hace que `Apify — IG Reels` corra una vez por cuenta. Por eso el límite de resultados es cap **por-referente**, no global. |
 | 11 | Apify — IG Reels | apify | Actor `apify~instagram-scraper`, `directUrls` = la URL del referente del item (vía Split), `searchType:'user'`, `resultsLimit`, `onlyPostsNewerThan` si hay ventana. |
 | 12 | Apify — TikTok Perfil | apify | Actor `clockworks~free-tiktok-scraper`, `profiles=tt_profiles` (referentes TikTok), `resultsPerPage=resultados_referente`. |

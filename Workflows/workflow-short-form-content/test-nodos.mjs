@@ -1,0 +1,206 @@
+#!/usr/bin/env node
+// test-nodos.mjs — ejercita los code nodes del motor FUERA de n8n, con un `$` mockeado.
+//
+//   node Workflows/workflow-short-form-content/test-nodos.mjs
+//
+// Por qué existe: el motor corre en n8n, así que la única forma de probar la lógica sin re-importar y
+// gastar una corrida real (Apify/Supadata/Haiku cuestan) es sacar el `jsCode` del nodo del JSON y
+// correrlo con `new Function`, inyectándole un `$` falso. Sin esto, un cambio en el corte o en el plan
+// se verifica recién en producción, una semana después.
+//
+// Cubre la semántica que NO se ve leyendo el código de a un nodo: N por proyecto y su fallback
+// (ADR-024), el orden dedup→corte, el gate por `Voces.activo` (C.2), el piso por cuenta (ADR-017), y
+// las regresiones que ya nos mordieron (`normLang` cierre 34, ⚠️ SIN GUION decisión #6, los `_descarte`
+// de ADR-021).
+//
+// Si tocás `Armar plan de corrida` o `Armar candidato`, corré esto ANTES de re-importar.
+// (El chequeo de contrato/manifest es otra cosa y vive en `core/scripts`: `npm run validate`.)
+
+import { readFileSync } from 'node:fs';
+
+const w = JSON.parse(readFileSync(new URL('./workflow.json', import.meta.url), 'utf8'));
+const jsCode = (n) => {
+  const x = w.nodes.find((y) => y.name === n);
+  if (!x || !x.parameters.jsCode) throw new Error('sin code node: ' + n);
+  return x.parameters.jsCode;
+};
+
+let fail = 0;
+const check = (nombre, cond, detalle) => {
+  console.log((cond ? '✅' : '❌') + ' ' + nombre + (cond ? '' : '\n     → ' + detalle));
+  if (!cond) fail++;
+};
+const seccion = (t) => console.log('\n── ' + t);
+
+// ════════════════════════════════════════════════════════════════════════════
+// Armar plan de corrida — C.1 (N por proyecto) + C.2 (gate por Voces.activo)
+// ════════════════════════════════════════════════════════════════════════════
+const CFG_PLAN = { top_n: 100, dias_recencia: 7, resultados_referente: 20, cap_resultados_referente: 50, cap_top_n: 100, buscar_referente_ig: 1, buscar_referente_tiktok: 1 };
+
+// OJO: 'Leer Voces' viene filtrado por {activo} server-side (C.2), así que el mock recibe SOLO las
+// voces activas — igual que en n8n. Una voz apagada = una voz que no está en la lista.
+const runPlan = ({ proyectos = [], vocesActivas = [], referentes = [], ajustes = [], cfg = {} } = {}) => {
+  const wrap = (recs) => [{ json: { records: recs } }];
+  const tablas = { 'Leer Proyectos': proyectos, 'Leer Voces': vocesActivas, 'Leer Referentes': referentes, 'Leer Ajustes': ajustes };
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: Object.assign({}, CFG_PLAN, cfg) }) };
+    if (tablas[n]) return { all: () => wrap(tablas[n]) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const logs = [];
+  const out = new Function('$', 'console', jsCode('Armar plan de corrida'))($, { log: (m) => logs.push(m) });
+  return { plan: out[0].json, logs };
+};
+const P = (id, nombre, vozIds, extra = {}) => ({ id, fields: Object.assign({ nombre, voz_default: vozIds }, extra) });
+const V = (id, nombre) => ({ id, fields: { nombre, criterios_relevancia: 'crit de ' + nombre } });
+
+seccion('C.2 — el gate por Voces.activo');
+{
+  const { plan, logs } = runPlan({
+    proyectos: [P('p1', 'Vive', ['v1']), P('p2', 'Muere', ['v2'])],
+    vocesActivas: [V('v1', 'Voz ON')], // v2 no vino → apagada
+  });
+  check('proyecto con voz ENCENDIDA corre', !!plan.projects.p1, JSON.stringify(Object.keys(plan.projects)));
+  check('proyecto con voz APAGADA no corre (aunque el proyecto esté activo)', !plan.projects.p2, JSON.stringify(Object.keys(plan.projects)));
+  check('lo dice en el log, no lo hace en silencio', logs.some((l) => /salteado \(voz apagada\): Muere/.test(l)), JSON.stringify(logs));
+  check('active_project_ids refleja el gate', JSON.stringify(plan.active_project_ids) === '["p1"]', JSON.stringify(plan.active_project_ids));
+}
+{
+  const { plan } = runPlan({ proyectos: [P('p1', 'Sin voz', [])], vocesActivas: [] });
+  check('proyecto SIN voz corre (no hay voz que lo apague)', !!plan.projects.p1, JSON.stringify(Object.keys(plan.projects)));
+}
+{
+  const { plan } = runPlan({
+    proyectos: [P('p1', 'Vive', ['v1']), P('p2', 'Muere', ['v2'])],
+    vocesActivas: [V('v1', 'ON')],
+    referentes: [
+      { id: 'r1', fields: { handle: '@vive', plataforma: 'instagram', proyecto: ['p1'] } },
+      { id: 'r2', fields: { handle: '@muere', plataforma: 'instagram', proyecto: ['p2'] } },
+    ],
+  });
+  check('no se paga Apify por un proyecto salteado', plan.ig_urls.length === 1 && /vive/.test(plan.ig_urls[0]), JSON.stringify(plan.ig_urls));
+}
+
+seccion('La anomalía de dato: un proyecto con 2 voces linkeadas (existe en la base viva)');
+{
+  const { plan, logs } = runPlan({
+    proyectos: [P('p1', 'Comunicación para lideres', ['v1', 'v2'])],
+    vocesActivas: [V('v1', 'Milena'), V('v2', 'Rosario')],
+  });
+  check('con 2 voces usa la PRIMERA', plan.projects.p1.voz_nombre === 'Milena', plan.projects.p1.voz_nombre);
+  check('y AVISA que ignoró la otra (no se lo traga)', logs.some((l) => /2 voces linkeadas/.test(l)), JSON.stringify(logs));
+}
+{
+  const { plan } = runPlan({ proyectos: [P('p1', 'Ambiguo', ['v1', 'v2'])], vocesActivas: [V('v2', 'Rosario')] });
+  check('2 voces con la PRIMERA apagada → se saltea (gate por [0], consistente con criterios/nombre)', !plan.projects.p1, JSON.stringify(Object.keys(plan.projects)));
+}
+
+seccion('C.1 — N por proyecto (ADR-024)');
+{
+  const { plan } = runPlan({
+    proyectos: [P('p1', 'ConN', ['v1'], { N: 20 }), P('p2', 'SinN', ['v1'])],
+    vocesActivas: [V('v1', 'Voz')],
+  });
+  check('la N del proyecto manda', plan.projects.p1.n === 20, String(plan.projects.p1.n));
+  check('proyecto sin N cae al global', plan.projects.p2.n === 100, String(plan.projects.p2.n));
+}
+{
+  const { plan } = runPlan({ proyectos: [P('p1', 'x', ['v1'], { N: 0 })], vocesActivas: [V('v1', 'V')] });
+  check('N=0 cae al global (no entrega cero)', plan.projects.p1.n === 100, String(plan.projects.p1.n));
+}
+{
+  const { plan } = runPlan({
+    proyectos: [P('p1', 'x', ['v1'])], vocesActivas: [V('v1', 'V')],
+    ajustes: [{ id: 'a1', fields: { clave: 'Candidatos por corrida', valor: 33 } }],
+  });
+  check('el global de Ajustes pisa el default de Config', plan.projects.p1.n === 33, String(plan.projects.p1.n));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Armar candidato — el corte final por proyecto (C.1) + dedup (ADR-018) + piso (ADR-017)
+// ════════════════════════════════════════════════════════════════════════════
+const CFG_CAND = { top_n: 100, piso_referente: 0 };
+const runCorte = (items, plan, cfg = {}) => {
+  const $ = (n) => {
+    if (n === 'Armar plan de corrida') return { first: () => ({ json: plan }) };
+    if (n === 'Config') return { first: () => ({ json: Object.assign({}, CFG_CAND, cfg) }) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const $input = { all: () => items.map((j) => ({ json: j })) };
+  const logs = [];
+  const out = new Function('$', '$input', 'console', jsCode('Armar candidato'))($, $input, { log: (m) => logs.push(m) });
+  return { out: out.map((i) => i.json), logs };
+};
+const vid = (id, pid, heat, extra = {}) => Object.assign(
+  { external_id: id, proyecto_id: pid, heat_score: heat, username: 'ref1', descripcion: 'v' + id, script: 'txt', url: '', plataforma: 'ig' }, extra);
+
+seccion('C.1 — el corte final va por proyecto');
+{
+  const items = [];
+  for (let i = 0; i < 10; i++) items.push(vid('a' + i, 'P1', 1 - i / 100));
+  for (let i = 0; i < 10; i++) items.push(vid('b' + i, 'P2', 1 - i / 100));
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 }, P2: { nombre: 'P2', n: 5 } } });
+  const n1 = out.filter((o) => o.proyecto_id === 'P1').length;
+  const n2 = out.filter((o) => o.proyecto_id === 'P2').length;
+  check('cada proyecto entrega su N (3 y 5)', n1 === 3 && n2 === 5, `P1=${n1} P2=${n2}`);
+}
+{
+  const items = [];
+  for (let i = 0; i < 10; i++) items.push(vid('c' + i, 'P3', 1 - i / 100));
+  const { out } = runCorte(items, { top_n: 4, projects: { P3: { nombre: 'P3' } } }); // sin n
+  check('proyecto sin N usa el global como default (4)', out.length === 4, 'entregó ' + out.length);
+}
+{
+  const items = [];
+  for (let i = 0; i < 3; i++) items.push(vid('z' + i, 'P1', 0.5));
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 999 } } });
+  check('N no inventa candidatos: entrega lo disponible', out.length === 3, 'entregó ' + out.length);
+}
+
+seccion('El orden dedup→corte (lo que motivó invertirlo)');
+// v1 lo reclaman P1 (relevancia .9) y P2 (relevancia .3), N=2 cada uno. Con dedup primero, P1 se lleva
+// v1 y P2 rellena con su siguiente → los DOS entregan 2. Cortando primero, P2 quedaba en 1.
+{
+  const items = [
+    vid('v1', 'P1', 0.99, { relevancia_score: 0.9 }),
+    vid('v1', 'P2', 0.99, { relevancia_score: 0.3 }), // misma pieza, fan-out
+    vid('v2', 'P1', 0.80, { relevancia_score: 0.8 }),
+    vid('v3', 'P1', 0.70, { relevancia_score: 0.8 }),
+    vid('v4', 'P2', 0.60, { relevancia_score: 0.8 }),
+    vid('v5', 'P2', 0.50, { relevancia_score: 0.8 }),
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 }, P2: { nombre: 'P2', n: 2 } } });
+  const v1s = out.filter((o) => o.external_id === 'v1');
+  check('el video disputado va UNA sola vez (ADR-018)', v1s.length === 1, v1s.length + ' copias');
+  check('gana el proyecto que lo juzgó más relevante (P1)', v1s[0] && v1s[0].proyecto_id === 'P1', v1s[0] && v1s[0].proyecto_id);
+  check('el proyecto que lo perdió NO queda corto: rellena a su N',
+    out.filter((o) => o.proyecto_id === 'P1').length === 2 && out.filter((o) => o.proyecto_id === 'P2').length === 2,
+    `P1=${out.filter((o) => o.proyecto_id === 'P1').length} P2=${out.filter((o) => o.proyecto_id === 'P2').length}`);
+}
+
+seccion('Invariantes que no se tocan');
+{
+  const items = [];
+  for (let i = 0; i < 5; i++) items.push(vid('h' + i, 'P1', 0.9 - i / 100, { username: 'hog' })); // una cuenta acapara
+  for (let i = 0; i < 5; i++) items.push(vid('o' + i, 'P1', 0.5 - i / 100, { username: 'otra' }));
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 4 } } }, { piso_referente: 2 });
+  const otra = out.filter((o) => o.referente === 'otra').length;
+  check('PISO reparte dentro del proyecto (ADR-017)', out.length === 4 && otra >= 2, `otra=${otra} total=${out.length}`);
+}
+{
+  const items = [vid('d1', 'P1', 0.99, { _descarte: true }), vid('e1', 'P1', 0.50), vid('e2', 'P1', 0.40)];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 } } });
+  check('los _descarte no entran ni consumen N (ADR-021)', out.length === 2 && !out.some((o) => o.external_id === 'd1'), JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  const items = [vid('l1', 'P1', 0.5, { idioma: 'ingles' }), vid('l2', 'P1', 0.4, { idioma: 'ru' })];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
+  check('normLang canoniza el idioma (ingles→en, ru→otro) — cierre 34', out[0].idioma === 'en' && out[1].idioma === 'otro', out.map((o) => o.idioma).join(','));
+}
+{
+  const { out } = runCorte([vid('s1', 'P1', 0.5, { script: '' })], { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
+  check('sin transcript pasa igual, con marca visible (fail-open, decisión #6)', out.length === 1 && out[0].titulo.startsWith('⚠️ SIN GUION'), out[0] && out[0].titulo);
+}
+
+console.log(fail ? `\n${fail} test(s) en rojo` : '\nTodo en verde');
+process.exit(fail ? 1 : 0);
