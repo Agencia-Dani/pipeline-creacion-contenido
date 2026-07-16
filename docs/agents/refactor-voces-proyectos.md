@@ -176,10 +176,12 @@ cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, f
 
 - [ ] **A.1** Verificar los 3 `workflow.json` contra dev-doc/guía: cada nodo existe, hace lo dicho, y
       está cableado (0 refs rotas, 0 huérfanos — reusar el chequeo de grafo de cierres 34/36).
-- [ ] **A.2** Mapa **campo × tabla × quién-escribe/lee**: para cada campo de las 9 tablas, quién lo
+- [ ] 🔧 **A.2** Mapa **campo × tabla × quién-escribe/lee**: para cada campo de las 9 tablas, quién lo
       llena (motor/archivado/descubrimiento/equipo) y quién lo lee. **Responde las 4 preguntas de Mani:
       ¿cada campo cómo se maneja? ¿cómo influye en el workflow? ¿es necesario? ¿está estandarizado?**
       Marcar campos sin lector o sin escritor (candidatos a huérfano). Confirmar la base viva por MCP.
+      → **El entregable vive en [mapa-campos.md](./mapa-campos.md)** (en curso: hallazgos y
+      reconciliación repo↔live cerrados 2026-07-16; falta el barrido campo por campo, ver su §4).
 - [ ] **A.3** Mapa **página/vista × tabla × propósito**: cada página del interface *Cockpit Redes*, qué
       tabla lee, qué filtro, edit/solo-lectura, para qué la usa el equipo. Flagear páginas sin uso claro.
 - [ ] **A.4** Reconciliar **repo ↔ live**: qué está en el repo pero **no re-importado en n8n** (M2,
@@ -208,6 +210,11 @@ correr) y la **racionalización de campos** que salga de la auditoría.
       toggles son la selección. (Descartado: tabla `Corridas` + cron-poll — quema cuota y deja estado colgado.)
 - [ ] **B.3** **Racionalización de campos** (sale de A.2): quitar/estandarizar los campos que la
       auditoría marque innecesarios o inconsistentes; dejar la superficie coherente para el equipo.
+      **Ya en la lista** ([mapa-campos.md §2.1](./mapa-campos.md)): las 4 columnas de calidad que
+      `Métricas Global` arrastra del split (`score_aprobados`/`score_descartados`/`separacion_gate`/
+      `diagnostico`, muertas en filas GLOBAL) · los links inversos auto-creados que el equipo ve
+      (`Proyectos.Referentes`/`.Candidatos`/…, `Voces.Proyectos`/`.Candidatos`) · la descripción de la
+      tabla `Voces` en vivo, todavía pre-ADR-009 ("Eje de generación (cómo suena)").
 - [ ] **B.4** `Mínimo likes/vistas` **team-facing**: marcar `Mostrar al equipo ✓` en esas 2 filas de
       `Ajustes` (probablemente el cambio completo — confirmar en la auditoría).
 - [ ] **B.5** Toggle de **Voz** visible/editable para el equipo (pareja del campo de datos en E).
@@ -229,7 +236,12 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       semántica en cron y on-demand. El **corte final pasa a ser por proyecto** (cada uno a su N por heat
       compuesto, después del gate). `cap_top_n` sigue siendo el gobernador duro (no se toca — protege el backfill).
 - [ ] **C.2** **Respetar `Voces.activo`**: un proyecto cuya voz está apagada no corre (aunque el proyecto
-      esté `activo`). Toca `Leer Proyectos` / `Armar plan`.
+      esté `activo`). Toca `Leer Proyectos` / `Armar plan`. *(A.2 confirmó por MCP que `Voces.activo`
+      **no existe** en la base viva — el campo lo crea E.1.)*
+- [ ] **C.5** **Podar 2 knobs muertos del `Config` del motor** ([mapa-campos.md §2.1](./mapa-campos.md)):
+      `banda_descarte_min` (0.35) y `banda_descarte_max` (0.6) — **nadie los lee** desde que la enmienda
+      2026-07-13 reemplazó la banda fija por el top-K (`cap_descartes`). Cero cambio de conducta; se hace
+      acá porque toca `workflow.json` y se arrastra con el re-import.
 - [ ] **C.3** **Webhook trigger** (según [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)): nuevo
       trigger de Producción con guard **single-flight**, en paralelo al cron. El motor **sigue leyendo "los
       activos"** (no gana un modo "solo este proyecto"); lo único nuevo es respetar `Voces.activo` (C.2) y la
@@ -250,6 +262,16 @@ rompe el cómputo semanal ni la salud por referente.
 - [ ] **D.1** Auditar (parte de A) cómo el archivado agrega Métricas/costos y si asume el barrido total.
 - [ ] **D.2** Ajustar si corridas por-proyecto cambian la forma de los `runs` que lee. Probablemente
       poco (el archivado agrega por semana, no por corrida), pero **confirmar, no asumir**.
+- [ ] ⭐ **D.3 (a revisar — lo abre A.2):** **`notas_equipo` no entra al loop de aprendizaje y se destruye.**
+      El equipo escribe su razonamiento en `Candidatos.notas_equipo`; **ningún workflow lo lee** (no va a
+      `outputs.metadata` ni al Sheet) y el archivado borra el record cada domingo. Y `Destilar criterios`
+      (ADR-022 — el nodo que existe para *aprender de las decisiones del equipo*) solo le manda
+      `titulo`+`script` a Haiku. **Puede ser la señal más valiosa que produce el equipo** (el *por qué*
+      de un 👎, que ni el script ni el score capturan) y hoy se tira a la basura. Revisar las 3 salidas
+      de [mapa-campos.md §2.2](./mapa-campos.md): (a) sumarlo al `_snip` de `Destilar criterios`;
+      (b) archivarlo a `outputs.metadata` para dejar de perderlo aunque no se use aún; (c) declararlo
+      scratch-pad efímero. **(a) cambia qué consume el loop → va con enmienda de ADR-022.** (b) es barato
+      y reversible, y de paso construye el corpus para decidir (a) con datos.
 
 **Hecho cuando:** tras un ciclo con corridas por-proyecto, `Métricas`/`Costos` y la salud por referente
 se computan igual de bien que con el barrido semanal.

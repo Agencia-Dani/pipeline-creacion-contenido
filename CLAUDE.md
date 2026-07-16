@@ -18,7 +18,8 @@ en §Agent skills; acá solo se ubican.
 **Estado y dominio (para trabajar)**
 - [docs/agents/handoff.md](docs/agents/handoff.md) — estado vivo del repo (leelo al empezar la sesión).
 - [docs/agents/context.md](docs/agents/context.md) — glosario de dominio (lenguaje ubicuo).
-- [docs/agents/dev-doc.md](docs/agents/dev-doc.md) — los 2 workflows nodo por nodo + mapa de datos.
+- [docs/agents/dev-doc.md](docs/agents/dev-doc.md) — los 3 workflows nodo por nodo + mapa de datos (por tabla).
+- [docs/agents/mapa-campos.md](docs/agents/mapa-campos.md) — mapa **por campo** de las 9 tablas + huérfanos + reconciliación repo↔live (A.2 del refactor, en curso).
 
 **Decisiones**
 - [docs/adr/](docs/adr/) — ADRs 001–012, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).

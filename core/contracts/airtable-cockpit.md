@@ -124,7 +124,7 @@ como los del motor): `Descubrir en Instagram` 1 · `Descubrir en TikTok` 1 (1=on
 on; off = ese eje no genera semillas y su rama no corre). El eje TikTok igual necesita referentes TT
 sembrados para producir algo.
 
-**Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` 30
+**Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` **50**
 (techo de `Resultados por cuenta de referente`; el motor usa `min(valor_equipo, cap)`) · `cap_top_n`
 100 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real)
 · `cap_descartes` 10 (tope de rechazos top-K por score que se

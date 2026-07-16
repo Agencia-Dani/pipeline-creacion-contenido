@@ -55,6 +55,20 @@
 > 17b–17f). Cockpit 6 → 9 tablas; páginas *Métricas — Calidad*, *Métricas — Salud*, *Costos* y
 > *Descartes (auditar)*.
 >
+> ⚠️ **Fase M2 2026-07-14 (ADR-022) — loop de aprendizaje de criterios: archivado 30 → 37 nodos.**
+> Dos ramas laterales nuevas colgadas de `Cerrar run` (§4.2): **`Destilar criterios` → `PATCH Proyectos
+> criterios`** escribe `Proyectos.criterios_aprendidos` con lo aprendido de la curación, y el motor lo
+> lee (`Armar plan de corrida` + `Gate de relevancia`) → el loop cierra; **`Leer señal selección
+> (archivado)` → `Leer Referentes (archivado)` → `Computar salud referentes` → `PATCH Referentes salud`**
+> escribe la salud por referente. Suma **`Leer runs descubrimiento`** (costos, cierre 37) entre `Leer runs
+> de la semana` y `Leer Descartes del gate`. El **motor no gana nodos** (sigue en 33): ADR-022 le cambia
+> qué lee, no su topología.
+>
+> ⚠️ **Verificado contra el JSON vivo 2026-07-16 (A.1 del refactor).** Los tres grafos: 0 conexiones
+> rotas · 0 refs `$('…')` colgadas · 0 nodos inalcanzables · 0 huérfanos · 0 deshabilitados. Conteos
+> reales: **motor 33 · descubrimiento 27 · archivado 37**. Motor y descubrimiento calzan nodo por nodo
+> con §2.2/§3.2; §4 se actualizó en esta pasada (documentaba 30, y §1/§4.2 se contradecían).
+>
 > Pies de página: el motor en
 > [`workflows/workflow-short-form-content/`](../../workflows/workflow-short-form-content/), el
 > descubrimiento en
@@ -71,7 +85,7 @@
 |---|---|---|---|---|
 | **Motor** (`short-form-content`) | Cron + Execute manual | **Semanal**, lunes 8am | 33 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** + los descartes borderline (**Descartes del gate**, ADR-021) en Airtable + registra la corrida en Supabase. §2. |
 | **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 27 | Promueve a `Referentes` los propuestos que el equipo marcó `aprobado` → busca cuentas nuevas parecidas a las que funcionan (IG: sugeridos, 2 pasadas Apify; TikTok: lookalike, rama paralela — ADR-020 §8) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **Referentes propuestos**. §3. |
-| **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 24 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`, con relevancia — ADR-021) + append al **Sheet Histórico** → los borra de Airtable → **computa las filas semanales de `Métricas Proyectos` + `Métricas Global`** (calidad / salud+costos, routea por `_tabla`) y limpia `Descartes del gate`. §4. |
+| **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 37 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`, con relevancia — ADR-021) + append al **Sheet Histórico** → los borra de Airtable → **computa las filas semanales de `Métricas Proyectos` + `Métricas Global`** (calidad / salud+costos, routea por `_tabla`), limpia `Descartes del gate`, y **destila criterios aprendidos + salud por referente** (ADR-022). §4. |
 
 Los tres comparten el patrón `Config → Abrir run → Barrer runs zombie → … → Cerrar run`: la corrida
 se registra en la tabla `runs` de Supabase (abre `en_curso` con `params.workflow` propio, cierra `ok`
@@ -331,7 +345,7 @@ perfiles), TT 1 Apify (≤15 lookalikes, $0.20 c/u; $0 sin semillas TT), 1 Haiku
 
 ---
 
-## 4. Archivado (`archivado`) — 30 nodos
+## 4. Archivado (`archivado`) — 37 nodos
 
 > **Validado para producción (cierre 19).** Corrió end-to-end con calificados reales (run `687027e2`):
 > idempotencia, paginación, split de estados, barrido de zombies, cierre robusto y curación completa. El
@@ -365,15 +379,20 @@ Ejecutar manual ┘                                                             
                                                ▼                                                │
                                      Leer runs de la semana ◄────────────────────────────────────┘
                                                ▼
+                                     Leer runs descubrimiento   (costos, cierre 37)
+                                               ▼
                                     Leer Descartes del gate ─► Computar métricas semana ─► POST Métricas (Airtable)
                                                                                               │              │
                                                                                               ▼              ▼
                                                                                        Cerrar run   Preparar borrado Descartes
                                                                                           │                   ▼
                                                                                           │        Borrar Descartes del gate
-                                    (higiene 2026-07-14, colgada de Cerrar run) ──────────┤
-                                    ├─► Leer nuevos viejos ─► Preparar barrido nuevos ─► Barrer Candidatos nuevos viejos
-                                    └─► Leer Métricas viejas ─► Preparar barrido Metricas ─► Barrer Metricas viejas
+                                    (4 ramas laterales colgadas de Cerrar run) ───────────┤
+      (higiene 2026-07-14)          ├─► Leer Candidatos nuevos viejos ─► Preparar barrido nuevos ─► Barrer Candidatos nuevos viejos
+      (higiene 2026-07-14)          ├─► Leer Metricas viejas ─► Preparar barrido Metricas ─► Barrer Metricas viejas
+      (ADR-022, M2)                 ├─► Destilar criterios ─► PATCH Proyectos criterios
+      (ADR-022, M2)                 └─► Leer señal selección (archivado) ─► Leer Referentes (archivado)
+                                            ─► Computar salud referentes ─► PATCH Referentes salud
 ```
 
 **El SPLIT de sumideros (cierre 19):** `Registrar outputs` escribe a Supabase **todos** los decididos (con
@@ -390,12 +409,23 @@ en try/catch y SIEMPRE emite ≥1 batch con la fila GLOBAL) → la cadena llega 
 Supabase o Airtable estén caídos. El borrado de descartes es una **rama lateral** después de
 `POST Métricas` (si no hay nada que borrar, muere sin bloquear el cierre).
 
-**Higiene (enmienda 2026-07-14):** dos ramas laterales cuelgan de `Cerrar run` (`onError:continue`,
-el run ya cerró — no lo bloquean). **Barrer Candidatos nuevos viejos**: purga `nuevo` con `fecha` >20
+**Las 4 ramas laterales de `Cerrar run`** (todas `onError:continue` — el run ya cerró, no lo bloquean):
+
+*Higiene (enmienda 2026-07-14):* **Barrer Candidatos nuevos viejos** purga `nuevo` con `fecha` >20
 días (`filterByFormula` `AND({estado}='nuevo',IS_BEFORE({fecha},DATEADD(NOW(),-20,'days')))`) sin
-archivar. **Barrer Metricas viejas**: purga `Métricas` con `semana` >84 días. Ambas leen paginado y
+archivar. **Barrer Metricas viejas** purga con `semana` >84 días. Ambas leen paginado y
 borran en lotes de 10 vía un code node de `Preparar barrido`, mismo patrón que descartes. La columna
 `diagnostico` la escribe `Computar métricas semana` (regla, sin IA).
+> ℹ️ **El barrido de métricas cubre solo `Métricas Proyectos`, a propósito** (hardcodeado en `Leer
+> Metricas viejas` **y** en la URL que arma `Preparar barrido Metricas`). `Métricas Global` **no se
+> barre**: crece ~2 filas/semana (GLOBAL + DESCUBRIMIENTO) y conviene guardar más trend de costos/salud
+> — decisión del contrato ([airtable-cockpit.md](../../core/contracts/airtable-cockpit.md) §Reglas para
+> no salir del plan free). **No lo "arregles"**: la asimetría es intencional. Verificado en A.1 (2026-07-16).
+
+*Loop de aprendizaje (ADR-022, M2):* **Destilar criterios → PATCH Proyectos criterios** escribe
+`Proyectos.criterios_aprendidos` (lo que el motor lee en `Armar plan` + `Gate` → el loop cierra).
+**Leer señal selección (archivado) → Leer Referentes (archivado) → Computar salud referentes → PATCH
+Referentes salud** escribe la salud por referente.
 
 ### 4.2 Nodo por nodo
 
@@ -418,31 +448,42 @@ borran en lotes de 10 vía un code node de `Preparar barrido`, mismo patrón que
 | 15 | Reconvergir tras Sheet | merge | Une la rama Sheet (input 0) con la rama directa de Registrar outputs (input 1) → el borrado corre aun con 0 aprobados, pero espera al Append. |
 | 16 | Preparar borrado Airtable | code | Arma URLs `DELETE` en **batches de 10** (`records[]=…`) con TODOS los decididos. |
 | 17 | Borrar de Airtable | http DELETE | Borra los decididos de `Candidatos`. **retry 3× / 2s.** Sale a `Leer runs de la semana` (la cadena de métricas, ADR-021). |
-| 17b | Leer runs de la semana | http GET | Supabase `runs` del motor de los últimos 7 días (`params->>workflow=eq.motor` + `inicio=gte.<now-7d>`, timestamp URL-encodeado), `select=id,estado,inicio,fin,metricas`. **Fail-soft** (`alwaysOutputData` + continue). |
+| 17b | Leer runs de la semana | http GET | Supabase `runs` del motor de los últimos 7 días (`params->>workflow=eq.motor` + `inicio=gte.<now-7d>`, timestamp URL-encodeado), `select=id,estado,inicio,fin,metricas`. **Fail-soft** (`alwaysOutputData` + continue). Lo leen 17d (métricas) y 22 (salud por referente). |
+| 17b′ | Leer runs descubrimiento | http GET | **Costos (cierre 37).** Supabase `runs` del **descubrimiento** de los últimos 7 días (`params->>workflow=eq.descubrimiento`) → alimenta la fila DESCUBRIMIENTO de `Métricas Global` (contadores Apify por actor). Entre `Leer runs de la semana` y `Leer Descartes del gate`. **Fail-soft.** |
 | 17c | Leer Descartes del gate | http GET | Airtable `Descartes del gate` (todos; pagina). **Fail-soft.** |
 | 17d | Computar métricas semana | code | **El cómputo de ADR-021.** Calidad por proyecto (de los calificados de este cierre): `precision` = aprobados/calificados, `score_aprobados/descartados`, `separacion_gate`. Salud global (de los runs del motor): embudo sumado, `sin_guion`, `descartes_expuestos`, `runs_ok/fallo`, `duracion_min`, llamadas por servicio; + `falsos_negativos` = descartes con `veredicto='era bueno'`. Emite batches de `records[]` para `Métricas` (fila por proyecto + fila GLOBAL); el 1er batch lleva `_resumen` para Cerrar run. **Defensivo:** try/catch por lectura, SIEMPRE ≥1 batch. La "semana" = semana de calificación (este cierre). |
 | 17e | POST Métricas (Airtable) | http POST | POST a la tabla del batch (`$json._tabla`: `Métricas Proyectos` o `Métricas Global` — split 2026-07-15) con `typecast`. **continue-on-fail** (las métricas no bloquean el cierre). Sale a 2 ramas: Cerrar run + Preparar borrado Descartes. |
 | 17f | Preparar borrado Descartes → Borrar Descartes del gate | code + http DELETE | Limpia `Descartes del gate` (batches de 10) — auditados o no, no se acumulan; el conteo de falsos negativos ya quedó en Métricas. Rama lateral, **continue-on-fail**, sin nada aguas abajo. |
-| 18 | Cerrar run en el registro | http PATCH | `PATCH runs` con `fin`, `estado:'ok'`, `metricas:{archivados, falsos_negativos, filas_metricas}` (los últimos 2 del `_resumen` de 17d). **El conteo `archivados` se hace sobre `Leer Candidatos calificados`** (corre en ambas ramas del IF) → robusto en el caso 0 calificados. continue-on-fail. |
+| 18 | Cerrar run en el registro | http PATCH | `PATCH runs` con `fin`, `estado:'ok'`, `metricas:{archivados, falsos_negativos, filas_metricas}` (los últimos 2 del `_resumen` de 17d). **El conteo `archivados` se hace sobre `Leer Candidatos calificados`** (corre en ambas ramas del IF) → robusto en el caso 0 calificados. continue-on-fail. **De acá cuelgan las 4 ramas laterales** (19–20 higiene, 21–24 ADR-022). |
+| 19 | Leer Candidatos nuevos viejos → Preparar barrido nuevos → Barrer Candidatos nuevos viejos | http GET + code + http DELETE | *Higiene (2026-07-14).* Purga `Candidatos` en `nuevo` con `fecha` >20 días, sin archivar (nunca se calificaron). Lee paginado, borra en lotes de 10. Rama lateral, continue-on-fail. |
+| 20 | Leer Metricas viejas → Preparar barrido Metricas → Barrer Metricas viejas | http GET + code + http DELETE | *Higiene (2026-07-14).* Purga filas con `semana` >84 días, en lotes de 10. Apunta **solo a `Métricas Proyectos`** (hardcodeado en los 2 nodos): `Métricas Global` no se barre **a propósito** (ver §4.1). Rama lateral, continue-on-fail. |
+| 21 | Destilar criterios | code + Haiku | **El loop de aprendizaje (ADR-022/M2).** Por proyecto, Haiku resume los calificados de la semana en patrones (lo que SÍ / lo que NO), priorizando los 🔥 como ejemplos positivos (fallback: aprobados). La **misma llamada** lintea los criterios manuales y deja `advertencia_criterios`. No destila con menos de `min_muestra_destilar` (4) calificados. **NUNCA pisa `criterios_relevancia` manual** — escribe al campo aparte `criterios_aprendidos`. Fail-soft: si Haiku falla, ese proyecto se salta. `<ANTHROPIC_API_KEY>`. |
+| 22 | PATCH Proyectos criterios | http PATCH | `PATCH Proyectos` con `criterios_aprendidos` + `advertencia_criterios`. **Cierra el loop:** el motor lo lee en `Armar plan de corrida` + `Gate de relevancia`. continue-on-fail. |
+| 23 | Leer señal selección (archivado) → Leer Referentes (archivado) | http GET ×2 | Supabase `v_senal_seleccion` (tasa acumulada por referente) + Airtable `Referentes` (pagina) → insumos de la salud por referente. Fail-soft. |
+| 24 | Computar salud referentes → PATCH Referentes salud | code + http PATCH | **La mitad-archivado de la higiene de fuentes (ADR-022).** Por referente: `tasa_gate` (`gate_pass/evaluados` del desglose `por_referente` de `runs.metricas` de la semana — 17b), `tasa_aprobacion` (acumulada de `v_senal_seleccion`) y `videos_evaluados`. Exige `min_muestra_referente` (10) para no juzgar con pocos videos. Matchea por **handle normalizado** (sin `@`, minúscula). Escribe la salud a `Referentes`. continue-on-fail. |
 
 ---
 
 ## 5. Conexión con Airtable (mapa lee/escribe)
 
-Base "Reels Cockpit", 8 tablas (contrato completo en
+Base "Reels Cockpit", 9 tablas (contrato completo en
 [`airtable-cockpit.md`](../../core/contracts/airtable-cockpit.md)). La API es REST: el motor pega a
 `https://api.airtable.com/v0/<base_id>/<Tabla>`. Quién toca qué:
 
+> El mapa **por campo** (quién escribe/lee cada campo + huérfanos) vive en
+> [mapa-campos.md](./mapa-campos.md) — acá la tabla y el nodo, allá el campo.
+
 | Tabla | Motor | Descubrimiento | Archivado | Notas |
 |---|---|---|---|---|
-| `Proyectos` | **lee** (`{activo}`) | **lee** (`{activo}`, criterios) | **lee** (`id→nombre`) | El motor lee config (criterios, voz_default); el descubrimiento los criterios para el vetting; el archivado solo resuelve el nombre. |
+| `Proyectos` | **lee** (`{activo}`, incl. `criterios_aprendidos`) | **lee** (`{activo}`, criterios) | **lee** (`id→nombre`) + **PATCH** (`criterios_aprendidos`, `advertencia_criterios` — ADR-022) | El motor lee config (criterios manuales ⊕ aprendidos, voz_default); el descubrimiento los criterios para el vetting; el archivado resuelve el nombre **y destila los criterios aprendidos**. |
 | `Voces` | **lee** | **lee** (criterios) | **lee** (`id→nombre`) | `criterios_relevancia` afina gate y vetting (Proyecto⊕Voz, ADR-010). |
-| `Referentes` | **lee** (`{activo}`) | **lee** (TODOS, para dedup) + **escribe** (promoción de aprobados) | — | `handle` + `plataforma` → IG por cuenta / TikTok por perfil. **La única fuente del motor** (ADR-019); el descubrimiento la alimenta (ADR-020). |
+| `Referentes` | **lee** (`{activo}`) | **lee** (TODOS, para dedup) + **escribe** (promoción de aprobados) | **lee** + **PATCH** (salud por referente — ADR-022) | `handle` + `plataforma` → IG por cuenta / TikTok por perfil. **La única fuente del motor** (ADR-019); el descubrimiento la alimenta (ADR-020); el archivado le escribe `tasa_gate`/`tasa_aprobacion`/`videos_evaluados`. |
 | `Ajustes` | **lee** | **lee** (2 knobs propios) | — | Knobs clave→valor; pisa los defaults de Config (fail-open). |
 | `Candidatos` | **escribe** (`POST`, `typecast`, batch 10) | — | **lee** (calificados) + **borra** (`DELETE`, batch 10) | El único write del motor a Airtable. El equipo califica acá; el archivado lo vacía. |
 | `Referentes propuestos` | — | **lee** (dedup+promoción) + **escribe** (`estado:'propuesto'`) + **PATCH** (`promovido`) | — | La bandeja del descubrimiento (ADR-020). El equipo marca `aprobado`/`descartado`; el motor NO la lee. |
 | `Descartes del gate` | **escribe** (banda borderline, cap ~10/corrida) | — | **lee** (cuenta `veredicto='era bueno'`) + **borra** (limpieza semanal) | Auditoría de falsos negativos (ADR-021). El equipo marca `veredicto`. |
-| `Métricas` | — | — | **escribe** (fila por semana×proyecto + GLOBAL) | Proyección solo-lectura del desempeño (ADR-021); regenerable desde Supabase. |
+| `Métricas Proyectos` | — | — | **escribe** (fila por semana×proyecto) + **borra** (retención 84d) | Calidad por proyecto (`precision`, scores, `separacion_gate`). Split del 2026-07-15; el routing es `_tabla` en 17d/17e. Proyección solo-lectura, regenerable desde Supabase. |
+| `Métricas Global` | — | — | **escribe** (fila GLOBAL + fila DESCUBRIMIENTO por semana) | Salud + costos (embudo, `sin_guion`, runs ok/fallo, llamadas y $ por servicio, contadores Apify). **Sin barrido a propósito** (~2 filas/semana; se guarda el trend largo — ver contrato). |
 
 **Campos de `Candidatos` que escribe el motor** (nodo `Preparar batch Airtable`): `titulo`, `script`,
 `idioma`, `referente`, `url_referente`, `views`, `likes`, `seguidores`, `engagement`, `heat_score`,
