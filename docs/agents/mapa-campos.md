@@ -39,7 +39,7 @@ Tres fuentes, cruzadas:
 | `banda_descarte_min` · `banda_descarte_max` (0.35 / 0.6) | nodo `Config` del **motor** | 🔴 **Muertos.** Los dejó la enmienda 2026-07-13 que reemplazó la banda fija por el **top-K** (`cap_descartes`). Ningún nodo los lee. **Podar en C** (tocan `workflow.json`). |
 | `Candidatos.notas_equipo` | tabla `Candidatos` | 🟠 **Write-only del equipo, y se destruye.** Ningún workflow lo lee: no va al `metadata` de `outputs`, no va al Sheet, y el archivado borra el record cada domingo. Ver §2.2. |
 | `Métricas Global`: `score_aprobados`, `score_descartados`, `separacion_gate`, `diagnostico` | **solo en la base viva** | 🟠 **Residuo del split del 2026-07-15.** Son campos de *calidad* (pertenecen a `Métricas Proyectos`). La tabla live es la vieja `Métricas` **renombrada**, así que arrastra sus columnas; `Métricas Proyectos` se creó nueva. `setup-airtable.mjs` **no** las declara y `Computar métricas semana` **no** las escribe en filas GLOBAL → columnas muertas en la cara del equipo. **Podar en B.3.** |
-| `f.tema` · `f.link_doc` | nodo `Armar filas archivado` del **archivado** | 🔴 **Lecturas fantasma.** El nodo lee `f.tema` y `f.link_doc` de cada Candidato para llenar `outputs.metadata` — **esos campos no existen** en `Candidatos` (ni declarados ni en la base viva). Resuelven a `''` siempre ⇒ `metadata.tema` y `metadata.link_doc` son cadenas vacías en **todos** los outputs archivados. Residuo pre-ADR-009 (cuando el pipeline generaba docs). Cero conducta rota; es ruido en el registro. **Podar en D** (toca `workflow.json`, se arrastra con el re-import). |
+| `f.tema` · `f.link_doc` | nodo `Armar filas archivado` del **archivado** | 🟡 **Vestigiales — ya documentados, no son un hallazgo.** El nodo los lee para llenar `outputs.metadata` y **no existen** en `Candidatos`, así que archiva `''` siempre. Pero **es deliberado y está escrito**: [dev-doc §8](./dev-doc.md) los llama *`tema` (`''` fail-safe)* y *`link_doc` (vestigial, siempre `''`)*, y [`004_historico_script_texto.sql`](../../core/schema/004_historico_script_texto.sql) dice que `link_doc` quedó vestigial al pasar el histórico a texto. `tema` murió con el eje keyword (ADR-019), `link_doc` con ADR-009. Poda **opcional** (**D.4**): cero cambio de conducta, solo saca ruido del registro. *(Anotado primero como 🔴 hallazgo nuevo en el cierre 43 — error mío: estaba documentado. Corregido en el 44.)* |
 | `Candidatos.viral_por_tamano` | tabla `Candidatos` | 🟠 **Marca write-only que no sobrevive.** La escribe el motor, la ve el equipo, pero **no va a `outputs.metadata` ni al Sheet** → cuando el archivado borra el record, se pierde. Nunca vas a poder preguntar "¿lo viral se aprueba más?". Mismo patrón y mismo fix barato que `notas_equipo` (b) → **D.3**. |
 | Links inversos auto-creados: `Proyectos.Referentes`, `Proyectos.Candidatos`, `Proyectos.Referentes propuestos`, `Proyectos.Descartes del gate`, `Voces.Proyectos`, `Voces.Candidatos` | base viva | 🟡 Artefacto de Airtable (todo link crea su inverso). Nadie los declaró ni los lee, pero **el equipo los ve**. Decidir en **B.3** si se ocultan de las páginas. |
 
@@ -232,7 +232,7 @@ también (*Salud* + *Costos*). **No hay páginas huérfanas** — el problema no
 | **Referentes** | `Referentes` | `handle`, `plataforma`, `proyecto`, `activo`, `notas` | alta y toggle de fuentes | ✅ |
 | **Referentes - Revisar/Flojos** | `Referentes` | todo, incl. `tasa_gate`/`tasa_aprobacion`/`videos_evaluados` ⚠️ | la vista "A revisar" de ADR-022: podar fuentes flojas | 🟠 salud editable (§5.1-4) |
 | **Referentes - Sugeridos** | `Referentes propuestos` | `handle`, `proyecto`, `estado` | aprobar/descartar propuestas del descubrimiento | ✅ diseño correcto (solo `estado` importa). 🟠 falta el filtro `estado=propuesto` (arrastre) |
-| **Descartes** | `Descartes del gate` | `titulo`, `thumbnail`, `proyecto`, `referente` — **`veredicto` NO** | auditar falsos negativos (ADR-021) | 🔴 **la página no puede hacer lo único que existe para hacer** (§5.1-1) |
+| **Descartes** | `Descartes del gate` | `titulo`, `thumbnail`, `proyecto`, `referente` — **`veredicto` NO** | auditar falsos negativos (ADR-021) | 🟠 `veredicto` se marca editable recién con records en la página → después del lunes (§5.1-1) |
 | **Configuración Global** | `Ajustes` | solo `valor` | los knobs del equipo (filtro `Mostrar al equipo ✓`) | ✅ **el mejor ejemplo del cockpit**: muestra `clave`+`descripcion` read-only y deja editar solo el valor |
 | **Ajustes Dev-Only** | `Ajustes` | **nada** (`valor` read-only) | los knobs avanzados | 🟡 un dev no puede editar desde su propia página (§5.1-5) |
 | **Calidad por Proyecto** | `Métricas Proyectos` | todo ⚠️ (tabla solo-lectura) | precisión + diagnóstico por proyecto | 🟠 editable + no muestra `separacion_gate` (§5.1-3) |
@@ -242,14 +242,18 @@ también (*Salud* + *Costos*). **No hay páginas huérfanas** — el problema no
 
 ### 5.1 Hallazgos de páginas
 
-**1. 🔴 `veredicto` es read-only ⇒ el loop de auditoría de ADR-021 está muerto, no incompleto.**
-Ya estaba anotado como un fix de UI de B.6 ("`veredicto` editable en *Descartes*"), pero el mapa muestra
-que **no es cosmético**. `veredicto` es el **único** campo de esa tabla que lee una máquina
-([§4.5](#45-descartes-del-gate)): el archivado cuenta los `era bueno` → `falsos_negativos`. Si el equipo
-no lo puede marcar, ese contador es **siempre 0** — y "0 falsos negativos" se lee como *el gate está
-perfecto*, que es la conclusión opuesta a la verdad. Y la página **sí** deja editar `titulo`,
-`thumbnail`, `proyecto` y `referente`, que no le importan a nadie: está exactamente al revés.
-**Sube de prioridad dentro de B.6.**
+**1. 🟠 `veredicto` read-only ⇒ `falsos_negativos` = 0 hasta que se marque editable.**
+La API lo reporta `isEditable: false`, pero **no es una decisión de diseño: la tabla está vacía**
+(el archivado la barre cada domingo y el motor con código nuevo todavía no corrió) y Airtable no deja
+configurar el permiso del campo sin records en la página — *Mani, 2026-07-16*. O sea que el fix es el
+que ya estaba en B.6 (marcarlo editable), y la ventana para hacerlo abre **después de la corrida del
+lunes**, cuando la página tenga descartes.
+Lo que **sí** conviene tener presente: `veredicto` es el **único** campo de esa tabla que lee una
+máquina ([§4.5](#45-descartes-del-gate)) — el archivado cuenta los `era bueno` → `falsos_negativos`.
+Mientras no se pueda marcar, ese contador es **siempre 0**, y "0 falsos negativos" se lee como *el gate
+está perfecto*: la conclusión opuesta a la verdad. **No leas ese 0 como dato hasta que el fix esté.**
+Aparte, y esto sí es configuración: la página deja editar `titulo`, `thumbnail`, `proyecto` y
+`referente` — los campos que **no** le importan a nadie (§5.1-4).
 
 **2. 🔴 La mitad humana del loop de ADR-022 nunca llega al humano.** La página *Proyectos* no muestra
 `criterios_aprendidos` **ni** `advertencia_criterios`. El problema real es `advertencia_criterios`: ese

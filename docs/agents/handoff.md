@@ -75,7 +75,7 @@ El detalle de cada componente y el "hecho cuando" viven en
 |---|---|---|---|
 | **A** Auditoría del pipeline vivo | mapa nodo/campo/página + reconciliar repo↔live + decisión §3 (ADR) | Dev 1 | 🔧 **A.1 ✅ · A.2 ✅ · A.3 ✅ · A.4 ✅** · **A.5 ⬜** (la decisión §3) — pero antes **B.6(2)**, ver abajo |
 | **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | ⬜ **B.6 destrabado y priorizado** por A.3 (3 hallazgos 🔴) |
-| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | ⬜ |
+| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | 🔧 **C.1 ✅ · C.5 ✅** (en el repo, **sin re-importar**) · C.2 ⬜ (espera `Voces.activo`/E.1) · C.3 ⬜ (webhook) · C.4 ⬜ |
 | **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | ⬜ |
 | **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización (autorizado por el ADR de A.5) | Dev 1 | ⬜ |
 

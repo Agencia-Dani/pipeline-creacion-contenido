@@ -179,7 +179,7 @@ cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, f
 - [x] **A.2** ✅ Mapa **campo × tabla × quién-escribe/lee** de las 9 tablas → entregable completo en
       **[mapa-campos.md](./mapa-campos.md)** (§4 el mapa, §2 los hallazgos). Responde las 4 preguntas de
       Mani. Base viva confirmada por MCP. **Huérfanos con veredicto, todos enganchados a su componente:**
-      `banda_descarte_min`/`max` → C.5 · lecturas fantasma `tema`/`link_doc` → D.4 · `notas_equipo` y
+      `banda_descarte_min`/`max` → C.5 · `tema`/`link_doc` vestigiales (ya documentados) → D.4 · `notas_equipo` y
       `viral_por_tamano` → D.3 · las 4 columnas de calidad de `Métricas Global`, los links inversos y la
       descripción pre-ADR-009 de `Voces` → B.3 · `Candidatos.fecha` manual → pasada única (§3 del mapa).
       **Lo que abre:** el multi-link de `Referentes.proyecto` cruza voces ([§2.5](./mapa-campos.md)) → B.1/E.
@@ -267,17 +267,24 @@ disparar una corrida, y ver Métricas/Costos reales — con una superficie de ca
 proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pipeline del motor
 (transcribir → traducir → gate → entregar → registrar) **no se toca**.
 
-- [ ] **C.1** **N por proyecto** ([ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md)): N vuelve a
-      ser campo de `Proyectos`; el global `Candidatos por corrida` pasa a **default por proyecto**. Misma
-      semántica en cron y on-demand. El **corte final pasa a ser por proyecto** (cada uno a su N por heat
-      compuesto, después del gate). `cap_top_n` sigue siendo el gobernador duro (no se toca — protege el backfill).
+- [x] **C.1** ✅ **N por proyecto** ([ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md)) — hecho en
+      el `workflow.json` del motor (2026-07-16): `Armar plan de corrida` lee `Proyectos.N` con fallback al
+      global; `Armar candidato` corta **por proyecto**. `cap_top_n` intacto (ya muerde antes, en `Heat-score v1`).
+      **Decisión que el ADR no fijaba, resuelta acá:** el **orden** entre corte y dedup (ADR-018). Ahora
+      **dedup primero, corte después** — al revés, 2 proyectos que pescan el mismo video colisionan y los
+      **dos** quedan cortos (N sería un techo, no una entrega). Con este orden N se cumple exacto.
+      **Probado** fuera de n8n con `$` mockeado (10 casos: N por proyecto, fallback al global, el video
+      disputado, PISO, `_descarte`, + regresiones de `normLang` y ⚠️ SIN GUION).
+      ⚠️ **Falta para que sirva de verdad:** (a) crear el campo `N` en `Proyectos` (base viva + la pasada
+      única de `core/`, §3 de [mapa-campos](./mapa-campos.md)) y (b) **re-importar**. El motor **tolera que
+      `N` no exista** (cae al global = conducta de hoy), así que el re-import no depende de (a).
 - [ ] **C.2** **Respetar `Voces.activo`**: un proyecto cuya voz está apagada no corre (aunque el proyecto
       esté `activo`). Toca `Leer Proyectos` / `Armar plan`. *(A.2 confirmó por MCP que `Voces.activo`
       **no existe** en la base viva — el campo lo crea E.1.)*
-- [ ] **C.5** **Podar 2 knobs muertos del `Config` del motor** ([mapa-campos.md §2.1](./mapa-campos.md)):
-      `banda_descarte_min` (0.35) y `banda_descarte_max` (0.6) — **nadie los lee** desde que la enmienda
-      2026-07-13 reemplazó la banda fija por el top-K (`cap_descartes`). Cero cambio de conducta; se hace
-      acá porque toca `workflow.json` y se arrastra con el re-import.
+- [x] **C.5** ✅ **Podados los 2 knobs muertos del `Config` del motor** (2026-07-16): `banda_descarte_min`
+      (0.35) y `banda_descarte_max` (0.6), muertos desde la enmienda del 2026-07-13 (banda fija → top-K
+      `cap_descartes`). Config: 21 → **19 knobs**. Verificado que ningún nodo los lee. Cero cambio de
+      conducta. Se arrastra con el re-import de C.
 - [ ] **C.3** **Webhook trigger** (según [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)): nuevo
       trigger de Producción con guard **single-flight**, en paralelo al cron. El motor **sigue leyendo "los
       activos"** (no gana un modo "solo este proyecto"); lo único nuevo es respetar `Voces.activo` (C.2) y la
@@ -311,11 +318,11 @@ rompe el cómputo semanal ni la salud por referente.
       **Se le suma `viral_por_tamano`** ([mapa-campos §2.1](./mapa-campos.md)): mismo patrón (lo escribe
       el motor, no va a `outputs.metadata` ni al Sheet, muere con el record) → nunca se va a poder medir
       si lo viral se aprueba más. La salida (b) los cubre a los dos de una.
-- [ ] **D.4** **Podar 2 lecturas fantasma del archivado** ([mapa-campos §2.1](./mapa-campos.md)):
-      `Armar filas archivado` lee `f.tema` y `f.link_doc` de cada Candidato para llenar
-      `outputs.metadata` — **esos campos no existen** en la tabla, así que archiva `''` siempre. Residuo
-      pre-ADR-009. Cero cambio de conducta; toca `workflow.json` → se arrastra con el re-import, igual
-      que C.5. Si D.3 va por (b), hacerlo en la misma pasada sobre ese nodo.
+- [ ] **D.4** *(opcional, cosmético)* **Podar 2 lecturas vestigiales del archivado**
+      ([mapa-campos §2.1](./mapa-campos.md)): `Armar filas archivado` lee `f.tema` y `f.link_doc`, que no
+      existen en `Candidatos` → archiva `''` siempre. **Ya está documentado como deliberado** (dev-doc §8:
+      `tema` fail-safe, `link_doc` vestigial), así que esto es sacar ruido, no arreglar un bug. Cero
+      cambio de conducta. Solo vale la pena **si D.3 va por (b)** y ya se va a tocar ese nodo.
 
 **Hecho cuando:** tras un ciclo con corridas por-proyecto, `Métricas`/`Costos` y la salud por referente
 se computan igual de bien que con el barrido semanal.
