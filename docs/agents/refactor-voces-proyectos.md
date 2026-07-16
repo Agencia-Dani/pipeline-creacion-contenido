@@ -184,8 +184,14 @@ cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, f
       reconciliación repo↔live cerrados 2026-07-16; falta el barrido campo por campo, ver su §4).
 - [ ] **A.3** Mapa **página/vista × tabla × propósito**: cada página del interface *Cockpit Redes*, qué
       tabla lee, qué filtro, edit/solo-lectura, para qué la usa el equipo. Flagear páginas sin uso claro.
-- [ ] **A.4** Reconciliar **repo ↔ live**: qué está en el repo pero **no re-importado en n8n** (M2,
-      costos, contadores Apify) → lista de "vacío hasta re-import".
+- [x] **A.4** Reconciliar **repo ↔ live**: ✅ **el gap de workflows se cerró solo — Mani re-importó los 3
+      `workflow.json` el 2026-07-16** (M2, costos, contadores Apify y `normLang` ya viven en n8n), así que
+      la lista de "vacío hasta re-import" quedó sin objeto. Lo que **sí** queda de A.4 es la reconciliación
+      de **config**, ya hecha y documentada en [mapa-campos.md §2.3](./mapa-campos.md) (`Ajustes` live vs.
+      seed: `Días de recencia`=100 y `Bonus idioma`=0.45 son el equipo usando sus knobs, no drift; los 2
+      toggles del descubrimiento faltan en `ajustesSeed` → pasada única de `setup-airtable.mjs`).
+      ⚠️ **Verificación real pendiente:** el primer ciclo completo cierra el **26/07** (ver §Ciclo del
+      [handoff](./handoff.md)) — hasta ahí no hay prueba viva de que el re-import quedó bien.
 - [ ] **A.5** Con A.2/A.3 en mano, **cerrar la decisión de §3** (Airtable vs. dashboard propio) en un
       ADR. Es el gate de todo lo demás.
 
