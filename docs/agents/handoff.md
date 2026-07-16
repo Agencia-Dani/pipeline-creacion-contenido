@@ -35,8 +35,12 @@
      webhook solo escucha con el workflow activo).
   3. Después, en Airtable (B.2, la API no lo hace): automation con script `fetch(POST)` a esa URL +
      botón "▶ Correr ahora" ([contrato §Disparo on-demand](../../core/contracts/airtable-cockpit.md)).
-  **Cambio de conducta al re-importar:** solo el arranque (guard + `trigger_type` honesto); N vacía y
-  las 3 voces prendidas siguen dando la conducta de hoy. El guard aplica también al cron/manual.
+  **Cambio de conducta al re-importar (ACTUALIZADO en el cierre 50):** además del arranque (guard +
+  `trigger_type` honesto), ahora **N está sembrada**: *Trading Psychology* = **20** y *Trading fast tips*
+  = **10** (los 2 únicos proyectos activos; los otros 4 siguen vacíos = global). Se sembró asimétrica a
+  propósito — **es el test en vivo del corte por proyecto de C.1**: si la corrida post re-import entrega
+  ~20 y ~10 en vez de ~100 repartidos, C.1 quedó probado. Las 3 voces siguen prendidas. El guard aplica
+  también al cron/manual.
 - 🟠 **Re-import del ARCHIVADO pendiente (D, cierre 49).** Su `workflow.json` cambió en el repo:
   `notas_equipo`/`viral_por_tamano` a `outputs.metadata` (D.3b), poda de `tema`/`link_doc` (D.4),
   salteo de corridas vivas en `runs_ok/fallo` (matiz D.2, knob `ventana_corrida_min` en su Config).
@@ -54,13 +58,21 @@
 > Supabase, Anthropic, Supadata) — cierra la exposición del PAT en chat del cierre 36.
 > **Ojo con la primera lectura de Métricas (§Ciclo abajo): el domingo 19 va a salir a medias, y no es un fallo.**
 
-- 🟠 **Los fixes de UI en Airtable** (la API no los hace) — **A.3 les dio diagnóstico preciso y subió su
-  prioridad**: el detalle está en [mapa-campos.md §5.1](./mapa-campos.md) y el orden en **B.6** del plan.
-  Los 3 que importan: **`veredicto` editable** en *Descartes* (sin eso `falsos_negativos` es siempre 0 y
-  el loop de ADR-021 está muerto) · **curar *Salud del Sistema*** (no muestra el embudo y sí una columna
-  vacía) · **publicar *Costos*** + verificar que tenga filtro de semana. Siguen: `precision` como %,
-  `separacion_gate` en *Calidad*, filtro *Referentes propuestos* → `estado=propuesto`, y sumar
-  `advertencia_criterios` a la página *Proyectos*.
+- 🟠 **Los fixes de UI en Airtable** — **confirmado en el cierre 50 barriendo la API entera: el MCP puede
+  escribir *records* y publicar el interface, pero NO editar la config de una página** (no existe un
+  `update_page`; solo `create_page`/`delete_page`/`publish_interface`). O sea: **estos son de Mani, a mano,
+  y no hay atajo de agente.** Diagnóstico en [mapa-campos.md §5.1](./mapa-campos.md), orden en **B.6**.
+  Lo que queda: **`veredicto` editable** en *Descartes* (sin eso `falsos_negativos` es siempre 0 y el loop
+  de ADR-021 está muerto — hoy `isEditable: false`, verificado por MCP) · **curar *Salud del Sistema***
+  (hoy muestra `calificados`/`aprobados`/`precision` + `diagnostico` — todas de calidad o muertas en filas
+  GLOBAL — y **cero** del embudo) · `precision` como % y `separacion_gate` en *Calidad* · filtro
+  *Referentes propuestos* → `estado=propuesto` · `advertencia_criterios` en *Proyectos* · **B.5**
+  (`Voces.activo` en la página *Voces*: el campo existe y el motor ya lo respeta, pero la página no lo
+  muestra — verificado por MCP).
+- ✅ **Publicada *Costos*** (cierre 50, por MCP, `publish_interface` sobre *Cockpit Redes* entero — Mani
+  autorizó publicar todos los drafts). ⚠️ **Verificá a ojo el filtro de semana**: los 9 `bigNumber` suman
+  con `summaryFunction: sum` y `Métricas Global` no se barre nunca ⇒ sin filtro muestran el costo
+  histórico acumulado, no el de la semana.
 - 🟠 **Equipo:** sembrar 3–5 referentes TikTok (bootstrap del eje TT); aprobar *Referentes propuestos*.
 - ✅ **Pasada única sobre `setup-airtable.mjs` + `airtable-cockpit.md`: 3 de 4 hechas** (cierre 45,
   desagrupada por decisión de Mani — ver [mapa-campos.md §3](./mapa-campos.md)). Hechas: N por proyecto
@@ -95,7 +107,7 @@ El detalle de cada componente y el "hecho cuando" viven en
 | Componente | Qué | Carril | Estado |
 |---|---|---|---|
 | **A** Auditoría del pipeline vivo | mapa nodo/campo/página + reconciliar repo↔live + decisión §3 (ADR) | Dev 1 | 🔧 **A.1 ✅ · A.2 ✅ · A.3 ✅ · A.4 ✅** · **A.5 ⬜** (la decisión §3) — pero antes **B.6(2)**, ver abajo |
-| **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | ⬜ **B.6 destrabado y priorizado** por A.3 (3 hallazgos 🔴) · **B.4 a 2 clicks** (el permiso MCP de escritura se denegó en el cierre 49): tildar `Mostrar al equipo` en las filas *Mínimo de likes* y *Mínimo de vistas* de `Ajustes` — nada más, las filas ya existen (seed 0) y la máquina no lee ese checkbox · **B.2 esperando el re-import** (botón + automation, §Pendiente vivo) |
+| **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | 🔧 **B.4 ✅** (cierre 50, por MCP: los 2 knobs ya son team-facing) · **B.6 parcial** — (4) *Costos* **publicada** por MCP, falta verificar su filtro de semana; (1)(2)(3)(5) siguen ⬜ **y son UI pura: la API de Airtable no los hace** (ver abajo) · **B.2 esperando el re-import** (botón + automation, §Pendiente vivo) |
 | **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | ✅ **COMPLETO en el repo** (C.1–C.5, cierres 45–48), **sin re-importar** — el re-import quedó destrabado (§Pendiente vivo). C.4 confirmado a nivel repo; la prueba viva = V-run post re-import |
 | **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | ✅ **COMPLETO en el repo** (cierres 48–49): D.1/D.2 confirmados (suma sobre todos los runs, no asume barrido total) + matiz `runs_fallo`×`en_curso` arreglado + **D.3(b)** (`notas_equipo`/`viral_por_tamano` → `outputs.metadata`) + **D.4** (poda `tema`/`link_doc`). **Sin re-importar** |
 | **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización (autorizado por el ADR de A.5) | Dev 1 | 🔧 **E.1 ✅** (`Voces.activo` vivo) · **E.2 ✅ mitad-repo** (señal desnuda ⇒ sin campos nuevos; contrato documentado — falta botón+automation a mano, va con B.2) · E.3 ⬜ (espera B.3/A.5) |
@@ -147,6 +159,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-16 (cierre 50) — Barrido de "qué puede hacer el agente y qué no" antes de la corrida manual: B.4 cerrado, *Costos* publicada, N sembrada (Mani + Claude).** No es código: es destrabar a mano lo destrabable y **dejar por escrito el límite de la API**, que era lo que se re-derivaba cada sesión. **(1) B.4 ✅** — el permiso MCP de escritura que se denegó en el cierre 49 esta vez pasó: tildado `Mostrar al equipo` en *Mínimo de likes* y *Mínimo de vistas*. Cero riesgo (la máquina no lee ese checkbox; es el filtro de la página *Configuración Global*). **(2) *Costos* publicada** por `publish_interface` — Mani autorizó publicar el interface *Cockpit Redes* **entero** sabiendo que promueve todos los drafts, no solo esa página. Queda verificar a ojo el filtro de semana (§Pendiente vivo). **(3) N sembrada, y es lo que le da sentido a la corrida manual:** el hallazgo del cierre — con `N` vacía en los 6 proyectos, **el motor nuevo entrega exactamente lo mismo que el viejo** (todo cae al global 100), así que la V-run habría verificado "no rompí nada" sin probar **ninguna** feature de C. Decisión de Mani: N **asimétrica** en los 2 únicos proyectos activos — *Trading Psychology* = 20, *Trading fast tips* = 10. Si post re-import entrega ~20 y ~10, C.1 (corte por proyecto, ADR-024) queda probado en vivo con una sola corrida. **(4) El límite de la API, ahora documentado para no re-derivarlo:** el MCP de Airtable escribe *records* y publica interfaces, pero **no edita la config de una página** — no existe `update_page`, solo `create_page`/`delete_page`/`publish_interface`. ⇒ **todo B.6 restante + B.5 son de Mani a mano, sin atajo de agente**. Verificado de paso por MCP: `veredicto` sigue `isEditable: false` en *Descartes* (el loop de ADR-021 sigue muerto), *Salud del Sistema* sigue sin un solo campo del embudo, y la página *Voces* no muestra `activo`. **(5) Chequeos de estado que dieron limpio:** `test-nodos.mjs` verde, working tree limpio, el placeholder `<<WEBHOOK_PATH_MOTOR>>` intacto en el `workflow.json`, los 6 proyectos con 1 sola voz (la limpieza del cierre 47 aguantó), las 3 voces activas. **Archivos:** solo docs (handoff + plan §B.4/§B.6(4)/§C.1). **Estado:** el único bloqueante de la corrida manual es el **re-import del motor** — no espera nada más. **Próximo paso:** Mani hace el re-import (checklist §Pendiente vivo) y dispara el Execute; el botón/automation de B.2 es aparte y solo hace falta para probar el webhook, no la corrida manual.
 
 **2026-07-16 (cierre 49) — Las 3 decisiones abiertas del carril, consultadas y ejecutadas: D queda COMPLETO en el repo (Mani + Claude).** Continuación inmediata del 48; cierra todo lo que el carril del motor tenía "esperando a Mani" preguntándole en vivo. **(1) D.3 → salida (b):** `Armar filas archivado` ahora lleva **`notas_equipo` y `viral_por_tamano` a `outputs.metadata`** (al Sheet no van). La señal cualitativa del equipo (el *por qué* de un 👎) y la marca viral dejan de morir con el record cada domingo; "¿lo viral se aprueba más?" pasa a ser una query SQL. **La (a) — que las notas entren al destilado de Haiku — queda abierta a propósito:** se decide con el corpus que (b) empieza a acumular (si va, es enmienda de ADR-022). **(2) D.4 aprovechado** (el plan lo autorizaba solo si D.3 iba por (b)): podadas las lecturas vestigiales `f.tema`/`f.link_doc` del mismo nodo — archivaban `''` desde ADR-019/009; las filas viejas conservan sus keys en el jsonb y `v_senal_tema` ya era inerte. **(3) Matiz D.2 arreglado:** `Computar métricas semana` **saltea los `en_curso` más jóvenes que `ventana_corrida_min`** al contar `runs_ok/fallo` (knob nuevo en el Config del archivado, 120, mismo nombre/semántica que el motor) — un click del botón cerca del domingo 6pm ya no cuenta como fallo; un `en_curso` más viejo es zombie y sigue contando. Loguea `corridas vivas salteadas: n`. **(4) Descubrimiento vs `Voces.activo` → se queda como está, DELIBERADO:** una voz apagada sigue recibiendo propuestas (barato, despensa para cuando se prenda). Documentado en el plan §Descubrimiento y en el README del descubrimiento con "no lo arregles" explícito — la decisión pasó de "pendiente" a "tomada", que es lo que evita el fix silencioso de un agente futuro. **Archivos:** `workflow-archivado/workflow.json` (builder Node, 3 nodos tocados: Config, `Armar filas archivado`, `Computar métricas semana`), plan (D.3/D.4 ✅, D.2 actualizado, §Descubrimiento decidido), mapa-campos (§2.1/§2.2/§4 resueltos), dev-doc (§4.2 filas 3/10/17d, §6 convención de metadata), README del descubrimiento. **Verificación:** grafo del archivado limpio (37 nodos, 10 code nodes, sintaxis OK), validador **1228/0**, secretos limpios. **Estado:** C y D completos en el repo, **ninguno re-importado** — el §Pendiente vivo tiene los 2 checklists (motor con webhook path; archivado sin placeholders nuevos, puede ir en la misma sesión de n8n). **Próximo paso:** los re-imports + botón/automation (Mani); en código del refactor no queda nada que no espere a A.5/B (carril superficie).
 

@@ -243,8 +243,11 @@ correr) y la **racionalización de campos** que salga de la auditoría.
       máquina y hoy el equipo puede pisar (*Feed*: `titulo`/`thumbnail`/`referente` · *Referentes -
       Revisar*: `tasa_gate`/`tasa_aprobacion`/`videos_evaluados` · las 2 páginas de Métricas: **todo**,
       sobre tablas que el contrato declara solo-lectura). El modelo a copiar es *Configuración Global*.
-- [ ] **B.4** `Mínimo likes/vistas` **team-facing**: marcar `Mostrar al equipo ✓` en esas 2 filas de
-      `Ajustes` (probablemente el cambio completo — confirmar en la auditoría).
+- [x] **B.4** ✅ `Mínimo likes/vistas` **team-facing** (2026-07-16, por MCP): tildado `Mostrar al equipo`
+      en las filas *Mínimo de likes* (`recShFcaK7nTZWCOM`) y *Mínimo de vistas* (`recc2cFlEgZC2WNQN`) de
+      `Ajustes`. Era el cambio completo, como preveía la auditoría: las filas ya existían con seed 0 y la
+      máquina no lee ese checkbox (es solo el filtro de la página *Configuración Global*). Cero cambio de
+      conducta del motor; el equipo ahora ve y edita los 2 knobs.
 - [ ] **B.5** Toggle de **Voz** visible/editable para el equipo (pareja del campo de datos en E).
 - [ ] **B.6** Cerrar **Métricas + Costos** (arrastre cierres 37-39), ahora con el diagnóstico preciso de
       [mapa-campos §5.1](./mapa-campos.md): **(1)** `veredicto` **editable** en *Descartes* — **no es
@@ -253,8 +256,11 @@ correr) y la **racionalización de campos** que salga de la auditoría.
       campos de calidad y una columna muerta (`diagnostico` en filas GLOBAL) y **no muestra el embudo**
       (`colectados`/`pretrim`/`gate_pass`/`entregados`/`runs_ok`/`runs_fallo`/`duracion_min`/`sin_guion`/
       `falsos_negativos` no están en ninguna página). **(3)** *Calidad por Proyecto*: sumar
-      `separacion_gate`, `precision` como %. **(4)** publicar *Costos* + verificar que el filtro de
-      semana exista (sin él suma toda la historia). **(5)** sumar `advertencia_criterios` +
+      `separacion_gate`, `precision` como %. **(4)** ✅ *Costos* **publicada** (2026-07-16, por MCP —
+      `publish_interface` sobre *Cockpit Redes*, decisión de Mani de publicar el interface entero);
+      ⚠️ **queda verificar a ojo que tenga filtro de semana** (los 9 `bigNumber` suman con
+      `summaryFunction: sum`; sin filtro suman toda la historia y `Métricas Global` no se barre nunca).
+      **(5)** sumar `advertencia_criterios` +
       `criterios_aprendidos` a la página *Proyectos*. **Hacer (2) antes de A.5** — es la prueba honesta
       de si Airtable se queda corto ([§5.2](./mapa-campos.md)).
 
@@ -275,9 +281,11 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       **dos** quedan cortos (N sería un techo, no una entrega). Con este orden N se cumple exacto.
       **Probado** fuera de n8n con `$` mockeado (10 casos: N por proyecto, fallback al global, el video
       disputado, PISO, `_descarte`, + regresiones de `normLang` y ⚠️ SIN GUION).
-      ⚠️ **Falta para que sirva de verdad:** (a) crear el campo `N` en `Proyectos` (base viva + la pasada
-      única de `core/`, §3 de [mapa-campos](./mapa-campos.md)) y (b) **re-importar**. El motor **tolera que
-      `N` no exista** (cae al global = conducta de hoy), así que el re-import no depende de (a).
+      ✅ (a) el campo `N` existe en `Proyectos` (`fld9MCZ5y2pSWRxHc`) y **está sembrado en los 2 proyectos
+      activos** (2026-07-16, por MCP): *Trading Psychology* = **20**, *Trading fast tips* = **10** —
+      asimétricos a propósito, para que la V-run post re-import pruebe el corte por proyecto en vivo
+      (los otros 4 proyectos siguen con `N` vacía = caen al global). ⚠️ **Falta (b) re-importar** — hasta
+      ahí el motor vivo ignora la `N` y sigue entregando por el global.
 - [x] **C.2** ✅ **Respetar `Voces.activo`** (2026-07-16): `Leer Voces` del motor filtra **server-side**
       (`filterByFormula={activo}`, mismo patrón que `Leer Proyectos`) y `Armar plan` saltea los proyectos
       cuya voz no llegó, logueando cuál. Proyecto **sin** voz: no gateado. **Server-side y no en el code
