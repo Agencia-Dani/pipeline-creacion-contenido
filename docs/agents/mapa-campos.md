@@ -1,17 +1,18 @@
-# Mapa campo × tabla × quién escribe/lee (A.2 del refactor)
+# Mapa del cockpit: campos y páginas (A.2 + A.3 del refactor)
 
-> **Qué es:** el mapa por **campo** de las 9 tablas del cockpit: quién lo llena, quién lo lee, y si
-> tiene propósito. Responde las 4 preguntas de Mani: *¿cada campo cómo se maneja? ¿cómo influye en el
-> workflow? ¿es necesario? ¿está estandarizado?* Es el entregable de **A.2** del
+> **Qué es:** el mapa de la superficie del equipo por sus dos ejes — **campo** (§4: quién lo llena,
+> quién lo lee, si tiene propósito) y **página** (§5: qué tabla lee, qué edita, para qué sirve). Responde
+> las 4 preguntas de Mani: *¿cada campo cómo se maneja? ¿cómo influye en el workflow? ¿es necesario?
+> ¿está estandarizado?* Es el entregable de **A.2 + A.3** del
 > [refactor Voces→Proyectos](./refactor-voces-proyectos.md), y lo que alimenta la racionalización de
-> campos de **B.3**.
+> campos de **B.3** y la decisión de herramienta de **A.5**.
 >
 > **Granularidad:** el mapa **por tabla** (quién toca qué tabla) vive en [dev-doc §5](./dev-doc.md);
-> este doc baja a campo. No dupliques: acá el campo, allá la tabla y el nodo.
+> este doc baja a campo y a página. No dupliques: acá el campo y la página, allá la tabla y el nodo.
 >
-> **Estado: ✅ COMPLETO** (2026-07-16). Las 9 tablas barridas campo por campo (§4), hallazgos en §2.
-> Fuentes de verdad: los 3 `workflow.json` + `core/scripts/setup-airtable.mjs` + la base viva
-> (`Reels Cockpit`, por MCP).
+> **Estado: ✅ COMPLETO** — A.2 (9 tablas campo por campo, §4) y A.3 (12 páginas + 1 form, §5), ambos
+> 2026-07-16. Hallazgos de campo en §2, de página en §5.1. Fuentes de verdad: los 3 `workflow.json` +
+> `core/scripts/setup-airtable.mjs` + la base viva (`Reels Cockpit`, por MCP).
 
 ## 1. Método (para que la próxima pasada no re-derive)
 
@@ -211,3 +212,114 @@ solo-lectura, proyección regenerable (la verdad cruda vive en Supabase).
 **Barrido:** `Leer Metricas viejas` + `Barrer Metricas viejas` borran filas de **más de 84 días**, y
 apuntan **solo a `Métricas Proyectos`**. `Métricas Global` no se barre nunca — **deliberado, guarda el
 trend** (está en el contrato; no lo "arregles").
+
+## 5. El mapa de páginas (A.3)
+
+El interface **Cockpit Redes** (`pbdXZRaSlAAGRAPGH`) tiene **12 páginas**, más **1 form standalone que
+vive fuera del interface** (§5.1-6). Leído por MCP (`list_pages_for_base` + `get_form_schema`), no por
+captura de pantalla.
+
+**Cobertura:** las 9 tablas tienen al menos una página; ninguna página quedó sin tabla. `Referentes` y
+`Ajustes` tienen 2 páginas cada una (una para el equipo, otra especializada) y `Métricas Global`
+también (*Salud* + *Costos*). **No hay páginas huérfanas** — el problema no es sobra de páginas, es
+**qué campo muestra cada una** (§5.1).
+
+| Página | Tabla | Edita | Propósito | Veredicto |
+|---|---|---|---|---|
+| **Feed de Calificación** | `Candidatos` | `calificacion`, `estado`, `notas_equipo` (+ `titulo`, `thumbnail`, `referente` ⚠️) | el loop central: el equipo califica | 🟠 edita 3 campos de la máquina (§5.1-4) |
+| **Proyectos** | `Proyectos` | `nombre`, `activo`, `descripcion`, `voz_default`, `criterios_relevancia` | el equipo define qué se busca | 🔴 **no muestra `criterios_aprendidos` ni `advertencia_criterios`** (§5.1-2) |
+| **Voces** | `Voces` | `nombre`, `descripcion`, `criterios_relevancia` | el eje organizativo | ✅ (le falta `activo` → **E.1** + **B.5**) |
+| **Referentes** | `Referentes` | `handle`, `plataforma`, `proyecto`, `activo`, `notas` | alta y toggle de fuentes | ✅ |
+| **Referentes - Revisar/Flojos** | `Referentes` | todo, incl. `tasa_gate`/`tasa_aprobacion`/`videos_evaluados` ⚠️ | la vista "A revisar" de ADR-022: podar fuentes flojas | 🟠 salud editable (§5.1-4) |
+| **Referentes - Sugeridos** | `Referentes propuestos` | `handle`, `proyecto`, `estado` | aprobar/descartar propuestas del descubrimiento | ✅ diseño correcto (solo `estado` importa). 🟠 falta el filtro `estado=propuesto` (arrastre) |
+| **Descartes** | `Descartes del gate` | `titulo`, `thumbnail`, `proyecto`, `referente` — **`veredicto` NO** | auditar falsos negativos (ADR-021) | 🔴 **la página no puede hacer lo único que existe para hacer** (§5.1-1) |
+| **Configuración Global** | `Ajustes` | solo `valor` | los knobs del equipo (filtro `Mostrar al equipo ✓`) | ✅ **el mejor ejemplo del cockpit**: muestra `clave`+`descripcion` read-only y deja editar solo el valor |
+| **Ajustes Dev-Only** | `Ajustes` | **nada** (`valor` read-only) | los knobs avanzados | 🟡 un dev no puede editar desde su propia página (§5.1-5) |
+| **Calidad por Proyecto** | `Métricas Proyectos` | todo ⚠️ (tabla solo-lectura) | precisión + diagnóstico por proyecto | 🟠 editable + no muestra `separacion_gate` (§5.1-3) |
+| **Salud del Sistema** | `Métricas Global` | `semana`, `clave` ⚠️ | la salud del motor | 🔴 **no muestra salud** (§5.1-3) |
+| **Costos** | `Métricas Global` | — (dashboard, 9 `bigNumber` sumando las fórmulas de costo) | el gasto de la semana por servicio | 🟠 **sin publicar** (arrastre) + verificar el filtro de semana (§5.1-7) |
+| *(fuera del interface)* **Nuevo Proyecto** | `Proyectos` | form de alta | crear un proyecto | 🔴 **trampa**: `criterios_relevancia` no es obligatorio (§5.1-6) |
+
+### 5.1 Hallazgos de páginas
+
+**1. 🔴 `veredicto` es read-only ⇒ el loop de auditoría de ADR-021 está muerto, no incompleto.**
+Ya estaba anotado como un fix de UI de B.6 ("`veredicto` editable en *Descartes*"), pero el mapa muestra
+que **no es cosmético**. `veredicto` es el **único** campo de esa tabla que lee una máquina
+([§4.5](#45-descartes-del-gate)): el archivado cuenta los `era bueno` → `falsos_negativos`. Si el equipo
+no lo puede marcar, ese contador es **siempre 0** — y "0 falsos negativos" se lee como *el gate está
+perfecto*, que es la conclusión opuesta a la verdad. Y la página **sí** deja editar `titulo`,
+`thumbnail`, `proyecto` y `referente`, que no le importan a nadie: está exactamente al revés.
+**Sube de prioridad dentro de B.6.**
+
+**2. 🔴 La mitad humana del loop de ADR-022 nunca llega al humano.** La página *Proyectos* no muestra
+`criterios_aprendidos` **ni** `advertencia_criterios`. El problema real es `advertencia_criterios`: ese
+campo existe **solo** para que una persona lo lea (el gate no lo lee, por contrato — [§4.1](#41-proyectos)).
+Si no está en ninguna página, el archivado gasta una llamada a Haiku cada domingo para escribir un aviso
+que **nadie ve**, salvo que abra la tabla cruda. En los hechos es un huérfano — no por el schema, por la
+superficie. `criterios_aprendidos` es menos grave (el gate sí lo lee, así que funciona igual), pero el
+contrato promete que el equipo puede editarlo o borrarlo, y desde el cockpit no puede.
+**→ B.3/B.6: sumar los 2 campos a la página *Proyectos*.**
+
+**3. 🔴 *Salud del Sistema* no muestra salud — el split del 2026-07-15 partió las tablas y nadie curó
+las páginas.** La página lee `Métricas Global` pero muestra `calificados`, `aprobados`, `precision` y
+`diagnostico`: **campos de calidad**, que después del split son el negocio de `Métricas Proyectos`. El
+embudo entero (`colectados`, `pretrim`, `gate_pass`, `entregados`, `runs_ok`, `runs_fallo`,
+`duracion_min`, `sin_guion`, `falsos_negativos`) **no está en ninguna página**. Peor: `diagnostico` es
+una de las 4 columnas muertas de `Métricas Global` ([§2.1](#21-huérfanos-confirmados-leídos-por-nadie)) —
+la página le muestra al equipo una columna que en filas GLOBAL está **siempre vacía**. Eso confirma la
+poda de B.3 desde el otro lado: el huérfano no es teórico, está en la cara del equipo.
+Simétrico, menor: *Calidad por Proyecto* no muestra `separacion_gate`, el número del que sale el
+`diagnostico` que sí muestra. **→ B.6, y es el input más fuerte para A.5** (ver §5.2).
+
+**4. 🟠 Campos de la máquina editables por el equipo, en 4 páginas.** *Feed* deja editar `titulo`,
+`thumbnail` y `referente`; *Referentes - Revisar* deja editar `tasa_gate`, `tasa_aprobacion` y
+`videos_evaluados`; las 2 páginas de Métricas dejan editar **todo**, sobre tablas que el contrato declara
+**solo-lectura**. Nada se rompe (el archivado pisa esos valores el domingo siguiente, o los archiva tal
+como quedaron), pero es confuso: alguien "arregla" una tasa_gate y su cambio desaparece sin explicación.
+El contraste sano es *Configuración Global*, que muestra el contexto read-only y deja editar solo lo que
+el equipo debe tocar. **→ B.3: pasar a read-only lo que escribe la máquina.**
+
+**5. 🟡 *Ajustes Dev-Only* tiene `valor` read-only** — un dev no puede editar los knobs avanzados desde
+la página hecha para eso; tiene que ir a la tabla cruda. O se arregla (1 clic) o se admite que la página
+es solo de consulta y se documenta. Trivial, pero es de la familia "la superficie no dice la verdad".
+
+**6. 🔴 El form *Nuevo Proyecto* es una trampa, y vive fuera del interface.** Es un form **standalone**
+(`interfaceId: null`), no documentado en ningún lado hasta ahora. Dos problemas: **(a)** `criterios_relevancia`
+**no es obligatorio** — y un proyecto sin criterios no es inofensivo: el gate del motor es **fail-open**
+(sin criterios **deja pasar todo** y ordena por métrica), así que ese proyecto entrega ruido sin filtrar,
+mientras que el descubrimiento es fail-closed y lo saltea. Crear un proyecto por este form es la forma más
+fácil de romper la relevancia sin darse cuenta. **(b)** expone `Candidatos` (un **link inverso**, §2.1) como
+campo a llenar en el alta, lo cual no tiene sentido: los candidatos los crea el motor.
+**→ B.1/B.3: `criterios_relevancia` obligatorio, sacar `Candidatos`, y decidir si el form entra al
+interface o se borra.**
+
+**7. 🟠 *Costos*: sin publicar (arrastre conocido) + un chequeo pendiente.** Los 9 `bigNumber` suman con
+`summaryFunction: sum` sobre `Métricas Global`. El subtítulo dice *"Elegí la semana arriba"*, pero el
+filtro de semana **no se puede verificar por API** — si no está, la página suma **toda la historia** en
+vez de la semana (y `Métricas Global` no se barre nunca, [§4.6](#46-métricas-proyectos)), así que el
+número crecería para siempre. **Verificar al publicar.**
+
+**8. 🟡 La vista "🔥 Seleccionados" no es una página.** El re-rank que pidió el jefe (ADR-008) vive como
+**vista de la tabla cruda** `Candidatos`, no como página del cockpit. Funciona, pero queda fuera de la
+superficie curada. Decidir en B.1 si sube a página.
+
+### 5.2 Lo que A.3 le aporta a la decisión de A.5 (Airtable vs. dashboard propio)
+
+El mapa parte en dos, limpio, y **confirma el matiz de "partir la superficie"** de
+[§3 del plan](./refactor-voces-proyectos.md):
+
+- **El eje operativo funciona bien en Airtable.** *Configuración Global*, *Referentes*, *Sugeridos* y
+  *Feed* hacen lo suyo; sus problemas son de **curaduría** (un permiso, un filtro, un campo de más), no
+  de la herramienta. Ninguno justifica infra nueva. Esto respalda ADR-023 (el operativo se queda).
+- **El eje analítico es donde se rompe.** Las 3 páginas analíticas (*Salud*, *Calidad*, *Costos*) son las
+  3 con hallazgos 🔴/🟠 estructurales, y ninguno es coincidencia: el split partió tablas y las páginas
+  quedaron desfasadas; el embudo entero no se muestra; *Costos* depende de fórmulas baked en Airtable y
+  de un filtro que no se puede verificar por API; y **todo eso ya vive en Supabase**, que es la fuente de
+  verdad (NFR5). Es exactamente el perfil de "read-only sobre Supabase, bajo riesgo" del plan.
+
+→ **Recomendación para el ADR de A.5, sin cerrarlo acá:** estirar Airtable en lo operativo (barato,
+respeta el invariante) y evaluar dashboard propio **solo** para las 3 páginas analíticas. **Antes de
+decidir, ojo con el sesgo:** ninguna de esas 3 páginas fue curada después del split — o sea que estamos
+comparando Airtable-mal-configurado contra un dashboard imaginario. La prueba honesta es **arreglar
+*Salud del Sistema* primero** (B.6, es de horas) y recién ahí ver si Airtable se quedó corto de verdad o
+si nunca le dimos la chance.

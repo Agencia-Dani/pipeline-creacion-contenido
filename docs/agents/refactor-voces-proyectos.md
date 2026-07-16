@@ -183,8 +183,15 @@ cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, f
       `viral_por_tamano` → D.3 · las 4 columnas de calidad de `Métricas Global`, los links inversos y la
       descripción pre-ADR-009 de `Voces` → B.3 · `Candidatos.fecha` manual → pasada única (§3 del mapa).
       **Lo que abre:** el multi-link de `Referentes.proyecto` cruza voces ([§2.5](./mapa-campos.md)) → B.1/E.
-- [ ] **A.3** Mapa **página/vista × tabla × propósito**: cada página del interface *Cockpit Redes*, qué
-      tabla lee, qué filtro, edit/solo-lectura, para qué la usa el equipo. Flagear páginas sin uso claro.
+- [x] **A.3** ✅ Mapa **página/vista × tabla × propósito** → **[mapa-campos.md §5](./mapa-campos.md)**
+      (12 páginas + 1 form standalone, leídas por MCP). **No hay páginas huérfanas** — las 9 tablas
+      tienen página y ninguna página quedó sin tabla; el problema es **qué campo muestra cada una**.
+      **3 hallazgos 🔴 → B.6/B.3:** `veredicto` read-only mata el loop de ADR-021 (`falsos_negativos`
+      siempre 0) · la página *Proyectos* no muestra `advertencia_criterios` (el archivado escribe cada
+      domingo un aviso que nadie ve) · *Salud del Sistema* no muestra salud (el split partió tablas y
+      nadie curó la página) · el form *Nuevo Proyecto* permite proyectos sin criterios ⇒ gate fail-open
+      = ruido sin filtrar. **Aporte a A.5 en [§5.2](./mapa-campos.md)**: el eje operativo aguanta; el
+      analítico es donde se rompe — pero curar *Salud* primero, o la comparación es tramposa.
 - [x] **A.4** Reconciliar **repo ↔ live**: ✅ **el gap de workflows se cerró solo — Mani re-importó los 3
       `workflow.json` el 2026-07-16** (M2, costos, contadores Apify y `normLang` ya viven en n8n), así que
       la lista de "vacío hasta re-import" quedó sin objeto. Lo que **sí** queda de A.4 es la reconciliación
@@ -194,7 +201,11 @@ cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, f
       ⚠️ **Verificación real pendiente:** el primer ciclo completo cierra el **26/07** (ver §Ciclo del
       [handoff](./handoff.md)) — hasta ahí no hay prueba viva de que el re-import quedó bien.
 - [ ] **A.5** Con A.2/A.3 en mano, **cerrar la decisión de §3** (Airtable vs. dashboard propio) en un
-      ADR. Es el gate de todo lo demás.
+      ADR. Es el gate de todo lo demás. **Insumo listo en [mapa-campos §5.2](./mapa-campos.md):** el eje
+      operativo aguanta en Airtable (sus problemas son de curaduría), el analítico es donde se rompe.
+      ⚠️ **Precondición para no decidir con sesgo:** hacer B.6(2) (curar *Salud del Sistema*) **antes** —
+      las 3 páginas analíticas nunca se curaron después del split del 2026-07-15, así que hoy la
+      comparación sería contra un Airtable mal configurado.
 
 **Hecho cuando:** existe un mapa donde cada nodo, campo y página tiene propósito y dueño; los huérfanos
 están listados con veredicto (podar/documentar, nunca borrar en silencio); repo↔live reconciliado; y la
@@ -210,6 +221,12 @@ correr) y la **racionalización de campos** que salga de la auditoría.
 - [ ] **B.1** Definir el **flujo de una corrida efectiva** de punta a punta: cómo el equipo elige Voz,
       ve sus proyectos, prende/apaga referentes, fija N, dispara, y ve el resultado. Este flujo es el
       contrato que B.2 y el componente C (motor) implementan.
+      **3 decisiones que le abrió la auditoría** ([mapa-campos §2.5 y §5.1](./mapa-campos.md)): el alta
+      de proyecto (el form *Nuevo Proyecto* vive fuera del interface y permite proyectos **sin
+      criterios** ⇒ gate fail-open = ruido: hacerlo obligatorio, sacarle el link inverso `Candidatos`, y
+      decidir si entra al interface o se borra) · si un referente puede **cruzar voces** (hoy el schema
+      lo permite y el motor lo ejecuta; la independencia es convención, no garantía) · si la vista
+      "🔥 Seleccionados" sube de vista cruda a página del cockpit.
 - [ ] **B.2** **Mecanismo de disparo** ([ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md), cerrado):
       **botón nativo de Airtable → "Run automation" → webhook de Producción de n8n**. Señal desnuda
       ("correr ahora", sin payload); el motor lee Airtable. Una corrida = todos los proyectos activos, cada
@@ -222,12 +239,24 @@ correr) y la **racionalización de campos** que salga de la auditoría.
       `diagnostico`, muertas en filas GLOBAL) · los links inversos auto-creados que el equipo ve
       (`Proyectos.Referentes`/`.Candidatos`/…, `Voces.Proyectos`/`.Candidatos`) · la descripción de la
       tabla `Voces` en vivo, todavía pre-ADR-009 ("Eje de generación (cómo suena)").
+      **Suma A.3** ([mapa-campos §5.1](./mapa-campos.md)): pasar a **read-only** lo que escribe la
+      máquina y hoy el equipo puede pisar (*Feed*: `titulo`/`thumbnail`/`referente` · *Referentes -
+      Revisar*: `tasa_gate`/`tasa_aprobacion`/`videos_evaluados` · las 2 páginas de Métricas: **todo**,
+      sobre tablas que el contrato declara solo-lectura). El modelo a copiar es *Configuración Global*.
 - [ ] **B.4** `Mínimo likes/vistas` **team-facing**: marcar `Mostrar al equipo ✓` en esas 2 filas de
       `Ajustes` (probablemente el cambio completo — confirmar en la auditoría).
 - [ ] **B.5** Toggle de **Voz** visible/editable para el equipo (pareja del campo de datos en E).
-- [ ] **B.6** Cerrar **Métricas + Costos** (arrastre cierres 37-39): publicar *Costos*, curar *Métricas
-      de Calidad* / *Salud del Sistema*, `veredicto` editable en *Descartes*, precision como %. **Candidato
-      #1 a dashboard propio read-only** si se va por esa vía (lee Supabase directo).
+- [ ] **B.6** Cerrar **Métricas + Costos** (arrastre cierres 37-39), ahora con el diagnóstico preciso de
+      [mapa-campos §5.1](./mapa-campos.md): **(1)** `veredicto` **editable** en *Descartes* — **no es
+      cosmético**: es el único campo que lee una máquina ahí, y read-only deja `falsos_negativos` en 0
+      para siempre (se lee como "el gate está perfecto"). **(2)** curar *Salud del Sistema*: hoy muestra
+      campos de calidad y una columna muerta (`diagnostico` en filas GLOBAL) y **no muestra el embudo**
+      (`colectados`/`pretrim`/`gate_pass`/`entregados`/`runs_ok`/`runs_fallo`/`duracion_min`/`sin_guion`/
+      `falsos_negativos` no están en ninguna página). **(3)** *Calidad por Proyecto*: sumar
+      `separacion_gate`, `precision` como %. **(4)** publicar *Costos* + verificar que el filtro de
+      semana exista (sin él suma toda la historia). **(5)** sumar `advertencia_criterios` +
+      `criterios_aprendidos` a la página *Proyectos*. **Hacer (2) antes de A.5** — es la prueba honesta
+      de si Airtable se queda corto ([§5.2](./mapa-campos.md)).
 
 **Hecho cuando:** el equipo puede, desde la superficie elegida, elegir una Voz y un Proyecto, fijar N,
 disparar una corrida, y ver Métricas/Costos reales — con una superficie de campos coherente y sin ruido.
