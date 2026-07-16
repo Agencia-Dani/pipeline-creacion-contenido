@@ -116,7 +116,7 @@ Buena parte del andamiaje ya está. Verificado contra
 |---|---|---|
 | Voces como tabla, criterios, link a proyectos | ✅ tabla `Voces`; `Proyectos.voz_default` (1 voz/proyecto) | — |
 | Referente por proyecto, toggleable | ✅ `Referentes.proyecto` + `Referentes.activo` | — |
-| Referentes independientes entre voces | ✅ implícito (referente → 1 proyecto → 1 voz) | confirmar en la auditoría |
+| Referentes independientes entre voces | ⚠️ **convención, no garantía** — `Referentes.proyecto` es multi-link y el motor itera el array entero: un referente puede alimentar proyectos de 2 voces ([mapa-campos §2.5](./mapa-campos.md)) | decidir en B.1/E: documentar como permitido, o restringir |
 | Proyecto toggleable | ✅ `Proyectos.activo` | — |
 | **Voz toggleable** | ❌ no hay `Voces.activo` | campo nuevo + el motor lo respeta |
 | **N por proyecto** | ❌ N es **global** (`Candidatos por corrida`=100; ADR-016 lo sacó del proyecto a propósito) | ADR-024 (cerrado): N vuelve a `Proyectos`, global = default, corte por proyecto |
@@ -176,12 +176,13 @@ cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, f
 
 - [ ] **A.1** Verificar los 3 `workflow.json` contra dev-doc/guía: cada nodo existe, hace lo dicho, y
       está cableado (0 refs rotas, 0 huérfanos — reusar el chequeo de grafo de cierres 34/36).
-- [ ] 🔧 **A.2** Mapa **campo × tabla × quién-escribe/lee**: para cada campo de las 9 tablas, quién lo
-      llena (motor/archivado/descubrimiento/equipo) y quién lo lee. **Responde las 4 preguntas de Mani:
-      ¿cada campo cómo se maneja? ¿cómo influye en el workflow? ¿es necesario? ¿está estandarizado?**
-      Marcar campos sin lector o sin escritor (candidatos a huérfano). Confirmar la base viva por MCP.
-      → **El entregable vive en [mapa-campos.md](./mapa-campos.md)** (en curso: hallazgos y
-      reconciliación repo↔live cerrados 2026-07-16; falta el barrido campo por campo, ver su §4).
+- [x] **A.2** ✅ Mapa **campo × tabla × quién-escribe/lee** de las 9 tablas → entregable completo en
+      **[mapa-campos.md](./mapa-campos.md)** (§4 el mapa, §2 los hallazgos). Responde las 4 preguntas de
+      Mani. Base viva confirmada por MCP. **Huérfanos con veredicto, todos enganchados a su componente:**
+      `banda_descarte_min`/`max` → C.5 · lecturas fantasma `tema`/`link_doc` → D.4 · `notas_equipo` y
+      `viral_por_tamano` → D.3 · las 4 columnas de calidad de `Métricas Global`, los links inversos y la
+      descripción pre-ADR-009 de `Voces` → B.3 · `Candidatos.fecha` manual → pasada única (§3 del mapa).
+      **Lo que abre:** el multi-link de `Referentes.proyecto` cruza voces ([§2.5](./mapa-campos.md)) → B.1/E.
 - [ ] **A.3** Mapa **página/vista × tabla × propósito**: cada página del interface *Cockpit Redes*, qué
       tabla lee, qué filtro, edit/solo-lectura, para qué la usa el equipo. Flagear páginas sin uso claro.
 - [x] **A.4** Reconciliar **repo ↔ live**: ✅ **el gap de workflows se cerró solo — Mani re-importó los 3
@@ -278,6 +279,14 @@ rompe el cómputo semanal ni la salud por referente.
       (b) archivarlo a `outputs.metadata` para dejar de perderlo aunque no se use aún; (c) declararlo
       scratch-pad efímero. **(a) cambia qué consume el loop → va con enmienda de ADR-022.** (b) es barato
       y reversible, y de paso construye el corpus para decidir (a) con datos.
+      **Se le suma `viral_por_tamano`** ([mapa-campos §2.1](./mapa-campos.md)): mismo patrón (lo escribe
+      el motor, no va a `outputs.metadata` ni al Sheet, muere con el record) → nunca se va a poder medir
+      si lo viral se aprueba más. La salida (b) los cubre a los dos de una.
+- [ ] **D.4** **Podar 2 lecturas fantasma del archivado** ([mapa-campos §2.1](./mapa-campos.md)):
+      `Armar filas archivado` lee `f.tema` y `f.link_doc` de cada Candidato para llenar
+      `outputs.metadata` — **esos campos no existen** en la tabla, así que archiva `''` siempre. Residuo
+      pre-ADR-009. Cero cambio de conducta; toca `workflow.json` → se arrastra con el re-import, igual
+      que C.5. Si D.3 va por (b), hacerlo en la misma pasada sobre ese nodo.
 
 **Hecho cuando:** tras un ciclo con corridas por-proyecto, `Métricas`/`Costos` y la salud por referente
 se computan igual de bien que con el barrido semanal.
