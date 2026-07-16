@@ -37,6 +37,10 @@
      botón "▶ Correr ahora" ([contrato §Disparo on-demand](../../core/contracts/airtable-cockpit.md)).
   **Cambio de conducta al re-importar:** solo el arranque (guard + `trigger_type` honesto); N vacía y
   las 3 voces prendidas siguen dando la conducta de hoy. El guard aplica también al cron/manual.
+- 🟠 **Re-import del ARCHIVADO pendiente (D, cierre 49).** Su `workflow.json` cambió en el repo:
+  `notas_equipo`/`viral_por_tamano` a `outputs.metadata` (D.3b), poda de `tema`/`link_doc` (D.4),
+  salteo de corridas vivas en `runs_ok/fallo` (matiz D.2, knob `ventana_corrida_min` en su Config).
+  Sin placeholder nuevo (no tiene webhook). Puede ir en la misma sesión de n8n que el del motor.
 > ✅ **Los 2 proyectos con 2 voces: RESUELTO por Mani el 2026-07-16** (mismo día del hallazgo). La regla
 > queda firme y es la esencia del refactor: **un proyecto tiene UNA voz; una voz tiene VARIOS
 > proyectos**. Dato limpio, verificado por MCP (6 proyectos, 1 voz cada uno, 2 por voz). *Coletazo a
@@ -93,7 +97,7 @@ El detalle de cada componente y el "hecho cuando" viven en
 | **A** Auditoría del pipeline vivo | mapa nodo/campo/página + reconciliar repo↔live + decisión §3 (ADR) | Dev 1 | 🔧 **A.1 ✅ · A.2 ✅ · A.3 ✅ · A.4 ✅** · **A.5 ⬜** (la decisión §3) — pero antes **B.6(2)**, ver abajo |
 | **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | ⬜ **B.6 destrabado y priorizado** por A.3 (3 hallazgos 🔴) |
 | **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | ✅ **COMPLETO en el repo** (C.1–C.5, cierres 45–48), **sin re-importar** — el re-import quedó destrabado (§Pendiente vivo). C.4 confirmado a nivel repo; la prueba viva = V-run post re-import |
-| **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | 🔧 **D.1 ✅ · D.2 ✅** (suma sobre todos los runs de la semana, no asume barrido total; matiz `runs_fallo`×`en_curso` flagueado en el plan) · D.3 ⬜ (decisión Mani) · D.4 ⬜ opcional |
+| **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | ✅ **COMPLETO en el repo** (cierres 48–49): D.1/D.2 confirmados (suma sobre todos los runs, no asume barrido total) + matiz `runs_fallo`×`en_curso` arreglado + **D.3(b)** (`notas_equipo`/`viral_por_tamano` → `outputs.metadata`) + **D.4** (poda `tema`/`link_doc`). **Sin re-importar** |
 | **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización (autorizado por el ADR de A.5) | Dev 1 | 🔧 **E.1 ✅** (`Voces.activo` vivo) · **E.2 ✅ mitad-repo** (señal desnuda ⇒ sin campos nuevos; contrato documentado — falta botón+automation a mano, va con B.2) · E.3 ⬜ (espera B.3/A.5) |
 
 ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)
@@ -109,11 +113,10 @@ builder Node) y C.4 (dedup confirmado a nivel repo) cerraron. Lo que sigue en es
 
 1. **El re-import del motor** — ya no espera nada; checklist en §Pendiente vivo (es de Mani: n8n +
    el path del webhook + la automation/botón en Airtable).
-2. **D (archivado): D.1/D.2 también cerraron** (mismo cierre 48): la agregación suma sobre todos
-   los runs de la semana, sin asumir barrido total — detalle y el matiz `runs_fallo`×`en_curso` en
-   el plan (D.2). Lo que queda de D son **decisiones de Mani**: D.3 (`notas_equipo`/
-   `viral_por_tamano`, salida (b) recomendada barata) y D.4 (poda opcional, solo si D.3 va por (b)),
-   más el matiz de D.2 si molesta.
+2. **D (archivado): COMPLETO en el repo** (cierres 48–49): D.1/D.2 confirmados (suma sobre todos
+   los runs de la semana, sin asumir barrido total), y las decisiones que quedaban las tomó Mani el
+   mismo día: D.3 por la salida (b), D.4 aprovechado, matiz `runs_fallo`×`en_curso` arreglado.
+   Falta solo su **re-import** (§Pendiente vivo).
 3. **La prueba viva de C** llega con la V-run post re-import: corrida botón + cron de la misma
    semana, sin candidatos repetidos y con `trigger_type` distinguible en `runs`.
 
@@ -122,14 +125,13 @@ builder Node) y C.4 (dedup confirmado a nivel repo) cerraron. Lo que sigue en es
 eso, la decisión Airtable-vs-dashboard se toma contra un Airtable mal configurado. Y **B.5**: mostrarle
 `Voces.activo` al equipo en la página *Voces* (el campo ya existe y el motor ya lo respeta).
 
-**2 decisiones abiertas que no debe tomar un agente solo** (documentadas donde corresponde):
+**Las 2 decisiones abiertas se CERRARON el 2026-07-16 (cierre 49, consultadas a Mani):**
+el **descubrimiento NO respeta `Voces.activo` a propósito** (despensa para voces pausadas —
+documentado en el plan §Descubrimiento y el README del descubrimiento para que nadie lo "arregle") ·
+**`notas_equipo` + `viral_por_tamano` van a `outputs.metadata`** (D.3 salida (b); la (a) — que entren
+al destilado — se decidirá con el corpus que (b) acumula).
 
-| Qué | Dónde | Por qué importa |
-|---|---|---|
-| **El descubrimiento no respeta `Voces.activo`** | [plan §Descubrimiento](./refactor-voces-proyectos.md) | fix de 1 línea, pero puede ser deseable como está (tener referentes listos para cuando prendas la voz) |
-| **`notas_equipo` + `viral_por_tamano` se destruyen** | D.3 del plan · [mapa-campos §2.2](./mapa-campos.md) | la señal más rica del equipo no entra al loop de aprendizaje |
-
-*(Cerrada el 2026-07-16: los 2 proyectos con 2 voces — **1 proyecto = 1 voz** es regla firme, dato ya
+*(Cerrada antes, mismo día: los 2 proyectos con 2 voces — **1 proyecto = 1 voz** es regla firme, dato ya
 limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-campos §2.5](./mapa-campos.md).)*
 
 **Contexto que ahorra media hora de re-derivar:**
@@ -145,6 +147,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-16 (cierre 49) — Las 3 decisiones abiertas del carril, consultadas y ejecutadas: D queda COMPLETO en el repo (Mani + Claude).** Continuación inmediata del 48; cierra todo lo que el carril del motor tenía "esperando a Mani" preguntándole en vivo. **(1) D.3 → salida (b):** `Armar filas archivado` ahora lleva **`notas_equipo` y `viral_por_tamano` a `outputs.metadata`** (al Sheet no van). La señal cualitativa del equipo (el *por qué* de un 👎) y la marca viral dejan de morir con el record cada domingo; "¿lo viral se aprueba más?" pasa a ser una query SQL. **La (a) — que las notas entren al destilado de Haiku — queda abierta a propósito:** se decide con el corpus que (b) empieza a acumular (si va, es enmienda de ADR-022). **(2) D.4 aprovechado** (el plan lo autorizaba solo si D.3 iba por (b)): podadas las lecturas vestigiales `f.tema`/`f.link_doc` del mismo nodo — archivaban `''` desde ADR-019/009; las filas viejas conservan sus keys en el jsonb y `v_senal_tema` ya era inerte. **(3) Matiz D.2 arreglado:** `Computar métricas semana` **saltea los `en_curso` más jóvenes que `ventana_corrida_min`** al contar `runs_ok/fallo` (knob nuevo en el Config del archivado, 120, mismo nombre/semántica que el motor) — un click del botón cerca del domingo 6pm ya no cuenta como fallo; un `en_curso` más viejo es zombie y sigue contando. Loguea `corridas vivas salteadas: n`. **(4) Descubrimiento vs `Voces.activo` → se queda como está, DELIBERADO:** una voz apagada sigue recibiendo propuestas (barato, despensa para cuando se prenda). Documentado en el plan §Descubrimiento y en el README del descubrimiento con "no lo arregles" explícito — la decisión pasó de "pendiente" a "tomada", que es lo que evita el fix silencioso de un agente futuro. **Archivos:** `workflow-archivado/workflow.json` (builder Node, 3 nodos tocados: Config, `Armar filas archivado`, `Computar métricas semana`), plan (D.3/D.4 ✅, D.2 actualizado, §Descubrimiento decidido), mapa-campos (§2.1/§2.2/§4 resueltos), dev-doc (§4.2 filas 3/10/17d, §6 convención de metadata), README del descubrimiento. **Verificación:** grafo del archivado limpio (37 nodos, 10 code nodes, sintaxis OK), validador **1228/0**, secretos limpios. **Estado:** C y D completos en el repo, **ninguno re-importado** — el §Pendiente vivo tiene los 2 checklists (motor con webhook path; archivado sin placeholders nuevos, puede ir en la misma sesión de n8n). **Próximo paso:** los re-imports + botón/automation (Mani); en código del refactor no queda nada que no espere a A.5/B (carril superficie).
 
 **2026-07-16 (cierre 48) — C.3 + C.4: el webhook single-flight está construido y C queda COMPLETO en el repo (Mani + Claude).** Cierra el carril del motor. **C.3 (ADR-023, builder Node):** nodo `Disparo on-demand (webhook)` (POST, path placeholder `<<WEBHOOK_PATH_MOTOR>>` — la URL de Producción dispara corridas pagas, va al gestor, jamás a git; responde 200 inmediato) + el guard. **Las 3 decisiones las tomó Mani** (consultadas, no asumidas): (1) **el guard aplica a los 3 triggers**, no solo al webhook — sin eso el cron del lunes podía arrancar encima de una on-demand viva, el barredor zombie la marcaba `fallo` y las dos corrían en paralelo pagando doble; costo aceptado: si hay corrida viva a la hora del cron, esa semana se saltea (recuperable con el botón). (2) **Vivo vs. zombie por `ventana_corrida_min`** (knob nuevo del Config, 120 min; 19→20 knobs): `en_curso` más joven = viva (bloquea), más viejo = zombie. **El barredor zombie se movió ANTES del guard** y ganó umbral de edad — así un zombie jamás traba el motor (con el orden viejo, barrido-después-de-abrir, un zombie habría bloqueado todo para siempre) y ya no necesita excluir su propio run id. (3) **Check-then-act aceptado**: ventana residual de ~1-2 s entre clicks casi simultáneos (peor caso: costo doble + candidatos duplicados esa vez; `processed_items` no se ensucia); se descartó el unique index parcial en Supabase. **Arranque nuevo del motor (33→37 nodos):** `[cron|manual|webhook] → Config → Barrer runs zombie → Leer corridas vivas → Guard single-flight → (libre) Abrir run → Leer Proyectos`, con la rama bloqueada muriendo en un NoOp **sin abrir run** (un click bloqueado no ensucia `runs_fallo` ni la salud). Fail-open intacto: Supabase caído ⇒ el guard deja pasar. **Bonus de trazabilidad:** `Abrir run` registra el `trigger_type` real (`on_demand`/`manual`/`cron` vía `isExecuted` — antes TODO se registraba `'cron'`; el check de 001 ya permitía los 3). **C.4 (confirmar, no asumir — confirmado a nivel repo):** la coexistencia secuencial cron+on-demand es limpia por diseño (`unique(platform, external_id)` de 002 + `ignore-duplicates` + `Leer procesados`/`Heat-score` — quien corre primero se lleva el video) y **el archivado no filtra por `trigger_type`** ⇒ las corridas on-demand entran solas a Métricas (medio D.2 de regalo). Matiz documentado en el contrato: **un segundo click re-paga scrape+pre-trim aunque entregue nada nuevo** (el dedup corta en Heat-score, después del pre-trim) — el botón no es gratis. **E.2 quedó ✅ en su mitad-repo:** con la señal desnuda no hay tabla `Corridas` ni campos nuevos; lo que falta es a mano (botón + automation, la API no los crea) → B.2, checklist en §Pendiente vivo y en el contrato §Disparo on-demand. **Drift ajeno corregido de pasada:** el manifest (`workflow.yaml`) todavía listaba `banda_descarte_min/max` como filters (C.5 los podó del Config en el cierre 45) — podados; sumado el trigger webhook y `ventana_corrida_min`. **Docs:** enmienda C.3 en ADR-023 (el "cómo" del guard) · dev-doc §1/§2.1/§2.2/§9 (topología nueva, filas 2b/4/4b/4c/4d) · contrato cockpit §Disparo on-demand nuevo · README/CLAUDE.md del motor · checklist manual de `setup-airtable.mjs`. **Verificación:** grafo 0 problemas (37 nodos, 3 triggers, 15 code nodes) · `test-nodos.mjs` verde (los jsCode no se tocaron) · validador **1228/0**, secretos limpios. **⚠️ El guard NO está probado en vivo** (es httpRequest+IF, no code node — `test-nodos.mjs` no lo cubre): la prueba real es el re-import + un Execute con una corrida ya corriendo. **Bonus del mismo cierre — D.1 + D.2 ✅:** leídos `Computar métricas semana` y `Computar salud referentes` del archivado: **no asumen el barrido total** — suman sobre todos los runs de la semana (dedup por id, `duracion_min` promedia, `por_referente` acumula, min de muestra al total semanal); la calidad por proyecto ni mira runs. Matiz flagueado sin parchear (D.2 del plan): `runs_fallo` contaría como fallo un run legítimamente `en_curso` al momento del archivado — imposible con solo cron, posible con un click del botón ~5:45pm del domingo; cosmético, fix barato si Mani lo quiere. **Próximo paso:** re-import del motor (Mani, checklist §Pendiente vivo) + botón/automation en Airtable (B.2); en código del carril motor solo quedan decisiones de Mani (D.3, D.4, matiz D.2); los carriles de superficie siguen (B.6 → A.5).
 

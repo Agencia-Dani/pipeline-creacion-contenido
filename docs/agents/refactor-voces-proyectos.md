@@ -332,27 +332,21 @@ rompe el cómputo semanal ni la salud por referente.
       on-demand): `runs_fallo` cuenta como fallo cualquier run no-`ok`, **incluido uno legítimamente
       `en_curso`** al correr el archivado (domingo 6pm). Con solo cron era imposible; con el botón, un
       click ~5:45pm del domingo se cuenta fallo esa semana (cosmético: ensucia `runs_ok/runs_fallo`
-      una vez, no rompe nada). Fix barato si molesta: excluir/contar aparte los `en_curso` más jóvenes
-      que `ventana_corrida_min` en `Computar métricas semana`. **Decisión de Mani** — si va, se
-      arrastra con el próximo re-import del archivado.
-- [ ] ⭐ **D.3 (a revisar — lo abre A.2):** **`notas_equipo` no entra al loop de aprendizaje y se destruye.**
-      El equipo escribe su razonamiento en `Candidatos.notas_equipo`; **ningún workflow lo lee** (no va a
-      `outputs.metadata` ni al Sheet) y el archivado borra el record cada domingo. Y `Destilar criterios`
-      (ADR-022 — el nodo que existe para *aprender de las decisiones del equipo*) solo le manda
-      `titulo`+`script` a Haiku. **Puede ser la señal más valiosa que produce el equipo** (el *por qué*
-      de un 👎, que ni el script ni el score capturan) y hoy se tira a la basura. Revisar las 3 salidas
-      de [mapa-campos.md §2.2](./mapa-campos.md): (a) sumarlo al `_snip` de `Destilar criterios`;
-      (b) archivarlo a `outputs.metadata` para dejar de perderlo aunque no se use aún; (c) declararlo
-      scratch-pad efímero. **(a) cambia qué consume el loop → va con enmienda de ADR-022.** (b) es barato
-      y reversible, y de paso construye el corpus para decidir (a) con datos.
-      **Se le suma `viral_por_tamano`** ([mapa-campos §2.1](./mapa-campos.md)): mismo patrón (lo escribe
-      el motor, no va a `outputs.metadata` ni al Sheet, muere con el record) → nunca se va a poder medir
-      si lo viral se aprueba más. La salida (b) los cubre a los dos de una.
-- [ ] **D.4** *(opcional, cosmético)* **Podar 2 lecturas vestigiales del archivado**
-      ([mapa-campos §2.1](./mapa-campos.md)): `Armar filas archivado` lee `f.tema` y `f.link_doc`, que no
-      existen en `Candidatos` → archiva `''` siempre. **Ya está documentado como deliberado** (dev-doc §8:
-      `tema` fail-safe, `link_doc` vestigial), así que esto es sacar ruido, no arreglar un bug. Cero
-      cambio de conducta. Solo vale la pena **si D.3 va por (b)** y ya se va a tocar ese nodo.
+      una vez, no rompe nada). **Arreglado (decisión Mani, mismo día):** `Computar métricas semana`
+      saltea los `en_curso` más jóvenes que `ventana_corrida_min` (knob nuevo en el Config del
+      archivado, 120 — mismo nombre y semántica que en el motor); un `en_curso` más viejo es zombie y
+      sigue contando fallo. Se arrastra con el re-import del archivado.
+- [x] ⭐ **D.3** ✅ **Decidido por Mani (2026-07-16): la salida (b)** de las 3 de
+      [mapa-campos §2.2](./mapa-campos.md) — `Armar filas archivado` ahora lleva **`notas_equipo` y
+      `viral_por_tamano` a `outputs.metadata`** (al Sheet no van). Dejan de morir con el record cada
+      domingo; el *por qué* de un 👎 y la marca viral quedan consultables por SQL sobre `outputs`.
+      **La (a) (que las notas entren al destilado de Haiku) queda abierta a propósito:** se decidirá
+      con el corpus que (b) empieza a acumular — si va, es enmienda de ADR-022. Pendiente de
+      **re-import del archivado**.
+- [x] **D.4** ✅ Podadas las 2 lecturas vestigiales (`f.tema`, `f.link_doc`) de `Armar filas archivado`
+      (2026-07-16) — se aprovechó que D.3(b) ya tocaba ese nodo, como preveía el plan. Cero cambio de
+      conducta (archivaban `''` siempre); las filas viejas conservan sus keys en el jsonb y
+      `v_senal_tema` ya era inerte (ADR-019).
 
 **Hecho cuando:** tras un ciclo con corridas por-proyecto, `Métricas`/`Costos` y la salud por referente
 se computan igual de bien que con el barrido semanal.
@@ -384,14 +378,12 @@ El workflow de descubrimiento (ADR-020) no cambia por este refactor: propone ref
 que ya viven bajo una voz. Solo se **audita** (parte de A) para confirmar que no queda huérfano y que
 respeta la jerarquía.
 
-⚠️ **Decisión abierta que dejó C.2 (2026-07-16):** `Voces.activo` ya existe y **el motor lo respeta**,
-pero el **descubrimiento no** — su `Leer Voces` sigue trayendo todas y su `Leer Proyectos` filtra solo
-por `Proyectos.activo`. O sea: una voz apagada **no corre en el motor pero sí recibe propuestas de
-referentes** cada semana. Es barato (el descubrimiento no es lo caro) pero incoherente con "la voz se
-prende/apaga como unidad". **El fix es 1 línea** (copiar el `filterByFormula={activo}` en su `Leer
-Voces` y saltear igual que `Armar plan de corrida`), pero cambia conducta y hay que decidirlo, no
-asumirlo: quizá quieras seguir descubriendo referentes para una voz pausada, justamente para tenerlos
-listos cuando la prendas.
+✅ **Decidido por Mani (2026-07-16): el descubrimiento NO respeta `Voces.activo`, a propósito.**
+Una voz apagada no corre en el motor pero **sigue recibiendo propuestas de referentes** cada semana:
+es barato (el descubrimiento no paga Supadata/gate) y llena la despensa para cuando la voz se prenda.
+**Es deliberado — no lo "arregles"** copiando el filtro de C.2 a su `Leer Voces`; si algún día
+molesta (ruido en *Referentes propuestos* de voces muertas), el fix sigue siendo 1 línea con el
+patrón de C.2, pero se decide de nuevo, no se asume.
 
 ## 5. Cómo se reparte entre 2 devs
 

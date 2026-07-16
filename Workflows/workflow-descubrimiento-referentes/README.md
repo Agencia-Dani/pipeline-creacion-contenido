@@ -13,6 +13,9 @@ funcionan* y el equipo decide cuáles entran. El porqué de cada decisión está
    copia a mano.
 2. **Semillas** — referentes IG activos de proyectos activos, rankeados por `v_senal_seleccion`
    (tasa de selección del equipo); sin señal entran todos. Tope `cap_semillas` (8).
+   ⚠️ **Deliberado (decisión Mani 2026-07-16): este workflow NO filtra por `Voces.activo`** (el motor
+   sí, C.2). Una voz apagada sigue recibiendo propuestas — es barato y llena la despensa para cuando
+   se prenda. No lo "arregles" copiando el filtro del motor.
 3. **Sugeridos** — Apify `instagram-profile-scraper` trae el perfil de cada semilla con sus
    `relatedProfiles` (las cuentas "sugeridas" del propio algoritmo de IG, ~20 por semilla).
 4. **Dedup + ranking** — fuera privados, fuera handles ya en `Referentes` (activos o no) o en

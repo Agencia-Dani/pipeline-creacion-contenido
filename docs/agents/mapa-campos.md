@@ -37,10 +37,10 @@ Tres fuentes, cruzadas:
 | Qué | Dónde | Veredicto |
 |---|---|---|
 | `banda_descarte_min` · `banda_descarte_max` (0.35 / 0.6) | nodo `Config` del **motor** | 🔴 **Muertos.** Los dejó la enmienda 2026-07-13 que reemplazó la banda fija por el **top-K** (`cap_descartes`). Ningún nodo los lee. **Podar en C** (tocan `workflow.json`). |
-| `Candidatos.notas_equipo` | tabla `Candidatos` | 🟠 **Write-only del equipo, y se destruye.** Ningún workflow lo lee: no va al `metadata` de `outputs`, no va al Sheet, y el archivado borra el record cada domingo. Ver §2.2. |
+| `Candidatos.notas_equipo` | tabla `Candidatos` | ✅ **Resuelto (D.3(b), Mani 2026-07-16):** `Armar filas archivado` ahora lo lleva a `outputs.metadata` — deja de morir con el record. Al Sheet no va (a propósito). Si algún día entra al destilado de criterios (la salida (a)), se decide con este corpus. Ver §2.2. |
 | `Métricas Global`: `score_aprobados`, `score_descartados`, `separacion_gate`, `diagnostico` | **solo en la base viva** | 🟠 **Residuo del split del 2026-07-15.** Son campos de *calidad* (pertenecen a `Métricas Proyectos`). La tabla live es la vieja `Métricas` **renombrada**, así que arrastra sus columnas; `Métricas Proyectos` se creó nueva. `setup-airtable.mjs` **no** las declara y `Computar métricas semana` **no** las escribe en filas GLOBAL → columnas muertas en la cara del equipo. **Podar en B.3.** |
-| `f.tema` · `f.link_doc` | nodo `Armar filas archivado` del **archivado** | 🟡 **Vestigiales — ya documentados, no son un hallazgo.** El nodo los lee para llenar `outputs.metadata` y **no existen** en `Candidatos`, así que archiva `''` siempre. Pero **es deliberado y está escrito**: [dev-doc §8](./dev-doc.md) los llama *`tema` (`''` fail-safe)* y *`link_doc` (vestigial, siempre `''`)*, y [`004_historico_script_texto.sql`](../../core/schema/004_historico_script_texto.sql) dice que `link_doc` quedó vestigial al pasar el histórico a texto. `tema` murió con el eje keyword (ADR-019), `link_doc` con ADR-009. Poda **opcional** (**D.4**): cero cambio de conducta, solo saca ruido del registro. *(Anotado primero como 🔴 hallazgo nuevo en el cierre 43 — error mío: estaba documentado. Corregido en el 44.)* |
-| `Candidatos.viral_por_tamano` | tabla `Candidatos` | 🟠 **Marca write-only que no sobrevive.** La escribe el motor, la ve el equipo, pero **no va a `outputs.metadata` ni al Sheet** → cuando el archivado borra el record, se pierde. Nunca vas a poder preguntar "¿lo viral se aprueba más?". Mismo patrón y mismo fix barato que `notas_equipo` (b) → **D.3**. |
+| `f.tema` · `f.link_doc` | nodo `Armar filas archivado` del **archivado** | ✅ **Podados (D.4, 2026-07-16)** — se aprovechó que D.3(b) ya tocaba ese nodo, como preveía el plan. Eran vestigiales documentados (`tema` murió con ADR-019, `link_doc` con ADR-009; archivaban `''` siempre); las filas viejas de `outputs` conservan las keys en su jsonb y `v_senal_tema` ya era inerte. Cero cambio de conducta. *(Anotado primero como 🔴 hallazgo nuevo en el cierre 43 — error mío: estaba documentado. Corregido en el 44.)* |
+| `Candidatos.viral_por_tamano` | tabla `Candidatos` | ✅ **Resuelto (D.3(b), Mani 2026-07-16):** va a `outputs.metadata` junto con `notas_equipo` — "¿lo viral se aprueba más?" ya se puede responder con SQL sobre `outputs` de acá en adelante. |
 | Links inversos auto-creados: `Proyectos.Referentes`, `Proyectos.Candidatos`, `Proyectos.Referentes propuestos`, `Proyectos.Descartes del gate`, `Voces.Proyectos`, `Voces.Candidatos` | base viva | 🟡 Artefacto de Airtable (todo link crea su inverso). Nadie los declaró ni los lee, pero **el equipo los ve**. Decidir en **B.3** si se ocultan de las páginas. |
 
 **`Ajustes.Mostrar al equipo` NO es huérfano** aunque ningún workflow lo lea: es el filtro de la página
@@ -53,13 +53,14 @@ Peor: `Destilar criterios` (ADR-022 — el nodo cuyo propósito literal es *apre
 equipo*) solo le manda **`titulo` + `script`** a Haiku (verificado en su `_snip`). O sea que la señal
 cualitativa más rica que produce el equipo no entra al loop que existe para consumirla.
 
-Tres salidas posibles, **sin decidir**: (a) sumar `notas_equipo` al `_snip` de `Destilar criterios`
-(cambia qué consume el loop → **enmienda de ADR-022**); (b) archivarlo a `outputs.metadata` para
-no perderlo aunque no se use hoy (barato, reversible, y construye el corpus para decidir (a) con datos);
-(c) declararlo scratch-pad efímero a propósito y documentarlo.
+Tres salidas posibles: (a) sumar `notas_equipo` al `_snip` de `Destilar criterios` (cambia qué
+consume el loop → **enmienda de ADR-022**); (b) archivarlo a `outputs.metadata` para no perderlo
+aunque no se use hoy; (c) declararlo scratch-pad efímero a propósito.
 
-→ **En el plan como [D.3](./refactor-voces-proyectos.md) (Mani, 2026-07-16): a revisar** — puede ser la
-señal más valiosa que produce el equipo (el *por qué* de un 👎, que ni el script ni el score capturan).
+→ **Decidido (D.3, Mani 2026-07-16): la (b).** Barata, reversible, y construye el corpus para decidir
+(a) con datos — cuando haya semanas de `notas_equipo` en `outputs.metadata`, se puede juzgar si el
+*por qué* de un 👎 mejora el destilado antes de tocar ADR-022. Implementado en `Armar filas archivado`
+(pendiente de re-import del archivado).
 
 ### 2.3 Reconciliación repo ↔ live (insumo de A.4)
 
@@ -197,10 +198,10 @@ Los escribe **MOTOR** (`Preparar batch Airtable`) salvo donde diga otra cosa. **
 | `relevancia_razon` | MOTOR (`Gate`) | ARCH → `outputs.metadata` + Sheet | ✅ |
 | `referente` · `url_referente` | MOTOR | ARCH → `outputs.metadata` + `source_items` | ✅ |
 | `thumbnail` | MOTOR | **equipo** (no se archiva) | ✅ Ayuda visual para calificar; muere con el record. |
-| `viral_por_tamano` | MOTOR | **nadie** — ni `outputs`, ni Sheet, ni Métricas | 🟠 **Marca visual write-only.** Sirve al equipo mientras el record vive, pero **no sobrevive al archivado**: no se puede analizar después si lo viral se aprueba más. Barato de arreglar (sumarlo a `outputs.metadata`, mismo caso (b) que `notas_equipo`) → **D.3**. |
+| `viral_por_tamano` | MOTOR | ARCH → `outputs.metadata` (**D.3(b), 2026-07-16**; al Sheet no va) | ✅ Sobrevive al archivado — "¿lo viral se aprueba más?" se responde con SQL sobre `outputs`. |
 | `calificacion` (🔥/👍/👎) | **equipo** | ARCH → `outputs.metadata` + Sheet · **`Destilar`** (los 🔥 son los ejemplos positivos) | ✅ La señal del equipo que **sí** entra al loop. |
 | `estado` | MOTOR (`nuevo`) → **equipo** | ARCH (`filterByFormula NOT({estado}='nuevo')` = qué archivar; barrido de `nuevo` viejos; `Computar métricas`; `Destilar`) | ✅ El campo más load-bearing de la tabla. |
-| `notas_equipo` | **equipo** | **nadie** | 🟠 Huérfano y se destruye (§2.1/§2.2) → **D.3**. |
+| `notas_equipo` | **equipo** | ARCH → `outputs.metadata` (**D.3(b), 2026-07-16**) | ✅ Deja de destruirse (§2.2); si entra al destilado (salida (a)) se decide con este corpus. |
 | `proyecto` · `voz` (links) | MOTOR | ARCH (`Armar filas`, `Computar métricas`, `Destilar` agrupan por `proyecto[0]`) | ✅ |
 | `fecha` (createdTime) | Airtable | **ARCH** (`Leer Candidatos nuevos viejos`: `IS_BEFORE({fecha}, -20 días)`) | ⚠️ **Load-bearing y se crea a mano.** `setup-airtable.mjs` no lo crea (la API no hace campos computados) — lo pide por consola. Base nueva sin `fecha` ⇒ el `filterByFormula` del barrido **falla** y los `nuevo` viejos se acumulan. Misma clase de bug que los toggles faltantes → **anotado en §3**. |
 | `fecha_calificacion` (lastModified de `calificacion`) | Airtable | ARCH (`calificado_en` de `outputs` + Sheet) | ✅ Con fallback a `now()` si falta. |
