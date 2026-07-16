@@ -322,9 +322,19 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
 Corre semanal (domingo) y computa Métricas; hay que confirmar que el cambio a corridas por-proyecto no
 rompe el cómputo semanal ni la salud por referente.
 
-- [ ] **D.1** Auditar (parte de A) cómo el archivado agrega Métricas/costos y si asume el barrido total.
-- [ ] **D.2** Ajustar si corridas por-proyecto cambian la forma de los `runs` que lee. Probablemente
-      poco (el archivado agrega por semana, no por corrida), pero **confirmar, no asumir**.
+- [x] **D.1** ✅ Auditado (2026-07-16, leyendo `Computar métricas semana` + `Computar salud referentes`):
+      **no asume el barrido total.** Ambos agregan **sumando sobre todos los runs de la semana** (con
+      dedup por run id): el embudo global suma, `duracion_min` promedia, `por_referente` acumula
+      `evaluados`/`gate_pass` entre corridas y el `min_muestra_referente` aplica al total semanal. La
+      calidad por proyecto ni mira runs (sale de los calificados de Airtable). Tampoco filtra
+      `trigger_type` ⇒ las corridas on-demand entran solas.
+- [x] **D.2** ✅ Sin ajuste necesario — con **un matiz flagueado, no parcheado** (lo habilita el
+      on-demand): `runs_fallo` cuenta como fallo cualquier run no-`ok`, **incluido uno legítimamente
+      `en_curso`** al correr el archivado (domingo 6pm). Con solo cron era imposible; con el botón, un
+      click ~5:45pm del domingo se cuenta fallo esa semana (cosmético: ensucia `runs_ok/runs_fallo`
+      una vez, no rompe nada). Fix barato si molesta: excluir/contar aparte los `en_curso` más jóvenes
+      que `ventana_corrida_min` en `Computar métricas semana`. **Decisión de Mani** — si va, se
+      arrastra con el próximo re-import del archivado.
 - [ ] ⭐ **D.3 (a revisar — lo abre A.2):** **`notas_equipo` no entra al loop de aprendizaje y se destruye.**
       El equipo escribe su razonamiento en `Candidatos.notas_equipo`; **ningún workflow lo lee** (no va a
       `outputs.metadata` ni al Sheet) y el archivado borra el record cada domingo. Y `Destilar criterios`
