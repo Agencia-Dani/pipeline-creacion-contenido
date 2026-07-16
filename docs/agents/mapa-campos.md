@@ -101,23 +101,31 @@ independencia entre voces es una **convención del equipo, no una garantía del 
 un referente cruce voces. Importa para el norte Netflix ("las voces son universos separados"). **Decidir
 en B.1/E:** o se documenta como permitido, o el schema lo restringe. No lo toques sin decidir.
 
-**⚠️ Corrección (2026-07-16, cierre 46): `voz_default` tiene el mismo problema y ya se materializó.**
-Esta sección decía que *"1 proyecto = 1 voz sí está garantizado por el código"* porque los 3 workflows
-leen `voz_default[0]`. **Media verdad:** el código elige una, pero el **dato tiene dos** y nadie lo
-impedía. En la base viva, **2 de 6 proyectos tienen 2 voces linkeadas**:
+⚠️ **§2.6 vuelve esta pregunta más filosa, no menos.** Ahora que *1 proyecto = 1 voz* es regla firme, la
+cadena referente → proyecto → voz es inequívoca en su segundo tramo: si un referente apunta a proyectos
+de 2 voces, **cruza voces de verdad**, sin ambigüedad que lo tape. Es el único lugar que queda donde el
+dato puede contradecir el norte Netflix.
 
-| Proyecto | `voz_default` | Qué pasa de verdad |
-|---|---|---|
-| Comunicación para lideres | [Milena Morales, **Rosario Gomez**] | usa Milena; **Rosario se ignora en silencio** |
-| Comunicación en empresas | [Milena Morales, **Rosario Gomez**] | idem |
+### 2.6 ✅ `voz_default`: el modelo es **1 proyecto = 1 voz**, y el dato ya está limpio
 
-Consecuencia real: esos 2 proyectos vienen aplicando en el gate el *ajuste de voz* de **Milena** y
-archivando `outputs.metadata.voz = "Milena Morales"`, mientras alguien del equipo linkeó a Rosario
-esperando algo. Con **C.2** se suma: si apagás Milena, esos proyectos se apagan **aunque Rosario esté
-prendida**; si apagás Rosario, no pasa nada. **El motor ahora lo avisa por log** en vez de tragárselo
-(`[Plan] ⚠️ … tiene 2 voces linkeadas; se usa solo la primera`). **Está sin resolver:** es dato, no
-código — o se limpia el link de más (y el contrato se hace cumplir), o multi-voz pasa a ser parte del
-modelo (y entonces cambian el gate, los criterios y el archivado). **Va a B.1/E con lo de arriba.**
+Esta doc llegó a decir que *"1 proyecto = 1 voz está garantizado por el código"* porque los 3 workflows
+leen `voz_default[0]`. **Era media verdad:** el código elige una, pero el **dato tenía dos** y nada lo
+impedía. Encontrado en la base viva el 2026-07-16: *Comunicación para lideres* y *Comunicación en
+empresas* tenían `[Milena Morales, Rosario Gomez]` → el motor usaba Milena y **Rosario no hacía nada**.
+
+→ **Resuelto (Mani, 2026-07-16).** La regla es **firme y es la esencia del refactor**: **un proyecto
+tiene UNA voz; una voz tiene VARIOS proyectos.** Mani limpió el dato en Airtable el mismo día;
+verificado por MCP: los 6 proyectos con una sola voz, 2 por voz (Milena → parejas + empresas · Rosario →
+Storytelling + líderes · Juan Pablo → los 2 de Trading).
+
+*Efecto real de la limpieza:* en *Comunicación para lideres* quedó **Rosario**, y el motor venía usando
+**Milena** (era `[0]`) ⇒ ese proyecto **cambia de criterios de voz** cuando se prenda (hoy está inactivo).
+
+**Lo que queda como guarda, porque el schema no puede prohibirlo:** `voz_default` sigue siendo un
+`multipleRecordLinks` (Airtable no ofrece un link "exactamente uno" por API), así que nada impide
+re-romperlo. Por eso el motor **avisa por log** si vuelve a pasar
+(`[Plan] ⚠️ … tiene N voces linkeadas; se usa solo la primera`) y hay un test que lo cubre. **Si ese
+aviso aparece, se limpia el dato — no se toca el código.**
 
 ## 3. Pasada única de `setup-airtable.mjs` + contrato — ✅ 3 de 4 hechas
 
@@ -161,7 +169,7 @@ vista del cockpit, ningún workflow).
 | `criterios_aprendidos` | **ARCH** (`Destilar criterios`) | MOTOR (`Armar plan` + `Gate`) | ✅ El loop de ADR-022 cierra. |
 | `advertencia_criterios` | **ARCH** (misma llamada) | **equipo** | ✅ Lint para el humano; el gate **no** lo lee (por contrato). |
 | `activo` | equipo | MOTOR + DESC (`filterByFormula={activo}` en `Leer Proyectos`) | ✅ Gate operativo real. **ARCH no lo filtra** (archiva calificados de proyectos apagados) — correcto: no querés perder lo ya calificado. |
-| `voz_default` (link) | equipo | MOTOR · ARCH · DESC (los 3 resuelven la voz por este link) | ⚠️ Los 3 leen `[0]`, pero es **multi-link** y **2 proyectos vivos tienen 2 voces** → la segunda se ignora (§2.5). El motor lo avisa por log; el dato está sin limpiar. |
+| `voz_default` (link) | equipo | MOTOR · ARCH · DESC (los 3 resuelven la voz por este link) | ✅ **1 proyecto = 1 voz** (regla firme, esencia del refactor). Los 3 leen `[0]`; el schema **no puede** forzar un solo link, así que el motor **avisa por log** si aparecen 2 y el dato se limpia a mano (§2.6). |
 | `N` | equipo | MOTOR (`Armar plan` → `Armar candidato` corta a esta N) | ✅ **Nuevo 2026-07-16** (ADR-024/C.1). Vacío o 0 → cae al global `Candidatos por corrida`. Existe en el repo **y en la base viva**; el motor lo usa **recién tras el re-import de C**. |
 | `Referentes` · `Candidatos` · `Referentes propuestos` · `Descartes del gate` (links inversos) | Airtable | nadie | 🟡 Auto-creados, el equipo los ve → **B.3** (§2.1). |
 

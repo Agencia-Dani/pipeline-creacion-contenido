@@ -31,13 +31,12 @@
   está vacía en los 6 proyectos (⇒ cae al global) y las 3 voces están prendidas (⇒ no saltea a nadie).
   Conviene re-importar **cuando C.3 esté**, así el re-import carga solo lo de C y un fallo apunta a un
   culpable (lección del cierre 42). **Antes de re-importar: `node Workflows/workflow-short-form-content/test-nodos.mjs`.**
-- 🔴 **Dato sucio, decisión pendiente: 2 proyectos tienen 2 voces linkeadas** (cierre 46) —
-  *Comunicación para lideres* y *Comunicación en empresas* → `voz_default = [Milena Morales, Rosario
-  Gomez]`. El motor usa **solo la primera** (Milena): esos proyectos vienen aplicando el ajuste de voz de
-  Milena y archivando `voz: "Milena Morales"`; Rosario nunca hizo nada. **Con C.2 se suma:** apagar a
-  Milena los apaga aunque Rosario esté prendida. Es dato, no código: o se limpia el link de más, o
-  multi-voz entra al modelo (y cambian gate, criterios y archivado). Detalle en
-  [mapa-campos §2.5](./mapa-campos.md).
+> ✅ **Los 2 proyectos con 2 voces: RESUELTO por Mani el 2026-07-16** (mismo día del hallazgo). La regla
+> queda firme y es la esencia del refactor: **un proyecto tiene UNA voz; una voz tiene VARIOS
+> proyectos**. Dato limpio, verificado por MCP (6 proyectos, 1 voz cada uno, 2 por voz). *Coletazo a
+> tener presente:* en *Comunicación para lideres* quedó **Rosario** y el motor venía usando **Milena**
+> ⇒ ese proyecto **va a filtrar distinto** cuando se prenda (hoy está inactivo). El aviso por log del
+> motor queda como guarda: el schema no puede forzar un solo link ([mapa-campos §2.6](./mapa-campos.md)).
 
 > ✅ **Re-import de los 3 `workflow.json` + rotación de credenciales: HECHOS por Mani el 2026-07-16**
 > (cierre 42). Cae el bloqueante que arrastraba desde el cierre 37: M1, M2/ADR-022, costos $, contadores
@@ -117,13 +116,15 @@ repo, **sin re-importar**. Lo siguiente:
 eso, la decisión Airtable-vs-dashboard se toma contra un Airtable mal configurado. Y **B.5**: mostrarle
 `Voces.activo` al equipo en la página *Voces* (el campo ya existe y el motor ya lo respeta).
 
-**3 decisiones abiertas que no debe tomar un agente solo** (están todas documentadas donde corresponde):
+**2 decisiones abiertas que no debe tomar un agente solo** (documentadas donde corresponde):
 
 | Qué | Dónde | Por qué importa |
 |---|---|---|
-| **2 proyectos con 2 voces linkeadas** | §Pendiente vivo · [mapa-campos §2.5](./mapa-campos.md) | dato sucio vivo; con C.2 apagar una voz apaga proyectos que "no son de ella" |
-| **El descubrimiento no respeta `Voces.activo`** | [plan §Descubrimiento](./refactor-voces-proyectos.md) | fix de 1 línea, pero puede ser deseable como está |
+| **El descubrimiento no respeta `Voces.activo`** | [plan §Descubrimiento](./refactor-voces-proyectos.md) | fix de 1 línea, pero puede ser deseable como está (tener referentes listos para cuando prendas la voz) |
 | **`notas_equipo` + `viral_por_tamano` se destruyen** | D.3 del plan · [mapa-campos §2.2](./mapa-campos.md) | la señal más rica del equipo no entra al loop de aprendizaje |
+
+*(Cerrada el 2026-07-16: los 2 proyectos con 2 voces — **1 proyecto = 1 voz** es regla firme, dato ya
+limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-campos §2.5](./mapa-campos.md).)*
 
 **Contexto que ahorra media hora de re-derivar:**
 - El mapa de la superficie ya está completo: **[mapa-campos.md](./mapa-campos.md)** (§4 campos, §5 páginas).
@@ -134,6 +135,8 @@ eso, la decisión Airtable-vs-dashboard se toma contra un Airtable mal configura
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-16 (cierre 47) — el dato de las 2 voces, limpio; la regla del modelo queda escrita (Mani).** Cierre del hallazgo del 46, mismo día. **Mani fijó la regla, y es la esencia del refactor: un proyecto tiene UNA voz; una voz tiene VARIOS proyectos.** Limpió los 2 proyectos en Airtable; verificado por MCP: los 6 con una sola voz, 2 por voz (Milena → parejas + empresas · Rosario → Storytelling + líderes · Juan Pablo → los 2 de Trading). **Coletazo que vale anotar:** en *Comunicación para lideres* eligió **Rosario**, y el motor venía usando **Milena** (era `[0]`) ⇒ ese proyecto **va a filtrar con otros criterios de voz** cuando se prenda. No hay efecto hoy (está inactivo; solo corren los 2 de Trading), pero es exactamente el silencio que el hallazgo destapó: nadie sabía qué voz estaba aplicando. **Lo que NO se puede cerrar y queda como guarda:** Airtable no ofrece un link "exactamente uno" por API, así que `voz_default` sigue siendo multi-link y nada impide re-romperlo. Por eso quedan las 3 capas: la regla en el contrato, el **aviso por log** del motor, y el test. **Si el aviso aparece, se limpia el dato — no se toca el código.** Escrito en [mapa-campos §2.6](./mapa-campos.md) (la vieja §2.5 se partió: el multi-link de **Referentes** sigue abierto, es otra pregunta), el contrato y §Pendiente vivo. Decisiones abiertas del refactor: de 3 a **2**.
 
 **2026-07-16 (cierre 46) — E.1 + C.2 (`Voces.activo` vivo y respetado) + tests de verdad para el motor + un dato sucio que apareció solo (Mani + Claude).** Cierra el bloque de C que no depende del webhook. **E.1:** `Voces.activo` creado en contrato + `setup-airtable.mjs` + **la base viva** por MCP (`fldqekbuBxhzgOSG1`). **🚨 El gotcha del cierre, vale para E.2 y para cualquier toggle futuro:** crear un checkbox en Airtable deja **todos los records existentes destildados**, y como C.2 filtra server-side por `{activo}`, desplegar así habría dejado **cero voces activas ⇒ el motor entregando nada**. Se prendieron las 3 voces a mano en la misma pasada. **Campo nuevo + filtro nuevo = poblar el dato ANTES, siempre.** **C.2:** `Leer Voces` del motor (solo el motor) filtra `filterByFormula={activo}`; `Armar plan` saltea los proyectos cuya voz no llegó y **loguea cuál**. **Por qué server-side y no en el code node** (esto es lo que hay que entender antes de tocarlo): Airtable **omite los checkbox destildados** del payload, así que en el code node `activo` ausente es indistinguible de *el campo no existe* → no hay fail-open posible sin ambigüedad. El filtro lo resuelve en el server, y **es el mismo patrón que ya usaba `Leer Proyectos`** — no inventamos nada. Proyecto **sin** voz: no gateado. Bonus verificado: el gate corta **antes del scrape**, así que un proyecto salteado **no se paga en Apify**. **🔴 Lo que apareció solo mirando el dato vivo (lo más importante del cierre):** **2 de 6 proyectos tienen 2 voces linkeadas** — *Comunicación para lideres* y *Comunicación en empresas* → `[Milena Morales, Rosario Gomez]`. El código lee `voz_default[0]` ⇒ gana Milena y **Rosario se ignora en silencio**: esos proyectos vienen aplicando el ajuste de voz de Milena y archivando `voz: "Milena Morales"` mientras alguien linkeó a Rosario esperando algo. **Corrige un error mío del cierre 43:** el mapa decía que *"1 proyecto = 1 voz está garantizado por el código"* — media verdad: el código elige una, pero **el dato tiene dos** y nada lo impedía. Con C.2 se agrava (apagar Milena apaga esos proyectos aunque Rosario esté prendida). **Decisión de qué hacer: NO la tomé** — es dato, no código: o se limpia el link de más y el contrato se hace cumplir, o multi-voz entra al modelo (y cambian gate, criterios y archivado). Lo que **sí** hice: el motor **avisa por log** (`[Plan] ⚠️ … tiene 2 voces linkeadas`) en vez de tragárselo. Documentado en [mapa-campos §2.5](./mapa-campos.md), el contrato y el §Pendiente vivo. **Tests — cambia el feedback loop del repo:** nuevo [`Workflows/workflow-short-form-content/test-nodos.mjs`](../../Workflows/workflow-short-form-content/test-nodos.mjs), node pelado sin dependencias, que saca el `jsCode` del JSON y lo corre con un `$` de n8n mockeado. **23 casos verdes** sobre `Armar plan de corrida` y `Armar candidato`: gate por voz, proyecto sin voz, el multi-voz, Apify no pagado, N por proyecto + fallback + N=0 + el global de Ajustes, corte por proyecto, el orden dedup→corte con el video disputado, PISO, `_descarte`, `normLang`, ⚠️ SIN GUION. **Por qué vale la pena:** el motor corre en n8n, así que sin esto la lógica se verifica recién en producción una semana después, quemando Apify/Supadata/Haiku. `CLAUDE.md` §Feedback loops actualizado (el validador ya **no** es la única verificación). **Sin decidir, anotado:** el **descubrimiento no respeta `Voces.activo`** → una voz apagada no corre en el motor pero **sí recibe propuestas de referentes** cada semana. Fix de 1 línea, pero cambia conducta y puede ser deseable (tener referentes listos para cuando la prendas) → plan §Descubrimiento. **Validador 1221/0**, tests 23/23, secretos limpios. **Estado de C:** C.1/C.2/C.5 hechos en el repo, **sin re-importar** (hoy no cambian conducta: N vacía en los 6 proyectos, las 3 voces prendidas). **Próximo paso: C.3** — el webhook single-flight de ADR-023, que es el que falta para cerrar C y disparar el re-import. Ver §Para la próxima sesión abajo.
 

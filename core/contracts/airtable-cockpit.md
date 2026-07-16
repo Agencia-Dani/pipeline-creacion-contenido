@@ -54,11 +54,13 @@ la voz organiza la selección ("5 videos para tal voz") + el histórico, y afina
 | `criterios_relevancia` | texto largo | **qué le sirve a este cliente puntual** (fit de persona/audiencia) — afina el gate de relevancia por encima del tema del Proyecto. Opcional; el Proyecto filtra el tema, la Voz el cliente (ADR-010) |
 | `activo` | checkbox | si esta voz **y todos sus proyectos** entran en las corridas. La voz es la espina dorsal: se prende/apaga como unidad. **Un proyecto `activo` cuya voz está apagada NO corre.** El motor lo filtra server-side (`filterByFormula={activo}` en `Leer Voces`) — como `Proyectos.activo`, porque Airtable omite los checkbox destildados del payload y del lado del código "destildado" y "el campo no existe" son indistinguibles. Solo lo lee el **motor**: el archivado necesita todas las voces para resolver nombres al archivar, y el descubrimiento hoy **no** lo respeta (decisión abierta) |
 
-> ⚠️ **`voz_default` es un multi-link y el modelo asume una sola voz.** El contrato dice *un proyecto =
-> una voz* y los 3 workflows leen `voz_default[0]` (nombre, criterios y el gate de `activo`), pero nada
-> impide linkear dos: si pasa, **la segunda se ignora en silencio**. El motor ahora lo **avisa por log**
-> (`[Plan] ⚠️ … tiene N voces linkeadas`). Si aparece, se limpia el dato — no se cambia el código sin
-> cambiar antes el modelo. *(Pasó en vivo: ver el hallazgo del cierre 46 en el handoff.)*
+> ⚠️ **`voz_default`: la regla es 1 proyecto = 1 voz, y el schema no puede hacerla cumplir.** *Un
+> proyecto tiene UNA voz; una voz tiene VARIOS proyectos* — es la esencia del modelo (Mani, 2026-07-16),
+> y los 3 workflows leen `voz_default[0]` (nombre, criterios y el gate de `activo`). Pero Airtable no
+> ofrece un link "exactamente uno" por API, así que nada impide linkear dos, y si pasa **la segunda se
+> ignora en silencio**. *Ya pasó en vivo* (2 proyectos, limpiados el 2026-07-16 — cierre 46). Guarda: el
+> motor lo **avisa por log** (`[Plan] ⚠️ … tiene N voces linkeadas`) y hay test. **Si el aviso aparece,
+> se limpia el dato — no se toca el código.**
 
 ### 3. `Referentes` — banco de perfiles (**la única fuente de descubrimiento**, ADR-019)
 | Campo | Tipo | Para qué |
