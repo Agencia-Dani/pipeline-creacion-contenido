@@ -126,24 +126,35 @@ ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-dem
 
 ## Para la próxima sesión — arrancá por acá
 
-> Escrito al cerrar el 2026-07-16 (cierres 43–48, todos del mismo día). **Los dos carriles del refactor
-> están andando en paralelo:** Mani en la superficie (Airtable, a mano), el agente en el motor.
+> **Reescrito el 2026-07-17 (cierre 53). La próxima es una SESIÓN DE AUDITORÍA COMPLETA** — decisión de
+> Mani: no ir parcheando suelto, sino tomar todo lo hallado de una, con el sistema ya vivo. Tres frentes,
+> en este orden lógico (①→②→③), pero es una sola sesión de auditoría con su alcance ya fijado acá.
 
-**Carril motor (el agente) — C y D están COMPLETOS y VIVOS (re-importados el 2026-07-17, cierre 52).**
-El motor nuevo, el archivado y el descubrimiento corren en n8n. Lo que queda en este carril ya no es
-código, es verificación y la mitad-Airtable del webhook:
+**① Arreglar los hallazgos** (los de la V-run del cierre 53 + arrastres):
+- **Spillover gap de C.1** (el grande): `dedup→corte` descarta videos que pasaron el gate de un proyecto
+  hambriento cuando el pool compartido llenó otro. **Decidir:** enmendar C.1/ADR-024 con spillover
+  (repartir sobrantes a proyectos bajo su N que también pasaron el gate) o aceptar N como techo. Si toca
+  `Armar candidato`, correr `test-nodos.mjs`.
+- **Referentes-por-proyecto bajo una voz:** los 2 activos comparten los MISMOS 5 → decidir si es válido o
+  cada proyecto lleva los suyos (afecta supply y el modelo Netflix). Emparentado con el multi-link que
+  cruza voces ([mapa-campos §2.5](./mapa-campos.md)).
+- **Guard single-flight:** sin prueba viva — un 2º Execute encima de una corrida viva.
+- **Feed apilado (adopción, no código):** 51 `nuevo` sin calificar en `Candidatos` — el equipo no está
+  calificando.
 
-1. **B.2 — botón + automation en Airtable** (§Pendiente vivo): la mitad n8n del webhook está viva;
-   falta el `fetch(POST)` + botón a mano (la API no los crea). Un click de prueba antes del equipo.
-2. **La prueba viva de C** (V-run, §Pendiente vivo): disparar post re-import y verificar el corte por
-   proyecto (~20 / ~10) y el guard single-flight. `trigger_type` ya distinguible en `runs`.
-3. **El primer ciclo end-to-end cierra el 26/07** (§Ciclo): el archivado del 19/07 sale parcial por
-   diseño. No lo leas como veredicto del re-import.
+**② Analizar TODOS los workflows de punta a punta** (motor, archivado, descubrimiento): ahora que están
+vivos y re-importados, un barrido nodo-por-nodo estilo A.1 pero más profundo, buscando lo que la V-run no
+tocó. **El archivado real recién cierra el 26/07** (§Ciclo) y **el descubrimiento no se probó en vivo**
+desde el re-import.
 
-**Carril superficie (Mani) — los fixes de UI de B.6**, con diagnóstico preciso en
-[mapa-campos §5.1](./mapa-campos.md). **B.6(2) (curar *Salud del Sistema*) es precondición de A.5**: sin
-eso, la decisión Airtable-vs-dashboard se toma contra un Airtable mal configurado. Y **B.5**: mostrarle
-`Voces.activo` al equipo en la página *Voces* (el campo ya existe y el motor ya lo respeta).
+**③ Curar Airtable para que TODO quede vivo y coherente** — los fixes de UI de **B.6** (todos manuales, la
+API no los hace: `veredicto` editable en *Descartes*, curar *Salud del Sistema*, `precision` como %,
+`separacion_gate` en *Calidad*, filtro *Referentes propuestos*→`propuesto`, `advertencia_criterios` +
+`criterios_aprendidos` en *Proyectos*, **B.5** `Voces.activo` en *Voces*, verificar filtro de semana de
+*Costos*) + reconciliar el modelo. Diagnóstico preciso en [mapa-campos §5.1](./mapa-campos.md).
+⚠️ **Ojo con el norte:** Airtable es el cockpit vivo **mientras** se construye el producto propio (A.5,
+dirección tomada 2026-07-17) — curar lo necesario para operar hoy **sin sobre-invertir** en lo que el
+producto va a reemplazar.
 
 **Las 2 decisiones abiertas se CERRARON el 2026-07-16 (cierre 49, consultadas a Mani):**
 el **descubrimiento NO respeta `Voces.activo` a propósito** (despensa para voces pausadas —
