@@ -60,6 +60,11 @@ Los 7 puntos, con qué cambia cada uno:
 (proyectos, voces, referentes, calificación) — no-code e imposible de romper. El Sheet
 es la salida histórica. n8n y Supabase son sala de máquinas: ningún no-dev necesita tocarlos.
 
+> **Enmienda 2026-07-17 ([ADR-025](./docs/adr/ADR-025-cockpit-producto-propio.md)):** la superficie
+> del equipo **migra a un producto propio** (frontend+backend+DB+auth sobre Supabase). Airtable queda
+> como **cockpit interino** — sigue siendo la puerta no-code del equipo hasta que el producto opere,
+> curado al mínimo. El resto del invariante no cambia: n8n y Supabase siguen siendo sala de máquinas.
+
 ### Heat-score v1 (los criterios, concretos)
 
 Base = **las tres métricas combinadas**: likes, views y engagement. *(El "reach" real no lo dan

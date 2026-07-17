@@ -200,12 +200,12 @@ cero): [dev-doc.md](dev-doc.md) → **verificar contra el JSON vivo, extender, f
       toggles del descubrimiento faltan en `ajustesSeed` → pasada única de `setup-airtable.mjs`).
       ⚠️ **Verificación real pendiente:** el primer ciclo completo cierra el **26/07** (ver §Ciclo del
       [handoff](./handoff.md)) — hasta ahí no hay prueba viva de que el re-import quedó bien.
-- [ ] **A.5** Con A.2/A.3 en mano, **cerrar la decisión de §3** (Airtable vs. dashboard propio) en un
-      ADR. Es el gate de todo lo demás. **Insumo listo en [mapa-campos §5.2](./mapa-campos.md):** el eje
-      operativo aguanta en Airtable (sus problemas son de curaduría), el analítico es donde se rompe.
-      ⚠️ **Precondición para no decidir con sesgo:** hacer B.6(2) (curar *Salud del Sistema*) **antes** —
-      las 3 páginas analíticas nunca se curaron después del split del 2026-07-15, así que hoy la
-      comparación sería contra un Airtable mal configurado.
+- [x] **A.5** ✅ **CERRADA (2026-07-17): [ADR-025](../adr/ADR-025-cockpit-producto-propio.md)** — el
+      cockpit migra a un **producto propio** (frontend+backend+DB+auth sobre Supabase), toda la
+      superficie; Airtable queda como cockpit **interino** curado al mínimo (la guía ejecutable está en
+      [mapa-campos §6](./mapa-campos.md)); B.2 se retira (el muro del plan free fue el empujón). La
+      precondición "curar antes de decidir" quedó sin objeto: la decisión no se tomó comparando
+      superficies sino por el bloqueo del disparo + la evidencia de §5.2.
 
 **Hecho cuando:** existe un mapa donde cada nodo, campo y página tiene propósito y dueño; los huérfanos
 están listados con veredicto (podar/documentar, nunca borrar en silencio); repo↔live reconciliado; y la
@@ -227,7 +227,12 @@ correr) y la **racionalización de campos** que salga de la auditoría.
       decidir si entra al interface o se borra) · si un referente puede **cruzar voces** (hoy el schema
       lo permite y el motor lo ejecuta; la independencia es convención, no garantía) · si la vista
       "🔥 Seleccionados" sube de vista cruda a página del cockpit.
-- [ ] **B.2** **Mecanismo de disparo** ([ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md), cerrado):
+- [x] **B.2** ⛔ **RETIRADA (2026-07-17, [ADR-025](../adr/ADR-025-cockpit-producto-propio.md)):** Airtable
+      free bloquea "Run a script" (la única acción nativa que manda el header de auth) ⇒ el botón no se
+      construye en Airtable; el disparo interino es **Execute manual** en n8n y el botón real vivirá en
+      el producto propio. La mitad n8n (webhook + guard, C.3) queda viva y es la que el producto usará.
+      El diseño original queda abajo como referencia histórica:
+      **Mecanismo de disparo** ([ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md), cerrado):
       **botón nativo de Airtable → "Run automation" → webhook de Producción de n8n**. Señal desnuda
       ("correr ahora", sin payload); el motor lee Airtable. Una corrida = todos los proyectos activos, cada
       uno a su N. Webhook **single-flight** (no arranca si ya hay una corrida). La N por proyecto y los
@@ -431,10 +436,10 @@ ambos carriles respeten ese contrato.
   (botón Airtable → automation → webhook, señal desnuda, coexiste con cron). **Cerrado.**
 - ✅ **[ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md)** — N vuelve por proyecto, global =
   default, corte final por proyecto; `cap_top_n` intacto. **Cerrado.**
-- ⬜ **Herramienta del cockpit** (A.5) — Airtable vs. dashboard propio. **Acotado por ADR-023:** el eje
-  operativo se queda en Airtable; la pregunta queda sólo para lo analítico read-only (Métricas/Costos).
-  Se cierra al terminar la auditoría, con ADR.
-- El ADR de A.5 autoriza los cambios de `core/` de E que no cubran ya ADR-023/024.
+- ✅ **[ADR-025](../adr/ADR-025-cockpit-producto-propio.md)** — herramienta del cockpit (A.5): producto
+  propio para toda la superficie; Airtable interino curado al mínimo; B.2 retirada. **Cerrado 2026-07-17.**
+- Los cambios de `core/` del producto propio (E.3/B.3, racionalización) esperan el **diseño** de ese
+  producto — irán en sus propios ADRs (ADR-025 §Toca).
 
 ## 7. Lo que NO cambia (invariantes a respetar)
 

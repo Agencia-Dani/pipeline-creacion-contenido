@@ -34,12 +34,12 @@
 > **En cada re-import futuro reusá el MISMO path y el MISMO header** (gestor); valores nuevos = botón 403
 > en silencio (memoria `reimport-eslabon-debil`, versión webhook).
 
-> ⏸️ **B.2 — DEFERIDO (decisión de Mani, 2026-07-17, cierre 53).** Airtable **free bloquea la acción
-> "Run a script"** — la única forma nativa de hacer POST con header de auth — así que el botón de ADR-023
-> **no se construye en el plan free** (colisión ADR-023 ↔ NFR4). En vez de un workaround, Mani decidió
-> **mover todo a un producto propio** (frontend+backend+auth); eso resuelve A.5 hacia producto propio y
-> retira el botón de Airtable. **Mientras tanto el equipo dispara por *Execute manual* en n8n.** El detalle
-> de abajo queda como referencia histórica del mecanismo (si algún día se quisiera en un plan pago).
+> ⛔ **B.2 — RETIRADA (cierre 54: [ADR-025](../adr/ADR-025-cockpit-producto-propio.md) firmado).** Airtable
+> **free bloquea la acción "Run a script"** — la única forma nativa de hacer POST con header de auth — así
+> que el botón de ADR-023 **no se construye en Airtable** (colisión ADR-023 ↔ NFR4). La dirección quedó en
+> ADR: **producto propio** para toda la superficie; el botón real vivirá ahí, contra el mismo webhook.
+> **Mientras tanto el disparo es *Execute manual* en n8n.** El detalle de abajo queda como referencia
+> histórica del mecanismo (si algún día se quisiera en un plan pago).
 - 🟠 **B.2 — botón + automation en Airtable (la mitad que falta del webhook, es de Mani a mano).** El
   re-import dejó viva la mitad n8n del disparo on-demand; falta la mitad Airtable, que la API **no** crea:
   1. Automation con acción "Run script": `fetch(POST)` a la **URL de Producción del webhook** (del gestor),
@@ -132,46 +132,42 @@ El detalle de cada componente y el "hecho cuando" viven en
 
 | Componente | Qué | Carril | Estado |
 |---|---|---|---|
-| **A** Auditoría del pipeline vivo | mapa nodo/campo/página + reconciliar repo↔live + decisión §3 (ADR) | Dev 1 | 🔧 **A.1 ✅ · A.2 ✅ · A.3 ✅ · A.4 ✅** · **A.5 ⬜** (la decisión §3) — pero antes **B.6(2)**, ver abajo |
-| **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | 🔧 **B.4 ✅** (cierre 50, por MCP: los 2 knobs ya son team-facing) · **B.6 parcial** — (4) *Costos* **publicada** por MCP, falta verificar su filtro de semana; (1)(2)(3)(5) siguen ⬜ **y son UI pura: la API de Airtable no los hace** (ver abajo) · **B.2 DESBLOQUEADA** (cierre 52): el motor ya escucha el webhook; falta el botón + automation a mano en Airtable (§Pendiente vivo) |
-| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | ✅ **COMPLETO y VIVO** (C.1–C.5, cierres 45–48; re-importado 2026-07-17, cierre 52). **V-run ✅ (cierre 53): C.1 confirmado en vivo** (TfT=10 exacto). Destapó el **spillover gap** de C.1 (decisión de Mani, ver log) · **guard single-flight aún sin prueba viva** |
+| **A** Auditoría del pipeline vivo | mapa nodo/campo/página + reconciliar repo↔live + decisión §3 (ADR) | Dev 1 | ✅ **COMPLETO** — **A.5 cerrada (cierre 54): [ADR-025](../adr/ADR-025-cockpit-producto-propio.md)**, el cockpit migra a producto propio; Airtable interino curado al mínimo |
+| **B** Dashboard / Cockpit | flujo del operador, racionalización de campos, Métricas/Costos | Dev 1 | 🔧 **B.4 ✅** · **B.2 ⛔ RETIRADA** (ADR-025: sin botón en Airtable free; disparo interino = Execute manual; la mitad n8n queda viva para el producto propio) · **B.6: guía ejecutable LISTA** (cierre 54: [mapa-campos §6](./mapa-campos.md) + checklist interactiva) — la ejecución es de Mani a mano (12 pasos; el paso *Descartes* espera records del lunes) · B.3/B.5 quedaron subsumidos en esa guía |
+| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | ✅ COMPLETO · **V-run ✅ (cierre 53)** · **spillover gap RESUELTO en el repo (cierre 54, enmienda ADR-024 + replay con outputs reales: TP 6→9)** — pendiente de **re-import** (con el paso de infra antes, §Pendiente vivo) · **guard single-flight: prueba viva el lunes 20/07** (instrucción en §Pendiente vivo) |
 | **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | ✅ **COMPLETO y VIVO** (cierres 48–49; re-importado el 2026-07-17, cierre 52): D.1/D.2 confirmados + matiz `runs_fallo`×`en_curso` + **D.3(b)** (→ `outputs.metadata`) + **D.4** (poda `tema`/`link_doc`) |
-| **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización (autorizado por el ADR de A.5) | Dev 1 | 🔧 **E.1 ✅** (`Voces.activo` vivo) · **E.2 ✅ mitad-repo** (señal desnuda ⇒ sin campos nuevos; contrato documentado — falta botón+automation a mano, va con B.2) · E.3 ⬜ (espera B.3/A.5) |
+| **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización | Dev 1 | ✅ **E.1 ✅** · **E.2 ✅ mitad-repo** (la mitad-Airtable murió con B.2/ADR-025) · **E.3 espera el diseño del producto propio** (ADR-025 §Toca: irá en sus propios ADRs) |
 
 ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)
 (disparo on-demand), [ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md) (N por proyecto).
 
 ## Para la próxima sesión — arrancá por acá
 
-> **Reescrito el 2026-07-17 (cierre 53). La próxima es una SESIÓN DE AUDITORÍA COMPLETA** — decisión de
-> Mani: no ir parcheando suelto, sino tomar todo lo hallado de una, con el sistema ya vivo. Tres frentes,
-> en este orden lógico (①→②→③), pero es una sola sesión de auditoría con su alcance ya fijado acá.
+> **Reescrito el 2026-07-17 (cierre 54). La sesión de auditoría completa del cierre 53 SE HIZO** — los 3
+> frentes ①②③ están ejecutados en el repo (spillover, presupuesto de transcripción, ADR-025, guía de
+> curado, onboarding). Lo que queda es **aplicación manual + verificación del ciclo**, y después arranca
+> el producto propio.
 
-**① Arreglar los hallazgos** (los de la V-run del cierre 53 + arrastres):
-- **Spillover gap de C.1** (el grande): `dedup→corte` descarta videos que pasaron el gate de un proyecto
-  hambriento cuando el pool compartido llenó otro. **Decidir:** enmendar C.1/ADR-024 con spillover
-  (repartir sobrantes a proyectos bajo su N que también pasaron el gate) o aceptar N como techo. Si toca
-  `Armar candidato`, correr `test-nodos.mjs`.
-- **Referentes-por-proyecto bajo una voz:** los 2 activos comparten los MISMOS 5 → decidir si es válido o
-  cada proyecto lleva los suyos (afecta supply y el modelo Netflix). Emparentado con el multi-link que
-  cruza voces ([mapa-campos §2.5](./mapa-campos.md)).
-- **Guard single-flight:** sin prueba viva — un 2º Execute encima de una corrida viva.
-- **Feed apilado (adopción, no código):** 51 `nuevo` sin calificar en `Candidatos` — el equipo no está
-  calificando.
+**Lo manual de Mani (en orden, antes del lunes 20/07 idealmente):**
+1. **Infra:** subir `N8N_RUNNERS_TASK_TIMEOUT` a 3600 en InstaPods (§Pendiente vivo — el porqué: solo
+   28/84 transcripts con 780s).
+2. **Re-import del motor** (spillover + presupuesto 3000). ⚠️ Solo después del paso 1.
+3. **Lunes 20/07:** prueba viva del **guard** durante el cron de 08:00 (§Pendiente vivo) + verificar que
+   el **descubrimiento** de 09:00 corrió bien post re-import (nunca se vio en vivo) + confirmar
+   `runs.trigger_type` en Supabase.
+4. **Curar el cockpit:** los 12 pasos de [mapa-campos §6](./mapa-campos.md) (checklist interactiva
+   publicada como artifact "Curado del Cockpit"). El paso *Descartes* recién se puede después del lunes.
+5. **Equipo (Majo/Jero):** vaciar el backlog de calificación (51 `nuevo` viejos) + sembrar 3–5
+   referentes TikTok. El [onboarding](../onboarding-equipo-redes.md) ya está actualizado al refactor —
+   compartirles la versión nueva.
 
-**② Analizar TODOS los workflows de punta a punta** (motor, archivado, descubrimiento): ahora que están
-vivos y re-importados, un barrido nodo-por-nodo estilo A.1 pero más profundo, buscando lo que la V-run no
-tocó. **El archivado real recién cierra el 26/07** (§Ciclo) y **el descubrimiento no se probó en vivo**
-desde el re-import.
+**La verificación que cierra el ciclo:** el **26/07** (§Ciclo) — primera fila completa de `Métricas
+Global` (embudo + salud por referente + costos $). Con el presupuesto nuevo, `sin_guion` debería
+desplomarse vs. la corrida del 17/07 (6 de 16).
 
-**③ Curar Airtable para que TODO quede vivo y coherente** — los fixes de UI de **B.6** (todos manuales, la
-API no los hace: `veredicto` editable en *Descartes*, curar *Salud del Sistema*, `precision` como %,
-`separacion_gate` en *Calidad*, filtro *Referentes propuestos*→`propuesto`, `advertencia_criterios` +
-`criterios_aprendidos` en *Proyectos*, **B.5** `Voces.activo` en *Voces*, verificar filtro de semana de
-*Costos*) + reconciliar el modelo. Diagnóstico preciso en [mapa-campos §5.1](./mapa-campos.md).
-⚠️ **Ojo con el norte:** Airtable es el cockpit vivo **mientras** se construye el producto propio (A.5,
-dirección tomada 2026-07-17) — curar lo necesario para operar hoy **sin sobre-invertir** en lo que el
-producto va a reemplazar.
+**Después de eso: el producto propio (ADR-025).** Kickoff de diseño — el PRD ya existe
+([refactor-voces-proyectos §0](./refactor-voces-proyectos.md)), los contratos del motor no cambian, y
+el flujo Netflix (Voz→Proyecto→N→correr) es la espina del frontend. Ese diseño destraba E.3/B.3.
 
 **Las 2 decisiones abiertas se CERRARON el 2026-07-16 (cierre 49, consultadas a Mani):**
 el **descubrimiento NO respeta `Voces.activo` a propósito** (despensa para voces pausadas —
@@ -195,6 +191,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-17 (cierre 54) — La sesión de auditoría completa: spillover construido y verificado con datos reales, el hallazgo nuevo de transcripción, ADR-025 firmado y la guía de curado lista (Mani + Claude).** Ejecuta los 3 frentes que el cierre 53 parkeó. **① Fixes con decisiones de Mani (consultadas en vivo):** **(1) Spillover ✅ (enmienda de ADR-024):** `Armar candidato` gana el paso 3 — dedup → corte → **spillover**: los sobrantes van al proyecto con cupo que también los gateó, con LA COPIA de ese proyecto (su `relevancia_*`). **Garantía dura pedida por Mani: un video sale en UN solo proyecto, siempre** (N candidatos distintos). 8 casos nuevos en `test-nodos.mjs` (35/35 verdes) **+ replay con los outputs reales de la V-run: TP 6→9 clavado** (los 3 videos exactos del diagnóstico del 53), TfT 10, 0 duplicados. Semántica final documentada: **N es techo exacto, la entrega es best-effort sobre el supply**. **(2) Referentes compartidos entre proyectos de una voz = VÁLIDO** (decisión Mani): el pipeline ya dedupa las etapas pagas; el under-delivery se ataca sembrando referentes, no prohibiendo el solape. **(3) Guard single-flight → prueba viva el lunes 20/07 con el cron** (cero costo extra; instrucción paso a paso en §Pendiente vivo). **(4) Feed apilado → onboarding + tarea del equipo.** **② El barrido destapó el hallazgo gordo que la V-run no vio: la transcripción degradada en silencio.** De 84 videos únicos solo **28 salieron con transcript** — el patrón en `outputs-main` es un prefijo perfecto: `presupuesto_transcribir_s`=780 cortó el loop (~27s/video de Supadata; el sleep es 1s). Consecuencia real: **6 de los 16 entregados salieron ⚠️ SIN GUION** y el "supply fino" del 53 estaba en parte contaminado (el gate juzgó 56 videos solo por caption). **Decisión Mani: subir infra** — repo pasa el presupuesto a **3000**; Mani sube `N8N_RUNNERS_TASK_TIMEOUT` a 3600 en InstaPods **ANTES** del re-import (al revés = modo de fallo del 07-10: el watchdog mata el nodo entero; fallback documentado). El cierre 53 decía "84 transcritos" — era impreciso: 84 *procesados*. También del barrido: grafo limpio en los 3 workflows (0 refs rotas, 31 code nodes compilan), `ventana_corrida_min` vivo en el archivado, el no-filtro de voces del descubrimiento intacto, TikTok vacío confirmado como falta de siembra (`tt_profiles: []`), y un falso positivo documentado para no re-investigar: **`POST-airtable.json` es la RESPUESTA de Airtable y omite checkboxes false** — `viral_por_tamano` sí se escribe. **③ A.5 CERRADA: [ADR-025](../adr/ADR-025-cockpit-producto-propio.md)** — el cockpit migra a producto propio (toda la superficie); Airtable interino curado al mínimo; **B.2 RETIRADA** (el muro del free plan fue el empujón); disparo interino = Execute manual. Sin gate de aprobación (Mani lo propone al equipo y avanza). Enmienda del invariante transversal en ROADMAP §1. **Entregables de superficie:** guía de curado **ejecutable** en [mapa-campos §6](./mapa-campos.md) (12 pasos con textos de ayuda copiables) + **checklist interactiva** publicada como artifact ("Curado del Cockpit"); [onboarding](../onboarding-equipo-redes.md) actualizado al refactor (corridas a demanda §3.1, `N` y su semántica de máximo, `Voces.activo`, referentes compartidos, páginas nuevas del menú, FAQ). **Limpieza pedida por Mani:** el nombre "Andrés" borrado de docs y memoria (one-pager, plan §0, este log). **Verificación:** 35/35 tests, validador 1229/0, secretos limpios. **Archivos:** motor (`workflow.json` Armar candidato + Config, `workflow.yaml`, `test-nodos.mjs`, README), ADR-024 (enmienda), ADR-025 (nuevo), ADR README, ROADMAP §1, plan (A.5/B.2/C.1/§6), mapa-campos (§5.2 + §6 nueva), dev-doc (§ enmiendas + nodos 21/24 + Config), onboarding, CLAUDE.md (rango ADRs), one-pager. **Próximo paso:** todo manual — el checklist de §Para la próxima sesión (infra → re-import → lunes → curado → equipo); el ciclo se juzga el 26/07; después, kickoff del producto propio.**
 
 **2026-07-17 (cierre 53) — V-run: C.1 (N por proyecto) CONFIRMADO en vivo; el corte funciona, pero destapó el límite de supply + un spillover gap con proyectos que comparten referentes (Mani + Claude).** Mani corrió el motor por *Execute manual* post re-import y actualizó `/outputs` (gitignored). **Diagnóstico del run:** **✅ C.1 vivo** — el plan entregó N por proyecto: *Trading fast tips* = **10 exactos** (su N), no ~100 del global ⇒ el re-import del cierre 52 cargó C. **Verificado en Airtable por MCP:** 16 records nuevos fecha 07-17 (**TP 6 · TfT 10**), `estado=nuevo`, links proyecto/voz/referente correctos, calzan clavo con `POST-airtable.json`. **⚠️ Under-delivery: 16 entregados vs 30 objetivo (TP 6/20, TfT 10/10), dos causas con datos:** **(a) Supply (dominante)** — de 84 videos únicos transcritos (cap_top_n=100 no mordió), el gate pasó solo **22 únicos** (TP 11 = 3 exclusivos + 8 compartidos; TfT 19). **TP topa en 11 aun con asignación perfecta**, nunca 20: el pool no tiene 20 videos psychology-relevantes y el gate hace su trabajo (rechaza fast-tips para TP). **(b) Spillover gap (arreglable, NO parcheado)** — 3 videos que pasaron el gate de TP se **descartaron enteros** porque el dedup→corte de C.1 los asignó a TfT (mayor `relevancia_score`) y TfT ya estaba lleno (10), **sin spillover** al TP hambriento (tenía 14 slots). Arreglarlo llevaría TP 6→9. **El plan (C.1) decía "N se cumple exacto" — es media verdad:** N es un techo exacto (nunca lo pasa) pero no una entrega garantizada cuando el supply es fino o el pool compartido se concentra en un proyecto; dedup→corte no reparte los sobrantes. **No lo parcheé** (protocolo #4): toca la filosofía "N techo vs entrega" → decisión de Mani, posible enmienda de ADR-024. **Raíz que lo destapó:** los 2 proyectos activos comparten **la misma voz (Juan Pablo Vieira) y los MISMOS 5 referentes** (@abeteddymaruta, @nicholascrown, @martinelli_paul, @casper_smc, @krosh.ivan) — el peor caso del modelo Netflix ("universos separados"). Pregunta de producto abierta: ¿proyectos bajo una voz con referentes distintos, o se acepta N bajo para nichos finos? **🔵 Falso positivo que casi reporto, descartado (para que nadie lo re-investigue):** sospeché doble cobro Supadata/Haiku (126 filas video×proyecto para 84 únicos, 42 duplicados). **NO lo hay:** `Transcribir` y `Traducir` **dedupan por `external_id`** y reparten el resultado a las copias del fan-out (arreglado en cierre 31) ⇒ 84 llamadas, no 126. El pipeline ya maneja bien el caso de referentes compartidos en las etapas pagas. **NO probado:** el guard single-flight (fue un solo Execute) y `trigger_type='manual'` en `runs` (Supabase, sin acceso desde outputs). **Integridad Airtable (nota operativa, no bug):** la tabla `Candidatos` tiene **67 records** — 51 son `nuevo` sin calificar de corridas viejas (07-10/11/13): el equipo no está calificando; el archivado los purga a los 20 días, así que no rompe, pero el feed está apilado. **Decisión de producto de la sesión (turno previo, contexto para el ADR de A.5):** ante el muro de B.2 (Airtable free bloquea "Run a script"), Mani decidió **mover todo a un producto propio** (frontend+backend+auth+escalabilidad) → resuelve A.5 hacia producto propio para toda la superficie (Mani lo propone al equipo y avanza por su cuenta, sin gate de aprobación); **B.2 deferido**, el equipo dispara por Execute manual. Near-term nada se desarma (motor/archivado/descubrimiento + Airtable siguen vivos). Memoria `refactor-voces-proyectos` actualizada. **Archivos:** solo docs (handoff: §Pendiente vivo V-run ✅ + B.2 deferido, tablero C, este log). **Próximo paso:** (1) decidir el **spillover** (enmendar C.1/ADR-024 o aceptar N como techo); (2) decidir **referentes-por-proyecto** bajo una voz; (3) escribir el **ADR de A.5** (Airtable→producto; sin gate de aprobación); (4) el **guard single-flight** sigue sin prueba viva (un 2º Execute encima de una corrida viva).
 

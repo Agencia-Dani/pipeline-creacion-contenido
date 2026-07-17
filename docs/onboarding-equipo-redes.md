@@ -4,11 +4,15 @@
 > dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
 > falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
 >
-> *Actualizado: 2026-07-14. Refleja el sistema ya estabilizado: el motor busca **solo por
+> *Actualizado: 2026-07-17. Refleja el sistema ya estabilizado: el motor busca **solo por
 > referentes** (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron porque no
 > traían calidad —, el **buscador de cuentas nuevas** les propone referentes (§8.1), y hay
 > **páginas de métricas** que muestran cómo viene funcionando (§6.2), ahora con la columna
 > **`diagnostico`** que les dice en una frase qué criterio conviene ajustar (§6.2).*
+>
+> *Nuevo desde 2026-07-17:* además del lunes automático, **se puede correr a demanda** (§3.1);
+> cada Proyecto tiene su propia **`N`** (cuántos videos quieren de ese tema, §5.2); y las **Voces
+> tienen interruptor**: apagar una voz pausa todos sus proyectos de una (§5.1).
 
 ---
 
@@ -16,6 +20,8 @@
 
 **Lo que SÍ hacen ustedes:**
 - ✅ Entrar a **Airtable** todos los días (o cada 2-3 días) y **calificar** los videos que llegaron.
+- ✅ Armar la corrida a su medida: elegir **Voz → Proyectos → N** (cuántos videos por tema) y **pedir
+  una corrida a demanda** cuando la necesiten (§3.1) — ya no dependen del lunes.
 - ✅ Poner en cada candidato dos cosas: la **calificación** (🔥/👍/👎) y el **estado** (aprobado/descartado).
 - ✅ Calificar **también lo que descartan** (👎 + descartado): así la máquina aprende y mejora.
 - ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**).
@@ -58,7 +64,7 @@ dónde sale cada cosa que ven en Airtable:
 
 | Robot | Cuándo corre | Qué hace | Qué ven ustedes después |
 |---|---|---|---|
-| **El motor** | Lunes 8:00 am | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Feed de Calificación** + los dudosos en **Descartes**. |
+| **El motor** | Lunes 8:00 am **y a demanda** (§3.1) | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Feed de Calificación** + los dudosos en **Descartes**. |
 | **El buscador de cuentas** | Lunes 9:00 am | Mira sus mejores Referentes y busca cuentas **parecidas** para sumar. | Sugerencias en **Referentes propuestos**. |
 | **El archivador** | Domingo 6:00 pm | Se lleva al Histórico todo lo que ya calificaron, limpia la lista y cuenta el desempeño de la semana. | La lista queda limpia + se actualizan las **Métricas**. |
 
@@ -100,6 +106,23 @@ Lo que califican desaparece de pendientes y queda archivado.
 > de Airtable. Los que dejaron sin calificar **no se borran**: siguen esperando. Por eso conviene calificar
 > **antes del domingo** — así el archivo queda ordenado y la lista no se amontona.
 
+### 3.1 Corridas a demanda (nuevo)
+
+Ya no hay que esperar al lunes. El flujo es como elegir en Netflix: dentro de una **Voz** prendida,
+prenden los **Proyectos** que quieren, le ponen a cada uno su **`N`** (cuántos videos quieren de ese
+tema, §5.2), y se dispara una corrida. En unos ~40-60 minutos los videos aparecen en el Feed.
+
+Cómo se dispara **hoy**: se la piden al equipo técnico (es un click en la sala de máquinas; si en
+algún momento les enseñamos, es un solo botón — nada más de ahí se toca). Más adelante va a haber un
+botón propio en la herramienta nueva que estamos construyendo.
+
+Dos reglas que evitan sorpresas:
+- **Una corrida a la vez.** Si piden una mientras otra está corriendo, la segunda no arranca (no es
+  un error: es a propósito, para no pagar doble). Esperen a que termine y pidan de nuevo.
+- **Antes de pedir, dejen la selección lista:** Voz prendida, Proyectos que quieren en `activo`, la
+  `N` puesta, y los Referentes de esos proyectos activos. La corrida procesa **todos** los proyectos
+  activos, cada uno hasta su N.
+
 ---
 
 ## 4. Airtable por dentro: las tablas
@@ -129,7 +152,7 @@ Hay 8 tablas. Piénsenlas en tres grupos.
 
 ### La que solo miran
 
-- **Métricas** — el desempeño de cada semana (páginas *Métricas de Calidad* y *Salud del Sistema*, §6.2).
+- **Métricas** — el desempeño de cada semana (páginas *Calidad por Proyecto*, *Salud del Sistema* y *Costos*, §6.2).
   La llena la máquina cada domingo; **nadie escribe ahí**.
 
 ### 4.1 El layout que ven: el menú del "Cockpit Redes"
@@ -146,15 +169,18 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 | **Referentes** | El banco de cuentas de IG y TikTok que se rastrean | todo (arman la lista) |
 | **Proyectos** | Los temas que se buscan | todo (arman los temas) |
 | **Voces** | Para quién se selecciona | todo |
+| **Referentes - Revisar** | Las cuentas que vienen flojas (la máquina las señala, §5.3) | solo `activo` (podar es decisión de ustedes) |
 | **Configuración Global** | Las perillas del día a día (§5.5) | solo el `valor` de cada perilla |
 | **Ajustes Dev-Only** | Las perillas avanzadas | **nada — solo lectura** (avisen antes de tocar) |
-| **Métricas de Calidad** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
+| **Calidad por Proyecto** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
 | **Salud del Sistema** | Los números de la máquina (§6.2) | **nada — solo lectura** |
+| **Costos** | Cuánto gastó la semana, por servicio | **nada — solo lectura** |
 
 > **Ojo con los nombres.** Algunas páginas se llaman distinto a la tabla que muestran: *Feed de
 > Calificación* es la tabla **Candidatos**; *Configuración Global* es la tabla **Ajustes**; *Referentes
-> Buscados* es la tabla **Referentes propuestos**; *Métricas de Calidad* y *Salud del Sistema* son las
-> dos vistas de la tabla **Métricas**. Guíense por el nombre del **menú**, no por el de la tabla.
+> Buscados* es la tabla **Referentes propuestos**; *Calidad por Proyecto* muestra **Métricas Proyectos**
+> y *Salud del Sistema* / *Costos* muestran **Métricas Global**. Guíense por el nombre del **menú**, no
+> por el de la tabla.
 > También hay un formulario **"Nuevo Proyecto"** para crear un proyecto llenando un formulario en vez
 > de una fila.
 
@@ -185,6 +211,11 @@ Una Voz = un personaje o marca para la que curan contenido (ej: "Cora", "30X ins
 | `nombre` | el nombre de la voz. Ej: "Cora" |
 | `descripcion` | quién es / de qué tiene autoridad |
 | `criterios_relevancia` | qué le sirve a este cliente puntual (opcional; afina el filtro por encima del tema del Proyecto) |
+| `activo` | ✅ para que la voz corra. **Es el interruptor maestro:** destildarlo pausa **todos** los proyectos de esa voz de una (aunque los proyectos sigan en `activo`). Ideal para pausar un cliente entero sin tocar proyecto por proyecto |
+
+> **La voz apagada sigue recibiendo propuestas de cuentas.** El buscador de cuentas nuevas (§8.1) le
+> sigue proponiendo referentes aunque la voz esté apagada — es a propósito: cuando la prendan, ya
+> tiene la despensa llena. Apagar una voz solo frena los **videos**, no las propuestas.
 
 > **Cuidado con la coherencia Voz ↔ Proyecto.** La Voz tiene que tener sentido con el tema del Proyecto al
 > que la asignan. Ejemplo real que salió mal: una voz de *bienestar y maternidad* asignada a un proyecto de
@@ -202,7 +233,12 @@ con los de otro.
 | `descripcion` | qué cubre el tema |
 | `criterios_relevancia` | **qué hace relevante a un video para este tema, y qué NO.** Es el campo más importante: la máquina lo lee para juzgar si un video sirve de verdad o es viral-vacío. Mientras más concreto, menos basura les llega (ejemplo abajo) |
 | `voz_default` | la Voz que crearon en 5.1 (se elige de una lista). **Una sola voz por proyecto** |
-| `activo` | ✅ marcado para que el proyecto entre en las búsquedas. Sin marcar = pausado |
+| `activo` | ✅ marcado para que el proyecto entre en las búsquedas. Sin marcar = pausado. (Ojo: si la **Voz** está apagada, el proyecto no corre aunque esté activo — §5.1) |
+| `N` | **cuántos videos quieren de este tema por corrida** (ej: 20). Vacío = usa el global "Candidatos por corrida" (§5.5). Es POR proyecto: pueden pedir 20 de un tema y 10 de otro en la misma corrida |
+
+> **N es un máximo, no una promesa.** Si el filtro solo encuentra 12 videos que de verdad pegan con el
+> tema, llegan 12 — eso es el filtro trabajando, no un error. Si un proyecto entrega menos que su N
+> semana tras semana, la palanca es **darle más fuentes** (Referentes, §5.3), no subir la N.
 
 > **🔴 Regla de oro: un Proyecto activo necesita fuentes.** Un proyecto marcado `activo` pero **sin ningún
 > Referente** ligado **no trae absolutamente nada** — es un proyecto muerto que solo ocupa lugar. Antes de
@@ -231,7 +267,7 @@ Cada fila es una cuenta de la que la máquina trae videos. **Es la fuente más i
 |---|---|
 | `handle` | la cuenta con **una sola** arroba. Ej: `@simonsinek` |
 | `plataforma` | `instagram` o `tiktok` (lista) |
-| `proyecto` | a qué Proyecto alimenta (lista) |
+| `proyecto` | a qué Proyecto alimenta (lista). **Puede ser más de uno** (de la misma voz): la máquina garantiza que cada video llega UNA sola vez, al proyecto donde mejor pega |
 | `notas` | por qué la agregaron (opcional) |
 | `activo` | ✅ para rastrearla |
 
@@ -287,7 +323,8 @@ Las perillas que sí van a querer tocar viven en la página **Configuración Glo
 los proyectos):
 
 **Volumen y ventana:**
-- **Candidatos por corrida** — cuántos videos entrega cada corrida en total (ej: 100).
+- **Candidatos por corrida** — el valor **por defecto** de la `N` de cada proyecto: se usa para los
+  proyectos que no tienen `N` propia (§5.2). Ya no es un total de la corrida.
 - **Días de recencia** — qué tan atrás busca (ej: 7 para el día a día; más alto la primera vez o para un
   backfill).
 - **Resultados por cuenta de referente** — cuántos videos baja por cada cuenta de Referentes (más = más costo).
@@ -358,10 +395,10 @@ El domingo la máquina cuenta los "era bueno", los registra en Métricas y **vac
 acumulan; cada semana llega una tanda fresca). Si no alcanzan a revisarlos, no pasa nada, pero cada
 "era bueno" detectado mejora el filtro.
 
-### 6.2 Las páginas "Métricas de Calidad" y "Salud del Sistema" (solo para ver)
+### 6.2 Las páginas "Calidad por Proyecto", "Salud del Sistema" y "Costos" (solo para ver)
 
 Cada domingo la máquina escribe el resumen de la semana:
-- **Métricas de Calidad**: por proyecto, cuántos calificaron, cuántos aprobaron y la **precisión**
+- **Calidad por Proyecto**: por proyecto, cuántos calificaron, cuántos aprobaron y la **precisión**
   (de lo que llegó, qué fracción sirvió). La columna **`diagnostico`** les traduce en una frase si el
   criterio de ese proyecto está funcionando, con un semáforo:
   - 🟢 **sano** — el filtro distingue bien lo que ustedes quieren. No toquen nada.
@@ -479,8 +516,13 @@ Ninguna de estas rompe el uso diario. Son cosas en la lista para mejorar más ad
 
 ## 10. Preguntas frecuentes (para no tener que preguntar)
 
-**¿Cada cuánto entra contenido nuevo?** Una vez por semana (corrida automática). Pueden calificar cualquier
-día; lo calificado se archiva el domingo a las 18:00.
+**¿Cada cuánto entra contenido nuevo?** Una vez por semana (corrida automática del lunes) y cada vez
+que pidan una corrida a demanda (§3.1). Pueden calificar cualquier día; lo calificado se archiva el
+domingo a las 18:00.
+
+**Pedí N=20 y llegaron 12. ¿Está roto?** No: la N es un **máximo** (§5.2). El filtro solo deja pasar lo
+que de verdad pega con los criterios del proyecto; si el pool de esa corrida no daba para 20 buenos,
+llegan menos. La palanca para subir la entrega es agregar Referentes buenos a ese proyecto.
 
 **Califiqué algo por error, ¿lo puedo cambiar?** Sí, mientras no haya pasado el archivado del domingo. Solo
 cambien la `calificacion` o el `estado`. Después del domingo ya se fue al Histórico.

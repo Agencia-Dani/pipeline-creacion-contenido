@@ -340,6 +340,10 @@ superficie curada. Decidir en B.1 si sube a página.
 
 ### 5.2 Lo que A.3 le aporta a la decisión de A.5 (Airtable vs. dashboard propio)
 
+> **Cerrada (2026-07-17): [ADR-025](../adr/ADR-025-cockpit-producto-propio.md)** — el cockpit migra a
+> producto propio; Airtable queda como superficie **interina** curada al mínimo. El análisis de abajo
+> queda como el insumo que alimentó esa decisión.
+
 El mapa parte en dos, limpio, y **confirma el matiz de "partir la superficie"** de
 [§3 del plan](./refactor-voces-proyectos.md):
 
@@ -358,3 +362,52 @@ decidir, ojo con el sesgo:** ninguna de esas 3 páginas fue curada después del 
 comparando Airtable-mal-configurado contra un dashboard imaginario. La prueba honesta es **arreglar
 *Salud del Sistema* primero** (B.6, es de horas) y recién ahí ver si Airtable se quedó corto de verdad o
 si nunca le dimos la chance.
+
+## 6. Guía de curado por página — B.6 ejecutado a mano (cierre 54)
+
+> **Para Mani, a ejecutar en el interface designer de Airtable** (la API no edita config de páginas —
+> §5.1 del handoff histórico, confirmado cierre 50). Alcance fijado por [ADR-025](../adr/ADR-025-cockpit-producto-propio.md):
+> **lo mínimo para operar mientras llega el producto propio** — nada decorativo.
+> Los "textos de ayuda" van como *description* del campo en la tabla (el ⓘ) o como helper text del
+> elemento en la página; cualquiera de los dos sirve, el punto es que Majo/Jero lo vean.
+> Orden sugerido = el de la tabla (empieza por lo que destraba el trabajo diario).
+
+| # | Página | Qué hacer (pasos concretos) | Por qué |
+|---|---|---|---|
+| 1 | **Voces** | Sumar el campo `activo` a la página, **editable**. | B.5: el motor ya lo respeta; el equipo no lo ve. Es el interruptor maestro. |
+| 2 | **Proyectos** | Sumar 3 campos: `N` (**editable**), `criterios_aprendidos` (**editable** — el contrato dice que el equipo puede corregirlo/borrarlo), `advertencia_criterios` (**solo lectura**). | El aviso semanal de Haiku hoy no lo ve nadie; la N es el knob central del flujo on-demand. |
+| 3 | **Feed de Calificación** | Pasar a **solo lectura**: `titulo`, `thumbnail`, `referente`. Editables quedan solo `calificacion`, `estado`, `notas_equipo`. | Campos de la máquina editables confunden (§5.1-4). El modelo a copiar es *Configuración Global*. |
+| 4 | **Descartes** | **Después de la corrida del lunes** (necesita records en la página): marcar `veredicto` **editable**; pasar a solo lectura `titulo`, `thumbnail`, `proyecto`, `referente`. | Sin `veredicto` editable, `falsos_negativos` = 0 para siempre y el loop de ADR-021 está muerto (§5.1-1). Hoy está al revés. |
+| 5 | **Referentes - Revisar** | Pasar a **solo lectura**: `tasa_gate`, `tasa_aprobacion`, `videos_evaluados`. Editable queda solo `activo`. | La salud la escribe el archivado cada domingo; editarla a mano se pisa sin aviso. |
+| 6 | **Referentes Buscados** (Sugeridos) | Agregar el filtro `estado = propuesto` a la página. | Que la bandeja muestre solo lo pendiente de revisar (arrastre conocido). |
+| 7 | **Salud del Sistema** | **Rearmarla**: quitar `calificados`, `aprobados`, `precision`, `diagnostico` (post-split son de `Métricas Proyectos`; `diagnostico` en filas GLOBAL está siempre vacío). Mostrar el embudo, en este orden: `semana`, `colectados`, `pretrim`, `gate_pass`, `entregados`, `sin_guion`, `runs_ok`, `runs_fallo`, `duracion_min`, `falsos_negativos`. Orden de filas: `semana` desc. Todo **solo lectura**. | Hoy la página de salud no muestra salud (§5.1-3): el embudo entero no está en ninguna página. |
+| 8 | **Calidad por Proyecto** | Sumar `separacion_gate`; formatear `precision` como **%**; pasar TODO a **solo lectura**. | Se muestra el semáforo (`diagnostico`) sin el número del que sale; la tabla es solo-lectura por contrato. |
+| 9 | **Costos** | Verificar a ojo que los 9 `bigNumber` tengan **filtro de semana** (subtítulo "Elegí la semana arriba"). Si no lo tienen, agregarlo. | Sin filtro suman toda la historia (`Métricas Global` no se barre nunca) y el número crece para siempre (§5.1-7). |
+| 10 | **Ajustes Dev-Only** | Marcar `valor` **editable**. | Un dev no puede editar sus propios knobs desde la página hecha para eso (§5.1-5). |
+| 11 | **Form "Nuevo Proyecto"** (standalone) | Hacer `criterios_relevancia` **obligatorio**; **quitar** el campo `Candidatos` (link inverso); sumar `N` como campo opcional. | Un proyecto sin criterios = gate fail-open = ruido sin filtrar (§5.1-6). Es la forma más fácil de romper la relevancia. |
+| 12 | **Configuración Global** | Nada. | Ya es el modelo sano (contexto read-only + solo `valor` editable). |
+
+### 6.1 Textos de ayuda sugeridos (copiar/pegar)
+
+Escritos para Majo/Jero (mismo tono que el [onboarding](../onboarding-equipo-redes.md)). Solo los
+campos donde el texto cambia una decisión; el resto no necesita ayuda.
+
+| Tabla.campo | Texto de ayuda |
+|---|---|
+| `Voces.activo` | Interruptor maestro: destildarlo pausa TODOS los proyectos de esta voz de una. La voz apagada igual sigue recibiendo propuestas de cuentas nuevas. |
+| `Proyectos.N` | Cuántos videos quieren de este tema por corrida (ej: 20). Vacío = usa la perilla global "Candidatos por corrida". Es un máximo: si el filtro encuentra menos videos buenos, llegan menos. |
+| `Proyectos.criterios_relevancia` | El campo más importante: qué hace relevante a un video para este tema y qué NO. Concreto = menos basura. La máquina nunca lo pisa. |
+| `Proyectos.criterios_aprendidos` | Lo que la máquina destiló de sus calificaciones (se actualiza cada domingo). Pueden corregirlo o borrarlo si dice algo raro. |
+| `Proyectos.advertencia_criterios` | Aviso semanal de la máquina sobre los criterios de este proyecto. Si aparece algo acá, léanlo: sugiere cómo afinar los criterios. |
+| `Candidatos.calificacion` | 🔥 excelente (le enseña a la máquina el ejemplo ideal) · 👍 sirve · 👎 no sirve. Califiquen también lo que descartan: la máquina aprende del "no". |
+| `Candidatos.estado` | La decisión que cuenta: aprobado = seleccionado (va al Histórico el domingo) · descartado = no va. Lo que quede en "nuevo" más de 20 días se borra solo. |
+| `Candidatos.notas_equipo` | Opcional: por qué sí o por qué no. Se archiva con el video y ayuda a mejorar el filtro. |
+| `Descartes.veredicto` | ¿La máquina hizo bien en descartarlo? "bien descartado" = sí · "era bueno" = se equivocó (esta marca es oro: afina el filtro del proyecto). |
+| `Referentes.activo` | Destildar = la cuenta deja de rastrearse (no hace falta borrarla). La máquina señala las flojas en "Revisar" pero nunca las apaga sola: podar es decisión de ustedes. |
+| `Referentes.proyecto` | Puede alimentar más de un proyecto (de la misma voz). Cada video llega UNA sola vez, al proyecto donde mejor pega. |
+| `Referentes propuestos.estado` | aprobado = el lunes se siembra sola en Referentes y empieza a traer videos · descartado = definitivo (no se vuelve a proponer; siempre pueden agregarla a mano). |
+
+**Verificación al terminar:** entrar como miembro del equipo (o en vista previa), y chequear: (a) en el
+*Feed* no se puede tocar `titulo`; (b) en *Descartes* sí se puede marcar `veredicto`; (c) *Salud del
+Sistema* muestra `entregados` y `sin_guion` de la última semana; (d) *Buscados* solo muestra filas
+`propuesto`; (e) el form no deja crear un proyecto sin criterios.
