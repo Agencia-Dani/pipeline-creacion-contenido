@@ -1,6 +1,6 @@
 # Herramienta de Reels — Qué es y qué te da (una página)
 
-> **Para:** Andrés · **De:** Mani · **v2 — actualizada con lo acordado en la conversación del
+> **Para:** el equipo · **De:** Mani · **v2 — actualizada con lo acordado en la conversación del
 > visto bueno (2026-06-12;
 > [transcripción](./transcripciones/2026-06-12-visto-bueno-workflow.md)). La v1 presentada vive
 > en el historial del repo. Versión no técnica; los términos de máquina van *(entre paréntesis)*.

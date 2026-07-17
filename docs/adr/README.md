@@ -29,7 +29,7 @@
 | [ADR-021](./ADR-021-medicion-desempeno-embudo.md) | Medición de desempeño del embudo: tabla `Métricas` + descartes del gate visibles + histórico enriquecido (el archivado computa, Airtable proyecta; enmiendas 2026-07-13 top-K, 2026-07-14 diagnóstico+barridos, 2026-07-14 bis descubrimiento+costo+páginas, 2026-07-15 split en `Métricas Proyectos` + `Métricas Global`) | Aceptada |
 | [ADR-022](./ADR-022-loop-aprendizaje-criterios.md) | Loop de aprendizaje de criterios: destilación semanal en `criterios_aprendidos` + 🔥 prioriza ejemplos + salud por referente (extiende ADR-010, completa ADR-020) | Aceptada (se construye tras verificar ADR-021) |
 | [ADR-023](./ADR-023-disparo-on-demand-boton-airtable.md) | Disparo on-demand: botón Airtable → automation → webhook n8n; señal desnuda, el motor lee Airtable; una corrida = todos los activos; coexiste con el cron | Aceptada |
-| [ADR-024](./ADR-024-enmienda-adr016-n-por-proyecto.md) | Enmienda ADR-016: la N vuelve por proyecto (global = default), corte final por proyecto; `cap_top_n` intacto | Aceptada |
+| [ADR-024](./ADR-024-enmienda-adr016-n-por-proyecto.md) | Enmienda ADR-016: la N vuelve por proyecto (global = default), corte final por proyecto; `cap_top_n` intacto | Aceptada (enmendada 2026-07-17: spillover — N techo exacto, sobrantes al proyecto con cupo que también los gateó) |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

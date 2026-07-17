@@ -42,3 +42,41 @@
   `Candidatos por corrida` pasa de "N total" a "default por proyecto"), `setup-airtable.mjs`. El motor:
   `Armar plan` (lee N por proyecto con fallback al global) y el **nodo de corte final** (corta por
   proyecto, no global). `cap_top_n` en `Config` sin cambios.
+
+## Enmienda (2026-07-17) — spillover: N es techo exacto, la entrega es best-effort con reparto de sobrantes
+
+- **Estado:** aceptada — 2026-07-17 (decisión de Mani tras la V-run post re-import).
+- **Contexto:** la V-run destapó que "cada proyecto corta a su N" era media verdad. El corte va
+  **después** del dedup (ADR-018: cada video queda en UN solo proyecto, gana el que lo juzgó más
+  relevante), y cuando dos proyectos comparten referentes el pool compartido se concentra en el de
+  mayor relevancia. Si ese proyecto llena su N, los videos sobrantes se **descartaban enteros** aunque
+  hubieran pasado el gate del otro proyecto, que quedaba corto con cupo libre (caso real: *Trading
+  Psychology* entregó 6/20 mientras 3 videos que pasaron su gate se tiraban a un *Trading fast tips* ya
+  lleno). Antecedente de la misma decisión: **compartir referentes entre proyectos de una voz es
+  VÁLIDO** (Mani, 2026-07-17) — el pipeline ya dedupa las etapas pagas (una llamada por video), así que
+  el fix va en el reparto, no en prohibir el solape.
+- **Decisión:**
+  1. **Spillover en el corte final:** un sobrante (video que pasó el gate de ≥2 proyectos y cuyo
+     proyecto ganador llenó su N) se entrega al proyecto **con cupo** que también lo gateó, usando **la
+     copia de ese proyecto** (su `relevancia_score`/`relevancia_razon`, no los del ganador). Sobrantes
+     en orden de heat; entre alternativas gana la de mayor relevancia.
+  2. **Garantía dura (pedida por Mani): un video sale en UN solo proyecto, siempre.** Un video ya
+     entregado a su ganador jamás se re-asigna; un sobrante toma a lo sumo una alternativa. El
+     spillover no consume N sin necesidad: cada proyecto recibe N candidatos **distintos**.
+  3. **Semántica de N, ahora dicha completa:** N es un **techo exacto** (jamás se supera, con o sin
+     spillover) y la entrega es **best-effort sobre el supply real** — si el pool no tiene N videos que
+     pasen el gate del proyecto, entrega menos y eso es el gate trabajando, no un bug.
+  4. El PISO (ADR-017) no re-aplica en el spillover: es relleno marginal, no redistribución.
+- **Alternativas descartadas:**
+  - *Aceptar N como techo sin spillover (status quo):* gratis, pero tira videos ya pagados
+    (scrape+transcripción+gate) que un proyecto hambriento quería. Con referentes compartidos válidos,
+    el caso no es borde: es el modo normal de operar.
+  - *Referentes exclusivos por proyecto:* elimina el solape de raíz pero contradice la decisión de
+    compartir, exige re-curación del dato y no arregla el supply fino.
+- **Consecuencias:**
+  - (+) En la V-run habría llevado TP de 6 a 9 entregados sin costo extra (los videos ya estaban pagos).
+  - (−) Un candidato puede llegar con la relevancia del "segundo mejor" juicio — aceptado: esa copia
+    pasó el gate de ese proyecto por mérito propio.
+- **Toca:** solo `Armar candidato` en el motor (dedup guarda todas las copias gate-pass; pasada de
+  spillover tras el corte). Probado en `test-nodos.mjs` (8 casos nuevos, incluida la garantía de
+  no-duplicado). Sin cambio de schema ni de contrato de datos.

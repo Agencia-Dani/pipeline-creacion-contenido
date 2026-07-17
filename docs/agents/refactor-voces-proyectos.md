@@ -33,7 +33,7 @@ relevantes, califica, y el sistema aprende de esa elección — todo **sin ayuda
 |---|---|---|
 | **Majo, Jero** (equipo de redes) | operadores, no-code | eligen Voz→Proyecto→N, disparan, califican, curan referentes |
 | **Mani + teammate** (devs) | construyen y mantienen | motor, archivado, superficie, schema |
-| **Andrés** (jefe) | sponsor | ve progreso, precisión y costos |
+| **Sponsor** (agencia) | sponsor | ve progreso, precisión y costos |
 
 **Cómo debe sentirse y verse (look & feel):**
 
@@ -278,7 +278,8 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       global; `Armar candidato` corta **por proyecto**. `cap_top_n` intacto (ya muerde antes, en `Heat-score v1`).
       **Decisión que el ADR no fijaba, resuelta acá:** el **orden** entre corte y dedup (ADR-018). Ahora
       **dedup primero, corte después** — al revés, 2 proyectos que pescan el mismo video colisionan y los
-      **dos** quedan cortos (N sería un techo, no una entrega). Con este orden N se cumple exacto.
+      **dos** quedan cortos. *(La V-run matizó el "N se cumple exacto" y la enmienda spillover de abajo
+      lo cierra: N es techo exacto, entrega best-effort.)*
       **Probado** fuera de n8n con `$` mockeado (10 casos: N por proyecto, fallback al global, el video
       disputado, PISO, `_descarte`, + regresiones de `normLang` y ⚠️ SIN GUION).
       ✅ (a) el campo `N` existe en `Proyectos` (`fld9MCZ5y2pSWRxHc`) y **está sembrado en los 2 proyectos
@@ -286,14 +287,17 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       asimétricos a propósito, para que la V-run post re-import pruebe el corte por proyecto en vivo
       (los otros 4 proyectos siguen con `N` vacía = caen al global). ✅ (b) **re-importado (cierre 52) y
       V-run HECHA (cierre 53):** el corte por proyecto quedó **confirmado en vivo** — *Trading fast tips*
-      entregó 10 exactos (su N), no el global. 🔴 **Pero la V-run destapó el límite de "N se cumple
-      exacto":** con 2 proyectos que comparten los MISMOS referentes, el dedup→corte concentra los videos
-      compartidos en el proyecto de mayor score y, si está lleno, los **descarta sin spillover** al
-      proyecto hambriento (TP entregó 6/20; 3 de esos faltantes eran videos que pasaron el gate de TP y se
-      tiraron a un TfT lleno). N es un **techo** exacto, no una **entrega** garantizada. **Decisión abierta
-      (Mani):** ¿enmendar C.1 con spillover (repartir sobrantes a proyectos bajo su N que también pasaron
-      el gate), o aceptar N como techo? El resto del faltante de TP es supply real (el pool no tiene 20
-      videos psychology-relevantes). Ver cierre 53 del [handoff](./handoff.md).
+      entregó 10 exactos (su N), no el global. ✅ (c) **El spillover gap que destapó la V-run quedó
+      RESUELTO (2026-07-17, decisión de Mani, enmienda de ADR-024):** el corte gana un paso 3 —
+      **dedup → corte → spillover**. Los sobrantes (videos que pasaron el gate de ≥2 proyectos y cuyo
+      ganador llenó su N) se entregan al proyecto **con cupo** que también los gateó, con la copia de
+      ese proyecto. **Garantía dura: un video sale en UN solo proyecto, siempre** (N candidatos
+      **distintos** por proyecto). Semántica final: **N es techo exacto; la entrega es best-effort
+      sobre el supply real** — el faltante restante de TP era supply (el pool no tenía 20 videos
+      psychology-relevantes) y eso es el gate trabajando. En la misma decisión: **compartir referentes
+      entre proyectos de una voz es VÁLIDO** (el pipeline ya dedupa las etapas pagas; el under-delivery
+      se ataca sembrando más referentes, no prohibiendo el solape). Probado en `test-nodos.mjs` (8
+      casos nuevos); **pendiente de re-import** del motor.
 - [x] **C.2** ✅ **Respetar `Voces.activo`** (2026-07-16): `Leer Voces` del motor filtra **server-side**
       (`filterByFormula={activo}`, mismo patrón que `Leer Proyectos`) y `Armar plan` saltea los proyectos
       cuya voz no llegó, logueando cuál. Proyecto **sin** voz: no gateado. **Server-side y no en el code

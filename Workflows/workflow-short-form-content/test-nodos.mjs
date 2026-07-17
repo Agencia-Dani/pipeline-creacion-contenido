@@ -206,6 +206,58 @@ seccion('El orden dedup→corte (lo que motivó invertirlo)');
     `P1=${out.filter((o) => o.proyecto_id === 'P1').length} P2=${out.filter((o) => o.proyecto_id === 'P2').length}`);
 }
 
+seccion('Spillover (enmienda ADR-024, decisión Mani 2026-07-17): los sobrantes van al proyecto con cupo');
+// El caso de la V-run del 07-17: 2 proyectos comparten referentes, el dedup concentra el pool
+// compartido en el de mayor relevancia y, si está lleno, los sobrantes se tiraban enteros aunque el
+// otro proyecto (hambriento, bajo su N) también los hubiera gateado.
+{
+  const items = [
+    vid('s1', 'TFT', 0.99, { relevancia_score: 0.9 }),
+    vid('s2', 'TFT', 0.98, { relevancia_score: 0.9 }), // gana TfT... pero TfT (N=1) ya está lleno con s1
+    vid('s2', 'TP', 0.98, { relevancia_score: 0.7 }),  // la copia de TP: pasó SU gate → spillover
+    vid('s3', 'TP', 0.50, { relevancia_score: 0.8 }),
+  ];
+  const { out, logs } = runCorte(items, { top_n: 100, projects: { TFT: { nombre: 'TfT', n: 1 }, TP: { nombre: 'TP', n: 5 } } });
+  const s2 = out.filter((o) => o.external_id === 's2');
+  check('el sobrante se entrega al proyecto hambriento que también lo gateó', s2.length === 1 && s2[0].proyecto_id === 'TP', JSON.stringify(s2.map((o) => o.proyecto_id)));
+  check('con LA COPIA de ese proyecto (su relevancia, no la del ganador)', s2[0] && s2[0].relevancia_score === 0.7, s2[0] && String(s2[0].relevancia_score));
+  check('N sigue siendo techo: TfT no se pasa de 1', out.filter((o) => o.proyecto_id === 'TFT').length === 1, String(out.filter((o) => o.proyecto_id === 'TFT').length));
+  check('y lo dice en el log', logs.some((l) => /\[Spillover\] s2/.test(l)), JSON.stringify(logs));
+  check('GARANTÍA: ningún video sale en 2 proyectos', new Set(out.map((o) => o.external_id)).size === out.length, JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  // La garantía pedida por Mani, por el lado opuesto: un video YA entregado a su proyecto ganador
+  // jamás se re-asigna a otro, aunque el otro tenga cupo de sobra.
+  const items = [
+    vid('w1', 'P1', 0.9, { relevancia_score: 0.9 }),
+    vid('w1', 'P2', 0.9, { relevancia_score: 0.8 }),
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 }, P2: { nombre: 'P2', n: 5 } } });
+  check('un video entregado NO se duplica a otro proyecto con cupo', out.length === 1 && out[0].proyecto_id === 'P1', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
+}
+{
+  // Sobrante sin proyecto con cupo → se descarta (no se inventa dónde ponerlo).
+  const items = [
+    vid('x1', 'P1', 0.90, { relevancia_score: 0.9 }),
+    vid('x2', 'P1', 0.80, { relevancia_score: 0.9 }), // pierde el corte de P1 (N=1)
+    vid('x2', 'P2', 0.80, { relevancia_score: 0.5 }), // su alternativa: P2... también lleno
+    vid('x3', 'P2', 0.70, { relevancia_score: 0.9 }),
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: { nombre: 'P2', n: 1 } } });
+  check('sobrante con TODOS los proyectos llenos se descarta (N techo en ambos)', out.length === 2 && !out.some((o) => o.external_id === 'x2'), JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  // Un proyecto cuyo pool entero perdió el dedup (0 ganadores) igual recibe por spillover.
+  const items = [
+    vid('y1', 'P1', 0.90, { relevancia_score: 0.9 }),
+    vid('y2', 'P1', 0.80, { relevancia_score: 0.9 }),
+    vid('y2', 'P2', 0.80, { relevancia_score: 0.6 }), // lo único de P2 es la copia perdedora de y2
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: { nombre: 'P2', n: 3 } } });
+  const p2 = out.filter((o) => o.proyecto_id === 'P2');
+  check('proyecto sin ganadores propios igual recibe spillover', p2.length === 1 && p2[0].external_id === 'y2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
+}
+
 seccion('Invariantes que no se tocan');
 {
   const items = [];
