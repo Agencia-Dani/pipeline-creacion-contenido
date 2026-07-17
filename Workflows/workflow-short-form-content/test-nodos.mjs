@@ -95,6 +95,34 @@ seccion('La anomalía de dato: un proyecto con 2 voces linkeadas (existe en la b
   check('2 voces con la PRIMERA apagada → se saltea (gate por [0], consistente con criterios/nombre)', !plan.projects.p1, JSON.stringify(Object.keys(plan.projects)));
 }
 
+seccion('El referente que cruza voces (4 de 12 en la base viva: @howtoconvince y 3 más)');
+{
+  const { plan, logs } = runPlan({
+    proyectos: [P('p1', 'Storytelling', ['v1']), P('p2', 'Comunicación en empresas', ['v2'])],
+    vocesActivas: [V('v1', 'Rosario'), V('v2', 'Milena')],
+    referentes: [{ id: 'r1', fields: { handle: '@howtoconvince', plataforma: 'instagram', proyecto: ['p1', 'p2'] } }],
+  });
+  check('cruza voces: se PERMITE (sigue alimentando los 2 proyectos)', (plan.ig_owner_to_proj['howtoconvince'] || []).length === 2, JSON.stringify(plan.ig_owner_to_proj));
+  check('y AVISA, nombrando las voces', logs.some((l) => /referente @howtoconvince alimenta proyectos de 2 voces \(Rosario, Milena\)/.test(l)), JSON.stringify(logs));
+  check('el handle se scrapea UNA vez igual (no se paga Apify doble)', plan.ig_urls.length === 1, JSON.stringify(plan.ig_urls));
+}
+{
+  const { logs } = runPlan({
+    proyectos: [P('p1', 'Trading Psychology', ['v1']), P('p2', 'Trading fast tips', ['v1'])],
+    vocesActivas: [V('v1', 'Juan Pablo')],
+    referentes: [{ id: 'r1', fields: { handle: '@nicholascrown', plataforma: 'instagram', proyecto: ['p1', 'p2'] } }],
+  });
+  check('2 proyectos de la MISMA voz no avisan (es el caso normal: los 5 referentes activos de hoy)', !logs.some((l) => /alimenta proyectos de/.test(l)), JSON.stringify(logs));
+}
+{
+  const { logs } = runPlan({
+    proyectos: [P('p1', 'Storytelling', ['v1']), P('p2', 'Comunicación en empresas', ['v2'])],
+    vocesActivas: [V('v1', 'Rosario')], // Milena apagada → p2 no corre
+    referentes: [{ id: 'r1', fields: { handle: '@howtoconvince', plataforma: 'instagram', proyecto: ['p1', 'p2'] } }],
+  });
+  check('con una de las 2 voces apagada NO avisa (no hay ambigüedad viva en esta corrida)', !logs.some((l) => /alimenta proyectos de/.test(l)), JSON.stringify(logs));
+}
+
 seccion('C.1 — N por proyecto (ADR-024)');
 {
   const { plan } = runPlan({
