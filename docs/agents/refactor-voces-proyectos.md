@@ -284,8 +284,16 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       ✅ (a) el campo `N` existe en `Proyectos` (`fld9MCZ5y2pSWRxHc`) y **está sembrado en los 2 proyectos
       activos** (2026-07-16, por MCP): *Trading Psychology* = **20**, *Trading fast tips* = **10** —
       asimétricos a propósito, para que la V-run post re-import pruebe el corte por proyecto en vivo
-      (los otros 4 proyectos siguen con `N` vacía = caen al global). ⚠️ **Falta (b) re-importar** — hasta
-      ahí el motor vivo ignora la `N` y sigue entregando por el global.
+      (los otros 4 proyectos siguen con `N` vacía = caen al global). ✅ (b) **re-importado (cierre 52) y
+      V-run HECHA (cierre 53):** el corte por proyecto quedó **confirmado en vivo** — *Trading fast tips*
+      entregó 10 exactos (su N), no el global. 🔴 **Pero la V-run destapó el límite de "N se cumple
+      exacto":** con 2 proyectos que comparten los MISMOS referentes, el dedup→corte concentra los videos
+      compartidos en el proyecto de mayor score y, si está lleno, los **descarta sin spillover** al
+      proyecto hambriento (TP entregó 6/20; 3 de esos faltantes eran videos que pasaron el gate de TP y se
+      tiraron a un TfT lleno). N es un **techo** exacto, no una **entrega** garantizada. **Decisión abierta
+      (Mani):** ¿enmendar C.1 con spillover (repartir sobrantes a proyectos bajo su N que también pasaron
+      el gate), o aceptar N como techo? El resto del faltante de TP es supply real (el pool no tiene 20
+      videos psychology-relevantes). Ver cierre 53 del [handoff](./handoff.md).
 - [x] **C.2** ✅ **Respetar `Voces.activo`** (2026-07-16): `Leer Voces` del motor filtra **server-side**
       (`filterByFormula={activo}`, mismo patrón que `Leer Proyectos`) y `Armar plan` saltea los proyectos
       cuya voz no llegó, logueando cuál. Proyecto **sin** voz: no gateado. **Server-side y no en el code
