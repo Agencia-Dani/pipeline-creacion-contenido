@@ -55,9 +55,16 @@
 > hay corrida viva. Si en cambio arranca una segunda corrida en paralelo, el guard no quedó vivo en el
 > re-import → parar y revisar. De paso confirmar en Supabase `runs.trigger_type`: la del cron = `cron`,
 > la V-run del 17/07 = `manual` (quedó sin verificar en el cierre 53).
-> 🟠 **Re-import del motor pendiente (spillover, cierre 54):** `Armar candidato` ganó el paso 3
-> (dedup → corte → spillover, enmienda ADR-024). Hasta re-importar, el motor vivo sigue tirando
-> sobrantes. Mismo path y mismo header del webhook (gestor) — regla de siempre.
+> 🟠 **Re-import del motor pendiente (cierre 54) — con un paso de INFRA ANTES, el orden importa:**
+> 1. **Primero (Mani, a mano):** subir `N8N_RUNNERS_TASK_TIMEOUT` a **3600** en el pod de InstaPods
+>    (SSH al VPS, `.env`/compose de n8n + restart). Motivo: la corrida del 17/07 entregó solo 28/84
+>    transcripts — el presupuesto de 780s cortó el loop (~27s/video de Supadata). El repo ya lleva
+>    `presupuesto_transcribir_s=3000`.
+> 2. **Después:** re-importar el motor (spillover en `Armar candidato` + presupuesto nuevo). Mismo
+>    path y mismo header del webhook (gestor) — regla de siempre.
+> ⚠️ **Al revés es el modo de fallo del 07-10:** presupuesto 3000 con watchdog 900 = el nodo entero
+> muere y la corrida no entrega NADA. Si el env no se puede subir ya, re-importá igual el spillover
+> pero bajá `presupuesto_transcribir_s` a 780 a mano en el Config del editor de n8n.
 > ✅ **V-run — HECHA por Mani el 2026-07-17** (Execute manual, cierre 53). **C.1 (N por proyecto)
 > CONFIRMADO en vivo:** *Trading fast tips* entregó **10 exactos** (su N), no ~100 del global → el
 > re-import del cierre 52 cargó C. Calzó clavo con Airtable (16 records nuevos: TP 6 · TfT 10). **Pero
