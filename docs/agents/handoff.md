@@ -25,36 +25,27 @@
 > Lo que está **en el repo pero NO aplicado en n8n / la base viva**. Es el eslabón débil de siempre:
 > los fixes del repo no son live hasta re-importar (ver memoria `reimport-eslabon-debil`).
 
-- 🟠 **Re-import del motor DESTRABADO (C completo: C.1 + C.2 + C.3 + C.5, cierres 45–48).** El
-  `workflow.json` del motor en el repo tiene: N por proyecto, gate por `Voces.activo`, 2 knobs podados,
-  y ahora el **webhook on-demand con guard single-flight** (C.3, 37 nodos). Checklist del re-import:
-  1. `node Workflows/workflow-short-form-content/test-nodos.mjs` (verde antes de tocar n8n).
-  2. Re-importar el `workflow.json` → **reemplazar `<<WEBHOOK_PATH_MOTOR>>`** en el nodo `Disparo
-     on-demand (webhook)` por un path aleatorio (la URL de Producción va al gestor, jamás a git)
-     → **crear la credencial `httpHeaderAuth` llamada `Webhook Motor Header`** (nombre y valor de
-     header aleatorios — enmienda auth de ADR-023; el nodo ya viene con `authentication: headerAuth`,
-     así que sin la credencial el workflow no activa) → volver a llenar Config/keys como siempre →
-     **activar el workflow** (la URL de Producción del webhook solo escucha con el workflow activo).
-     ⚠️ **Desactivá la versión vieja del motor antes de activar la nueva**, o el lunes 8am el cron
-     dispara dos veces y pagás Apify doble.
-  3. Después, en Airtable (B.2, la API no lo hace): automation con script `fetch(POST)` a esa URL
-     **mandando el mismo header** + botón "▶ Correr ahora"
+> ✅ **Re-import de los 3 workflows: HECHO por Mani el 2026-07-17** (cierre 52). Motor, archivado y
+> descubrimiento **publicados y corriendo**. Cae el bloqueante que arrastraba desde el cierre 45: C
+> (motor: N por proyecto, `Voces.activo`, webhook single-flight de C.3, 37 nodos) y D (archivado: D.3b +
+> D.4 + matiz D.2) **ya están vivos**. Path del webhook y credencial `Webhook Motor Header` creados —
+> los dos en el gestor, nunca en git. **N sembrada:** *Trading Psychology* = 20, *Trading fast tips* = 10.
+> Las versiones viejas quedaron **desactivadas** (confirmado por Mani) — sin riesgo de cron doble el lun 20/07.
+> **En cada re-import futuro reusá el MISMO path y el MISMO header** (gestor); valores nuevos = botón 403
+> en silencio (memoria `reimport-eslabon-debil`, versión webhook).
+
+- 🟠 **B.2 — botón + automation en Airtable (la mitad que falta del webhook, es de Mani a mano).** El
+  re-import dejó viva la mitad n8n del disparo on-demand; falta la mitad Airtable, que la API **no** crea:
+  1. Automation con acción "Run script": `fetch(POST)` a la **URL de Producción del webhook** (del gestor),
+     **mandando el mismo header** (nombre + value de la credencial `Webhook Motor Header`)
      ([contrato §Disparo on-demand](../../core/contracts/airtable-cockpit.md) tiene el snippet).
-     ⚠️ **Si el header de la automation y el de n8n no coinciden, el botón da 403 en silencio** — es
-     el modo de fallo nuevo que trajo la auth. Probalo con un click antes de dárselo al equipo.
-  4. **En cada re-import futuro, reusá el MISMO path y el MISMO header** (los dos están en el gestor).
-     Si generás valores nuevos, la automation de Airtable queda apuntando al endpoint viejo y el botón
-     muere sin avisar (memoria `reimport-eslabon-debil`, versión webhook).
-  **Cambio de conducta al re-importar (ACTUALIZADO en el cierre 50):** además del arranque (guard +
-  `trigger_type` honesto), ahora **N está sembrada**: *Trading Psychology* = **20** y *Trading fast tips*
-  = **10** (los 2 únicos proyectos activos; los otros 4 siguen vacíos = global). Se sembró asimétrica a
-  propósito — **es el test en vivo del corte por proyecto de C.1**: si la corrida post re-import entrega
-  ~20 y ~10 en vez de ~100 repartidos, C.1 quedó probado. Las 3 voces siguen prendidas. El guard aplica
-  también al cron/manual.
-- 🟠 **Re-import del ARCHIVADO pendiente (D, cierre 49).** Su `workflow.json` cambió en el repo:
-  `notas_equipo`/`viral_por_tamano` a `outputs.metadata` (D.3b), poda de `tema`/`link_doc` (D.4),
-  salteo de corridas vivas en `runs_ok/fallo` (matiz D.2, knob `ventana_corrida_min` en su Config).
-  Sin placeholder nuevo (no tiene webhook). Puede ir en la misma sesión de n8n que el del motor.
+  2. Botón "▶ Correr ahora" en la superficie del operador que dispara esa automation.
+  ⚠️ **Si el header de la automation y el de n8n no coinciden, el botón da 403 en silencio** — probalo con
+  un click **antes** de dárselo a Majo/Jero.
+- 🟠 **V-run — la prueba viva de C, pendiente.** Disparar una corrida post re-import (botón o Execute
+  manual) y verificar el corte por proyecto de C.1: si *Trading Psychology* entrega ~20 y *Trading fast
+  tips* ~10 (en vez de ~100 repartidos), C.1 queda probado en vivo. El guard single-flight (httpRequest +
+  IF, no cubierto por `test-nodos.mjs`) se prueba recién con un Execute encima de una corrida viva.
 > ✅ **Los 2 proyectos con 2 voces: RESUELTO por Mani el 2026-07-16** (mismo día del hallazgo). La regla
 > queda firme y es la esencia del refactor: **un proyecto tiene UNA voz; una voz tiene VARIOS
 > proyectos**. Dato limpio, verificado por MCP (6 proyectos, 1 voz cada uno, 2 por voz). *Coletazo a
@@ -93,7 +84,7 @@
 
 ## Ciclo post-re-import — qué esperar (y qué NO es un fallo)
 
-El re-import fue el **jueves 16/07**, entre el archivado del domingo y el motor del lunes. Como el
+El re-import fue el **viernes 17/07**, entre el archivado del domingo y el motor del lunes. Como el
 archivado computa la salud y los costos **leyendo `runs.metricas` del motor de los últimos 7 días**, el
 primer ciclo sale **a medias por diseño**, no por un bug:
 
@@ -117,9 +108,9 @@ El detalle de cada componente y el "hecho cuando" viven en
 | Componente | Qué | Carril | Estado |
 |---|---|---|---|
 | **A** Auditoría del pipeline vivo | mapa nodo/campo/página + reconciliar repo↔live + decisión §3 (ADR) | Dev 1 | 🔧 **A.1 ✅ · A.2 ✅ · A.3 ✅ · A.4 ✅** · **A.5 ⬜** (la decisión §3) — pero antes **B.6(2)**, ver abajo |
-| **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | 🔧 **B.4 ✅** (cierre 50, por MCP: los 2 knobs ya son team-facing) · **B.6 parcial** — (4) *Costos* **publicada** por MCP, falta verificar su filtro de semana; (1)(2)(3)(5) siguen ⬜ **y son UI pura: la API de Airtable no los hace** (ver abajo) · **B.2 esperando el re-import** (botón + automation, §Pendiente vivo) |
-| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | ✅ **COMPLETO en el repo** (C.1–C.5, cierres 45–48), **sin re-importar** — el re-import quedó destrabado (§Pendiente vivo). C.4 confirmado a nivel repo; la prueba viva = V-run post re-import |
-| **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | ✅ **COMPLETO en el repo** (cierres 48–49): D.1/D.2 confirmados (suma sobre todos los runs, no asume barrido total) + matiz `runs_fallo`×`en_curso` arreglado + **D.3(b)** (`notas_equipo`/`viral_por_tamano` → `outputs.metadata`) + **D.4** (poda `tema`/`link_doc`). **Sin re-importar** |
+| **B** Dashboard / Cockpit | flujo del operador, botón de disparo, racionalización de campos, Métricas/Costos | Dev 1 | 🔧 **B.4 ✅** (cierre 50, por MCP: los 2 knobs ya son team-facing) · **B.6 parcial** — (4) *Costos* **publicada** por MCP, falta verificar su filtro de semana; (1)(2)(3)(5) siguen ⬜ **y son UI pura: la API de Airtable no los hace** (ver abajo) · **B.2 DESBLOQUEADA** (cierre 52): el motor ya escucha el webhook; falta el botón + automation a mano en Airtable (§Pendiente vivo) |
+| **C** Motor de búsqueda | N por proyecto (ADR-024), `Voces.activo`, corte por proyecto, webhook single-flight (ADR-023) | Dev 2 | ✅ **COMPLETO y VIVO** (C.1–C.5, cierres 45–48; re-importado el 2026-07-17, cierre 52). Falta solo la **prueba viva** (V-run: corte por proyecto + guard single-flight, §Pendiente vivo) |
+| **D** Archivado | confirmar que corridas por-proyecto no rompen Métricas/salud semanal | Dev 2 | ✅ **COMPLETO y VIVO** (cierres 48–49; re-importado el 2026-07-17, cierre 52): D.1/D.2 confirmados + matiz `runs_fallo`×`en_curso` + **D.3(b)** (→ `outputs.metadata`) + **D.4** (poda `tema`/`link_doc`) |
 | **E** Capa de datos | `Voces.activo`, campos de disparo, racionalización (autorizado por el ADR de A.5) | Dev 1 | 🔧 **E.1 ✅** (`Voces.activo` vivo) · **E.2 ✅ mitad-repo** (señal desnuda ⇒ sin campos nuevos; contrato documentado — falta botón+automation a mano, va con B.2) · E.3 ⬜ (espera B.3/A.5) |
 
 ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)
@@ -130,17 +121,16 @@ ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-dem
 > Escrito al cerrar el 2026-07-16 (cierres 43–48, todos del mismo día). **Los dos carriles del refactor
 > están andando en paralelo:** Mani en la superficie (Airtable, a mano), el agente en el motor.
 
-**Carril motor (el agente) — C está COMPLETO en el repo (cierre 48).** C.3 (webhook single-flight,
-builder Node) y C.4 (dedup confirmado a nivel repo) cerraron. Lo que sigue en este carril:
+**Carril motor (el agente) — C y D están COMPLETOS y VIVOS (re-importados el 2026-07-17, cierre 52).**
+El motor nuevo, el archivado y el descubrimiento corren en n8n. Lo que queda en este carril ya no es
+código, es verificación y la mitad-Airtable del webhook:
 
-1. **El re-import del motor** — ya no espera nada; checklist en §Pendiente vivo (es de Mani: n8n +
-   el path del webhook + la automation/botón en Airtable).
-2. **D (archivado): COMPLETO en el repo** (cierres 48–49): D.1/D.2 confirmados (suma sobre todos
-   los runs de la semana, sin asumir barrido total), y las decisiones que quedaban las tomó Mani el
-   mismo día: D.3 por la salida (b), D.4 aprovechado, matiz `runs_fallo`×`en_curso` arreglado.
-   Falta solo su **re-import** (§Pendiente vivo).
-3. **La prueba viva de C** llega con la V-run post re-import: corrida botón + cron de la misma
-   semana, sin candidatos repetidos y con `trigger_type` distinguible en `runs`.
+1. **B.2 — botón + automation en Airtable** (§Pendiente vivo): la mitad n8n del webhook está viva;
+   falta el `fetch(POST)` + botón a mano (la API no los crea). Un click de prueba antes del equipo.
+2. **La prueba viva de C** (V-run, §Pendiente vivo): disparar post re-import y verificar el corte por
+   proyecto (~20 / ~10) y el guard single-flight. `trigger_type` ya distinguible en `runs`.
+3. **El primer ciclo end-to-end cierra el 26/07** (§Ciclo): el archivado del 19/07 sale parcial por
+   diseño. No lo leas como veredicto del re-import.
 
 **Carril superficie (Mani) — los fixes de UI de B.6**, con diagnóstico preciso en
 [mapa-campos §5.1](./mapa-campos.md). **B.6(2) (curar *Salud del Sistema*) es precondición de A.5**: sin
@@ -169,6 +159,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-17 (cierre 52) — Re-import de los 3 workflows: el motor nuevo, el archivado nuevo y el descubrimiento están VIVOS (Mani).** Cae el bloqueante que arrastraba desde el cierre 45: todo lo que estaba "en el repo pero no en n8n" ahora corre. **Motor:** re-importado, publicado y activo, con el webhook on-demand + guard single-flight (C.3, 37 nodos), N por proyecto (C.1) y gate por `Voces.activo` (C.2). El path del webhook (`<<WEBHOOK_PATH_MOTOR>>` reemplazado) y la credencial `httpHeaderAuth` **`Webhook Motor Header`** (header + value) quedaron creados — **los dos en el gestor de contraseñas, jamás en git** (enmienda auth de ADR-023). **Archivado:** re-importado con los cambios de D (D.3b `notas_equipo`/`viral_por_tamano` → `outputs.metadata`, D.4 poda `tema`/`link_doc`, matiz D.2 `runs_fallo`×`en_curso`). **Descubrimiento:** también publicado y corriendo. Las versiones viejas quedaron **desactivadas** (confirmado por Mani) — sin riesgo de cron doble el lun 20/07. **Lo que NO cambia con esto:** el re-import es la mitad n8n del webhook; falta la mitad Airtable (**B.2**: automation `fetch(POST)` a la URL + botón "▶ Correr ahora", mandando el MISMO header — la API de Airtable no lo crea, es de Mani a mano). Y **la prueba viva de C sigue pendiente**: es la V-run (corrida post re-import — botón o Execute manual — verificando que *Trading Psychology* entrega ~20 y *Trading fast tips* ~10, no ~100 repartidos → C.1 probado en vivo). **El primer ciclo end-to-end sigue cerrando el 26/07** (§Ciclo): el archivado del dom 19/07 sale parcial por diseño (aún no corrió el motor nuevo). **Regla que se activa ahora:** en cada re-import futuro reusá el MISMO path y el MISMO header (memoria `reimport-eslabon-debil`, versión webhook); valores nuevos = automation apuntando al endpoint viejo, botón 403 en silencio. **Próximo paso:** B.2 (botón + automation en Airtable, con un click de prueba antes de dárselo a Majo/Jero) + esperar/disparar la V-run. Los fixes de UI de B.6 siguen en el carril de Mani.
 
 **2026-07-16 (cierre 51) — El webhook del motor gana Header Auth: enmienda de auth a ADR-023 (Mani + Claude).** Salió de una pregunta de Mani sobre qué era `<<WEBHOOK_PATH_MOTOR>>`. **El hallazgo:** el nodo webhook de C.3 quedó **sin autenticación** (`credentials: null`, sin opción de auth) ⇒ el **path hacía de bearer token por omisión, no por decisión** — y revisando ADR-023, **el ADR nunca decidió el tema**. Quien consiguiera la URL podía disparar corridas **pagas** (Apify + Supadata + Haiku) a voluntad; el guard single-flight acota un click repetido, no el abuso sostenido. **Decisión de Mani: Header Auth.** El nodo `Disparo on-demand (webhook)` ahora lleva `authentication: headerAuth` + credencial `httpHeaderAuth` **`Webhook Motor Header`** (builder Node, como manda el CLAUDE.md del motor; solo el nombre en git, nunca el valor). **Lo que cambia el modelo de amenaza:** el path pasa de secreto a identificador y el secreto es el header, que **no viaja en la URL** (donde una URL se filtra sola: logs de proxy, historiales, referers). El path aleatorio queda igual, como defensa en profundidad. La auth es del **trigger**, así que un POST no autorizado da 403 y **ni abre run** (no consume el guard, no ensucia `runs`). No toca cron ni Execute manual (no pasan por HTTP). **Descartadas** (en el ADR, con su porqué): Basic Auth, JWT, y seguir sin auth. **⚠️ El costo aceptado, que es el que va a morder:** un lugar más donde el re-import falla **en silencio** — si el header de la automation y el de n8n no coinciden, el botón da 403 y nadie se entera. Por eso el §Pendiente vivo ganó el paso de la credencial + "probalo con un click antes de dárselo al equipo" + **la regla de reusar el MISMO path y header en cada re-import futuro** (la versión webhook de `reimport-eslabon-debil`: valores nuevos = automation apuntando al endpoint viejo). **Corrección de algo que dije mal en la sesión:** avisé que el riesgo del timeout de 900s en `Transcribir` seguía vivo — **hay mitigación desde antes**, el knob `presupuesto_transcribir_s` (780) del Config: al excederlo el resto pasa **sin transcript** (fail-open) en vez de morir por el watchdog. El riesgo real de una corrida grande no es que muera, es **degradación silenciosa** (muchos ⚠️ SIN GUION). **Verificación:** grafo 0 problemas (37 nodos, 3 triggers), 15 code nodes compilan (ojo: hay que compilarlos como **AsyncFunction** — n8n los corre en contexto async, así que un `new Function()` pelado da 4 falsos positivos por el `await` de nivel superior), `test-nodos.mjs` verde, validador **1229/0** (+1: el manifest declara la credencial nueva), secretos limpios. **Archivos:** `workflow.json` (1 nodo), `workflow.yaml` (trigger + credentials + setup), ADR-023 (enmienda auth), contrato cockpit §Disparo on-demand (snippet del `fetch` con header), handoff (§Pendiente vivo). **Próximo paso:** sin cambios — el re-import del motor sigue siendo el único bloqueante de la V-run, ahora con un paso más.
 
