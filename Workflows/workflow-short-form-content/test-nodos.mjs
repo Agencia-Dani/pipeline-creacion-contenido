@@ -282,5 +282,70 @@ seccion('Invariantes que no se tocan');
   check('sin transcript pasa igual, con marca visible (fail-open, decisión #6)', out.length === 1 && out[0].titulo.startsWith('⚠️ SIN GUION'), out[0] && out[0].titulo);
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Transcribir (Supadata) — pool de concurrencia (cierre 55) + dedup + fail-open + presupuesto
+// (jsCode async con this.helpers.httpRequest → se compila como AsyncFunction y se corre con un
+// `this` mockeado; el mock cuenta llamadas y concurrencia en vuelo)
+// ════════════════════════════════════════════════════════════════════════════
+const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
+const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, falla } = {}) => {
+  const llamadas = [];
+  let enVuelo = 0, maxEnVuelo = 0;
+  const thisMock = { helpers: { httpRequest: async (opts) => {
+    llamadas.push(opts.url);
+    enVuelo++; maxEnVuelo = Math.max(maxEnVuelo, enVuelo);
+    await new Promise((r) => setTimeout(r, delayMs));
+    enVuelo--;
+    if (falla) throw new Error('supadata caída (mock)');
+    return respuesta || { content: 'transcript de prueba', lang: 'en' };
+  } } };
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto } }) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const $input = { all: () => items.map((j) => ({ json: j })) };
+  const logs = [];
+  const out = await new AsyncFn('$', '$input', 'console', jsCode('Transcribir (Supadata)'))
+    .call(thisMock, $, $input, { log: (m) => logs.push(m) });
+  return { out: out.map((i) => i.json), logs, llamadas, maxEnVuelo: () => maxEnVuelo };
+};
+const tvid = (id, extra = {}) => Object.assign({ external_id: id, video_url: 'https://v/' + id, idioma_guess: 'es' }, extra);
+
+seccion('Transcribir — pool de 8 (cierre 55, plan pago Supadata 10 req/s)');
+await (async () => {
+  {
+    const items = []; for (let i = 0; i < 20; i++) items.push(tvid('t' + i));
+    const { out, llamadas, maxEnVuelo } = await runTranscribir(items, { delayMs: 15 });
+    check('con 20 videos hay hasta 8 llamadas EN VUELO a la vez (antes: 1)', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
+    check('cada video distinto se llama UNA vez (dedup intacto con el pool)', llamadas.length === 20, llamadas.length + ' llamadas');
+    check('todos salen con transcript', out.every((o) => o.transcripcion === 'transcript de prueba'), JSON.stringify(out.filter((o) => !o.transcripcion).length + ' sin transcript'));
+  }
+  {
+    // fan-out: 3 copias de 2 videos → 2 llamadas, el transcript se reparte a las copias
+    const items = [tvid('a'), tvid('a'), tvid('b')];
+    const { out, llamadas } = await runTranscribir(items);
+    check('el fan-out no paga doble: 3 items / 2 únicos = 2 llamadas (cierre 31 intacto)', llamadas.length === 2, llamadas.length + ' llamadas');
+    check('las copias del fan-out comparten el transcript', out.length === 3 && out.every((o) => o.transcripcion), out.length + ' items');
+  }
+  {
+    const { out } = await runTranscribir([tvid('x')], { falla: true });
+    check('Supadata caída ⇒ fail-open (transcripcion vacía, el item sigue)', out.length === 1 && out[0].transcripcion === '', JSON.stringify(out[0] && out[0].transcripcion));
+    check('y el idioma cae al guess del item', out[0].idioma_detectado === 'es', out[0] && out[0].idioma_detectado);
+  }
+  {
+    // presupuesto agotado: budget ínfimo + llamadas lentas ⇒ no se ARRANCAN videos nuevos; el resto
+    // pasa sin transcript y lo dice en el log (la degradación del 07-17, ahora visible y probada)
+    const items = []; for (let i = 0; i < 30; i++) items.push(tvid('p' + i));
+    const { out, logs, llamadas } = await runTranscribir(items, { presupuesto: 0.04, delayMs: 25 });
+    check('el presupuesto corta: no se llaman los 30', llamadas.length < 30, llamadas.length + ' llamadas');
+    check('los cortados salen igual, sin transcript (fail-open)', out.length === 30, out.length + ' items');
+    check('y avisa cuántos quedaron sin transcript', logs.some((l) => /PRESUPUESTO agotado .*sin transcript/.test(l)), JSON.stringify(logs.slice(-2)));
+  }
+  {
+    const { out } = await runTranscribir([tvid('l1')], { respuesta: { content: 'the and you for with this', lang: '' } });
+    check('sin lang de Supadata, adivina sobre el transcript (en)', out[0].idioma_detectado === 'en', out[0].idioma_detectado);
+  }
+})();
+
 console.log(fail ? `\n${fail} test(s) en rojo` : '\nTodo en verde');
 process.exit(fail ? 1 : 0);

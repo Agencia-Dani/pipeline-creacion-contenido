@@ -62,9 +62,12 @@ node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log(
 
 ## Validar
 
-`cd core/scripts && npm run validate` (contrato del manifest + escaneo de secretos). No hay build ni
-tests: el motor corre **en n8n**, se valida por **re-import + Execute**. Tras editar, confirmá que el
-JSON parsea, `w.connections` sigue con keys, y los `jsCode` parsean (`new Function(...)`).
+`cd core/scripts && npm run validate` (contrato del manifest + escaneo de secretos) y
+`node test-nodos.mjs` (ejercita `Armar plan`, `Armar candidato` y `Transcribir` fuera de n8n con `$` y
+`this.helpers` mockeados — corrélo SIEMPRE antes de re-importar si tocaste esos nodos). La conducta
+final igual se valida por **re-import + Execute** (el motor corre en n8n). Tras editar, confirmá que el
+JSON parsea, `w.connections` sigue con keys, y los `jsCode` compilan **como AsyncFunction** (un
+`new Function()` pelado da falsos positivos por los `await` de nivel superior).
 
 ## Git
 
