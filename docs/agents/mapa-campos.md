@@ -368,9 +368,15 @@ si nunca le dimos la chance.
 > **Para Mani, a ejecutar en el interface designer de Airtable** (la API no edita config de páginas —
 > §5.1 del handoff histórico, confirmado cierre 50). Alcance fijado por [ADR-025](../adr/ADR-025-cockpit-producto-propio.md):
 > **lo mínimo para operar mientras llega el producto propio** — nada decorativo.
-> Los "textos de ayuda" van como *description* del campo en la tabla (el ⓘ) o como helper text del
-> elemento en la página; cualquiera de los dos sirve, el punto es que Majo/Jero lo vean.
 > Orden sugerido = el de la tabla (empieza por lo que destraba el trabajo diario).
+>
+> ✅ **Los textos de ayuda YA ESTÁN EN LA BASE (cierre 56, por MCP):** las 9 tablas tienen *description*
+> en **todos** sus campos (53 escritas en esa pasada + las que ya existían; también se corrigió la
+> descripción pre-ADR-009 de la tabla `Voces`). Al agregar un campo a una página, Airtable muestra ese
+> texto en el ⓘ — **no hay que escribir helper text a mano**; §6.1 queda como referencia de los textos
+> clave. Lo que resta a mano es SOLO lo de esta tabla: visibilidad, permisos y filtros por página.
+> Verificado en vivo en esa misma pasada: `Métricas Proyectos.precision` **ya es tipo percent** — el
+> viejo fix "(3) precision como %" de B.6 quedó sin objeto.
 
 | # | Página | Qué hacer (pasos concretos) | Por qué |
 |---|---|---|---|
@@ -380,8 +386,8 @@ si nunca le dimos la chance.
 | 4 | **Descartes** | **Después de la corrida del lunes** (necesita records en la página): marcar `veredicto` **editable**; pasar a solo lectura `titulo`, `thumbnail`, `proyecto`, `referente`. | Sin `veredicto` editable, `falsos_negativos` = 0 para siempre y el loop de ADR-021 está muerto (§5.1-1). Hoy está al revés. |
 | 5 | **Referentes - Revisar** | Pasar a **solo lectura**: `tasa_gate`, `tasa_aprobacion`, `videos_evaluados`. Editable queda solo `activo`. | La salud la escribe el archivado cada domingo; editarla a mano se pisa sin aviso. |
 | 6 | **Referentes Buscados** (Sugeridos) | Agregar el filtro `estado = propuesto` a la página. | Que la bandeja muestre solo lo pendiente de revisar (arrastre conocido). |
-| 7 | **Salud del Sistema** | **Rearmarla**: quitar `calificados`, `aprobados`, `precision`, `diagnostico` (post-split son de `Métricas Proyectos`; `diagnostico` en filas GLOBAL está siempre vacío). Mostrar el embudo, en este orden: `semana`, `colectados`, `pretrim`, `gate_pass`, `entregados`, `sin_guion`, `runs_ok`, `runs_fallo`, `duracion_min`, `falsos_negativos`. Orden de filas: `semana` desc. Todo **solo lectura**. | Hoy la página de salud no muestra salud (§5.1-3): el embudo entero no está en ninguna página. |
-| 8 | **Calidad por Proyecto** | Sumar `separacion_gate`; formatear `precision` como **%**; pasar TODO a **solo lectura**. | Se muestra el semáforo (`diagnostico`) sin el número del que sale; la tabla es solo-lectura por contrato. |
+| 7 | **Salud del Sistema** | **Rearmarla**: quitar `calificados`, `aprobados`, `precision`, `diagnostico` (post-split son de `Métricas Proyectos`; `diagnostico` en filas GLOBAL está siempre vacío). Mostrar el embudo, en este orden: `semana`, `colectados`, `pretrim`, `gate_pass`, `entregados`, `sin_guion`, `runs_ok`, `runs_fallo`, `duracion_min`, `falsos_negativos`. **Filtro `ambito = GLOBAL`** (la tabla también tiene filas DESCUBRIMIENTO, que en el embudo salen vacías). Orden de filas: `semana` desc. Todo **solo lectura**. | Hoy la página de salud no muestra salud (§5.1-3): el embudo entero no está en ninguna página. |
+| 8 | **Calidad por Proyecto** | Sumar `separacion_gate`; pasar TODO a **solo lectura**. *(`precision` ya es percent en vivo — verificado cierre 56.)* | Se muestra el semáforo (`diagnostico`) sin el número del que sale; la tabla es solo-lectura por contrato. |
 | 9 | **Costos** | Verificar a ojo que los 9 `bigNumber` tengan **filtro de semana** (subtítulo "Elegí la semana arriba"). Si no lo tienen, agregarlo. | Sin filtro suman toda la historia (`Métricas Global` no se barre nunca) y el número crece para siempre (§5.1-7). |
 | 10 | **Ajustes Dev-Only** | Marcar `valor` **editable**. | Un dev no puede editar sus propios knobs desde la página hecha para eso (§5.1-5). |
 | 11 | **Form "Nuevo Proyecto"** (standalone) | Hacer `criterios_relevancia` **obligatorio**; **quitar** el campo `Candidatos` (link inverso); sumar `N` como campo opcional. | Un proyecto sin criterios = gate fail-open = ruido sin filtrar (§5.1-6). Es la forma más fácil de romper la relevancia. |
@@ -411,3 +417,26 @@ campos donde el texto cambia una decisión; el resto no necesita ayuda.
 *Feed* no se puede tocar `titulo`; (b) en *Descartes* sí se puede marcar `veredicto`; (c) *Salud del
 Sistema* muestra `entregados` y `sin_guion` de la última semana; (d) *Buscados* solo muestra filas
 `propuesto`; (e) el form no deja crear un proyecto sin criterios.
+
+### 6.2 El spec por página: qué campo se muestra, en qué orden, y quién lo puede editar
+
+El detalle campo-a-campo de la tabla de arriba, para ejecutar sin pensar. Convención: **✏️ editable** ·
+**👁 solo lectura** · lo no listado se **oculta** de la página (existe en la tabla igual). El texto de
+ayuda de cada campo ya vive en su *description* (base viva, cierre 56) — al agregar el campo a la
+página, sale solo.
+
+| Página | Campos, en orden (✏️ = editable, 👁 = lectura) | Ocultar |
+|---|---|---|
+| **Feed de Calificación** | 👁 `thumbnail` · 👁 `titulo` · 👁 `script` · 👁 `relevancia_razon` · 👁 `heat_score` · 👁 `relevancia_score` · 👁 `referente` · 👁 `url_referente` · 👁 `idioma` · 👁 `views` `likes` `seguidores` `engagement` · 👁 `viral_por_tamano` · 👁 `proyecto` · 👁 `voz` · **✏️ `calificacion` · ✏️ `estado` · ✏️ `notas_equipo`** | `fecha`, `fecha_calificacion` (plomería) |
+| **Proyectos** | ✏️ `nombre` · ✏️ `activo` · ✏️ `voz_default` · ✏️ `N` · ✏️ `criterios_relevancia` · ✏️ `criterios_aprendidos` · 👁 `advertencia_criterios` · ✏️ `descripcion` | los 4 links inversos (`Referentes`, `Candidatos`, `Referentes propuestos`, `Descartes del gate`) |
+| **Voces** | ✏️ `nombre` · ✏️ `activo` · ✏️ `descripcion` · ✏️ `criterios_relevancia` | los links inversos (`Proyectos`, `Candidatos`) |
+| **Referentes** | ✏️ `handle` · ✏️ `plataforma` · ✏️ `proyecto` · ✏️ `activo` · ✏️ `notas` · 👁 `tasa_gate` · 👁 `tasa_aprobacion` · 👁 `videos_evaluados` | — |
+| **Referentes - Revisar** | 👁 `handle` · 👁 `plataforma` · 👁 `proyecto` · 👁 `tasa_gate` · 👁 `tasa_aprobacion` · 👁 `videos_evaluados` · **✏️ `activo`** (podar es del equipo) · 👁 `notas` | — |
+| **Referentes Buscados** | 👁 `handle` · 👁 `url` · 👁 `plataforma` · 👁 `afinidad` · 👁 `razon` · 👁 `bio` · 👁 `seguidores` · 👁 `semillas` · **✏️ `proyecto`** (corregible antes de aprobar) · **✏️ `estado`** — filtro `estado = propuesto` | — |
+| **Descartes** | 👁 `thumbnail` · 👁 `titulo` · 👁 `script` · 👁 `relevancia_razon` · 👁 `relevancia_score` · 👁 `referente` · 👁 `url_referente` · 👁 `proyecto` · **✏️ `veredicto`** (recién con records: post-lunes) | — |
+| **Configuración Global** | 👁 `clave` · 👁 `descripcion` · **✏️ `valor`** — filtro `Mostrar al equipo ✓` *(ya está así: no tocar)* | `Mostrar al equipo` |
+| **Ajustes Dev-Only** | 👁 `clave` · 👁 `descripcion` · **✏️ `valor`** (el fix del paso 10) — filtro `Mostrar al equipo` destildado | — |
+| **Calidad por Proyecto** | todo 👁: `semana` · `ambito` · `calificados` · `aprobados` · `descartados` · `precision` (ya percent) · `separacion_gate` · `diagnostico` — filas por `semana` desc | `clave`, `score_aprobados`, `score_descartados` (el detalle detrás de `separacion_gate`; opcional mostrarlos) |
+| **Salud del Sistema** | todo 👁: `semana` · `colectados` · `pretrim` · `gate_pass` · `entregados` · `sin_guion` · `runs_ok` · `runs_fallo` · `duracion_min` · `falsos_negativos` — **filtro `ambito = GLOBAL`**, filas por `semana` desc | `clave`, los campos de calidad (`calificados`…`diagnostico`), contadores y costos (viven en *Costos*) |
+| **Costos** | los 9 `bigNumber` existentes (fórmulas `costo_*`) — verificar **filtro de semana** | — |
+| **Form Nuevo Proyecto** | `nombre` (requerido) · **`criterios_relevancia` (requerido — el fix)** · `voz_default` · `N` (opcional, sumar) · `activo` · `descripcion` | `Candidatos` (quitar del form) |

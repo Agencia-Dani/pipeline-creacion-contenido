@@ -189,6 +189,10 @@ el **idioma original**, la **portada**, el **link al video original**, las **mé
 seguidores, engagement) y el **heat score** (§7). **Lo único que llenan ustedes:** la **calificación**, el
 **estado** y, si quieren, **notas del equipo**.
 
+> **Todos los campos tienen ayuda incorporada.** Al lado del nombre de cada campo hay un ícono **ⓘ**:
+> tóquenlo y sale la explicación de qué es y quién lo llena. Si dudan de un campo, el ⓘ responde más
+> rápido que este manual.
+
 ---
 
 ## 5. Configuración inicial: cómo llenar cada tabla la primera vez
@@ -395,6 +399,18 @@ El domingo la máquina cuenta los "era bueno", los registra en Métricas y **vac
 acumulan; cada semana llega una tanda fresca). Si no alcanzan a revisarlos, no pasa nada, pero cada
 "era bueno" detectado mejora el filtro.
 
+Qué ven en cada fila (todo lo llena la máquina, salvo el veredicto):
+
+| Columna | Qué es |
+|---|---|
+| `titulo` / `thumbnail` | el video descartado, para reconocerlo de un vistazo |
+| `script` | el transcript que juzgó el filtro (la evidencia) |
+| `relevancia_razon` | **por qué** lo rechazó — léanla primero |
+| `relevancia_score` | el puntaje que le dio (0 a 1); acá llegan los que CASI pasan |
+| `referente` / `url_referente` | la cuenta y el link al original, por si quieren verlo |
+| `proyecto` | el tema cuyo filtro lo rechazó |
+| **`veredicto`** | **lo único que tocan:** bien descartado / era bueno |
+
 ### 6.2 Las páginas "Calidad por Proyecto", "Salud del Sistema" y "Costos" (solo para ver)
 
 Cada domingo la máquina escribe el resumen de la semana:
@@ -411,6 +427,37 @@ Cada domingo la máquina escribe el resumen de la semana:
 
 Son de **solo lectura a propósito**: las llena la máquina, nadie escribe ahí. *(Guarda 12 semanas de
 historia visible; lo más viejo queda archivado por fuera.)*
+
+Qué significa cada columna, por página:
+
+**Calidad por Proyecto** (una fila por semana × proyecto):
+
+| Columna | Qué es |
+|---|---|
+| `semana` / `ambito` | la semana (lunes) y el proyecto de la fila |
+| `calificados` | cuántos candidatos calificaron esa semana (aprobados + descartados) |
+| `aprobados` / `descartados` | cómo se repartió esa calificación |
+| `precision` | **la métrica norte**: de lo que les mandamos, qué % sirvió |
+| `separacion_gate` | si el filtro distingue lo que aprueban de lo que descartan (0.20+ = sano; bajo = afinar criterios) |
+| `diagnostico` | el semáforo 🟢🟡🔴 con qué hacer (§ arriba) |
+
+**Salud del Sistema** (una fila por semana, el embudo de la máquina):
+
+| Columna | Qué es |
+|---|---|
+| `colectados` | videos crudos que trajo el scraping |
+| `pretrim` | los que sobrevivieron al pre-filtro rápido |
+| `gate_pass` | los que pasaron el filtro de relevancia (IA) |
+| `entregados` | los que llegaron a su bandeja |
+| `sin_guion` | cuántos llegaron sin transcripción (⚠️ SIN GUION) — si sube, avisen |
+| `falsos_negativos` | los "era bueno" que marcaron en Descartes (§6.1) |
+| `runs_ok` / `runs_fallo` | corridas que cerraron bien / mal esa semana |
+| `duracion_min` | cuánto tardó la corrida promedio |
+
+**Costos** (el gasto estimado de la semana, en dólares): un número grande por servicio —
+transcripción (Supadata), filtros y traducciones (IA), y los scrapers (Apify, IG/TikTok/buscador).
+Elijan la semana arriba; `costo_total` es la suma. Los campos que dicen "conteo" no son dólares:
+son la cantidad de llamadas de la que sale el costo.
 
 ---
 
