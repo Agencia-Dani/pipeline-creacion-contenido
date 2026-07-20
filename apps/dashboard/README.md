@@ -43,9 +43,15 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    [`009_app_config_sombra.sql`](../../core/schema/009_app_config_sombra.sql)** en el SQL Editor de
    Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas* (sin esto la app
    no lee roles ni las vistas analíticas).
-2. **Invitar a los 5 usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
+2. **Invitar a los usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.
+   > ⚠️ **El email built-in de Supabase (free) tiene rate limit muy bajo** (unos pocos/hora) y no deja
+   > editar templates sin custom SMTP. Para un login por mail confiable **conectá un SMTP propio
+   > (Resend: gratis, sin IP/host)** en *Authentication → SMTP Settings*. Eso además habilita editar el
+   > template "Magic Link" al flujo **token_hash** (`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`),
+   > que `auth/confirm` ya soporta y que evita el "el link ya no sirve" por cross-device o escaneo de
+   > Gmail. Sin SMTP el login se traba en testing (cierre 64).
 3. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
    env vars de `.env.example` (del gestor). Producción en `main`, preview por rama (ADR-026).
    En Supabase, *Authentication → URL Configuration*: agregar la URL de Vercel a *Redirect URLs*.
@@ -63,3 +69,11 @@ terminó y qué entregó (plan-cockpit §6).
 
 **Hecho-cuando de D2:** el embudo completo de la semana se ve en una pantalla y el jefe encuentra
 el costo de la semana solo (zona *Entender*, con la migración 008 aplicada).
+
+**Hecho-cuando de D3:** `npm run sombra:diff` da cero diferencias 3 corridas seguidas (una con
+ediciones del equipo de por medio), con las env de Airtable + `SUPABASE_SERVICE_ROLE` en `.env.local`.
+
+**Hecho-cuando de D4:** una corrida real del motor produce el mismo plan leyendo la fachada que
+leyendo Airtable (verificado con `test-nodos.mjs` + replay), tras el swap de nodos y el re-import #1.
+La mitad-app ya se puede probar sin n8n:
+`curl -H "<RUN_PLAN_HEADER_NOMBRE>: <valor>" https://<app>/api/engine/run-plan?ambito=motor`.

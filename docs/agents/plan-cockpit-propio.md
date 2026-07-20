@@ -267,8 +267,9 @@ Airtable intacto** — eso es lo que hace que valga la pena empezar.
       desde n8n. Se cierra con **ADR-029** al diseñar D7.
 - [ ] **Qué queda del archivado** cuando las Métricas son vistas: ¿sigue computando algo, o se
       reduce a barrer Candidatos y destilar criterios (ADR-022)?
-- [ ] **Estado de corrida: polling vs. Supabase Realtime.** Default barato = polling cada 5 s
-      mientras haya una corrida `en_curso`.
+- [x] **Estado de corrida: polling vs. Supabase Realtime.** RESUELTO en D1 (cierre 59): polling cada
+      5 s **solo** mientras hay una corrida `en_curso` (`operar/auto-refresh.tsx`). Realtime queda
+      como optimización futura si molesta.
 - [ ] **Cuándo entra `client_id`** en el schema `app` (multi-cliente, ADR-003). Hoy hay un cliente.
 - [ ] **El Sheet Histórico** (ADR-014): ¿sobrevive como export, o la app lo reemplaza?
 - [ ] **Techo de presupuesto** de la superficie nueva: Vercel free alcanza hoy; validar con el jefe

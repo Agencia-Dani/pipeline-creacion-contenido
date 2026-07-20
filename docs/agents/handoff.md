@@ -184,22 +184,42 @@ ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-dem
 Global` (embudo + salud por referente + costos $). Con el presupuesto nuevo, `sin_guion` debería
 desplomarse vs. la corrida del 17/07 (6 de 16).
 
-**El producto propio (ADR-025) ya arrancó: D0, D1 y D2 construidos (cierres 58–60).** El plan vive
-en [plan-cockpit-propio.md](./plan-cockpit-propio.md) (ADR-026..028); `apps/dashboard/` existe con
-login magic link, las 3 zonas, la pantalla **Operar completa** (qué corre + ▶ Correr ahora +
-corridas recientes) y la zona **Entender completa** (calidad por proyecto + embudo del motor +
-costos, sobre las 3 vistas de la migración `008`). Para cumplir los hecho-cuando de D0/D1/D2
-faltan los pasos manuales de Mani ([README del dashboard §Setup](../../apps/dashboard/README.md)):
-aplicar `007` **y `008`** + exponer el schema `app` · invitar los 5 mails + filas en `app.usuarios`
-· proyecto Vercel + Redirect URL · **las 6 env vars de D1** (service_role, PAT+base de Airtable,
-webhook+header del motor — todo del gestor). **D3 también está construido (cierre 61):** migración
-`009` (schema `app` completo, en sombra) + `npm run sombra:import` / `sombra:diff` en el dashboard —
-falta correrlos contra la base viva (necesitan las env de D1) hasta que el diff dé cero 3 veces
-seguidas. **De D4 ya está la mitad-app (cierre 62):** la fachada `GET /api/engine/run-plan` vive
-en el dashboard (ADR-028, contrato en [core/contracts/run-plan.md](../../core/contracts/run-plan.md));
-falta el swap de nodos en los 3 `workflow.json` + re-import #1. **La variante quedó decidida
-(Mani, cierre 63): un solo endpoint con `?ambito=motor` (default, filtrado) / `?ambito=completo`
-(sin filtros, para archivado y descubrimiento); typo de ambito = 400.** Ya implementada y testeada.
+### 🟢 El cockpit propio (ADR-025): D0–D4 construidos, deployado y verificado en prod
+
+Plan en [plan-cockpit-propio.md](./plan-cockpit-propio.md) (ADR-026..028). **App viva:**
+https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
+
+| Fase | Qué | Estado |
+|---|---|---|
+| **D0** Fundación | login magic link · 3 zonas con guardia por rol · migración `007` | ✅ código · ✅ infra · ⛔ **login bloqueado** (ver abajo) |
+| **D1** Operar | qué corre + ▶ Correr ahora + corridas recientes | ✅ código · env cargadas |
+| **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada |
+| **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ código · ⏳ falta correr contra la base viva (diff cero ×3) |
+| **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ **mitad-app VERIFICADA en prod con curl** (devolvió voces/proyectos/referentes/ajustes reales) · ⏳ falta swap de nodos n8n + re-import #1 |
+
+**Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
+en *Exposed schemas* · 2 usuarios en `app.usuarios` (cuentas de Mani; Majo/Jero en el beta) ·
+deployado en Vercel con **las 8 env vars** (2 públicas + service_role + Airtable PAT/base + webhook
+motor ×3 + run-plan ×2) · Site/Redirect URL de Auth. **Verificado por curl:** run-plan con header
+devuelve la config real; sin header 403; ambito typo 400.
+
+> ⛔ **BLOQUEANTE ÚNICO para cerrar D0: el magic link no llega (cierre 64).** El email built-in de
+> Supabase (free) tiene rate limit bajísimo (unos pocos/hora); probando el login tantas veces se
+> agotó → "no pudimos mandarte el link". El primer link **sí** llegó (los usuarios están bien; el
+> problema es la cuota de envío, no los records). Editar el template para el flujo token_hash
+> **requiere custom SMTP** (Supabase lo restringió). **Plan recomendado: conectar Resend como SMTP**
+> (gratis, sin IP/host, ~5 min) — destraba el rate limit Y habilita editar el template para pasar a
+> `token_hash` (que además evita el "link ya no sirve" por cross-device/scanning). Alternativa pobre:
+> esperar ~1h la cuota y abrir el link en el MISMO navegador, al toque. **Diagnóstico en vivo:** el
+> código ahora loguea la causa real — Vercel → Logs, línea `[login]` (no se manda) o `[auth/confirm]`
+> (se manda, no entra). El `?estado=` de la URL de login también lo pista.
+
+**Lo que queda del cockpit (orden sugerido):** (1) **destrabar el login** (Resend) → cerrar D0 ·
+(2) correr `sombra:import`/`sombra:diff` hasta cero ×3 (D3) · (3) **swap de nodos en los 3
+`workflow.json`** (4+ nodos de lectura → 1 HTTP Request a la fachada, con `?ambito=motor` en motor y
+`?ambito=completo` en archivado/descubrimiento) + **re-import #1** → verificar mismo plan con
+`test-nodos.mjs` + replay (hecho-cuando D4) · (4) **D5**: corte de config dominio por dominio
+(Ajustes → Referentes → Voces+Proyectos), cada uno pantalla → diff cero → flip.
 
 **Las 2 decisiones abiertas se CERRARON el 2026-07-16 (cierre 49, consultadas a Mani):**
 el **descubrimiento NO respeta `Voces.activo` a propósito** (despensa para voces pausadas —
@@ -223,6 +243,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-20 (cierre 64) — Deploy + setup de infra del cockpit, verificado en prod; D4 mitad-app confirmada leyendo Airtable real; login bloqueado por el email de Supabase (Mani ejecutó, Claude guió).** Sesión de puesta en marcha, no de código nuevo grande. **Hecho por Mani con guía:** migraciones 007–009 en Supabase (confirmadas por query: 9 tablas + 4 vistas) · schema `app` en *Exposed schemas* · 2 usuarios en `app.usuarios` · **deploy en Vercel** (root `apps/dashboard`) con las 8 env vars (2 públicas + service_role + `AIRTABLE_PAT`/`AIRTABLE_BASE_ID` + `MOTOR_WEBHOOK_*` ×3 + `RUN_PLAN_HEADER_*` ×2) · Site/Redirect URL de Auth · **credenciales rotadas** (cae el pendiente rojo del cierre 57). **Verificación en prod (curl + código):** `/` y `/operar` → 307 a `/login` · `/login` 200 · `/api/engine/run-plan` sin header 403, ambito typo 400, **con header devolvió la config REAL** (3 voces: Juan Pablo Vieira/Rosario Gómez/Milena Morales · 2 proyectos TP N=20 / TfT N=10 · 5 referentes con salud · 18 ajustes) — **D4 mitad-app probada end-to-end contra Airtable vivo, sin tocar n8n.** **Fixes de código de la sesión:** `?ambito=motor|completo` en la fachada (decisión de Mani "la más efectiva": un endpoint, no dos) + `armarRunPlanCompleto` (25/25 tests) · logging del error real en `auth/confirm` y `login/actions` (para diagnosticar el magic link sin adivinar). **El bloqueante:** el magic link no llega — rate limit del email built-in de Supabase (free). Detalle y plan (Resend) en §Para la próxima sesión. **Gotcha aprendido:** en Supabase free, editar email templates requiere custom SMTP, y el built-in tiene cuota de envío muy baja — para cualquier app con login por mail hay que conectar un SMTP propio (Resend) desde el arranque. **Doc actualizada:** handoff (este bloque + la tabla D0–D4 arriba), README del dashboard, CLAUDE.md (contrato run-plan.md + migraciones 001–009), memoria. **Próximo paso:** destrabar el login (Resend) → cerrar hecho-cuando D0 → swap de nodos + re-import #1 (D4 completo) → D5.
 
 **2026-07-20 (cierre 63) — La decisión de la fachada: query param, no endpoint hermano (Mani eligió "la más efectiva"; Claude implementó).** `GET /api/engine/run-plan?ambito=motor` (default) = filtros de ADR-028 §2 + N resuelta · `?ambito=completo` = mismo shape sin filtros de `activo` y N tal cual, para el **archivado** (todas las voces) y el **descubrimiento** (ignora `activo`, cierre 49) · ambito desconocido = **400** (un typo en n8n no degrada en silencio). Un solo endpoint = una credencial y una URL en n8n. Contrato actualizado ([run-plan.md §Los dos ámbitos](../../core/contracts/run-plan.md)) · 25/25 tests · verificado vivo con curl (400 typo / 503 fail-closed). **Setup de infra HECHO y verificado en prod (cierre 63, Mani + Claude):** migraciones 007–009 corridas (9 tablas + 4 vistas confirmadas por query) · schema `app` en *Exposed schemas* · 2 usuarios en `app.usuarios` (por ahora 2 cuentas de Mani; Majo/Jero se invitan en el beta) · **app deployada en Vercel**: https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`, 2 env públicas `NEXT_PUBLIC_SUPABASE_*`) · Site URL + Redirect URL de Auth apuntando a la URL de Vercel. **Verificado por curl:** `/` y `/operar` → 307 a `/login` · `/login` → 200 renderiza completo · `/api/engine/run-plan` sin header → 403 (NO redirige: el fix del proxy vive en prod). **Falta para cerrar hecho-cuando de D0:** Mani entra con su mail (magic link) y ve nombre+rol — es un click suyo, no queda nada de código. **Faltan las 8 env de D1/D4** (service_role, Airtable PAT+base, webhook motor ×3, run-plan ×2) en Vercel: cargar los valores **post-rotación** del martes 21/07 (cierre 57) — hasta entonces Operar/Entender muestran sus avisos de error a propósito y el resto anda.
 
