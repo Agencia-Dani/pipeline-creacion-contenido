@@ -10,8 +10,11 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
 
 - `app/` — rutas. `login/` + `auth/confirm/` (magic link), y las 3 zonas en `(zonas)/`:
   `operar` · `curar` · `entender` (plan-cockpit §2.1).
-- `domain/` — reglas puras sin IO (C3): hoy roles y zonas. Se testea con `node:test`.
-- `lib/` — clientes Supabase (server) y `auth.ts` (guardias `usuarioActual`/`exigirZona`).
+- `domain/` — reglas puras sin IO (C3): roles y zonas, y la vista de corrida (qué corre, N
+  resuelta, estado legible). Se testea con `node:test`.
+- `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
+  `airtable.ts` (lectura read-only de la config mientras viva en Airtable; muere en D5),
+  `runs.ts` (últimas corridas del motor) y `auth.ts` (guardias `usuarioActual`/`exigirZona`).
 - `components/ui/` — shadcn, código propio editable (C9).
 - `proxy.ts` — refresh de sesión + redirect a login (en Next 16 middleware se llama proxy).
 
@@ -35,9 +38,15 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 2. **Invitar a los 5 usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.
-3. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las 2
+3. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
    env vars de `.env.example` (del gestor). Producción en `main`, preview por rama (ADR-026).
    En Supabase, *Authentication → URL Configuration*: agregar la URL de Vercel a *Redirect URLs*.
+4. **Env vars de D1** (también del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` ·
+   `AIRTABLE_PAT` + `AIRTABLE_BASE_ID` · `MOTOR_WEBHOOK_URL` + los 2 del header (el par exacto de
+   la credencial `Webhook Motor Header` de n8n — si difiere en algo, el botón da 403).
 
 **Hecho-cuando de D0:** Majo entra desde su mail, ve su nombre y su rol `operador`, navega Operar y
 Curar, y `/entender` la devuelve a su zona.
+
+**Hecho-cuando de D1:** Jero dispara una corrida real desde *Operar* sin abrir n8n y ve cuándo
+terminó y qué entregó (plan-cockpit §6).
