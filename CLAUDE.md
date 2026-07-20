@@ -69,6 +69,10 @@ módulos), `/handoff` (compactar una sesión).
 - **Test / validar:** `cd core/scripts && npm run validate` — valida el contrato del manifest de
   workflows ([core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md)) y escanea
   secretos. Corre siempre, sobre todo el repo.
+- **Dashboard (cockpit propio, ADR-026):** en `apps/dashboard/` — `npm run typecheck` (tsc) +
+  `npm test` (dominio con `node:test`, corre los `.ts` directo en Node 26). Si tocaste rutas o
+  auth, además `npm run build`. Cómo correrlo y sus pasos manuales:
+  [apps/dashboard/README.md](apps/dashboard/README.md).
 - **Test de los code nodes del motor:** `node Workflows/workflow-short-form-content/test-nodos.mjs` —
   ejercita `Armar plan de corrida` y `Armar candidato` fuera de n8n con un `$` mockeado (N por proyecto,
   gate por `Voces.activo`, orden dedup→corte, piso, y las regresiones que ya nos mordieron). **Corrélo
