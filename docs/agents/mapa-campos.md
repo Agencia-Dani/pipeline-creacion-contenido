@@ -440,3 +440,185 @@ página, sale solo.
 | **Salud del Sistema** | todo 👁: `semana` · `colectados` · `pretrim` · `gate_pass` · `entregados` · `sin_guion` · `runs_ok` · `runs_fallo` · `duracion_min` · `falsos_negativos` — **filtro `ambito = GLOBAL`**, filas por `semana` desc | `clave`, los campos de calidad (`calificados`…`diagnostico`), contadores y costos (viven en *Costos*) |
 | **Costos** | los 9 `bigNumber` existentes (fórmulas `costo_*`) — verificar **filtro de semana** | — |
 | **Form Nuevo Proyecto** | `nombre` (requerido) · **`criterios_relevancia` (requerido — el fix)** · `voz_default` · `N` (opcional, sumar) · `activo` · `descripcion` | `Candidatos` (quitar del form) |
+
+### 6.3 Helper text por página (copiar al armar cada elemento)
+
+> **Qué es esto y en qué se diferencia de §6.1.** Airtable tiene **dos** textos por campo:
+> la ***description* del campo en la tabla** (el ⓘ — ya cargada en la base entera, cierre 56) y el
+> **helper text del elemento en la página**, que se escribe a mano al armar la vista y aparece
+> **debajo del campo**. La description explica *qué es el campo* en general; el helper de página dice
+> *qué hacer con él acá*. Estos son los helpers de página, redactados para Majo y Jero: cortos,
+> imperativos, sin jerga.
+>
+> **No hace falta ponerlos todos.** Si vas con poco tiempo, cargá solo los de los campos ✏️
+> (editables) — son los que guían una decisión; los 👁 ya se explican solos con el ⓘ.
+
+**Feed de Calificación** *(la bandeja diaria)*
+
+| Campo | Helper text |
+|---|---|
+| `thumbnail` | La portada, para reconocer el video de un vistazo. |
+| `titulo` | De qué va. Si dice ⚠️ SIN GUION no se pudo transcribir: abrí el original y decidí ahí. |
+| `script` | El video transcrito y traducido al español. Esto es lo que van a adaptar. |
+| `relevancia_razon` | Por qué la máquina lo dejó pasar. Leelo primero: te ahorra abrir el video. |
+| `heat_score` | Qué tan prometedor, solo para ordenar (arriba = mejor). No es una nota sobre 10. |
+| `relevancia_score` | Qué tan relevante al tema lo vio la máquina, de 0 a 1. |
+| `referente` | La cuenta de donde salió el video. |
+| `url_referente` | Abrí el video original acá. |
+| `idioma` | Idioma del video original (el script ya está en español). |
+| `views` | Reproducciones del original al momento de encontrarlo. |
+| `likes` | Likes del original al momento de encontrarlo. |
+| `seguidores` | Seguidores de la cuenta de origen. |
+| `engagement` | Interacción del video sobre su alcance. |
+| `viral_por_tamano` | Venía de una cuenta muy grande (+700K). Solo marca; no lo descarta. |
+| `proyecto` | El tema para el que se seleccionó. |
+| `voz` | La voz para la que se seleccionó. |
+| **`calificacion`** ✏️ | Tu opinión: 🔥 excelente · 👍 sirve · 👎 no sirve. El 🔥 le enseña a la máquina qué buscar. |
+| **`estado`** ✏️ | La decisión que cuenta: aprobado va al Histórico, descartado no va. Marcá también lo que no sirve. |
+| **`notas_equipo`** ✏️ | Opcional: por qué sí o por qué no. Se guarda y ayuda a afinar el filtro. |
+
+**Proyectos** *(los temas que se buscan)*
+
+| Campo | Helper text |
+|---|---|
+| **`nombre`** ✏️ | El tema, como lo llaman ustedes. |
+| **`activo`** ✏️ | Destildá para pausarlo. Ojo: si la Voz está apagada, no corre aunque esté activo. |
+| **`voz_default`** ✏️ | Una sola Voz por proyecto, y que hable del mismo mundo que el tema. |
+| **`N`** ✏️ | Cuántos videos querés de este tema por corrida. Vacío = el valor global. Es un máximo, no una promesa. |
+| **`criterios_relevancia`** ✏️ | Lo más importante de esta página: qué SÍ y qué NO cuenta como relevante, con ejemplos. Concreto = menos basura. |
+| **`criterios_aprendidos`** ✏️ | Lo que la máquina aprendió de sus calificaciones (se actualiza los domingos). Podés corregirlo si dice algo raro. |
+| `advertencia_criterios` 👁 | Aviso semanal de la máquina sobre estos criterios. Si aparece algo, vale la pena leerlo. |
+| **`descripcion`** ✏️ | Contexto para el equipo. La máquina no lo lee: el filtro real son los criterios. |
+
+**Voces** *(para quién se selecciona)*
+
+| Campo | Helper text |
+|---|---|
+| **`nombre`** ✏️ | El personaje o marca para el que se cura contenido. |
+| **`activo`** ✏️ | Interruptor maestro: destildá y se pausan TODOS los proyectos de esta voz de una. |
+| **`descripcion`** ✏️ | Quién es y de qué tiene autoridad. Contexto para ustedes; la máquina no lo lee. |
+| **`criterios_relevancia`** ✏️ | Opcional: qué le sirve a esta voz en particular. Se suma a los criterios del proyecto. |
+
+**Referentes** *(el banco de cuentas)*
+
+| Campo | Helper text |
+|---|---|
+| **`handle`** ✏️ | La cuenta con UNA sola arroba. Ej: @simonsinek. |
+| **`plataforma`** ✏️ | De dónde traer sus videos: instagram o tiktok. |
+| **`proyecto`** ✏️ | A qué tema alimenta. Puede ser más de uno: cada video llega una sola vez, al que mejor pega. |
+| **`activo`** ✏️ | Destildá para dejar de rastrearla, sin borrarla. |
+| **`notas`** ✏️ | Por qué la agregaron. El buscador escribe acá cuando siembra una cuenta aprobada. |
+| `tasa_gate` 👁 | Qué proporción de sus videos pasa el filtro. Baja sostenida = candidata a podar. |
+| `tasa_aprobacion` 👁 | Qué proporción de sus videos terminan aprobando ustedes. |
+| `videos_evaluados` 👁 | Sobre cuántos videos se calculan esas tasas. Con pocos, no saquen conclusiones. |
+
+**Referentes - Revisar** *(las cuentas flojas)*
+
+| Campo | Helper text |
+|---|---|
+| `handle` 👁 | La cuenta que la máquina señala como floja. |
+| `plataforma` 👁 | Instagram o TikTok. |
+| `proyecto` 👁 | A qué tema alimenta hoy. |
+| `tasa_gate` 👁 | Qué poco de lo suyo pasa el filtro: es la razón por la que está en esta lista. |
+| `tasa_aprobacion` 👁 | Qué poco de lo suyo terminan aprobando ustedes. |
+| `videos_evaluados` 👁 | Cuántos videos respaldan el número. Con menos de 5, dale otra semana. |
+| **`activo`** ✏️ | La decisión es de ustedes: destildá para podarla. La máquina nunca apaga una cuenta sola. |
+| `notas` 👁 | Por qué se había agregado, para decidir con contexto. |
+
+**Referentes Buscados** *(propuestas del buscador)*
+
+| Campo | Helper text |
+|---|---|
+| `handle` 👁 | La cuenta que propone el buscador. |
+| `url` 👁 | Abrí el perfil y mirala antes de decidir. |
+| `plataforma` 👁 | De dónde salió la sugerencia. |
+| `afinidad` 👁 | Qué tan bien pega con el tema, de 0 a 1. Solo llegan las de 0.6 para arriba. |
+| `razon` 👁 | Por qué la propone. Leelo primero: decide la mayoría de los casos. |
+| `bio` 👁 | La bio de la cuenta, para confirmar de qué habla. |
+| `seguidores` 👁 | Tamaño de la cuenta, como contexto. |
+| `semillas` 👁 | Cuáles de SUS referentes la recomendaron. |
+| **`proyecto`** ✏️ | A qué tema entraría. Es una sugerencia: cambialo antes de aprobar si va mejor en otro. |
+| **`estado`** ✏️ | aprobado = el lunes se siembra sola y empieza a traer videos. descartado = definitivo, no se vuelve a proponer. |
+
+**Descartes** *(auditar el filtro, 2 min por semana)*
+
+| Campo | Helper text |
+|---|---|
+| `thumbnail` 👁 | La portada del video que la máquina descartó. |
+| `titulo` 👁 | De qué era el video rechazado. |
+| `script` 👁 | El texto que juzgó el filtro: la evidencia para darle el veredicto. |
+| `relevancia_razon` 👁 | Por qué lo rechazó. Leelo primero: casi siempre alcanza para decidir. |
+| `relevancia_score` 👁 | Su puntaje. Acá llegan los que CASI pasan: por eso vale auditarlos. |
+| `referente` 👁 | De qué cuenta venía. |
+| `url_referente` 👁 | Abrí el original si con el texto no te alcanza. |
+| `proyecto` 👁 | El tema cuyo filtro lo rechazó. |
+| **`veredicto`** ✏️ | ¿Hizo bien? "bien descartado" = sí. "era bueno" = se equivocó, y esa marca es la que afina el filtro. |
+
+**Configuración Global** *(las perillas del equipo)*
+
+| Campo | Helper text |
+|---|---|
+| `clave` 👁 | El nombre de la perilla. No lo cambien: la máquina la busca por este nombre. |
+| `descripcion` 👁 | Qué hace esta perilla. |
+| **`valor`** ✏️ | Lo único que se edita acá. Si lo dejan vacío o mal, la máquina usa su valor por defecto (no se rompe). |
+
+**Ajustes Dev-Only** *(perillas avanzadas)*
+
+| Campo | Helper text |
+|---|---|
+| `clave` 👁 | Perilla avanzada. Equipo de redes: avisen antes de tocar. |
+| `descripcion` 👁 | Qué hace y por qué es avanzada. |
+| **`valor`** ✏️ | Editable solo para devs. Todas tienen tope de seguridad: nadie puede disparar el gasto sin querer. |
+
+**Calidad por Proyecto** *(solo lectura)*
+
+| Campo | Helper text |
+|---|---|
+| `semana` 👁 | La semana que resume la fila (arranca el lunes). |
+| `ambito` 👁 | El proyecto al que corresponden estos números. |
+| `calificados` 👁 | Cuántos candidatos calificaron esa semana. Si es 0, la fila no dice nada. |
+| `aprobados` 👁 | Cuántos aprobaron. |
+| `descartados` 👁 | Cuántos descartaron. |
+| `precision` 👁 | La métrica norte: de lo que les mandamos, qué % sirvió. |
+| `separacion_gate` 👁 | Si el filtro distingue lo bueno de lo malo: 0.20 o más está sano; bajo o negativo pide afinar los criterios. |
+| `diagnostico` 👁 | La lectura en una frase: 🟢 no toques nada · 🟡 un retoque · 🔴 reescribí los criterios del proyecto. |
+
+**Salud del Sistema** *(solo lectura — el embudo de la máquina)*
+
+| Campo | Helper text |
+|---|---|
+| `semana` 👁 | La semana que resume la fila (arranca el lunes). |
+| `colectados` 👁 | Videos crudos que trajo la búsqueda, antes de filtrar. |
+| `pretrim` 👁 | Los que sobrevivieron al primer filtro rápido. |
+| `gate_pass` 👁 | Los que pasaron el filtro de relevancia con IA. |
+| `entregados` 👁 | Los que llegaron a su bandeja para calificar. |
+| `sin_guion` 👁 | Cuántos llegaron sin transcripción. Si sube mucho, avisen al equipo técnico. |
+| `runs_ok` 👁 | Corridas que terminaron bien esa semana. |
+| `runs_fallo` 👁 | Corridas que fallaron. Si no es 0, avisen. |
+| `duracion_min` 👁 | Cuánto tardó la corrida promedio, en minutos. |
+| `falsos_negativos` 👁 | Cuántos "era bueno" marcaron en Descartes: contenido útil que el filtro mató. |
+
+**Costos** *(solo lectura — dólares de la semana)*
+
+| Elemento | Helper text |
+|---|---|
+| `costo_total` | Lo que costó la semana, todo incluido. Elegí la semana arriba. |
+| `costo_supadata` | Transcribir los videos (uno por video distinto). |
+| `costo_haiku_lotes` | Los filtros con IA que deciden qué es relevante. |
+| `costo_haiku_traducciones` | Traducir al español los videos que no venían en español. |
+| `costo_apify_ig` | Traer los videos de las cuentas de Instagram. |
+| `costo_apify_tt` | Traer los videos de las cuentas de TikTok. |
+| `costo_perfiles_semilla` | El buscador mirando sus mejores referentes para arrancar. |
+| `costo_detalle_sugeridos` | El buscador revisando a fondo las cuentas que encontró. |
+| `costo_lookalikes_tt` | Buscar cuentas parecidas en TikTok. **Es el más caro por resultado: miralo primero si el total sube.** |
+
+**Form "Nuevo Proyecto"**
+
+| Campo | Helper text |
+|---|---|
+| `nombre` | El tema que van a buscar. Ej: "Comunicación para líderes". |
+| **`criterios_relevancia`** (requerido) | Qué SÍ y qué NO cuenta como relevante, con ejemplos. **Sin esto el filtro deja pasar todo:** es el campo que define la calidad. |
+| `voz_default` | Para qué voz es este tema. Una sola, y que hable del mismo mundo. |
+| `N` | Cuántos videos querés por corrida. Vacío = el valor global. Podés cambiarlo cuando quieras. |
+| `activo` | Dejalo tildado si querés que empiece a buscar ya. Antes, cargale al menos un Referente. |
+| `descripcion` | Contexto para el equipo (opcional). |
