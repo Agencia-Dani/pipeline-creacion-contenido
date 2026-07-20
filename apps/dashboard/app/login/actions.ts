@@ -24,6 +24,11 @@ export async function enviarMagicLink(formData: FormData) {
   });
 
   // "Signups not allowed" = mail no invitado; no se distingue para no filtrar quién existe.
-  if (error) redirect("/login?estado=no-enviado");
+  // El error real va al log (rate limit del email built-in vs SMTP mal configurado vs
+  // mail no invitado se ven distinto acá, aunque al usuario le mostremos lo mismo).
+  if (error) {
+    console.error(`[login] signInWithOtp falló para ${parsed.data}: ${error.message}`);
+    redirect("/login?estado=no-enviado");
+  }
   redirect("/login?estado=enviado");
 }
