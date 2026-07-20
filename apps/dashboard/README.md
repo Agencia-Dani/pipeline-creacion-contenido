@@ -33,8 +33,10 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 
 ## Setup una sola vez (manual, de Mani)
 
-1. **Migración [`007_app_usuarios.sql`](../../core/schema/007_app_usuarios.sql)** en el SQL Editor
-   de Supabase, y agregar `app` a *Settings → API → Exposed schemas* (sin esto la app no lee roles).
+1. **Migraciones [`007_app_usuarios.sql`](../../core/schema/007_app_usuarios.sql) y
+   [`008_entender_tarifas_y_vistas.sql`](../../core/schema/008_entender_tarifas_y_vistas.sql)** en el
+   SQL Editor de Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas*
+   (sin esto la app no lee roles ni las vistas analíticas).
 2. **Invitar a los 5 usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.
@@ -50,3 +52,6 @@ Curar, y `/entender` la devuelve a su zona.
 
 **Hecho-cuando de D1:** Jero dispara una corrida real desde *Operar* sin abrir n8n y ve cuándo
 terminó y qué entregó (plan-cockpit §6).
+
+**Hecho-cuando de D2:** el embudo completo de la semana se ve en una pantalla y el jefe encuentra
+el costo de la semana solo (zona *Entender*, con la migración 008 aplicada).
