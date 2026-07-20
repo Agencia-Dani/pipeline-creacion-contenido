@@ -16,9 +16,15 @@ export async function GET(request: NextRequest) {
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) redirect("/");
+    console.error(`[auth/confirm] verifyOtp (token_hash) falló: ${error.message}`);
   } else if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) redirect("/");
+    // Causa típica: cookie code_verifier ausente (link abierto en otro browser/dispositivo,
+    // o pre-escaneado por el cliente de mail). El flujo token_hash lo evita.
+    console.error(`[auth/confirm] exchangeCodeForSession falló: ${error.message}`);
+  } else {
+    console.error("[auth/confirm] llegó sin token_hash+type ni code");
   }
 
   redirect("/login?estado=link-invalido");
