@@ -8,8 +8,10 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
 
 ## Mapa del código
 
-- `app/` — rutas. `login/` + `auth/confirm/` (magic link), y las 3 zonas en `(zonas)/`:
-  `operar` · `curar` · `entender` (plan-cockpit §2.1).
+- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 3 zonas en `(zonas)/`:
+  `operar` · `curar` · `entender` (plan-cockpit §2.1), y `api/engine/run-plan/` — la fachada del
+  motor (ADR-028, contrato en [core/contracts/run-plan.md](../../core/contracts/run-plan.md)):
+  header compartido, fail-closed, hoy lee Airtable por dentro.
 - `domain/` — reglas puras sin IO (C3): roles y zonas, y la vista de corrida (qué corre, N
   resuelta, estado legible). Se testea con `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
@@ -47,9 +49,11 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 3. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
    env vars de `.env.example` (del gestor). Producción en `main`, preview por rama (ADR-026).
    En Supabase, *Authentication → URL Configuration*: agregar la URL de Vercel a *Redirect URLs*.
-4. **Env vars de D1** (también del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` ·
+4. **Env vars de D1/D4** (también del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` ·
    `AIRTABLE_PAT` + `AIRTABLE_BASE_ID` · `MOTOR_WEBHOOK_URL` + los 2 del header (el par exacto de
-   la credencial `Webhook Motor Header` de n8n — si difiere en algo, el botón da 403).
+   la credencial `Webhook Motor Header` de n8n — si difiere en algo, el botón da 403) · los 2
+   `RUN_PLAN_HEADER_*` (el par que n8n mandará a la fachada; generar nuevo, no reusar el del
+   webhook).
 
 **Hecho-cuando de D0:** Majo entra desde su mail, ve su nombre y su rol `operador`, navega Operar y
 Curar, y `/entender` la devuelve a su zona.

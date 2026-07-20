@@ -35,7 +35,10 @@ export async function proxy(request: NextRequest) {
 
   const esRutaPublica =
     request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/auth");
+    request.nextUrl.pathname.startsWith("/auth") ||
+    // La fachada del motor (ADR-028) trae su propia auth (header compartido);
+    // un redirect a /login acá sería un 200 con HTML para n8n = fail-closed roto.
+    request.nextUrl.pathname.startsWith("/api/engine");
 
   if (!user && !esRutaPublica) {
     const url = request.nextUrl.clone();

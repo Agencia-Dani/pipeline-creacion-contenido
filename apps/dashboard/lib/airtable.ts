@@ -25,7 +25,7 @@ async function leerTabla(tabla: string, filtro: string): Promise<Registro[]> {
   let offset: string | undefined;
   do {
     const url = new URL(`https://api.airtable.com/v0/${base}/${encodeURIComponent(tabla)}`);
-    url.searchParams.set("filterByFormula", filtro);
+    if (filtro) url.searchParams.set("filterByFormula", filtro);
     if (offset) url.searchParams.set("offset", offset);
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${pat}` },
@@ -40,6 +40,19 @@ async function leerTabla(tabla: string, filtro: string): Promise<Registro[]> {
 }
 
 const texto = (v: unknown): string => (typeof v === "string" ? v : "");
+
+// Las 4 lecturas de la fachada del motor (ADR-028), con los MISMOS filtros que los
+// nodos Airtable que reemplaza: voces/proyectos/referentes solo activos, ajustes
+// completa (el motor traduce claves con su AJUSTE_MAP, fail-open).
+export async function leerRunPlanCrudo() {
+  const [voces, proyectos, referentes, ajustes] = await Promise.all([
+    leerTabla("Voces", "{activo}"),
+    leerTabla("Proyectos", "{activo}"),
+    leerTabla("Referentes", "{activo}"),
+    leerTabla("Ajustes", ""),
+  ]);
+  return { voces, proyectos, referentes, ajustes };
+}
 
 // Mismos filtros server-side que usa el motor (`filterByFormula={activo}`,
 // contrato §Cómo lo usa el motor): un checkbox destildado ni siquiera viene.
