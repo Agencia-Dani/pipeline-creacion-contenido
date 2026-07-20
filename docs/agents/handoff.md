@@ -191,7 +191,7 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 
 | Fase | Qué | Estado |
 |---|---|---|
-| **D0** Fundación | login magic link · 3 zonas con guardia por rol · migración `007` | ✅ código · ✅ infra · ⛔ **login bloqueado** (ver abajo) |
+| **D0** Fundación | login magic link · 3 zonas con guardia por rol · migración `007` | ✅ código · ✅ infra · ✅ **login funcionando** (Resend SMTP + dominio `contact.retiagrowth.com`, cierre 65) |
 | **D1** Operar | qué corre + ▶ Correr ahora + corridas recientes | ✅ código · env cargadas |
 | **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada |
 | **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ código · ⏳ falta correr contra la base viva (diff cero ×3) |
@@ -203,18 +203,17 @@ deployado en Vercel con **las 8 env vars** (2 públicas + service_role + Airtabl
 motor ×3 + run-plan ×2) · Site/Redirect URL de Auth. **Verificado por curl:** run-plan con header
 devuelve la config real; sin header 403; ambito typo 400.
 
-> ⛔ **BLOQUEANTE ÚNICO para cerrar D0: el magic link no llega (cierre 64).** El email built-in de
-> Supabase (free) tiene rate limit bajísimo (unos pocos/hora); probando el login tantas veces se
-> agotó → "no pudimos mandarte el link". El primer link **sí** llegó (los usuarios están bien; el
-> problema es la cuota de envío, no los records). Editar el template para el flujo token_hash
-> **requiere custom SMTP** (Supabase lo restringió). **Plan recomendado: conectar Resend como SMTP**
-> (gratis, sin IP/host, ~5 min) — destraba el rate limit Y habilita editar el template para pasar a
-> `token_hash` (que además evita el "link ya no sirve" por cross-device/scanning). Alternativa pobre:
-> esperar ~1h la cuota y abrir el link en el MISMO navegador, al toque. **Diagnóstico en vivo:** el
-> código ahora loguea la causa real — Vercel → Logs, línea `[login]` (no se manda) o `[auth/confirm]`
-> (se manda, no entra). El `?estado=` de la URL de login también lo pista.
+> ✅ **RESUELTO (cierre 65): el login por magic link funciona end-to-end con Resend SMTP.** Config:
+> host `smtp.resend.com` · port 465 · username literal `resend` · password = API key `re_...` · Sender
+> en el dominio verificado **`contact.retiagrowth.com`** (SPF/DKIM en el DNS de Squarespace de la
+> agencia). **Gotchas del debug, para no repetirlos:** Resend exige dominio verificado (sin verificar
+> solo entrega al mail dueño de la cuenta, rechaza el resto con 403 → Supabase 500); la cuenta Resend
+> es de Daniel (su mail personal); 30x.com no se pudo usar (sin acceso a su DNS). El error
+> real se diagnostica en **Supabase → Auth Logs** (500 = SMTP falló para invitado · 422 = mail no
+> invitado, esperado), no en Vercel (salía `{}`). Detalle en el log del cierre 65.
 
-**Lo que queda del cockpit (orden sugerido):** (1) **destrabar el login** (Resend) → cerrar D0 ·
+**Lo que queda del cockpit (orden sugerido):** (1) **cerrar hecho-cuando D0 con el equipo** (invitar
+Majo/Jero: *Authentication → Users* + fila en `app.usuarios`; el login ya funciona, cierre 65) ·
 (2) correr `sombra:import`/`sombra:diff` hasta cero ×3 (D3) · (3) **swap de nodos en los 3
 `workflow.json`** (4+ nodos de lectura → 1 HTTP Request a la fachada, con `?ambito=motor` en motor y
 `?ambito=completo` en archivado/descubrimiento) + **re-import #1** → verificar mismo plan con
@@ -243,6 +242,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-20 (cierre 65) — DESBLOQUEADO D0: el login por magic link funciona end-to-end con Resend SMTP; cae el único bloqueante del cierre 64 (Mani ejecutó, Claude diagnosticó).** Sesión de puro debug de config, sin código. **El síntoma:** "configuré SMTP con Resend pero el correo no se manda". **Diagnóstico paso a paso** (el código ya estaba instrumentado para esto, cierre 64): el error real NO vive en Vercel (salía `{}`) sino en **Supabase → Auth Logs** — `POST /auth/v1/otp` daba **500** para mail invitado (SMTP falló) y **422** para no invitado (esperado, `shouldCreateUser:false`). **La causa raíz encadenada:** (1) **Resend exige dominio verificado**; sin verificar está en modo test y solo entrega al mail dueño de la cuenta, rechazando el resto con **403** → Supabase 500. (2) **La cuenta Resend es de Daniel** (su mail personal), no de Mani — se probó el pipeline completo invitando ese mail y funcionó (cayó en spam la 1ª vez: `onboarding@resend.dev` sin firmar). (3) **30x.com NO se pudo verificar** (no controlan su DNS) → se usó **`retiagrowth.com`** (dominio de la agencia, DNS en Squarespace). **Fix final:** verificado el subdominio **`contact.retiagrowth.com`** en Resend (SPF/DKIM cargados en Squarespace) + Sender de Supabase apuntado ahí. Ahora el magic link llega a cualquier mail invitado, sin spam. **Config SMTP que quedó (al gestor, no acá):** host `smtp.resend.com` · port 465 · username literal `resend` · password = API key `re_...` · Sender en `contact.retiagrowth.com`. **Doc actualizada:** este log + tabla D0–D4 (D0 ✅) + bloque del bloqueante (resuelto), README del dashboard ([:54](../../apps/dashboard/README.md) — gotcha del dominio verificado), memoria del cockpit. **Próximo paso:** invitar los mails reales de Majo/Jero (*Authentication → Users* + fila en `app.usuarios`) → cerrar hecho-cuando D0 con el equipo → swap de nodos + re-import #1 (D4 completo) → D5.
 
 **2026-07-20 (cierre 64) — Deploy + setup de infra del cockpit, verificado en prod; D4 mitad-app confirmada leyendo Airtable real; login bloqueado por el email de Supabase (Mani ejecutó, Claude guió).** Sesión de puesta en marcha, no de código nuevo grande. **Hecho por Mani con guía:** migraciones 007–009 en Supabase (confirmadas por query: 9 tablas + 4 vistas) · schema `app` en *Exposed schemas* · 2 usuarios en `app.usuarios` · **deploy en Vercel** (root `apps/dashboard`) con las 8 env vars (2 públicas + service_role + `AIRTABLE_PAT`/`AIRTABLE_BASE_ID` + `MOTOR_WEBHOOK_*` ×3 + `RUN_PLAN_HEADER_*` ×2) · Site/Redirect URL de Auth · **credenciales rotadas** (cae el pendiente rojo del cierre 57). **Verificación en prod (curl + código):** `/` y `/operar` → 307 a `/login` · `/login` 200 · `/api/engine/run-plan` sin header 403, ambito typo 400, **con header devolvió la config REAL** (3 voces: Juan Pablo Vieira/Rosario Gómez/Milena Morales · 2 proyectos TP N=20 / TfT N=10 · 5 referentes con salud · 18 ajustes) — **D4 mitad-app probada end-to-end contra Airtable vivo, sin tocar n8n.** **Fixes de código de la sesión:** `?ambito=motor|completo` en la fachada (decisión de Mani "la más efectiva": un endpoint, no dos) + `armarRunPlanCompleto` (25/25 tests) · logging del error real en `auth/confirm` y `login/actions` (para diagnosticar el magic link sin adivinar). **El bloqueante:** el magic link no llega — rate limit del email built-in de Supabase (free). Detalle y plan (Resend) en §Para la próxima sesión. **Gotcha aprendido:** en Supabase free, editar email templates requiere custom SMTP, y el built-in tiene cuota de envío muy baja — para cualquier app con login por mail hay que conectar un SMTP propio (Resend) desde el arranque. **Doc actualizada:** handoff (este bloque + la tabla D0–D4 arriba), README del dashboard, CLAUDE.md (contrato run-plan.md + migraciones 001–009), memoria. **Próximo paso:** destrabar el login (Resend) → cerrar hecho-cuando D0 → swap de nodos + re-import #1 (D4 completo) → D5.
 

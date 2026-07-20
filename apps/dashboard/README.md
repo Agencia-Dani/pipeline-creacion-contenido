@@ -52,6 +52,12 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    > template "Magic Link" al flujo **token_hash** (`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`),
    > que `auth/confirm` ya soporta y que evita el "el link ya no sirve" por cross-device o escaneo de
    > Gmail. Sin SMTP el login se traba en testing (cierre 64).
+   > 🔑 **Resend exige un dominio verificado para mandar a mails arbitrarios** (cierre 65). Sin
+   > verificar, Resend está en modo test: solo entrega al mail dueño de la cuenta, y a cualquier otro
+   > lo rechaza con 403 → Supabase devuelve 500 (el `signInWithOtp` falla). Fix: *Resend → Domains →
+   > Add Domain*, cargar SPF/DKIM en el DNS del dominio, y poner el Sender email en ese dominio
+   > (`noreply@dominio`). Eso además saca al mail del spam (SPF/DKIM firmados). Con `onboarding@resend.dev`
+   > solo se puede probar contra el mail de la cuenta.
 3. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
    env vars de `.env.example` (del gestor). Producción en `main`, preview por rama (ADR-026).
    En Supabase, *Authentication → URL Configuration*: agregar la URL de Vercel a *Redirect URLs*.
