@@ -31,6 +31,9 @@
 | [ADR-023](./ADR-023-disparo-on-demand-boton-airtable.md) | Disparo on-demand: botón Airtable → automation → webhook n8n; señal desnuda, el motor lee Airtable; una corrida = todos los activos; coexiste con el cron | Aceptada |
 | [ADR-024](./ADR-024-enmienda-adr016-n-por-proyecto.md) | Enmienda ADR-016: la N vuelve por proyecto (global = default), corte final por proyecto; `cap_top_n` intacto | Aceptada (enmendada 2026-07-17: spillover — N techo exacto, sobrantes al proyecto con cupo que también los gateó) |
 | [ADR-025](./ADR-025-cockpit-producto-propio.md) | El cockpit migra a producto propio (frontend+backend+DB+auth sobre Supabase); Airtable queda como superficie interina curada al mínimo; B.2 retirado (cierra A.5, enmienda el invariante de ROADMAP §1) | Aceptada |
+| [ADR-026](./ADR-026-stack-del-cockpit-propio.md) | Stack del cockpit propio: Next.js + Supabase Auth/RLS + Vercel, sin ORM, en este repo (`apps/dashboard/`) — implementa ADR-025 | Aceptada |
+| [ADR-027](./ADR-027-postgres-fuente-unica-de-config.md) | Postgres es la fuente única de la config; Airtable se retira por dominio con corte seco por tabla (las tablas de Métricas mueren, no migran) | Aceptada |
+| [ADR-028](./ADR-028-contrato-motor-run-plan.md) | El motor lee su config por `GET /api/engine/run-plan` (fachada versionada, fail-closed); el disparo sigue siendo señal desnuda | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

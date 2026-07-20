@@ -331,8 +331,11 @@ El sistema sobrevive sin Mani en la cabeza.
 
 - **Reescribir el wf de Substack a n8n / el de reels a código** — los motores actuales funcionan;
   el contrato los cubre. Se reevalúa solo si un motor se vuelve el problema.
-- **UI web custom** — dashboard de herramienta existente cubre la necesidad; una UI propia es
-  mantenimiento permanente sin ganancia hoy.
+- ~~**UI web custom**~~ — **dejó de estar diferida (2026-07-19):** Airtable free bloqueó el disparo
+  del operador y el eje analítico, así que el cockpit pasa a producto propio
+  ([ADR-025](./docs/adr/ADR-025-cockpit-producto-propio.md), stack en
+  [ADR-026](./docs/adr/ADR-026-stack-del-cockpit-propio.md)). Plan:
+  [plan-cockpit-propio.md](./docs/agents/plan-cockpit-propio.md).
 - **Publicación automática** a Substack/Instagram — Substack no tiene API pública; el paso manual
   con humano en el loop es además un control de calidad, no solo una limitación.
 - **Notion curado para el jefe** — D4: solo si el dashboard + resumen se quedan cortos.
