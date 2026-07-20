@@ -24,6 +24,25 @@ export type RunPlan = {
 
 const DEFAULT_CANDIDATOS_POR_CORRIDA = 100; // fail-open, mismo default que el AJUSTE_MAP
 
+// La variante para el archivado (necesita TODAS las voces para resolver nombres) y el
+// descubrimiento (ignora `activo` a propósito, cierre 49): mismo shape, cero filtros,
+// N tal cual. Cada workflow aplica su propia lógica, como hoy.
+export function armarRunPlanCompleto(
+  entrada: {
+    voces: Registro[];
+    proyectos: Registro[];
+    referentes: Registro[];
+    ajustes: Registro[];
+  },
+  generadoEn: Date,
+): RunPlan {
+  return {
+    version: RUN_PLAN_VERSION,
+    generado_en: generadoEn.toISOString(),
+    ...entrada,
+  };
+}
+
 export function armarRunPlan(
   entrada: {
     voces: Registro[];

@@ -46,9 +46,13 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 salen los datos (Airtable → Postgres, dominio por dominio) sin tocar n8n. Un cambio de **forma**
 sube la versión y **ahí sí** hay re-import coordinado.
 
-## Alcance
+## Los dos ámbitos (decisión de Mani, 2026-07-20)
 
-Cubre el **run-plan del motor**. Los nodos de lectura del **archivado** (necesita TODAS las voces
-para resolver nombres) y del **descubrimiento** (no respeta `activo` a propósito, decisión del
-cierre 49) no pueden consumir estos filtros tal cual: su variante (¿query param? ¿endpoint
-hermano?) se decide al diseñar el swap de n8n de D4 — decisión abierta, del arquitecto.
+Un solo endpoint y una sola credencial; el query param elige el filtro:
+
+- **`?ambito=motor` (default):** lo de arriba — los filtros de ADR-028 §2 y la N resuelta.
+- **`?ambito=completo`:** el **mismo shape, sin filtros de `activo` y con `N` tal cual**. Lo
+  consumen el **archivado** (necesita TODAS las voces para resolver nombres al archivar) y el
+  **descubrimiento** (no respeta `activo` a propósito — despensa para voces pausadas, cierre 49).
+  Cada workflow aplica su propia lógica sobre el total, exactamente como hoy.
+- Un `ambito` desconocido responde **400** (un typo en n8n no puede degradar en silencio al default).

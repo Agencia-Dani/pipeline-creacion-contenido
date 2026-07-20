@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { armarRunPlan } from "@/domain/run-plan";
+import { armarRunPlan, armarRunPlanCompleto } from "@/domain/run-plan";
 import { leerRunPlanCrudo } from "@/lib/airtable";
 
 // La fachada de ADR-028: el motor pregunta qué correr ANTES de gastar créditos.
@@ -27,9 +27,19 @@ export async function GET(request: Request) {
     return Response.json({ error: "no autorizado" }, { status: 403 });
   }
 
+  // ?ambito=motor (default): filtrado como ADR-028 §2. ?ambito=completo: sin filtros,
+  // para archivado (necesita todas las voces) y descubrimiento (ignora `activo`).
+  // Un valor desconocido es un typo en n8n: 400 y la corrida no arranca (fail-closed).
+  const ambito = new URL(request.url).searchParams.get("ambito") ?? "motor";
+  if (ambito !== "motor" && ambito !== "completo") {
+    return Response.json({ error: `ambito desconocido: ${ambito}` }, { status: 400 });
+  }
+
   try {
-    const crudo = await leerRunPlanCrudo();
-    return Response.json(armarRunPlan(crudo, new Date()));
+    const crudo = await leerRunPlanCrudo(ambito);
+    const plan =
+      ambito === "motor" ? armarRunPlan(crudo, new Date()) : armarRunPlanCompleto(crudo, new Date());
+    return Response.json(plan);
   } catch (e) {
     console.error(`[run-plan] fallo leyendo config: ${e instanceof Error ? e.message : e}`);
     return Response.json({ error: "config no disponible" }, { status: 503 });

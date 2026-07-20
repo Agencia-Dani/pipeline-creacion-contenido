@@ -1,6 +1,11 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { armarRunPlan, RUN_PLAN_VERSION, type Registro } from "./run-plan.ts";
+import {
+  armarRunPlan,
+  armarRunPlanCompleto,
+  RUN_PLAN_VERSION,
+  type Registro,
+} from "./run-plan.ts";
 
 const ahora = new Date("2026-07-20T08:00:00Z");
 const reg = (id: string, fields: Registro["fields"]): Registro => ({ id, fields });
@@ -41,6 +46,19 @@ describe("armarRunPlan (ADR-028)", () => {
       ahora,
     );
     assert.equal(plan.proyectos[0].fields.N, 100);
+  });
+
+  it("ambito completo: pass-through total, sin gate de voz y con N tal cual", () => {
+    const entrada = {
+      voces: [reg("vozA", { nombre: "Apagada", activo: false })],
+      proyectos: [reg("p1", { nombre: "Sin voz ni N" })],
+      referentes: [reg("r1", { handle: "@inactivo" })],
+      ajustes: [reg("a1", { clave: "Candidatos por corrida", valor: 30 })],
+    };
+    const plan = armarRunPlanCompleto(entrada, ahora);
+    assert.equal(plan.version, RUN_PLAN_VERSION);
+    assert.deepEqual(plan.proyectos, entrada.proyectos); // ni filtrado ni N resuelta
+    assert.deepEqual(plan.voces, entrada.voces);
   });
 
   it("voces, referentes y ajustes pasan tal cual (el motor traduce claves con su AJUSTE_MAP)", () => {

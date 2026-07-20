@@ -44,11 +44,12 @@ const texto = (v: unknown): string => (typeof v === "string" ? v : "");
 // Las 4 lecturas de la fachada del motor (ADR-028), con los MISMOS filtros que los
 // nodos Airtable que reemplaza: voces/proyectos/referentes solo activos, ajustes
 // completa (el motor traduce claves con su AJUSTE_MAP, fail-open).
-export async function leerRunPlanCrudo() {
+export async function leerRunPlanCrudo(ambito: "motor" | "completo" = "motor") {
+  const filtro = ambito === "motor" ? "{activo}" : "";
   const [voces, proyectos, referentes, ajustes] = await Promise.all([
-    leerTabla("Voces", "{activo}"),
-    leerTabla("Proyectos", "{activo}"),
-    leerTabla("Referentes", "{activo}"),
+    leerTabla("Voces", filtro),
+    leerTabla("Proyectos", filtro),
+    leerTabla("Referentes", filtro),
     leerTabla("Ajustes", ""),
   ]);
   return { voces, proyectos, referentes, ajustes };
