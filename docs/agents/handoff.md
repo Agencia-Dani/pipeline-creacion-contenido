@@ -22,6 +22,28 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🔴 **ROTAR CREDENCIALES — martes 21/07, después de la corrida (decisión de Mani, cierre 57).** El
+> **PAT de Airtable** y el **`service_role` de Supabase** se pegaron en un chat el 2026-07-19 (misma
+> clase de exposición que el cierre 36). Rotar los dos y actualizar las credenciales en n8n
+> (`Airtable PAT`, `Supabase Registro`) + el gestor. Se difirió a propósito para no romper la corrida
+> del lunes 20/07. **El `service_role` bypassa RLS: da acceso total a la base.**
+>
+> ✅ **Los 3 re-imports: HECHOS por Mani el 2026-07-19** (cierre 57) — motor (spillover + pool de
+> transcripción), archivado y descubrimiento **vivos**. Cae el pendiente de re-import de los cierres
+> 54–55. **Confirmación independiente:** el archivado del domingo 19/07 18:00 corrió **`ok`** y dejó
+> *Descartes* en 0 + 2 filas nuevas en `outputs`.
+>
+> ✅ **Feed reseteado para la corrida del 20/07** (cierre 57, por pedido de Mani): borrados los **65
+> `Candidatos`** (todos `nuevo`, cero calificados ⇒ cero trabajo del equipo perdido) y **sus 65 filas
+> de `processed_items`** (match 1:1 por `url_referente` ↔ `processed_items.url`; `Candidatos` no
+> guarda `external_id`). **Alcance elegido por Mani: solo lo del feed actual** — el resto del
+> histórico procesado queda bloqueado a propósito (`processed_items` 298 → **233**). `outputs` (18) y
+> `runs` (22) **intactos**: son el histórico canónico (ADR-014) y la bitácora que el archivado lee.
+> **Qué esperar el lunes:** el pool = los 65 videos liberados (ya habían pasado el gate una vez, así
+> que es buen material para ver el **spillover** repartiendo) + lo publicado desde el 17/07. Los 68
+> videos del 17/07 que el motor vio pero **no** entregó siguen bloqueados, así que el pool es más
+> chico que el del viernes — no leas un número bajo de `colectados` como fallo.
+
 > Lo que está **en el repo pero NO aplicado en n8n / la base viva**. Es el eslabón débil de siempre:
 > los fixes del repo no son live hasta re-importar (ver memoria `reimport-eslabon-debil`).
 
@@ -144,9 +166,8 @@ ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-dem
 > curado, onboarding). Lo que queda es **aplicación manual + verificación del ciclo**, y después arranca
 > el producto propio.
 
-**Lo manual de Mani (en orden, antes del lunes 20/07 idealmente):**
-1. **Re-import del motor** (spillover + pool de transcripción; §Pendiente vivo). El paso de infra de
-   InstaPods se cayó: con el pool de 8, 780s alcanzan y el watchdog no se toca.
+**Lo manual de Mani (en orden):**
+1. ~~Re-import del motor~~ ✅ **HECHO el 19/07** (los 3 workflows vivos, §Pendiente vivo).
 2. **Lunes 20/07:** prueba viva del **guard** durante el cron de 08:00 (§Pendiente vivo) + verificar que
    el **descubrimiento** de 09:00 corrió bien post re-import (nunca se vio en vivo) + confirmar
    `runs.trigger_type` en Supabase.
@@ -189,6 +210,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-19 (cierre 57) — Los 3 re-imports hechos + feed reseteado a mano para la corrida del lunes (Mani + Claude).** **(1) Re-imports ✅** — Mani re-importó los 3 workflows: el motor entra con **spillover** (enmienda ADR-024) y **pool de 8 concurrentes** en `Transcribir` (cierre 55). Caen los pendientes de los cierres 54–55. **Confirmación independiente de que el archivado quedó bien:** su cron del domingo 19/07 18:00 corrió **`ok`**, dejó *Descartes del gate* en 0 y sumó 2 filas a `outputs`. **(2) Reset del feed, pedido por Mani para arrancar limpio.** Antes de borrar se auditó el blanco: `Candidatos` tenía **65 records, TODOS `nuevo`** (07-10/11/13/17) ⇒ cero calificaciones perdidas, y confirma otra vez el feed apilado del cierre 53. **La ambigüedad que hubo que resolver antes de tocar nada:** "borrar de Airtable y Supabase" no mapea 1:1 — en Supabase no existe "Feed de Calificación"; lo que gobierna si la corrida es realmente limpia es **`processed_items`** (el dedup), y aparte están `outputs` (histórico canónico, ADR-014, alimenta `v_senal_seleccion`) y `runs` (bitácora que el archivado lee para Métricas). **Decisión de Mani: solo lo del feed actual, el resto del histórico procesado se respeta.** Ejecutado: 65 `Candidatos` borrados + **sus** 65 filas de `processed_items` (**298 → 233**), con `outputs` (18) y `runs` (22) intactos. **El join no era obvio:** `Candidatos` **no guarda `external_id`**, así que el vínculo con el dedup es por `url_referente` ↔ `processed_items.url` — el cruce dio **65/65 exacto, cero huérfanos**. Backup de los 65 records en el scratchpad antes de borrar. **Gotcha de tooling que vale para la próxima:** el sandbox corta las requests curl con URL larga (**HTTP 000 en 0.000s** — no es rate limit de Airtable, que fue mi primera hipótesis equivocada): el DELETE de Airtable anda de a 1–2 ids por query string y **muere a partir de ~5**; la salida es el **MCP `delete_records_for_table`** (50 por request, sin límite de URL). También: el Python del sistema **no tiene certs CA** (`CERTIFICATE_VERIFY_FAILED`) ⇒ para HTTPS usar `curl`, no `urllib`. **(3) 🔴 Credenciales expuestas:** Mani pegó el **PAT de Airtable** y el **`service_role` de Supabase** en el chat (misma clase que el cierre 36). Se usaron desde un archivo en el scratchpad con permisos 600, **nunca** dentro del repo, y se borró al terminar. **Decisión de Mani: rotar el martes 21/07, después de la corrida**, para no romper la prueba del lunes → §Pendiente vivo. **Qué esperar el lunes:** pool = 65 videos liberados (ya habían pasado el gate una vez ⇒ buen material para ver el spillover repartiendo entre TP y TfT) + lo publicado desde el 17/07; los 68 vistos-y-no-entregados del 17/07 siguen bloqueados, así que `colectados` va a ser más bajo que el viernes y **eso no es un fallo**. **Archivos:** solo handoff (§Pendiente vivo + este log). **Próximo paso:** la corrida del lunes con sus 3 verificaciones (guard, descubrimiento, `trigger_type`), después el curado del cockpit, y el martes rotar credenciales.
 
 **2026-07-18 (cierre 56) — Pre-re-import: el cockpit gana su capa de ayuda (53 descriptions escritas por MCP) y el spec por página queda campo a campo (Mani + Claude).** Pedido de Mani antes del re-import: onboarding completamente ready (cada campo de cada página explicado) + guía tabla por tabla. **El hallazgo que lo simplificó todo: `update_field` SÍ edita descriptions** — el límite de la API (cierre 50) es la config de *páginas*, no el schema. Así que los "textos de ayuda" dejaron de ser un paso manual: **por MCP se escribieron las descriptions de TODOS los campos de las 9 tablas** (53 nuevas: `Candidatos` 21 — estaba en cero —, `Proyectos` 5, `Voces` 3, `Descartes` 7, `Métricas Global` 17 de contadores/costos; el resto ya las tenía de pasadas previas) **+ la descripción de la tabla `Voces`** (era pre-ADR-009, "Eje de generación" — poda de B.3 que estaba esperando). El equipo ahora ve el ⓘ en cada campo. **2 verificaciones en vivo de paso:** `Métricas Proyectos.precision` **ya es tipo percent** (el fix "(3) % en Calidad" de B.6 quedó sin objeto) · la tabla `Métricas Global` mezcla filas GLOBAL y DESCUBRIMIENTO ⇒ la página *Salud del Sistema* necesita **filtro `ambito = GLOBAL`** (sumado al paso 7 de la guía; sin él, el embudo muestra filas vacías del descubrimiento). **Entregables:** [mapa-campos §6.2](./mapa-campos.md) nueva — el spec por página campo a campo (orden, ✏️/👁, qué ocultar: links inversos en Proyectos/Voces, `fecha`/`fecha_calificacion` del Feed, calidad+costos fuera de *Salud*) · onboarding gana los diccionarios que faltaban (campos de *Descartes*, *Calidad por Proyecto*, *Salud*, *Costos* + la nota del ⓘ) · dev-doc §5 apunta al spec y fija la regla "campo nuevo = description junto con el campo" · artifact "Curado del Cockpit" republicado (v2: helper texts ✅, filtro ambito, precision sin objeto). **Lo que queda a mano para Mani:** visibilidad + permisos + filtros por página (los 12 pasos) y el helper text de cada elemento. **Adenda del mismo cierre — §6.3, el helper text por página:** Mani pidió el texto de ayuda de *cada campo mostrado en cada página*, que es una cosa **distinta** de la description de tabla — Airtable tiene dos: el **ⓘ del campo** (ya cargado por MCP) y el **helper del elemento en la página** (debajo del campo, se escribe a mano al armar la vista, la API no lo toca). Escritos los **105 helpers** de las 12 páginas + el form, en tono para Majo/Jero, con la regla de triage "si vas corto de tiempo, cargá solo los ✏️ editables — los 👁 ya se explican con el ⓘ". Viven en [mapa-campos §6.3](./mapa-campos.md) y en el artifact v3 (acordeón por página, botón de copiar por campo). **Próximo paso:** sin cambios — re-import (spillover + pool) y el checklist del lunes.
 
