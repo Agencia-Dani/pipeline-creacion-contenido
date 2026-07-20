@@ -16,6 +16,9 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   `airtable.ts` (lectura read-only de la config mientras viva en Airtable; muere en D5),
   `runs.ts` (últimas corridas del motor) y `auth.ts` (guardias `usuarioActual`/`exigirZona`).
 - `components/ui/` — shadcn, código propio editable (C9).
+- `scripts/` — el modo sombra de D3: `npm run sombra:import` (espejo idempotente Airtable → schema
+  `app`) y `npm run sombra:diff` (compara los dos mundos; exit 1 si difieren). Airtable sigue siendo
+  el dueño hasta que el diff dé cero 3 corridas seguidas (plan-cockpit §6/D3).
 - `proxy.ts` — refresh de sesión + redirect a login (en Next 16 middleware se llama proxy).
 
 La autoridad de permisos está en el servidor: cada página exige su zona con `exigirZona`, y los
@@ -33,10 +36,11 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 
 ## Setup una sola vez (manual, de Mani)
 
-1. **Migraciones [`007_app_usuarios.sql`](../../core/schema/007_app_usuarios.sql) y
-   [`008_entender_tarifas_y_vistas.sql`](../../core/schema/008_entender_tarifas_y_vistas.sql)** en el
-   SQL Editor de Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas*
-   (sin esto la app no lee roles ni las vistas analíticas).
+1. **Migraciones [`007_app_usuarios.sql`](../../core/schema/007_app_usuarios.sql),
+   [`008_entender_tarifas_y_vistas.sql`](../../core/schema/008_entender_tarifas_y_vistas.sql) y
+   [`009_app_config_sombra.sql`](../../core/schema/009_app_config_sombra.sql)** en el SQL Editor de
+   Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas* (sin esto la app
+   no lee roles ni las vistas analíticas).
 2. **Invitar a los 5 usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.

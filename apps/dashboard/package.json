@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"domain/**/*.test.ts\""
+    "test": "node --test \"domain/**/*.test.ts\"",
+    "sombra:import": "node --env-file=.env.local scripts/importar-airtable.ts",
+    "sombra:diff": "node --env-file=.env.local scripts/diff-airtable.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

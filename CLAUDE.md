@@ -31,7 +31,7 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
 - [core/contracts/airtable-cockpit.md](core/contracts/airtable-cockpit.md) — modelo de datos del cockpit (las 6 tablas Airtable).
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–008; se aplican en el SQL Editor).
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–009; se aplican en el SQL Editor).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
