@@ -4,15 +4,18 @@
 > dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
 > falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
 >
-> *Actualizado: 2026-07-17. Refleja el sistema ya estabilizado: el motor busca **solo por
+> *Actualizado: 2026-07-20. Refleja el sistema ya estabilizado: el motor busca **solo por
 > referentes** (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron porque no
 > traían calidad —, el **buscador de cuentas nuevas** les propone referentes (§8.1), y hay
-> **páginas de métricas** que muestran cómo viene funcionando (§6.2), ahora con la columna
+> **páginas de métricas** que muestran cómo viene funcionando (§6.2), con la columna
 > **`diagnostico`** que les dice en una frase qué criterio conviene ajustar (§6.2).*
 >
-> *Nuevo desde 2026-07-17:* además del lunes automático, **se puede correr a demanda** (§3.1);
+> *Cómo se pide contenido hoy:* además del lunes automático, **se puede correr a demanda** (§3.1);
 > cada Proyecto tiene su propia **`N`** (cuántos videos quieren de ese tema, §5.2); y las **Voces
 > tienen interruptor**: apagar una voz pausa todos sus proyectos de una (§5.1).
+>
+> *Cada campo trae su ayuda incorporada:* al lado del nombre de cada campo hay un ícono **ⓘ** con la
+> explicación de qué es y quién lo llena (§4.1). Si dudan de un campo, el ⓘ responde más rápido que este manual.
 
 ---
 
@@ -48,7 +51,7 @@ Si tienen 30 segundos y solo leen esto, ya pueden trabajar. El resto del manual 
 ## 1. Qué es esto y para qué sirve
 
 Hay una máquina que trabaja para ustedes. Cada semana sale a Instagram y TikTok, encuentra videos de
-referentes y de hashtags sobre los temas que les interesan, los **transcribe y traduce al español**, los
+referentes sobre los temas que les interesan, los **transcribe y traduce al español**, los
 ordena de **más prometedor a menos**, y se los deja servidos en una lista.
 
 El trabajo de ustedes no es buscar ni escribir. Es **decidir**: entrar a la lista, leer, y marcar cuáles
@@ -127,7 +130,7 @@ Dos reglas que evitan sorpresas:
 
 ## 4. Airtable por dentro: las tablas
 
-Hay 8 tablas. Piénsenlas en tres grupos.
+Piénsenlas en tres grupos.
 
 ### Las que arman una vez (la configuración de la búsqueda)
 
@@ -164,7 +167,7 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 | Página (lo que ven en el menú) | Para qué | Qué editan ahí |
 |---|---|---|
 | **Feed de Calificación** | Su bandeja diaria de videos a calificar | `calificacion`, `estado`, `notas_equipo` |
-| **Referentes Buscados** | Cuentas nuevas que sugiere el buscador (§8.1) | `estado` (aprobado / descartado) |
+| **Referentes - Sugeridos** | Cuentas nuevas que sugiere el buscador (§8.1) | `estado` (aprobado / descartado) |
 | **Descartes** | Los ~10 descartes dudosos de la semana (§6.1) | `veredicto` |
 | **Referentes** | El banco de cuentas de IG y TikTok que se rastrean | todo (arman la lista) |
 | **Proyectos** | Los temas que se buscan | todo (arman los temas) |
@@ -178,7 +181,7 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 
 > **Ojo con los nombres.** Algunas páginas se llaman distinto a la tabla que muestran: *Feed de
 > Calificación* es la tabla **Candidatos**; *Configuración Global* es la tabla **Ajustes**; *Referentes
-> Buscados* es la tabla **Referentes propuestos**; *Calidad por Proyecto* muestra **Métricas Proyectos**
+> - Sugeridos* es la tabla **Referentes propuestos**; *Calidad por Proyecto* muestra **Métricas Proyectos**
 > y *Salud del Sistema* / *Costos* muestran **Métricas Global**. Guíense por el nombre del **menú**, no
 > por el de la tabla.
 > También hay un formulario **"Nuevo Proyecto"** para crear un proyecto llenando un formulario en vez
