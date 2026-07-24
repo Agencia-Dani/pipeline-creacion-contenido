@@ -48,6 +48,11 @@
 >   (39/41 usan audio original). Sin pre-filtro de sin-audio posible con este actor. Si querés comparar
 >   actors, corré el spike de 1 tarde en la consola de Apify (criterios en el plan/ADR-030) — no es
 >   migración, solo medición.
+>
+> 💤 **Someday (no urgente):** **revisar alternativas de actors en Apify si sigue flaqueando** — el
+> transcript vacío / la calidad de scrape. Gatillo: si tras el retry de ADR-030 las vacías siguen altas
+> o el supply queda corto de forma sostenida, correr el spike de arriba y evaluar migrar de actor (ADR
+> aparte).
 
 > 🔴 **ROTAR CREDENCIALES — martes 21/07, después de la corrida (decisión de Mani, cierre 57).** El
 > **PAT de Airtable** y el **`service_role` de Supabase** se pegaron en un chat el 2026-07-19 (misma
