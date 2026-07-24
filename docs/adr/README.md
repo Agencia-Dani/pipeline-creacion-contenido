@@ -34,6 +34,7 @@
 | [ADR-026](./ADR-026-stack-del-cockpit-propio.md) | Stack del cockpit propio: Next.js + Supabase Auth/RLS + Vercel, sin ORM, en este repo (`apps/dashboard/`) — implementa ADR-025 | Aceptada |
 | [ADR-027](./ADR-027-postgres-fuente-unica-de-config.md) | Postgres es la fuente única de la config; Airtable se retira por dominio con corte seco por tabla (las tablas de Métricas mueren, no migran) | Aceptada |
 | [ADR-028](./ADR-028-contrato-motor-run-plan.md) | El motor lee su config por `GET /api/engine/run-plan` (fachada versionada, fail-closed); el disparo sigue siendo señal desnuda | Aceptada |
+| [ADR-029](./ADR-029-dedup-blindado-fail-closed-y-feed.md) | Dedup blindado: lectura de `processed_items` fail-closed, memoria grabada antes de entregar, `external_id` en el feed + `Leer feed vivo` como última línea (cubre el agujero de memoria de ADR-018) | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

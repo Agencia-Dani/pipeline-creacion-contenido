@@ -347,5 +347,57 @@ await (async () => {
   }
 })();
 
+// ════════════════════════════════════════════════════════════════════════════
+// Heat-score v1 — dedup blindado (ADR-029): processed_items (primaria, fail-closed) ∪ feed vivo
+// (secundaria, fail-open) + cap_top_n. Cubre la ruta que explica los duplicados del run 20→21/07,
+// que antes no tenía red de regresión.
+// ════════════════════════════════════════════════════════════════════════════
+const CFG_HEAT = { peso_views: 0.4, peso_likes: 0.4, peso_eng: 0.2, boost_idioma: 0.3, umbral_viral: 700000, min_views: 0, min_likes: 0, cap_top_n: 0 };
+const runHeat = ({ items = [], procesados = [], feed = [], senal = [], cfg = {}, ajustes = {} } = {}) => {
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: Object.assign({}, CFG_HEAT, cfg) }) };
+    if (n === 'Armar plan de corrida') return { first: () => ({ json: { ajustes } }) };
+    if (n === 'Pre-trim relevancia') return { all: () => items.map((j) => ({ json: j })) };
+    if (n === 'Leer procesados') return { all: () => procesados.map((j) => ({ json: j })) };
+    if (n === 'Leer señal selección') return { all: () => senal.map((j) => ({ json: j })) };
+    if (n === 'Leer feed vivo') return { all: () => feed.map((j) => ({ json: j })) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const logs = [];
+  const out = new Function('$', 'console', jsCode('Heat-score v1'))($, { log: (m) => logs.push(m) });
+  return { out: out.map((i) => i.json), logs };
+};
+// el shape del feed vivo = una página de Airtable: { records: [{ fields: { external_id } }] }
+const feedPage = (...ids) => ({ records: ids.map((id) => ({ fields: { external_id: id } })) });
+const hvid = (id, pid = 'P1', extra = {}) => Object.assign({ external_id: id, proyecto_id: pid, reproducciones: 100, likes: 10, engagement_rate: 0.1, descripcion: 'hola ' + id, username: 'ref' }, extra);
+
+seccion('Heat-score v1 — dedup blindado (ADR-029)');
+{
+  const { out } = runHeat({ items: [hvid('a'), hvid('b')], procesados: [{ external_id: 'a', platform: 'instagram' }] });
+  check('un video ya en processed_items no vuelve a salir', out.length === 1 && out[0].external_id === 'b', JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  const { out } = runHeat({ items: [hvid('a'), hvid('b')], feed: [feedPage('a')] });
+  check('un video ya en el feed vivo no vuelve a salir (última línea ADR-029)', out.length === 1 && out[0].external_id === 'b', JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  const { out } = runHeat({ items: [hvid('a'), hvid('b'), hvid('c')], procesados: [{ external_id: 'a', platform: 'ig' }], feed: [feedPage('b')] });
+  check('procesados ∪ feed: caen los dos, sale solo el fresco', out.length === 1 && out[0].external_id === 'c', JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  let threw = false, msg = '';
+  try { runHeat({ items: [hvid('a')], procesados: [{ error: 'supabase 500' }] }); } catch (e) { threw = true; msg = e.message; }
+  check('processed_items caído aborta el run (fail-closed, ADR-029)', threw && /\[Dedup\]/.test(msg), 'threw=' + threw + ' msg=' + msg);
+}
+{
+  const { out } = runHeat({ items: [hvid('a'), hvid('b')], procesados: [{ external_id: 'a', platform: 'ig' }], feed: [{ error: 'airtable 500' }] });
+  check('feed vivo caído NO aborta (fail-open); processed_items sigue dedupeando', out.length === 1 && out[0].external_id === 'b', JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  const items = []; for (let i = 0; i < 5; i++) items.push(hvid('c' + i, 'P1', { reproducciones: 100 - i, likes: 100 - i }));
+  const { out } = runHeat({ items, cfg: { cap_top_n: 2 } });
+  check('cap_top_n corta a 2 videos distintos (regresión)', out.length === 2, 'entregó ' + out.length);
+}
+
 console.log(fail ? `\n${fail} test(s) en rojo` : '\nTodo en verde');
 process.exit(fail ? 1 : 0);

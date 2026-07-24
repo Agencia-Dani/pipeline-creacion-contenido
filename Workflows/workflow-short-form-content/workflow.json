@@ -483,7 +483,6 @@
         3920,
         400
       ],
-      "onError": "continueRegularOutput",
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
@@ -493,7 +492,51 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\nconst seen = new Set(rows('Leer procesados').map(r => r && String(r.external_id)).filter(Boolean));\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = d.idioma_nativo || guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const sel = signal[(d.username || '') + '|' + idioma] || 0; // señal por referente (ADR-019)\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  fresh.forEach(d => out.push({ json: d })); // ADR-016: sin corte por proyecto; se transcribe todo\n}\n// cap_top_n (dev-only): techo duro de transcripcion por corrida (protege backfill).\n// ADR-016: cuenta VIDEOS DISTINTOS por heat, no filas (video,proyecto); el fan-out no consume cupo.\nconst CAP = Number($('Config').first().json.cap_top_n || 0);\nif (CAP > 0) { out.sort((a, b) => (b.json.heat_score || 0) - (a.json.heat_score || 0)); const keepIds = new Set(); const capped = []; for (const it of out) { const id = String(it.json.external_id || ''); if (!id) { capped.push(it); continue; } if (!keepIds.has(id)) { if (keepIds.size >= CAP) continue; keepIds.add(id); } capped.push(it); } return capped; }\nreturn out;\n"
+        "method": "GET",
+        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Candidatos?fields%5B%5D=external_id&pageSize=100' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {
+          "timeout": 20000,
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "offset",
+                    "value": "={{ $response.body.offset }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.offset }}",
+              "limitPagesFetched": true,
+              "maxRequestsInPagination": 30
+            }
+          }
+        }
+      },
+      "id": "leer-feed-vivo",
+      "name": "Leer feed vivo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4060,
+        240
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "name": "Airtable PAT"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cfg = Object.assign({}, $('Config').first().json, ($('Armar plan de corrida').first().json.ajustes || {}));\nconst rows = (n) => { const a = $(n).all().map(i => i.json); if (a.length === 1 && Array.isArray(a[0])) return a[0]; return a; };\nconst items = $('Pre-trim relevancia').all().map(i => i.json);\n// DEDUP (ADR-029): memoria = processed_items (primaria, fail-closed) ∪ feed vivo de Airtable\n// (secundaria, best-effort). El feed es la ultima linea si processed_items se borro a mano.\nconst _proc = rows('Leer procesados');\nif (_proc.some(r => r && r.error)) throw new Error('[Dedup] processed_items no disponible — abortando para no duplicar (ADR-029)');\nconst seen = new Set(_proc.map(r => r && String(r.external_id)).filter(Boolean));\ntry {\n  for (const it of $('Leer feed vivo').all()) {\n    const j = (it && it.json) || {};\n    const recs = Array.isArray(j.records) ? j.records : (Array.isArray(j) ? j : []);\n    for (const r of recs) { const eid = r && r.fields && r.fields.external_id; if (eid) seen.add(String(eid)); }\n  }\n} catch (e) { /* feed vivo best-effort (ADR-029): processed_items ya cubre el caso normal */ }\nconst signal = {};\nrows('Leer señal selección').forEach(r => { if (r && r.referente !== undefined) signal[(r.referente || '') + '|' + (r.idioma || '')] = Number(r.tasa_seleccion || 0); });\n\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst DICT = {\n  es: [' el ', ' la ', ' los ', ' las ', ' que ', ' de ', ' para ', ' con ', ' una ', ' como ', ' pero ', ' esto '],\n  en: [' the ', ' and ', ' you ', ' for ', ' with ', ' this ', ' that ', ' your ', ' are ', ' have ', ' what '],\n  pt: [' uma ', ' voce ', ' nao ', ' isso ', ' mais ', ' como ', ' obrigado ', ' entao ', ' muito '],\n  it: [' il ', ' che ', ' per ', ' una ', ' questo ', ' come ', ' sono ', ' non ', ' anche ', ' molto '],\n  fr: [' les ', ' une ', ' pour ', ' avec ', ' vous ', ' est ', ' pas ', ' comme ', ' dans ', ' mais '],\n  de: [' der ', ' die ', ' und ', ' ist ', ' nicht ', ' ein ', ' mit ', ' das ', ' ich ', ' auch '],\n  nl: [' het ', ' een ', ' van ', ' ik ', ' niet ', ' met ', ' dat ', ' zijn ', ' voor ', ' ook ']\n};\n// scripts no-latinos: evidencia directa de NO-español (caen a 'ot' -> reciben boost)\nconst NONLATIN = /[\\u3040-\\u30ff\\u4e00-\\u9fff\\uac00-\\ud7af\\u0400-\\u04ff\\u0600-\\u06ff\\u0590-\\u05ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u0370-\\u03ff]/;\nconst guessLang = (raw) => {\n  const orig = (raw || '').toString();\n  if (NONLATIN.test(orig)) return 'ot';\n  const t = ' ' + norm(orig) + ' '; let best = '', bestN = 0;\n  for (const lng in DICT) { let n = 0; DICT[lng].forEach(w => { if (t.indexOf(w) >= 0) n++; }); if (n > bestN) { bestN = n; best = lng; } }\n  if (bestN > 0) return best;\n  // sin stopwords reconocidas: marcas fuertes de español -> es; si no, desconocido -> 'ot' (premia no-español)\n  if (/[ñ¿¡áéíóú]/.test(orig.toLowerCase())) return 'es';\n  return 'ot';\n};\nconst pct = (arr, v) => { if (arr.length <= 1) return 1; let c = 0; for (const x of arr) if (x <= v) c++; return c / arr.length; };\n\nconst byProj = {};\nitems.forEach(d => { (byProj[d.proyecto_id] = byProj[d.proyecto_id] || []).push(d); });\nconst out = [];\nfor (const pid in byProj) {\n  const arr = byProj[pid];\n  const views = arr.map(d => Number(d.reproducciones || 0));\n  const likes = arr.map(d => Number(d.likes || 0));\n  const engs = arr.map(d => parseFloat(d.engagement_rate) || 0);\n  const scored = arr.map(d => {\n    const v = Number(d.reproducciones || 0), l = Number(d.likes || 0), e = parseFloat(d.engagement_rate) || 0;\n    const idioma = d.idioma_nativo || guessLang((d.descripcion || '') + ' ' + (d.bio || ''));\n    const idiomaBoost = idioma !== 'es' ? Number(cfg.boost_idioma || 0.3) : 0;\n    const sel = signal[(d.username || '') + '|' + idioma] || 0; // señal por referente (ADR-019)\n    const base = Number(cfg.peso_views || 0.4) * pct(views, v) + Number(cfg.peso_likes || 0.4) * pct(likes, l) + Number(cfg.peso_eng || 0.2) * pct(engs, e);\n    const heat = base * (1 + idiomaBoost) * (1 + sel);\n    return Object.assign({}, d, {\n      idioma_guess: idioma, heat_score: Math.round(heat * 10000) / 10000,\n      viral_por_tamano: Number(d.seguidores || 0) > Number(cfg.umbral_viral || 700000)\n    });\n  });\n  const MIN_V = Number(cfg.min_views || 0), MIN_L = Number(cfg.min_likes || 0);\n  const fresh = scored.filter(d => !seen.has(String(d.external_id)) && Number(d.reproducciones || 0) >= MIN_V && Number(d.likes || 0) >= MIN_L);\n  fresh.sort((a, b) => b.heat_score - a.heat_score);\n  fresh.forEach(d => out.push({ json: d })); // ADR-016: sin corte por proyecto; se transcribe todo\n}\n// cap_top_n (dev-only): techo duro de transcripcion por corrida (protege backfill).\n// ADR-016: cuenta VIDEOS DISTINTOS por heat, no filas (video,proyecto); el fan-out no consume cupo.\nconst CAP = Number($('Config').first().json.cap_top_n || 0);\nif (CAP > 0) { out.sort((a, b) => (b.json.heat_score || 0) - (a.json.heat_score || 0)); const keepIds = new Set(); const capped = []; for (const it of out) { const id = String(it.json.external_id || ''); if (!id) { capped.push(it); continue; } if (!keepIds.has(id)) { if (keepIds.size >= CAP) continue; keepIds.add(id); } capped.push(it); } return capped; }\nreturn out;\n"
       },
       "id": "heat-score-v1",
       "name": "Heat-score v1",
@@ -561,7 +604,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined, estado: 'nuevo'\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
+        "jsCode": "\nconst recs = $input.all().map(i => {\n  const d = i.json;\n  const f = {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || undefined,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : undefined),\n    relevancia_razon: d.relevancia_razon || undefined, estado: 'nuevo',\n    external_id: d.external_id || undefined // ADR-029: ultima linea de dedup contra el feed vivo\n  };\n  if (d.proyecto_id) f.proyecto = [d.proyecto_id];\n  if (d.voz_id) f.voz = [d.voz_id];\n  if (d.thumbnail_url) f.thumbnail = [{ url: d.thumbnail_url }];\n  return { fields: f };\n});\nconst out = [];\nfor (let i = 0; i < recs.length; i += 10) out.push({ json: { records: recs.slice(i, i + 10), typecast: true } });\nreturn out.length ? out : [];\n"
       },
       "id": "preparar-batch-airtable",
       "name": "Preparar batch Airtable",
@@ -882,7 +925,7 @@
         400
       ],
       "parameters": {
-        "jsCode": "\n// Resumen del run (ADR-021) — arma runs.metricas: embudo + sin_guion + llamadas estimadas por\n// servicio + desglose por referente (evaluados/gate_pass en videos DISTINTOS; habilita la higiene\n// de fuentes de ADR-022). Cerrar run persiste $json.metricas tal cual.\nconst gateAll = $('Gate de relevancia').all();\nconst gateKept = gateAll.filter(i => !i.json._descarte);\nconst outputs = $('Armar candidato').all();\nconst gateIn = $('Traducir (Claude Haiku)').all();\nconst _distinct = (items) => new Set(items.map(i => String(i.json.external_id || '')).filter(Boolean)).size;\nconst _lotes = (items) => new Set(items.map(i => String(i.json.proyecto_id || '')).filter(Boolean)).size;\n// llamadas estimadas: Supadata = videos distintos transcritos (dedup intra-corrida, ADR-016);\n// Haiku: pre-trim = 1 lote/proyecto (cota superior: exentos/sin-criterios no llaman), gate = chunks\n// de a 25 por proyecto (cierre 31), traducciones = videos DISTINTOS no-ES (Traducir dedupea, cierre 31).\nconst _lotesChunk = (items, chunk) => { const by = {}; items.forEach(i => { const p = String(i.json.proyecto_id || ''); if (p) by[p] = (by[p] || 0) + 1; }); return Object.values(by).reduce((a, n) => a + Math.ceil(n / chunk), 0); };\nconst llamadas = {\n  supadata: _distinct($('Transcribir (Supadata)').all()),\n  haiku_lotes_pretrim: _lotes($('Asignar proyecto+voz').all()),\n  haiku_lotes_gate: _lotesChunk(gateIn, 25),\n  haiku_traducciones: new Set(gateIn.filter(i => String(i.json.transcripcion || '').trim() && (i.json.idioma || 'es') !== 'es').map(i => String(i.json.external_id || i.json.url || '')).filter(Boolean)).size\n};\nconst por_referente = {};\nconst _mark = (items, key) => { const seen = new Set(); for (const it of items) { const u = String(it.json.username || '').toLowerCase(); const id = String(it.json.external_id || ''); if (!u || !id) continue; const k = u + '|' + id; if (seen.has(k)) continue; seen.add(k); (por_referente[u] = por_referente[u] || { evaluados: 0, gate_pass: 0 })[key]++; } };\n_mark(gateIn, 'evaluados');\n_mark(gateKept, 'gate_pass');\nconst _n = (name) => { try { return $(name).all().length; } catch (e) { return 0; } };\nconst metricas = {\n  colectados: $('Merge scrapes').all().length,\n  apify_ig: _n('Apify — IG Reels'),\n  apify_tt: _n('Apify — TikTok Perfil'),\n  asignados: $('Asignar proyecto+voz').all().length,\n  pretrim: $('Pre-trim relevancia').all().length,\n  filtrados: $('Heat-score v1').all().length,\n  gate: gateKept.length,\n  outputs: outputs.length,\n  sin_guion: outputs.filter(i => !String(i.json.script || '').trim()).length,\n  descartes_expuestos: gateAll.length - gateKept.length,\n  llamadas, por_referente\n};\nconsole.log('[Resumen] ' + JSON.stringify(metricas));\nreturn [{ json: { metricas } }];\n"
+        "jsCode": "\n// Resumen del run (ADR-021) — arma runs.metricas: embudo + sin_guion + llamadas estimadas por\n// servicio + desglose por referente (evaluados/gate_pass en videos DISTINTOS; habilita la higiene\n// de fuentes de ADR-022). Cerrar run persiste $json.metricas tal cual.\nconst gateAll = $('Gate de relevancia').all();\nconst gateKept = gateAll.filter(i => !i.json._descarte);\nconst outputs = $('Armar candidato').all();\nconst gateIn = $('Traducir (Claude Haiku)').all();\nconst _distinct = (items) => new Set(items.map(i => String(i.json.external_id || '')).filter(Boolean)).size;\nconst _lotes = (items) => new Set(items.map(i => String(i.json.proyecto_id || '')).filter(Boolean)).size;\n// llamadas estimadas: Supadata = videos distintos transcritos (dedup intra-corrida, ADR-016);\n// Haiku: pre-trim = 1 lote/proyecto (cota superior: exentos/sin-criterios no llaman), gate = chunks\n// de a 25 por proyecto (cierre 31), traducciones = videos DISTINTOS no-ES (Traducir dedupea, cierre 31).\nconst _lotesChunk = (items, chunk) => { const by = {}; items.forEach(i => { const p = String(i.json.proyecto_id || ''); if (p) by[p] = (by[p] || 0) + 1; }); return Object.values(by).reduce((a, n) => a + Math.ceil(n / chunk), 0); };\nconst llamadas = {\n  supadata: _distinct($('Transcribir (Supadata)').all()),\n  haiku_lotes_pretrim: _lotes($('Asignar proyecto+voz').all()),\n  haiku_lotes_gate: _lotesChunk(gateIn, 25),\n  haiku_traducciones: new Set(gateIn.filter(i => String(i.json.transcripcion || '').trim() && (i.json.idioma || 'es') !== 'es').map(i => String(i.json.external_id || i.json.url || '')).filter(Boolean)).size\n};\nconst por_referente = {};\nconst _mark = (items, key) => { const seen = new Set(); for (const it of items) { const u = String(it.json.username || '').toLowerCase(); const id = String(it.json.external_id || ''); if (!u || !id) continue; const k = u + '|' + id; if (seen.has(k)) continue; seen.add(k); (por_referente[u] = por_referente[u] || { evaluados: 0, gate_pass: 0 })[key]++; } };\n_mark(gateIn, 'evaluados');\n_mark(gateKept, 'gate_pass');\nconst _n = (name) => { try { return $(name).all().length; } catch (e) { return 0; } };\n// Verificacion de la escritura de memoria (ADR-029): con el reorden de ramas, POST processed_items\n// ya ejecuto cuando corre el Resumen. Si fallo, el proximo run depende solo del feed vivo.\nlet registro_dedup = 'no_corrio';\ntry { const _r = $('POST processed_items').all(); registro_dedup = _r.some(i => i && i.json && i.json.error) ? 'fallo' : 'ok'; } catch (e) {}\nconst avisos = [];\nif (registro_dedup === 'fallo') avisos.push('processed_items no se escribio: el proximo run dependeria del feed vivo para no duplicar');\nconst metricas = {\n  colectados: $('Merge scrapes').all().length,\n  apify_ig: _n('Apify — IG Reels'),\n  apify_tt: _n('Apify — TikTok Perfil'),\n  asignados: $('Asignar proyecto+voz').all().length,\n  pretrim: $('Pre-trim relevancia').all().length,\n  filtrados: $('Heat-score v1').all().length,\n  gate: gateKept.length,\n  outputs: outputs.length,\n  sin_guion: outputs.filter(i => !String(i.json.script || '').trim()).length,\n  descartes_expuestos: gateAll.length - gateKept.length,\n  llamadas, por_referente,\n  registro_dedup, avisos\n};\nconsole.log('[Resumen] ' + JSON.stringify(metricas));\nreturn [{ json: { metricas } }];\n"
       }
     },
     {
@@ -1144,7 +1187,7 @@
       "main": [
         [
           {
-            "node": "Heat-score v1",
+            "node": "Leer feed vivo",
             "type": "main",
             "index": 0
           }
@@ -1155,12 +1198,12 @@
       "main": [
         [
           {
-            "node": "Transcribir (Supadata)",
+            "node": "Preparar procesados",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Preparar procesados",
+            "node": "Transcribir (Supadata)",
             "type": "main",
             "index": 0
           }
@@ -1354,6 +1397,17 @@
         [
           {
             "node": "Bloqueada: ya hay corrida viva",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer feed vivo": {
+      "main": [
+        [
+          {
+            "node": "Heat-score v1",
             "type": "main",
             "index": 0
           }

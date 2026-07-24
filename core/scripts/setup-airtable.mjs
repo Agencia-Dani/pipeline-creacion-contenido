@@ -60,7 +60,7 @@ const tables = [
              check("viral_por_tamano"),
              sel("calificacion", "🔥", "👍", "👎"),
              sel("estado", "nuevo", "aprobado", "descartado"),
-             long("notas_equipo")] },
+             long("notas_equipo"), txt("external_id")] }, // external_id: dedup de última línea contra el feed (ADR-029)
   { name: "Ajustes", description: "Knobs del scoring (clave→valor) que el equipo edita sin tocar n8n — ADR-011. El motor los lee y caen sobre los defaults de Config; tabla vacía = motor con defaults.",
     fields: [txt("clave"), num("valor", 2), long("descripcion"), check("Mostrar al equipo")] },
   { name: "Referentes propuestos", description: "Cuentas candidatas a Referente que propone el workflow de descubrimiento (ADR-020). El equipo marca estado aprobado/descartado; los aprobados se promueven solos a Referentes en la corrida siguiente.",
