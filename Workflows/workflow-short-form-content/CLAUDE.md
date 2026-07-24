@@ -40,11 +40,14 @@ ADR-009); el "link" es la URL del video original.
   (no en paralelo), porque `Cerrar run` lo referencia por nombre y n8n ejecuta las ramas en orden de
   conexión. Si lo ponés en paralelo, corre **después** del pipeline y la referencia rompe
   ("hasn't been executed").
-- **Gates fail-open, pero el dedup es fail-closed:** si Haiku/Supadata fallan, el item pasa
-  (invariante #1: no conviertas un fallo externo en dependencia de ejecución). **Excepción, ADR-029:**
-  la lectura de `processed_items` (`Leer procesados`) es fail-closed — si no hay memoria, el run aborta
-  en vez de re-entregar todo. `Leer feed vivo` es fail-open (defensa secundaria). Fail-open aplica a
-  los gates de *juicio* y a las *escrituras* de registro; no a la *lectura* de la memoria de dedup.
+- **Gates fail-open, con dos excepciones:** si Haiku falla, el item pasa (invariante #1: no conviertas
+  un fallo externo en dependencia de ejecución). Fail-open aplica a los gates de *juicio* y a las
+  *escrituras* de registro. **Excepción 1 (ADR-029):** la *lectura* de `processed_items`
+  (`Leer procesados`) es fail-closed — sin memoria, el run aborta en vez de re-entregar todo
+  (`Leer feed vivo` sí es fail-open, defensa secundaria). **Excepción 2 (ADR-030):** un video **sin
+  transcript se descarta** en el `Gate` (`descarte_razon: 'sin_guion'`), no pasa marcado — el fail-open
+  ya no cubre el *insumo* transcript (revierte la decisión #6). Si Supadata se cae entera, la corrida
+  entrega 0 y lo avisa.
 - **`heat_score` es composite** (ADR-010): `peso_relevancia·score_haiku + (1-peso)·percentil(prescore
   métrico)`. El gate también guarda `relevancia_score`/`relevancia_razon` (se suben a Airtable). El
   substring de tema **no existe** (salió en el refactor de relevancia).

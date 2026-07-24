@@ -288,7 +288,7 @@ seccion('Invariantes que no se tocan');
 // `this` mockeado; el mock cuenta llamadas y concurrencia en vuelo)
 // ════════════════════════════════════════════════════════════════════════════
 const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
-const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, falla } = {}) => {
+const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, falla, secuencia } = {}) => {
   const llamadas = [];
   let enVuelo = 0, maxEnVuelo = 0;
   const thisMock = { helpers: { httpRequest: async (opts) => {
@@ -297,6 +297,7 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, 
     await new Promise((r) => setTimeout(r, delayMs));
     enVuelo--;
     if (falla) throw new Error('supadata caída (mock)');
+    if (secuencia) return secuencia[Math.min(llamadas.length - 1, secuencia.length - 1)]; // respuestas en orden (para probar el retry)
     return respuesta || { content: 'transcript de prueba', lang: 'en' };
   } } };
   const $ = (n) => {
@@ -344,6 +345,15 @@ await (async () => {
   {
     const { out } = await runTranscribir([tvid('l1')], { respuesta: { content: 'the and you for with this', lang: '' } });
     check('sin lang de Supadata, adivina sobre el transcript (en)', out[0].idioma_detectado === 'en', out[0].idioma_detectado);
+  }
+  // ADR-030: retry cuando la primera respuesta vuelve vacía
+  {
+    const { out, llamadas } = await runTranscribir([tvid('r1')], { secuencia: [{ content: '', lang: '' }, { content: 'recuperado al reintentar', lang: 'en' }] });
+    check('retry: primera vacía → reintenta y recupera (2 llamadas)', out[0].transcripcion === 'recuperado al reintentar' && llamadas.length === 2, `tx='${out[0].transcripcion}' llamadas=${llamadas.length}`);
+  }
+  {
+    const { out, llamadas } = await runTranscribir([tvid('r2')], { secuencia: [{ content: '', lang: '' }, { content: '', lang: '' }] });
+    check('dos vacías: fail-open (transcripcion vacía) tras agotar el retry', out[0].transcripcion === '' && llamadas.length === 2, `tx='${out[0].transcripcion}' llamadas=${llamadas.length}`);
   }
 })();
 
@@ -398,6 +408,65 @@ seccion('Heat-score v1 — dedup blindado (ADR-029)');
   const { out } = runHeat({ items, cfg: { cap_top_n: 2 } });
   check('cap_top_n corta a 2 videos distintos (regresión)', out.length === 2, 'entregó ' + out.length);
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Gate de relevancia — descarte duro de sin-guion (ADR-030): sin transcript = _descarte, sin gastar
+// Haiku ni consumir N; el juicio de los con-guion sigue fail-open. (async, this.helpers.httpRequest)
+// ════════════════════════════════════════════════════════════════════════════
+const runGate = async ({ items = [], projects = {}, cfg = {}, haikuFalla = false, juicioFn } = {}) => {
+  const llamadas = [];
+  const thisMock = { helpers: { httpRequest: async (opts) => {
+    llamadas.push(opts);
+    if (haikuFalla) throw new Error('haiku caído (mock)');
+    const usr = (((opts.body || {}).messages || [])[0] || {}).content || '';
+    let ids = [];
+    try { ids = JSON.parse(usr.slice(usr.indexOf('VIDEOS:\n') + 8)).map((v) => v.id); } catch (e) {}
+    const juicio = ids.map((id) => (juicioFn ? juicioFn(id) : { id, relevante: true, score: 0.8, razon: 'ok' }));
+    return { content: [{ text: JSON.stringify({ juicio }) }] };
+  } } };
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: Object.assign({ peso_relevancia: 0.7, min_relevancia: 0, cap_descartes: 10 }, cfg) }) };
+    if (n === 'Armar plan de corrida') return { first: () => ({ json: { projects, ajustes: {} } }) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const $input = { all: () => items.map((j) => ({ json: j })) };
+  const logs = [];
+  const out = await new AsyncFn('$', '$input', 'console', jsCode('Gate de relevancia')).call(thisMock, $, $input, { log: (m) => logs.push(m) });
+  return { out: out.map((i) => i.json), logs, llamadas };
+};
+const gvid = (id, pid = 'P1', extra = {}) => Object.assign({ external_id: id, proyecto_id: pid, heat_score: 0.5, descripcion: 'caption ' + id, script: 'guion de ' + id, username: 'ref' }, extra);
+
+seccion('Gate de relevancia — descarte duro de sin-guion (ADR-030)');
+await (async () => {
+  {
+    const { out, llamadas } = await runGate({ items: [gvid('a', 'P1', { script: '' })], projects: { P1: { nombre: 'P1', criterios: 'trading' } } });
+    const d = out.find((o) => o.external_id === 'a');
+    check('item sin guion sale _descarte con razón sin_guion', !!d && d._descarte === true && d.descarte_razon === 'sin_guion', JSON.stringify(d));
+    check('y NO gasta una llamada a Haiku por él', llamadas.length === 0, llamadas.length + ' llamadas');
+  }
+  {
+    const { out, llamadas } = await runGate({ items: [gvid('b')], projects: { P1: { nombre: 'P1', criterios: 'trading' } } });
+    check('item con guion se juzga (Haiku llamado)', llamadas.length === 1, llamadas.length + ' llamadas');
+    check('y pasa si el juicio es relevante (no _descarte)', out.some((o) => o.external_id === 'b' && !o._descarte), JSON.stringify(out.map((o) => [o.external_id, !!o._descarte])));
+  }
+  {
+    const { out } = await runGate({ items: [gvid('c')], projects: { P1: { nombre: 'P1', criterios: 'trading' } }, haikuFalla: true });
+    const d = out.find((o) => o.external_id === 'c' && !o._descarte);
+    check('Haiku caído: el con-guion pasa igual, sin score (fail-open del juicio intacto)', !!d && d.relevancia_score == null, JSON.stringify(d && d.relevancia_score));
+  }
+  {
+    const { out, llamadas } = await runGate({ items: [gvid('d'), gvid('e')], projects: { P1: { nombre: 'P1' } } }); // sin criterios
+    check('sin criterios: pasa todo sin llamar a Haiku', llamadas.length === 0 && out.filter((o) => !o._descarte).length === 2, `llamadas=${llamadas.length} pasaron=${out.filter((o) => !o._descarte).length}`);
+  }
+  {
+    // mezcla: un sin-guion + un con-guion; el sin-guion no cuenta como borderline de auditoría
+    const { out } = await runGate({ items: [gvid('f', 'P1', { script: '' }), gvid('g')], projects: { P1: { nombre: 'P1', criterios: 'trading' } }, juicioFn: (id) => ({ id, relevante: false, score: 0.9, razon: 'no' }) });
+    const sinG = out.find((o) => o.external_id === 'f');
+    const bordG = out.find((o) => o.external_id === 'g' && o._descarte);
+    check('el sin-guion se marca por sin_guion, no por el gate', sinG && sinG.descarte_razon === 'sin_guion', JSON.stringify(sinG));
+    check('el con-guion rechazado sí es descarte de auditoría (razón ≠ sin_guion)', !!bordG && bordG.descarte_razon !== 'sin_guion', JSON.stringify(bordG && bordG.descarte_razon));
+  }
+})();
 
 console.log(fail ? `\n${fail} test(s) en rojo` : '\nTodo en verde');
 process.exit(fail ? 1 : 0);

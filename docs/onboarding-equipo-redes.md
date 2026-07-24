@@ -265,6 +265,16 @@ con los de otro.
 >
 > Vale la pena que el jefe valide este texto por proyecto.
 
+> **¿Mi criterio está muy fuerte? Léanlo por la tasa de gate.** Cada corrida guarda, por proyecto,
+> cuántos videos **evaluó** y cuántos **pasaron** el filtro (lo van a ver en el dashboard, y en el
+> `separacion_gate` de §6.2). Regla simple: si de 200 evaluados pasan 30, su criterio **mata el 85%** —
+> quizás está demasiado estricto y les está recortando la entrega. Si pasan casi todos, está demasiado
+> laxo y llega ruido. El equilibrio: escriban el criterio del **tema** amplio (que no mate de más) y
+> dejen la exigencia fina para la **calificación humana** (🔥/👍/👎) — así la máquina aprende de lo que
+> ustedes eligen sin cortar el supply de entrada. Si un proyecto entrega siempre menos de lo que pidió,
+> miren primero si es **poca fuente** (pocos Referentes activos) o **criterio muy fuerte** (tasa de gate
+> baja): el dashboard lo dice con una etiqueta (`supply` / `gate` / `mixta`).
+
 ### 5.3 `Referentes` — las cuentas de Instagram y TikTok que se siguen
 
 Cada fila es una cuenta de la que la máquina trae videos. **Es la fuente más importante y de mejor calidad**
@@ -452,7 +462,7 @@ Qué significa cada columna, por página:
 | `pretrim` | los que sobrevivieron al pre-filtro rápido |
 | `gate_pass` | los que pasaron el filtro de relevancia (IA) |
 | `entregados` | los que llegaron a su bandeja |
-| `sin_guion` | cuántos llegaron sin transcripción (⚠️ SIN GUION) — si sube, avisen |
+| `sin_guion` | cuántos videos se **descartaron** por no tener guion (audio sin voz). Ya no llegan al feed (§9); si este número dispara, avisen: puede ser el transcriptor caído |
 | `falsos_negativos` | los "era bueno" que marcaron en Descartes (§6.1) |
 | `runs_ok` / `runs_fallo` | corridas que cerraron bien / mal esa semana |
 | `duracion_min` | cuánto tardó la corrida promedio |
@@ -553,8 +563,10 @@ Honestidad por adelantado, para que no se sorprendan:
   buscador de cuentas nuevas (§8.1) ayuda a reponerla en Instagram y TikTok, pero solo propone: la
   decisión de qué cuenta entra sigue siendo de ustedes (y las primeras cuentas de TikTok las siembran
   ustedes a mano para que el buscador tenga de dónde partir).
-- **A veces un video llega sin transcripción** (§5.4): mírenlo y decidan a mano. Esos llegan con el
-  título marcado **⚠️ SIN GUION** en el feed.
+- **Los videos sin voz se descartan solos.** Si un video no tiene guion (audio sin voz, música, texto
+  en pantalla) la máquina lo descarta sola: ya **no** llega marcado ⚠️ SIN GUION al feed. Solo llega lo
+  que tiene guion de verdad. *(Contra: si el transcriptor se cae una corrida entera, esa corrida puede
+  llegar vacía — la máquina avisa en las métricas.)*
 - **El empujón por idioma es parejo para todos los idiomas no-español.** No premia más el inglés que el
   portugués: todos los no-español reciben el mismo empujón.
 - **El orden es menos estable con poco volumen.** Con pocas corridas el heat score puede ser ruidoso; se
