@@ -11,11 +11,13 @@ import { Separator } from "@/components/ui/separator";
 import {
   DISPARO_LEGIBLE,
   ESTADO_LEGIBLE,
+  RAZON_FALTANTE_LEGIBLE,
   armarVistaOperar,
   duracionLegible,
   entregaLegible,
   haceCuanto,
   hayCorridaViva,
+  ultimoEmbudo,
   type Corrida,
   type VistaOperar,
 } from "@/domain/corrida";
@@ -53,6 +55,7 @@ export default async function OperarPage() {
   const runs = corridas.status === "fulfilled" ? corridas.value : null;
   const ahora = new Date();
   const corridaViva = runs ? hayCorridaViva(runs, ahora) : false;
+  const embudo = runs ? ultimoEmbudo(runs) : null;
 
   return (
     <div className="space-y-6">
@@ -116,6 +119,47 @@ export default async function OperarPage() {
           <BotonCorrer deshabilitado={corridaViva} />
         </CardContent>
       </Card>
+
+      {embudo && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Última corrida, por proyecto</CardTitle>
+            <CardDescription>
+              De {haceCuanto(embudo.corrida.inicio, ahora)}: cuánto entregó cada proyecto
+              de su meta, qué tan estricto fue su filtro, y por qué faltó (si faltó).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {embudo.filas.map((f) => {
+                const corto = f.entregados < f.nObjetivo;
+                return (
+                  <li key={f.nombre} className="space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+                      <span className="font-medium">{f.nombre}</span>
+                      <span className={corto ? "text-muted-foreground" : ""}>
+                        entregó {f.entregados} de {f.nObjetivo}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>
+                        filtro:{" "}
+                        {f.tasaGate == null
+                          ? "sin datos"
+                          : `pasó el ${Math.round(f.tasaGate * 100)}% de ${f.evaluados} evaluados`}
+                      </span>
+                      {f.sinGuion > 0 && <span>· {f.sinGuion} sin guion (descartados)</span>}
+                      {corto && f.razonFaltante && (
+                        <Badge variant="outline">{RAZON_FALTANTE_LEGIBLE[f.razonFaltante]}</Badge>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

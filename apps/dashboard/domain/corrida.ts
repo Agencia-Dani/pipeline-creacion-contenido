@@ -126,3 +126,63 @@ export function entregaLegible(corrida: Corrida): string | null {
   if (typeof outputs !== "number") return null;
   return outputs === 1 ? "entregó 1 candidato" : `entregó ${outputs} candidatos`;
 }
+
+// ── Embudo por proyecto (ADR-030 / Fase 3) ────────────────────────────────────
+// Lee `metricas.por_proyecto` que arma `Resumen del run`: la incidencia del
+// criterio por proyecto. Responde "entregó X de N y por qué faltó" sin SQL.
+
+export type RazonFaltante = "supply" | "gate" | "mixta";
+
+export type EmbudoProyecto = {
+  nombre: string;
+  nObjetivo: number;
+  evaluados: number;
+  sinGuion: number;
+  gatePass: number;
+  tasaGate: number | null; // gate_pass / evaluados-con-guion (0..1); null si no evaluó nada con guion
+  entregados: number;
+  razonFaltante: RazonFaltante | null; // solo si entregados < nObjetivo
+};
+
+export const RAZON_FALTANTE_LEGIBLE: Record<RazonFaltante, string> = {
+  supply: "poca fuente (faltan referentes)",
+  gate: "criterio muy estricto",
+  mixta: "poca fuente y criterio estricto",
+};
+
+// Parseo defensivo: metricas es jsonb libre; una corrida vieja (sin por_proyecto)
+// devuelve []. Se ordena por nombre para que la card sea estable entre renders.
+export function embudoPorProyecto(corrida: Corrida): EmbudoProyecto[] {
+  const pp = corrida.metricas?.["por_proyecto"];
+  if (!pp || typeof pp !== "object") return [];
+  const filas: EmbudoProyecto[] = [];
+  for (const valor of Object.values(pp as Record<string, unknown>)) {
+    if (!valor || typeof valor !== "object") continue;
+    const o = valor as Record<string, unknown>;
+    const num = (k: string) => (typeof o[k] === "number" ? (o[k] as number) : 0);
+    const razon = o["razon_faltante"];
+    filas.push({
+      nombre: typeof o["nombre"] === "string" ? (o["nombre"] as string) : "—",
+      nObjetivo: num("n_objetivo"),
+      evaluados: num("evaluados"),
+      sinGuion: num("sin_guion"),
+      gatePass: num("gate_pass"),
+      tasaGate: typeof o["tasa_gate"] === "number" ? (o["tasa_gate"] as number) : null,
+      entregados: num("entregados"),
+      razonFaltante:
+        razon === "supply" || razon === "gate" || razon === "mixta" ? razon : null,
+    });
+  }
+  return filas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+// La corrida más reciente que trae el embudo por proyecto (las viejas no lo tienen).
+export function ultimoEmbudo(
+  corridas: Corrida[],
+): { corrida: Corrida; filas: EmbudoProyecto[] } | null {
+  for (const corrida of corridas) {
+    const filas = embudoPorProyecto(corrida);
+    if (filas.length > 0) return { corrida, filas };
+  }
+  return null;
+}

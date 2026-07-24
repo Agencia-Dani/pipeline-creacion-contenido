@@ -3,9 +3,11 @@ import { describe, it } from "node:test";
 import {
   armarVistaOperar,
   duracionLegible,
+  embudoPorProyecto,
   entregaLegible,
   haceCuanto,
   hayCorridaViva,
+  ultimoEmbudo,
   type Corrida,
 } from "./corrida.ts";
 
@@ -109,5 +111,46 @@ describe("lecturas legibles", () => {
     assert.equal(entregaLegible(corrida({ metricas: { outputs: 16 } })), "entregó 16 candidatos");
     assert.equal(entregaLegible(corrida({ metricas: { outputs: 1 } })), "entregó 1 candidato");
     assert.equal(entregaLegible(corrida({})), null);
+  });
+});
+
+describe("embudoPorProyecto", () => {
+  const conEmbudo = corrida({
+    metricas: {
+      por_proyecto: {
+        recTP: { nombre: "Trading Psychology", n_objetivo: 30, evaluados: 40, sin_guion: 5, gate_pass: 15, tasa_gate: 0.43, entregados: 15, razon_faltante: "supply" },
+        recTFT: { nombre: "Trading fast tips", n_objetivo: 40, evaluados: 60, sin_guion: 3, gate_pass: 16, tasa_gate: 0.28, entregados: 16, razon_faltante: "mixta" },
+      },
+    },
+  });
+
+  it("parsea por_proyecto y devuelve una fila por proyecto", () => {
+    const filas = embudoPorProyecto(conEmbudo);
+    assert.equal(filas.length, 2);
+    const tp = filas.find((f) => f.nombre === "Trading Psychology")!;
+    assert.equal(tp.nObjetivo, 30);
+    assert.equal(tp.entregados, 15);
+    assert.equal(tp.tasaGate, 0.43);
+    assert.equal(tp.razonFaltante, "supply");
+  });
+
+  it("una corrida sin por_proyecto (vieja) devuelve []", () => {
+    assert.deepEqual(embudoPorProyecto(corrida({ metricas: { outputs: 10 } })), []);
+    assert.deepEqual(embudoPorProyecto(corrida({})), []);
+  });
+
+  it("razon_faltante inválida cae a null; tasa_gate ausente cae a null", () => {
+    const c = corrida({ metricas: { por_proyecto: { r1: { nombre: "X", razon_faltante: "otra", entregados: 5 } } } });
+    const [fila] = embudoPorProyecto(c);
+    assert.equal(fila.razonFaltante, null);
+    assert.equal(fila.tasaGate, null);
+  });
+
+  it("ultimoEmbudo toma la corrida más reciente que trae embudo", () => {
+    const vieja = corrida({ id: "vieja", metricas: { outputs: 3 } });
+    const encontrado = ultimoEmbudo([vieja, conEmbudo]);
+    assert.equal(encontrado?.corrida.id, conEmbudo.id);
+    assert.equal(encontrado?.filas.length, 2);
+    assert.equal(ultimoEmbudo([vieja]), null);
   });
 });
