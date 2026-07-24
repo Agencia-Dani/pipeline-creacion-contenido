@@ -22,6 +22,33 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🟠 **RE-IMPORTAR el motor (cierre 66, audit de Jero).** El `workflow.json` en el repo trae **Fase 1–4
+> juntas** (ADR-029 dedup blindado + ADR-030 descarte sin-guion + caps). Un solo re-import las aplica
+> todas (los 2 commits fueron back-to-back, no hay estado intermedio). **Prerequisito YA hecho:** el
+> campo `Candidatos.external_id` está creado en la base viva (Claude, MCP). Reusá el MISMO webhook
+> path/header del gestor (memoria `reimport-eslabon-debil`). **Corrida de fuego #1 (dedup):** disparar
+> dos veces seguidas → la intersección de `external_id` entre ambas debe ser **∅**; mirar
+> `runs.metricas.registro_dedup == 'ok'` y que `processed_items` tenga filas de hoy ANTES que los
+> candidatos. **Corrida de fuego #2 (sin-guion + entrega):** **cero** títulos `⚠️ SIN GUION` en el feed;
+> `metricas.sin_guion` (ahora = descartados) > 0; `transcripciones_vacias` < 41% baseline (efecto del
+> retry — mirar los logs `[Transcribir] ... VACIA` para la razón cruda de Supadata); `por_proyecto` con
+> `tasa_gate`/`razon_faltante` coherentes con los logs `[Gate]`.
+>
+> 🟡 **Decisiones de Mani que quedaron abiertas (cierre 66):**
+> - **TikTok:** la rama TT corre en vacío (`apify_tt:1`, `[{}]`) porque hay **0 handles TT activos**. Se
+>   dejó `buscar_referente_tiktok=1` a propósito (apagarlo deshabilitaría TT si el equipo suma handles).
+>   Decidí: sembrar handles TT o apagar el toggle en `Config`. Es gasto de Apify menor pero constante.
+> - **Watchdog vs cap_top_n=250:** el techo real de la transcripción es `N8N_RUNNERS_TASK_TIMEOUT`
+>   (**900s en el pod**), no el presupuesto (840s, debajo a propósito). Con pool de 8 a ~27s/video, 250
+>   videos ≈ 844s: entra justo. Para holgura (o si los videos son lentos), subí el watchdog en el pod o
+>   la concurrencia. Si el presupuesto corta, lo no-transcrito ahora se **descarta** (ADR-030) = menos
+>   entrega. No subir el presupuesto por encima de 900 (sería inútil: el watchdog mata primero).
+> - **Spike Apify (Fase 6, opcional):** el paso 0 ya está resuelto — el actor IG `apify~instagram-scraper`
+>   trae caption/duración/tipo confiables pero **NO** `hasAudio`, y `musicInfo` no discrimina las vacías
+>   (39/41 usan audio original). Sin pre-filtro de sin-audio posible con este actor. Si querés comparar
+>   actors, corré el spike de 1 tarde en la consola de Apify (criterios en el plan/ADR-030) — no es
+>   migración, solo medición.
+
 > 🔴 **ROTAR CREDENCIALES — martes 21/07, después de la corrida (decisión de Mani, cierre 57).** El
 > **PAT de Airtable** y el **`service_role` de Supabase** se pegaron en un chat el 2026-07-19 (misma
 > clase de exposición que el cierre 36). Rotar los dos y actualizar las credenciales en n8n
@@ -242,6 +269,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-24 (cierre 66) — Audit del run manual de Jero: dedup blindado + descarte duro de sin-guion + métricas por proyecto + caps de entrega (Claude, pedido de Mani).** Tres fallas del run del 23/07, confirmadas contra código + `outputs-main` + Supabase + Airtable, cerradas en 2 ADRs y 3 commits. **[ADR-029](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md) — duplicados:** la causa raíz de los 15 duplicados del run 20→21/07 fue triple (memoria de `processed_items` ausente + `Leer procesados` fail-open + feed sin `external_id`). Fix: `Leer procesados` **fail-closed** (GET caído aborta, no re-entrega); nodo nuevo **`Leer feed vivo`** (GET paginado a Airtable, última línea de dedup, fail-open); `Heat-score` une las dos memorias + tripwire; **reorden de ramas** para grabar la memoria **antes** de entregar; `external_id` ahora se escribe en el feed (`Preparar batch Airtable`) + campo creado en la base viva; `Resumen` reporta `registro_dedup`+`avisos`. **[ADR-030](../adr/ADR-030-descarte-duro-sin-transcript.md) — sin-guion (revierte la decisión #6):** un video sin transcript se **descarta** en el `Gate` (`descarte_razon:'sin_guion'`, no gasta Haiku ni N), se retira el fallback por caption, no van a *Descartes del gate*; `Transcribir` reintenta 1 vez y loguea la respuesta cruda de las vacías (el 41% del 23/07: 39/41 usaban audio original → NO es música licenciada, el actor IG no trae `hasAudio` → no hay pre-filtro por metadata posible con este actor). **Entrega (Falla 2):** `cap_top_n` 100→250 y `presupuesto_transcribir_s` 780→**840** (⚠️ el plan decía 1560 pero el **watchdog del task runner es 900s** y el presupuesto DEBE quedar debajo; 1560 lo rompía — corregido). **Métrica de criterios (Falla 5):** `Resumen` arma `metricas.por_proyecto {evaluados, sin_guion, gate_pass, tasa_gate, entregados, razon_faltante}` + **card nueva en Operar** (`apps/dashboard`, `domain/corrida.ts` → `embudoPorProyecto`/`ultimoEmbudo`, 4 tests). **Verificación:** `test-nodos.mjs` +13 casos (harness `runHeatScore` y `runGate` nuevos, retry de Transcribir) todo verde · validador **1409/0** · dashboard 29/29 tests, typecheck limpio en mis archivos (los 2 errores de `layout.tsx` son `@vercel/*` sin instalar, preexistentes). **Fase 0:** borrados los **15 duplicados** del feed (conservando la copia calificada/vieja de cada par; los 15 están en `processed_items` desde el 21/07 así que no resucitan). **Docs:** ADR-029/030 + índice, dev-doc (nodo nuevo, Gate, Resumen, Transcribir), CLAUDE.md del workflow (fail-open matizado), onboarding equipo (sin-voz se descarta solo + cómo leer la tasa de gate), mapa-campos, `setup-airtable.mjs` (+external_id), `workflow.yaml` (presupuesto). **Decisiones pendientes de Mani:** ver §Pendiente vivo (re-import, TikTok, watchdog, corrida de fuego, spike Apify). **Próximo paso:** re-import del `workflow.json` (trae Fase 1–4 juntas) + corrida de fuego doble para verificar dedup.
 
 **2026-07-20 (cierre 65) — DESBLOQUEADO D0: el login por magic link funciona end-to-end con Resend SMTP; cae el único bloqueante del cierre 64 (Mani ejecutó, Claude diagnosticó).** Sesión de puro debug de config, sin código. **El síntoma:** "configuré SMTP con Resend pero el correo no se manda". **Diagnóstico paso a paso** (el código ya estaba instrumentado para esto, cierre 64): el error real NO vive en Vercel (salía `{}`) sino en **Supabase → Auth Logs** — `POST /auth/v1/otp` daba **500** para mail invitado (SMTP falló) y **422** para no invitado (esperado, `shouldCreateUser:false`). **La causa raíz encadenada:** (1) **Resend exige dominio verificado**; sin verificar está en modo test y solo entrega al mail dueño de la cuenta, rechazando el resto con **403** → Supabase 500. (2) **La cuenta Resend es de Daniel** (su mail personal), no de Mani — se probó el pipeline completo invitando ese mail y funcionó (cayó en spam la 1ª vez: `onboarding@resend.dev` sin firmar). (3) **30x.com NO se pudo verificar** (no controlan su DNS) → se usó **`retiagrowth.com`** (dominio de la agencia, DNS en Squarespace). **Fix final:** verificado el subdominio **`contact.retiagrowth.com`** en Resend (SPF/DKIM cargados en Squarespace) + Sender de Supabase apuntado ahí. Ahora el magic link llega a cualquier mail invitado, sin spam. **Config SMTP que quedó (al gestor, no acá):** host `smtp.resend.com` · port 465 · username literal `resend` · password = API key `re_...` · Sender en `contact.retiagrowth.com`. **Doc actualizada:** este log + tabla D0–D4 (D0 ✅) + bloque del bloqueante (resuelto), README del dashboard ([:54](../../apps/dashboard/README.md) — gotcha del dominio verificado), memoria del cockpit. **Próximo paso:** invitar los mails reales de Majo/Jero (*Authentication → Users* + fila en `app.usuarios`) → cerrar hecho-cuando D0 con el equipo → swap de nodos + re-import #1 (D4 completo) → D5.
 
