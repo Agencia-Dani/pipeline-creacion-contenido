@@ -22,17 +22,27 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> 🟠 **RE-IMPORTAR el motor (cierre 66, audit de Jero).** El `workflow.json` en el repo trae **Fase 1–4
-> juntas** (ADR-029 dedup blindado + ADR-030 descarte sin-guion + caps). Un solo re-import las aplica
-> todas (los 2 commits fueron back-to-back, no hay estado intermedio). **Prerequisito YA hecho:** el
-> campo `Candidatos.external_id` está creado en la base viva (Claude, MCP). Reusá el MISMO webhook
-> path/header del gestor (memoria `reimport-eslabon-debil`). **Corrida de fuego #1 (dedup):** disparar
-> dos veces seguidas → la intersección de `external_id` entre ambas debe ser **∅**; mirar
-> `runs.metricas.registro_dedup == 'ok'` y que `processed_items` tenga filas de hoy ANTES que los
-> candidatos. **Corrida de fuego #2 (sin-guion + entrega):** **cero** títulos `⚠️ SIN GUION` en el feed;
-> `metricas.sin_guion` (ahora = descartados) > 0; `transcripciones_vacias` < 41% baseline (efecto del
-> retry — mirar los logs `[Transcribir] ... VACIA` para la razón cruda de Supadata); `por_proyecto` con
-> `tasa_gate`/`razon_faltante` coherentes con los logs `[Gate]`.
+> ✅ **El re-import del cierre 66 está HECHO** (confirmado por conducta, no por memoria): el cron del
+> 27/07 **abortó** en `Leer procesados`, que es exactamente el camino fail-closed de ADR-029 — con el
+> motor viejo (fail-open) el timeout se tragaba en silencio. ADR-029/030 están vivos.
+>
+> 🟠 **RE-IMPORTAR el motor otra vez (cierre 67).** Trae el fix del timeout que mató ese cron:
+> `executeOnce` + retry ×3 en los 3 nodos de lectura del dedup y la lectura completa de
+> `processed_items`. Reusá el MISMO webhook path/header del gestor (memoria `reimport-eslabon-debil`).
+> **Verificación del re-import:** en la ejecución, `Leer procesados` debe mostrar **1 ejecución / 1
+> item de entrada** (antes: cientos). El run zombie del 27/07 se barre solo al arrancar.
+>
+> 🟠 **Las 2 corridas de fuego del cierre 66 SIGUEN pendientes** — el run del 27/07 murió antes de
+> entregar, así que no probaron nada. **#1 (dedup):** disparar dos veces seguidas → la intersección de
+> `external_id` entre ambas debe ser **∅**; mirar `runs.metricas.registro_dedup == 'ok'` y que
+> `processed_items` tenga filas de hoy ANTES que los candidatos. **#2 (sin-guion + entrega):** **cero**
+> títulos `⚠️ SIN GUION` en el feed; `metricas.sin_guion` (ahora = descartados) > 0;
+> `transcripciones_vacias` < 41% baseline (efecto del retry — mirar los logs `[Transcribir] ... VACIA`
+> para la razón cruda de Supadata); `por_proyecto` con `tasa_gate`/`razon_faltante` coherentes con los
+> logs `[Gate]`.
+>
+> 🟡 **Suelto, sin diagnosticar:** el run de **descubrimiento** del 27/07 14:00 UTC quedó `en_curso`
+> sin cerrar (igual que el del motor, pero ese tiene causa conocida). Nadie lo miró.
 >
 > 🟡 **Decisiones de Mani que quedaron abiertas (cierre 66):**
 > - **TikTok:** la rama TT corre en vacío (`apify_tt:1`, `[{}]`) porque hay **0 handles TT activos**. Se
@@ -59,6 +69,10 @@
 > clase de exposición que el cierre 36). Rotar los dos y actualizar las credenciales en n8n
 > (`Airtable PAT`, `Supabase Registro`) + el gestor. Se difirió a propósito para no romper la corrida
 > del lunes 20/07. **El `service_role` bypassa RLS: da acceso total a la base.**
+> **↻ Vuelve a pasar: el `service_role` se pegó de nuevo en un chat el 2026-07-28** (cierre 67, para
+> verificar si el run fallido había guardado IDs). Tercera vez. Rotar ya. Si esto sigue repitiéndose,
+> el fix no es rotar más rápido: es una key de solo-lectura aparte para diagnosticar, o el MCP de
+> Supabase, en vez de pegar la `service_role` en el chat.
 >
 > ✅ **Los 3 re-imports: HECHOS por Mani el 2026-07-19** (cierre 57) — motor (spillover + pool de
 > transcripción), archivado y descubrimiento **vivos**. Cae el pendiente de re-import de los cierres
@@ -274,6 +288,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-28 (cierre 67) — El cron del 27/07 murió por timeout en `Leer procesados`: no era el timeout, era el nodo corriendo ~600 veces (Claude, reporte de Mani).** **La causa raíz, que no es la que parecía:** un `httpRequest` de n8n corre **una vez por item de entrada**, y el propio error lo delata (`"itemIndex": 2`). Después del fan-out entran ~600 items (280 videos IG → 635 filas video×proyecto), así que `Leer señal selección` disparaba ~600 GETs idénticos, y como esa respuesta se despliega en items, `Leer procesados` disparaba **miles** — cada uno con la **misma** URL de 5,1 KB (257 `external_id` dentro del `in.(…)`), porque el nodo arma su URL desde `$('Pre-trim relevancia').all()`, no desde el item que procesa. Trabajo O(N²): N requests idénticos de tamaño N. Subir el timeout no arreglaba nada (600 requests secuenciales a 2s = 20 min). **🚨 Lo más importante del cierre:** este mismo timeout **ya venía pasando antes de ADR-029**, cuando `Leer procesados` era `continueRegularOutput` — se lo tragaba en silencio, `seen` quedaba vacío y el motor re-entregaba todo. **Es el origen de los 15 duplicados del 20→21/07.** ADR-029 no lo causó: lo hizo visible. Arreglar esto ES arreglar los duplicados, no un tema aparte. **Fix (3 cosas, ningún nodo nuevo, ninguna conexión nueva):** (1) **`executeOnce: true`** en `Leer señal selección`, `Leer procesados` y `Leer feed vivo` — son lookups **de corrida**, no de item; de ~600 requests a 1. Los tres, no solo el que falló: `Leer feed vivo` era la próxima bomba (600 ejecuciones × hasta 30 páginas contra Airtable, que limita a 5 req/s = horas). Seguro porque `Heat-score v1` **no usa su input directo**, lee todo por referencia. (2) **Fuera el `in.(…)`**: la URL vuelve a ser constante (`select=external_id,platform&limit=50000`). Revierte el "dedup acotado #5" del cierre 15, que se decidió **sin medir la tabla**: `processed_items` tiene **408 filas / 26 KB**, o sea el filtro de 5,1 KB existía para evitar leer 408 filas. De paso muere el techo de 414 (a ~700 ids distintos la URL pasa los 8 KB). (3) **Retry nativo ×3 / 2s + timeout 30s** en los tres — un hipo de red ya no mata la corrida; si tras 3 intentos la memoria sigue sin leerse, el run **aborta** (decisión de Mani: los duplicados son inservibles, ADR-029 intacto). **⚠️ No le pongas `onError` a `Leer procesados`:** fail-open ahí es literalmente la falla que estamos arreglando. **Verificado contra Supabase:** el run fallido **no guardó ningún ID** (cero filas del 27/07; la última escritura es del 23/07) — coincide con la topología, `Leer procesados` está aguas arriba de `Heat-score → Preparar procesados → POST processed_items`. No hay nada que limpiar. **Sin ADR:** no cambia ninguna decisión; endurece la implementación de ADR-029 y revierte una micro-optimización que nunca tuvo ADR propio. **Verificación:** `test-nodos.mjs` **+1 caso** (memoria truncada en el límite aborta) todo verde · validador **1409/0** · grafo 38 nodos / 3 triggers / 0 rotas / 0 refs colgadas / 0 inalcanzables · 15 code nodes compilan como AsyncFunction. **Docs:** dev-doc §2.1 (el bullet 🔴 del execute-once) + filas 18/19/19b + nodo 20, CLAUDE.md del motor (la trampa del "corre una vez por item", que va a reaparecer con cualquier lookup nuevo). **Próximo paso:** re-import + las 2 corridas de fuego del cierre 66, que siguen sin correrse. **Y rotar el `service_role`** (§Pendiente vivo): se pegó en el chat por tercera vez.
 
 **2026-07-24 (cierre 66) — Audit del run manual de Jero: dedup blindado + descarte duro de sin-guion + métricas por proyecto + caps de entrega (Claude, pedido de Mani).** Tres fallas del run del 23/07, confirmadas contra código + `outputs-main` + Supabase + Airtable, cerradas en 2 ADRs y 3 commits. **[ADR-029](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md) — duplicados:** la causa raíz de los 15 duplicados del run 20→21/07 fue triple (memoria de `processed_items` ausente + `Leer procesados` fail-open + feed sin `external_id`). Fix: `Leer procesados` **fail-closed** (GET caído aborta, no re-entrega); nodo nuevo **`Leer feed vivo`** (GET paginado a Airtable, última línea de dedup, fail-open); `Heat-score` une las dos memorias + tripwire; **reorden de ramas** para grabar la memoria **antes** de entregar; `external_id` ahora se escribe en el feed (`Preparar batch Airtable`) + campo creado en la base viva; `Resumen` reporta `registro_dedup`+`avisos`. **[ADR-030](../adr/ADR-030-descarte-duro-sin-transcript.md) — sin-guion (revierte la decisión #6):** un video sin transcript se **descarta** en el `Gate` (`descarte_razon:'sin_guion'`, no gasta Haiku ni N), se retira el fallback por caption, no van a *Descartes del gate*; `Transcribir` reintenta 1 vez y loguea la respuesta cruda de las vacías (el 41% del 23/07: 39/41 usaban audio original → NO es música licenciada, el actor IG no trae `hasAudio` → no hay pre-filtro por metadata posible con este actor). **Entrega (Falla 2):** `cap_top_n` 100→250 y `presupuesto_transcribir_s` 780→**840** (⚠️ el plan decía 1560 pero el **watchdog del task runner es 900s** y el presupuesto DEBE quedar debajo; 1560 lo rompía — corregido). **Métrica de criterios (Falla 5):** `Resumen` arma `metricas.por_proyecto {evaluados, sin_guion, gate_pass, tasa_gate, entregados, razon_faltante}` + **card nueva en Operar** (`apps/dashboard`, `domain/corrida.ts` → `embudoPorProyecto`/`ultimoEmbudo`, 4 tests). **Verificación:** `test-nodos.mjs` +13 casos (harness `runHeatScore` y `runGate` nuevos, retry de Transcribir) todo verde · validador **1409/0** · dashboard 29/29 tests, typecheck limpio en mis archivos (los 2 errores de `layout.tsx` son `@vercel/*` sin instalar, preexistentes). **Fase 0:** borrados los **15 duplicados** del feed (conservando la copia calificada/vieja de cada par; los 15 están en `processed_items` desde el 21/07 así que no resucitan). **Docs:** ADR-029/030 + índice, dev-doc (nodo nuevo, Gate, Resumen, Transcribir), CLAUDE.md del workflow (fail-open matizado), onboarding equipo (sin-voz se descarta solo + cómo leer la tasa de gate), mapa-campos, `setup-airtable.mjs` (+external_id), `workflow.yaml` (presupuesto). **Decisiones pendientes de Mani:** ver §Pendiente vivo (re-import, TikTok, watchdog, corrida de fuego, spike Apify). **Próximo paso:** re-import del `workflow.json` (trae Fase 1–4 juntas) + corrida de fuego doble para verificar dedup.
 

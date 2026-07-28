@@ -400,6 +400,14 @@ seccion('Heat-score v1 — dedup blindado (ADR-029)');
   check('processed_items caído aborta el run (fail-closed, ADR-029)', threw && /\[Dedup\]/.test(msg), 'threw=' + threw + ' msg=' + msg);
 }
 {
+  // La lectura ya no filtra por in.(ids): trae la tabla entera con limit=50000. Si algún día toca
+  // ese techo, la memoria llega truncada y los duplicados vuelven en silencio -> abortar.
+  const procesados = []; for (let i = 0; i < 50000; i++) procesados.push({ external_id: 'p' + i, platform: 'ig' });
+  let threw = false, msg = '';
+  try { runHeat({ items: [hvid('a')], procesados }); } catch (e) { threw = true; msg = e.message; }
+  check('processed_items truncado en el límite aborta el run', threw && /truncado/.test(msg), 'threw=' + threw + ' msg=' + msg);
+}
+{
   const { out } = runHeat({ items: [hvid('a'), hvid('b')], procesados: [{ external_id: 'a', platform: 'ig' }], feed: [{ error: 'airtable 500' }] });
   check('feed vivo caído NO aborta (fail-open); processed_items sigue dedupeando', out.length === 1 && out[0].external_id === 'b', JSON.stringify(out.map((o) => o.external_id)));
 }

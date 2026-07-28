@@ -48,6 +48,10 @@ ADR-009); el "link" es la URL del video original.
   transcript se descarta** en el `Gate` (`descarte_razon: 'sin_guion'`), no pasa marcado — el fail-open
   ya no cubre el *insumo* transcript (revierte la decisión #6). Si Supadata se cae entera, la corrida
   entrega 0 y lo avisa.
+- **Un `httpRequest` corre una vez POR ITEM.** Después del fan-out entran cientos de items, así que
+  cualquier lookup **de corrida** (URL igual para todos) necesita `executeOnce: true` o dispara
+  cientos de requests idénticos y muere por timeout. Ya pasó: mató el cron del 27/07 en `Leer
+  procesados`. Los 3 del segmento de dedup lo tienen + retry ×3 (dev-doc §2.1).
 - **`heat_score` es composite** (ADR-010): `peso_relevancia·score_haiku + (1-peso)·percentil(prescore
   métrico)`. El gate también guarda `relevancia_score`/`relevancia_razon` (se suben a Airtable). El
   substring de tema **no existe** (salió en el refactor de relevancia).
