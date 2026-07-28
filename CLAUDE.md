@@ -91,6 +91,13 @@ módulos), `/handoff` (compactar una sesión).
   a tocarlo fuera de lo previsto, se para y se discute (puede terminar en un ADR nuevo).
 - **Secretos JAMÁS en git** — ni credenciales ni IDs en ningún archivo del repo. Todo va al gestor de
   contraseñas compartido; el validador escanea el patrón `pat...` y otros secretos en cada corrida.
+- **Credenciales para trabajar: `.env` en la raíz** (gitignored, local, no versionado). Es el hub
+  único: Supabase, Airtable, el webhook del motor (el botón "Ejecutar"), run-plan, Apify, Anthropic,
+  Supadata, Google Sheets. **Usalo proactivamente** — si necesitás pegarle a un componente del
+  pipeline, cargá `set -a && source .env && set +a` y usá `"$VAR"`, no le pidas la key a Mani.
+  Nunca imprimas un valor en el chat. Si una var está vacía, decílo y seguí con lo que sí se pueda.
+  El propio archivo está comentado var por var (de dónde sale, quién la consume, qué rompe).
+  ⚠️ `POST "$MOTOR_WEBHOOK_URL"` arranca una corrida real y paga: confirmá antes.
 - **Commits en español, concisos, directo a `main`** (repo de la agencia).
 - **Docs lean:** un hecho, un dueño. Antes de crear un doc nuevo, mirá si encaja en uno existente
   (README, ROADMAP, PLAN, handoff, ADRs). El histórico vive en git, no en prosa duplicada.
