@@ -81,15 +81,21 @@ trabajar; ninguna fase requiere una ventana de mantenimiento.
 | **C8** | **Entrega** | Preview por rama, producción en `main`, migraciones SQL versionadas y aplicadas a mano | Vercel + `core/schema/` |
 | **C9** | **Design system** | Tokens, componentes y los patrones no-code (read-only visible, helper text, estados vacíos) | `apps/dashboard/src/components/ui/` |
 
-### 2.1 Las tres zonas de la superficie (arquitectura de información)
+### 2.1 Las zonas de la superficie (arquitectura de información)
 
-No hay 12 páginas planas como en Airtable. Hay **tres zonas**, y cada usuario entra en la suya:
+No hay 12 páginas planas como en Airtable. Hay **una zona por verbo**, y cada usuario entra en la suya:
 
 | Zona | Para quién | Qué contiene | Reemplaza (páginas Airtable) |
 |---|---|---|---|
 | **Operar** | operador | Voz → Proyecto → N → ▶ Correr · estado de la corrida en vivo | *(no existe hoy: es el muro de B.2)* |
 | **Curar** | operador | Feed de calificación · Referentes (+ los flojos) · Sugeridos · Descartes · Proyectos y Voces · Configuración | Feed · Referentes ×2 · Sugeridos · Descartes · Proyectos · Voces · Configuración Global |
+| **Transcribir** | operador | Pegar enlaces sueltos → script literal; entran al dedup del motor | *(no existe hoy: pedido nuevo, ADR-031)* |
 | **Entender** | dev + sponsor | Precisión por proyecto · embudo y salud del motor · costos de la semana | Calidad · Salud del Sistema · Costos (las 3 rojas del [mapa](./mapa-campos.md) §5.1) |
+
+> **Enmienda 2026-07-28 ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)):** esto decía "tres
+> zonas". Entró una cuarta, *Transcribir*. La regla que importaba no era el número sino que **una
+> zona = un verbo del usuario**, y transcribir un video que trae el equipo no es ni operar la máquina
+> ni curar su salida. El sponsor no la ve.
 
 Los **105 helper texts** ya escritos en [mapa-campos §6.3](./mapa-campos.md) se reusan tal cual: el
 trabajo de redacción del cockpit no se tira, se porta.

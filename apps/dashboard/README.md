@@ -8,15 +8,19 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
 
 ## Mapa del código
 
-- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 3 zonas en `(zonas)/`:
-  `operar` · `curar` · `entender` (plan-cockpit §2.1), y `api/engine/run-plan/` — la fachada del
-  motor (ADR-028, contrato en [core/contracts/run-plan.md](../../core/contracts/run-plan.md)):
-  header compartido, fail-closed, hoy lee Airtable por dentro.
-- `domain/` — reglas puras sin IO (C3): roles y zonas, y la vista de corrida (qué corre, N
-  resuelta, estado legible). Se testea con `node:test`.
+- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 4 zonas en `(zonas)/`:
+  `operar` · `curar` · `transcribir` · `entender` (plan-cockpit §2.1 + ADR-031), y
+  `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
+  [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed,
+  hoy lee Airtable por dentro.
+- `domain/` — reglas puras sin IO (C3): roles y zonas, la vista de corrida (qué corre, N
+  resuelta, estado legible) y `enlace.ts` (de un pegote de texto a `external_id`). Se testea con
+  `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
   `airtable.ts` (lectura read-only de la config mientras viva en Airtable; muere en D5),
-  `runs.ts` (últimas corridas del motor) y `auth.ts` (guardias `usuarioActual`/`exigirZona`).
+  `runs.ts` (últimas corridas del motor), `transcripciones.ts` + `transcribir.ts` (el transcriptor:
+  la cola y las llamadas a Supadata/Haiku), `eventos.ts` (auditoría, sumidero) y `auth.ts`
+  (guardias `usuarioActual`/`exigirZona`).
 - `components/ui/` — shadcn, código propio editable (C9).
 - `scripts/` — el modo sombra de D3: `npm run sombra:import` (espejo idempotente Airtable → schema
   `app`) y `npm run sombra:diff` (compara los dos mundos; exit 1 si difieren). Airtable sigue siendo
@@ -39,10 +43,13 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 ## Setup una sola vez (manual, de Mani)
 
 1. **Migraciones [`007_app_usuarios.sql`](../../core/schema/007_app_usuarios.sql),
-   [`008_entender_tarifas_y_vistas.sql`](../../core/schema/008_entender_tarifas_y_vistas.sql) y
-   [`009_app_config_sombra.sql`](../../core/schema/009_app_config_sombra.sql)** en el SQL Editor de
+   [`008_entender_tarifas_y_vistas.sql`](../../core/schema/008_entender_tarifas_y_vistas.sql),
+   [`009_app_config_sombra.sql`](../../core/schema/009_app_config_sombra.sql) y
+   [`010_transcripciones.sql`](../../core/schema/010_transcripciones.sql)** en el SQL Editor de
    Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas* (sin esto la app
    no lee roles ni las vistas analíticas).
+   La 010 es la del transcriptor (ADR-031): sin ella, la zona *Transcribir* muestra el cartel rojo
+   de "no se pudo leer la lista".
 2. **Invitar a los usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.

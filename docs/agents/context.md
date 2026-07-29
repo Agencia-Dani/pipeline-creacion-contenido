@@ -97,7 +97,25 @@ el heat-score (ADR-009).
 
 **Script literal**:
 El texto de un candidato: la transcripción del video tal cual, traducida al español solo si el
-original no lo está. Sin reescritura ni adaptación a voz (ADR-009).
+original no lo está. Sin reescritura ni adaptación a voz (ADR-009). Es lo mismo que entrega el
+transcriptor por un **enlace pegado**: la misma llamada, el mismo prompt, el mismo resultado.
+
+**Enlace pegado**:
+Un link de video que alguien del equipo trae **a mano** a la zona *Transcribir*, en vez de que lo
+haya encontrado el motor. Es la **segunda fuente** de videos del sistema, junto al Referente
+(ADR-031, que enmienda el "única fuente" de ADR-019). Su identidad —el `external_id` con el que
+entra al dedup— se **deriva de la URL**, no de una llamada a Apify.
+
+**Transcripción a pedido**:
+Lo que produce el transcriptor por un enlace pegado: el video, su **script literal**, y el estado del
+pedido (`pendiente` → `listo` | `sin_transcript` | `fallo`). **No es un Candidato**: no pasó por el
+gate, no tiene heat-score, no consume la `N` de ningún proyecto y no está atada a una dupla
+(video, proyecto). Vive en `app.transcripciones`, no en el feed de calificación.
+
+**El transcriptor**:
+Cómo se llama de cara al equipo la máquina que atiende los enlaces pegados, en la familia de *el
+motor*, *el buscador de cuentas* y *el archivador*. A diferencia de las otras tres, no corre en n8n:
+corre en el cockpit (ADR-031).
 
 **Corrida**:
 Una ejecución del motor. Dos modos que **coexisten**: el **cron semanal** (autónomo, barre los

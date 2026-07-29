@@ -59,17 +59,18 @@ sirven. La máquina **aprende** de lo que eligen y va mejorando lo que les trae.
 
 En una frase: **la máquina encuentra y ordena; ustedes eligen y adaptan.**
 
-### 1.1 Las tres máquinas (qué corre solo y cuándo)
+### 1.1 Las cuatro máquinas (qué corre solo y cuándo)
 
-Por detrás no hay una sola máquina, son tres robots que corren solos en el momento justo. **No
-tienen que hacer nada para que arranquen** — es plomería. Sirve saber que existen para entender de
-dónde sale cada cosa que ven en Airtable:
+Por detrás no hay una sola máquina. Tres robots corren solos en el momento justo — **no tienen que
+hacer nada para que arranquen**, es plomería — y el cuarto arranca cuando ustedes se lo piden. Sirve
+saber que existen para entender de dónde sale cada cosa que ven:
 
 | Robot | Cuándo corre | Qué hace | Qué ven ustedes después |
 |---|---|---|---|
 | **El motor** | Lunes 8:00 am **y a demanda** (§3.1) | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Feed de Calificación** + los dudosos en **Descartes**. |
 | **El buscador de cuentas** | Lunes 9:00 am | Mira sus mejores Referentes y busca cuentas **parecidas** para sumar. | Sugerencias en **Referentes propuestos**. |
 | **El archivador** | Domingo 6:00 pm | Se lleva al Histórico todo lo que ya calificaron, limpia la lista y cuenta el desempeño de la semana. | La lista queda limpia + se actualizan las **Métricas**. |
+| **El transcriptor** | Cuando ustedes le pegan links (§8.2) | Le saca el script en español a videos que traen ustedes, no la máquina. | Los scripts en la pestaña **Transcribir**, y esos videos dejan de aparecer en el Feed. |
 
 Regla mental de la semana: **el lunes llega trabajo, durante la semana ustedes califican, el domingo
 se archiva y se mide.** Todo lo demás es automático.
@@ -551,6 +552,30 @@ Tres cosas para saber:
 - Mientras mejor califiquen los Candidatos durante la semana, mejores semillas usa el buscador →
   mejores propuestas les llegan. Todo se retroalimenta.
 
+### 8.2 Cuando el video lo traen ustedes: **el transcriptor**
+
+Todo lo de arriba es la máquina buscando sola. Pero a veces el video llega por otro lado: se los pasa
+un cliente, lo manda el jefe, lo encuentran ustedes scrolleando. Para eso está la pestaña
+**Transcribir** de la herramienta nueva.
+
+**Cómo se usa:** pegan los links y listo. No hay formato: uno por línea, separados por comas, o el
+chat de WhatsApp copiado entero con los mensajes y todo — la herramienta saca los links sola y les
+muestra cuántos entendió **antes** de arrancar. Después van apareciendo los scripts en la lista de
+abajo, con un botón para copiar cada uno.
+
+**Tres cosas que conviene saber:**
+
+- **Lo que pegan deja de aparecer en el Feed.** Ese es el punto: si ustedes ya trabajaron un video, la
+  máquina no se los vuelve a recomendar la semana que viene. Se marca solo, no tienen que hacer nada.
+- **Pegar dos veces el mismo video no cuesta nada.** Si ya lo pidieron antes, les devuelve el script
+  que ya estaba en vez de volver a procesarlo.
+- **Sirven links de Instagram (reels y posts de video) y de TikTok.** Los links cortos de TikTok (los
+  `vm.tiktok.com/…` que salen del botón de compartir) **no** sirven: abrilo, y copiá el link largo de
+  la barra de direcciones, el que tiene `/video/`.
+
+El script que sale es exactamente el mismo tipo de script que el del Feed: **literal**, el video tal
+cual traducido. La adaptación a la voz sigue siendo de ustedes.
+
 ---
 
 ## 9. Lo que el sistema todavía NO hace (limitaciones conocidas)
@@ -559,10 +584,11 @@ Honestidad por adelantado, para que no se sorprendan:
 
 - **La traducción es literal, no adaptada.** El script es el video tal cual, traducido al español. La
   adaptación a la voz/marca la hacen ustedes.
-- **Los videos salen solo de sus Referentes.** Si la lista es floja, lo que llega es flojo. El
-  buscador de cuentas nuevas (§8.1) ayuda a reponerla en Instagram y TikTok, pero solo propone: la
-  decisión de qué cuenta entra sigue siendo de ustedes (y las primeras cuentas de TikTok las siembran
-  ustedes a mano para que el buscador tenga de dónde partir).
+- **Los videos que llegan al Feed salen solo de sus Referentes.** Si la lista es floja, lo que llega
+  es flojo. El buscador de cuentas nuevas (§8.1) ayuda a reponerla en Instagram y TikTok, pero solo
+  propone: la decisión de qué cuenta entra sigue siendo de ustedes (y las primeras cuentas de TikTok
+  las siembran ustedes a mano para que el buscador tenga de dónde partir). Si el video lo tienen
+  ustedes y no viene de un Referente, para eso está el transcriptor (§8.2).
 - **Los videos sin voz se descartan solos.** Si un video no tiene guion (audio sin voz, música, texto
   en pantalla) la máquina lo descarta sola: ya **no** llega marcado ⚠️ SIN GUION al feed. Solo llega lo
   que tiene guion de verdad. *(Contra: si el transcriptor se cae una corrida entera, esa corrida puede

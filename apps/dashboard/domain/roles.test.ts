@@ -9,9 +9,10 @@ import {
   zonasDe,
 } from "./roles.ts";
 
-test("el operador opera y cura, pero no entra a entender (la zona dev/sponsor)", () => {
+test("el operador opera, cura y transcribe, pero no entra a entender (la zona dev/sponsor)", () => {
   assert.equal(puedeVerZona("operador", "operar"), true);
   assert.equal(puedeVerZona("operador", "curar"), true);
+  assert.equal(puedeVerZona("operador", "transcribir"), true);
   assert.equal(puedeVerZona("operador", "entender"), false);
 });
 
@@ -19,9 +20,11 @@ test("el sponsor solo entiende", () => {
   assert.deepEqual(zonasDe("sponsor"), ["entender"]);
   assert.equal(puedeVerZona("sponsor", "operar"), false);
   assert.equal(puedeVerZona("sponsor", "curar"), false);
+  // Transcribir es una herramienta del equipo, no un reporte: el sponsor no la ve (ADR-031).
+  assert.equal(puedeVerZona("sponsor", "transcribir"), false);
 });
 
-test("el dev ve las tres zonas", () => {
+test("el dev ve las cuatro zonas", () => {
   assert.deepEqual(zonasDe("dev"), ZONAS);
 });
 

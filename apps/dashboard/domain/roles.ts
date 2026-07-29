@@ -3,16 +3,18 @@
 // "la UI esconde; RLS impide") y para poder testearlas con node:test.
 
 export type Rol = "operador" | "dev" | "sponsor";
-export type Zona = "operar" | "curar" | "entender";
+export type Zona = "operar" | "curar" | "transcribir" | "entender";
 
 export const ROLES: readonly Rol[] = ["operador", "dev", "sponsor"];
-export const ZONAS: readonly Zona[] = ["operar", "curar", "entender"];
+export const ZONAS: readonly Zona[] = ["operar", "curar", "transcribir", "entender"];
 
-// Quién ve qué zona (plan-cockpit §2.1): el operador opera y cura; el sponsor
-// solo entiende; el dev ve todo (los knobs avanzados viven detrás de su rol, §3.4).
+// Quién ve qué zona (plan-cockpit §2.1): el operador opera, cura y transcribe; el
+// sponsor solo entiende; el dev ve todo (los knobs avanzados viven detrás de su rol, §3.4).
+// "transcribir" es la cuarta zona que agregó ADR-031: un verbo propio del equipo de
+// redes, no una vista de la máquina — por eso el sponsor no la ve.
 const ZONAS_POR_ROL: Record<Rol, readonly Zona[]> = {
-  operador: ["operar", "curar"],
-  dev: ["operar", "curar", "entender"],
+  operador: ["operar", "curar", "transcribir"],
+  dev: ["operar", "curar", "transcribir", "entender"],
   sponsor: ["entender"],
 };
 

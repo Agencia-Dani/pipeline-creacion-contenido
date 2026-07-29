@@ -36,6 +36,7 @@
 | [ADR-028](./ADR-028-contrato-motor-run-plan.md) | El motor lee su config por `GET /api/engine/run-plan` (fachada versionada, fail-closed); el disparo sigue siendo señal desnuda | Aceptada |
 | [ADR-029](./ADR-029-dedup-blindado-fail-closed-y-feed.md) | Dedup blindado: lectura de `processed_items` fail-closed, memoria grabada antes de entregar, `external_id` en el feed + `Leer feed vivo` como última línea (cubre el agujero de memoria de ADR-018) | Aceptada (enmendada 2026-07-28: los 3 lookups del dedup van `executeOnce` + retry ×3 y la lectura deja de filtrar por `in.(…)` — el fail-open que este ADR cerró se estaba disparando por timeout) |
 | [ADR-030](./ADR-030-descarte-duro-sin-transcript.md) | Descarte duro de los videos sin transcript en el gate (revierte la decisión #6, acota el invariante fail-open); retry en Supadata; `metricas.por_proyecto` con `tasa_gate`/`razon_faltante`; caps de entrega (cap_top_n 250, presupuesto 840) | Aceptada |
+| [ADR-031](./ADR-031-transcriptor-a-pedido.md) | Transcriptor a pedido: el equipo pega enlaces y recibe el script literal; entran al dedup derivando el `external_id` de la URL (shortcode IG = id numérico en base64, 408/408) — sin tocar n8n. Cuarta zona `Transcribir`; lo que produce no es un Candidato (enmienda ADR-019 y el modelo de 3 zonas) | Aceptada |
 
 **Cuándo escribir un ADR nuevo:** cada vez que una decisión costaría caro revertir (stack, motor,
 store, modelo de datos, límites de servicio). Copiá el formato de cualquiera de estos archivos.

@@ -8,6 +8,7 @@ import { cerrarSesion } from "./actions";
 const ETIQUETAS: Record<Zona, string> = {
   operar: "Operar",
   curar: "Curar",
+  transcribir: "Transcribir",
   entender: "Entender",
 };
 
