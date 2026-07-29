@@ -45,11 +45,13 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 1. **Migraciones [`007_app_usuarios.sql`](../../core/schema/007_app_usuarios.sql),
    [`008_entender_tarifas_y_vistas.sql`](../../core/schema/008_entender_tarifas_y_vistas.sql),
    [`009_app_config_sombra.sql`](../../core/schema/009_app_config_sombra.sql) y
-   [`010_transcripciones.sql`](../../core/schema/010_transcripciones.sql)** en el SQL Editor de
-   Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas* (sin esto la app
-   no lee roles ni las vistas analíticas).
-   La 010 es la del transcriptor (ADR-031): sin ella, la zona *Transcribir* muestra el cartel rojo
-   de "no se pudo leer la lista".
+   [`010_transcripciones.sql`](../../core/schema/010_transcripciones.sql) y
+   [`011_grants_app_service_role.sql`](../../core/schema/011_grants_app_service_role.sql)** en el
+   SQL Editor de Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas*
+   (sin esto la app no lee roles ni las vistas analíticas).
+   La 010 es la del transcriptor (ADR-031). La **011 es obligatoria**: sin ella el BFF recibe
+   `42501 permission denied for schema app` en TODO lo que lee de `app.*` — *Entender*,
+   *Transcribir* y los scripts de sombra. El login no lo delata porque va por la anon key.
 2. **Invitar a los usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.

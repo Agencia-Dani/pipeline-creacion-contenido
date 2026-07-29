@@ -125,4 +125,7 @@ where u.unidades is not null and u.unidades > 0
 group by u.semana, u.servicio, t.unidad, t.usd_por_unidad;
 
 -- Sin grants nuevos: por REST solo las lee el service_role (bypassa RLS y tiene los suyos).
+-- ⚠️ CORRECCIÓN 2026-07-29: esa última afirmación era falsa. BYPASSRLS no otorga USAGE sobre un
+-- schema propio ni privilegios de tabla; Postgres los pide igual. Estas vistas devolvieron
+-- `42501 permission denied for schema app` hasta que 011_grants_app_service_role.sql lo reparó.
 -- `authenticated` NO ve tarifas ni vistas — la zona Entender pasa por el BFF, no por el browser.
