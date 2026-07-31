@@ -9,8 +9,6 @@ import {
   mapearCandidato,
   mapearDescarte,
   mapearPropuesto,
-  mapearProyecto,
-  mapearVoz,
   type Fila,
   type RegistroAirtable,
 } from "../domain/sombra.ts";
@@ -56,10 +54,13 @@ export async function leerTablaAirtable(tabla: string): Promise<RegistroAirtable
 // ⚠️ Una tabla que ya se cortó (D5) SALE de esta lista y no vuelve. Con Postgres de dueño, un
 // import la pisaría con los valores viejos de Airtable y revertiría en silencio lo que el
 // equipo editó en la app; el diff, por el mismo motivo, reportaría diferencias legítimas como
-// error. **Ya cortadas: `Ajustes` → `app.ajustes`** (corte 1/4; su `mapearAjuste` se fue con
-// ella, está en git si hiciera falta volver atrás) y **`Referentes` → `app.referentes` +
-// `app.referentes_proyectos`** (corte 2/4; su carga inicial la hizo `cortar-referentes.ts`,
-// que corre una sola vez — `mapearReferente` sobrevive ahí, no acá).
+// error. **Ya cortadas: `Ajustes`** (corte 1/4; su `mapearAjuste` se fue con ella, está en git
+// si hiciera falta volver atrás) · **`Referentes`** (corte 2/4) · **`Voces` y `Proyectos`**
+// (corte 3/4). Las cargas iniciales las hicieron `cortar-referentes.ts` y
+// `cortar-voces-proyectos.ts`, que corren una sola vez — sus `mapear*` sobreviven ahí, no acá.
+//
+// Lo que queda son las 3 tablas que ESCRIBE n8n (candidatos, descartes, propuestos): su corte
+// es D7, y hasta entonces el modo sombra sigue siendo su espejo.
 export type TablaSombra = {
   airtable: string;
   pg: string;
@@ -69,11 +70,6 @@ export type TablaSombra = {
 };
 
 export const TABLAS: TablaSombra[] = [
-  { airtable: "Voces", pg: "voces", mapear: mapearVoz, conflicto: "airtable_id", fks: [] },
-  {
-    airtable: "Proyectos", pg: "proyectos", mapear: mapearProyecto, conflicto: "airtable_id",
-    fks: [{ placeholder: "_voz", columna: "voz_id", padre: "voces" }],
-  },
   {
     airtable: "Candidatos", pg: "candidatos", mapear: mapearCandidato, conflicto: "airtable_id",
     fks: [

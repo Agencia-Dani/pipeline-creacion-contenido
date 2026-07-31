@@ -550,7 +550,7 @@ Referentes salud** escribe la salud por referente.
 | 19 | Leer Candidatos nuevos viejos → Preparar barrido nuevos → Barrer Candidatos nuevos viejos | http GET + code + http DELETE | *Higiene (2026-07-14).* Purga `Candidatos` en `nuevo` con `fecha` >20 días, sin archivar (nunca se calificaron). Lee paginado, borra en lotes de 10. Rama lateral, continue-on-fail. |
 | 20 | Leer Metricas viejas → Preparar barrido Metricas → Barrer Metricas viejas | http GET + code + http DELETE | *Higiene (2026-07-14).* Purga filas con `semana` >84 días, en lotes de 10. Apunta **solo a `Métricas Proyectos`** (hardcodeado en los 2 nodos): `Métricas Global` no se barre **a propósito** (ver §4.1). Rama lateral, continue-on-fail. |
 | 21 | Destilar criterios | code + Haiku | **El loop de aprendizaje (ADR-022/M2).** Por proyecto, Haiku resume los calificados de la semana en patrones (lo que SÍ / lo que NO), priorizando los 🔥 como ejemplos positivos (fallback: aprobados). La **misma llamada** lintea los criterios manuales y deja `advertencia_criterios`. No destila con menos de `min_muestra_destilar` (4) calificados. **NUNCA pisa `criterios_relevancia` manual** — escribe al campo aparte `criterios_aprendidos`. Fail-soft: si Haiku falla, ese proyecto se salta. `<ANTHROPIC_API_KEY>`. |
-| 22 | PATCH Proyectos criterios | http PATCH | `PATCH Proyectos` con `criterios_aprendidos` + `advertencia_criterios`. **Cierra el loop:** el motor lo lee en `Armar plan de corrida` + `Gate de relevancia`. continue-on-fail. |
+| 22 | PATCH Proyectos criterios | http PATCH | `PATCH Proyectos` con `criterios_aprendidos` + `advertencia_criterios`. **Cierra el loop:** el motor lo lee en `Armar plan de corrida` + `Gate de relevancia`. continue-on-fail. ⚠️ **Sigue escribiendo en Airtable después del corte 3/4, a propósito:** es el único escritor de esos 2 campos, así que la fachada los lee de ahí ([ADR-033](../adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md)). Bloquear la tabla `Proyectos` mata el loop; congelar la *página* no. Muere en D7. |
 | 23 | Leer señal selección (archivado) | http GET | Supabase `v_senal_seleccion` (tasa acumulada por referente) → insumo de la salud por referente. Fail-soft. Los referentes ya no se leen acá: salen del nodo 6. |
 | 24 | Computar salud referentes → PATCH Referentes salud | code + http PATCH | **La mitad-archivado de la higiene de fuentes (ADR-022).** Por referente: `tasa_gate` (`gate_pass/evaluados` del desglose `por_referente` de `runs.metricas` de la semana — 17b), `tasa_aprobacion` (acumulada de `v_senal_seleccion`) y `videos_evaluados`. Exige `min_muestra_referente` (10) para no juzgar con pocos videos. Matchea por **handle normalizado** (sin `@`, minúscula). Escribe la salud a `Referentes`. continue-on-fail. |
 
@@ -569,6 +569,15 @@ Base "Reels Cockpit", 9 tablas (contrato completo en
 
 > El mapa **por campo** (quién escribe/lee cada campo + huérfanos) vive en
 > [mapa-campos.md](./mapa-campos.md) — acá la tabla y el nodo, allá el campo.
+
+> ⚠️ **"Lee" es la lectura LÓGICA, no de dónde sale el dato.** Desde D4 ningún workflow le pregunta
+> a Airtable por la config: la pide a la fachada (`Leer plan (fachada)`), y de D5 en adelante la
+> fachada la sirve desde Postgres. **Ya cortadas: `Ajustes` (1/4) · `Referentes` (2/4) · `Voces` y
+> `Proyectos` (3/4).** Las columnas de abajo dicen quién consume qué, que es lo que no cambia. Las
+> **escrituras**, en cambio, siguen yendo a Airtable tal cual hasta D7 — y la de `Proyectos` tiene
+> una consecuencia: `criterios_aprendidos` y `advertencia_criterios` **siguen siendo de Airtable**,
+> porque su único escritor es el archivado (un dueño por campo,
+> [ADR-033](../adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md)).
 
 | Tabla | Motor | Descubrimiento | Archivado | Notas |
 |---|---|---|---|---|

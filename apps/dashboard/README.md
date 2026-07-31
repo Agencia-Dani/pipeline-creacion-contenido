@@ -13,13 +13,16 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
   [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed.
   De qué almacenamiento sale cada dominio lo decide `lib/config.ts` — la costura de los cortes de
-  D5 (Ajustes y Referentes ya en Postgres; Voces y Proyectos todavía en Airtable).
+  D5. Con el corte 3/4 los **cuatro** dominios del contrato salen de Postgres; lo único que sigue
+  viniendo de Airtable son `criterios_aprendidos` y `advertencia_criterios`, que no son config del
+  equipo sino salida del archivado y se leen de donde su escritor los deja hasta D7
+  ([ADR-033](../../docs/adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md)).
 - `domain/` — reglas puras sin IO (C3): roles y zonas, la vista de corrida (qué corre, N
   resuelta, estado legible) y `enlace.ts` (de un pegote de texto a `external_id`). Se testea con
   `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
-  `airtable.ts` (lo que todavía vive en Airtable; muere en D8), `ajustes.ts` y `referentes.ts` (los
-  dos dominios ya cortados a Postgres), `sugeridos.ts` (la bandeja del descubrimiento),
+  `airtable.ts` (lo que todavía vive en Airtable; muere en D8), `ajustes.ts`, `referentes.ts` y
+  `proyectos.ts` (los dominios ya cortados a Postgres), `sugeridos.ts` (la bandeja del descubrimiento),
   `runs.ts` (últimas corridas del motor), `transcripciones.ts` + `transcribir.ts` (el transcriptor:
   la cola y las llamadas a Supadata/Haiku), `eventos.ts` (auditoría, sumidero) y `auth.ts`
   (guardias `usuarioActual`/`exigirZona`).
@@ -27,9 +30,10 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
 - `scripts/` — el modo sombra de D3: `npm run sombra:import` (espejo idempotente Airtable → schema
   `app`) y `npm run sombra:diff` (compara los dos mundos; exit 1 si difieren). **Una tabla ya
   cortada sale del catálogo** (`comun.ts`) para que un import no pise lo que el equipo editó en la
-  app. Más `npm run cortar:referentes`, la carga de datos del corte 2/4: corre **una sola vez**,
-  entre la migración `012` y el flip, e imprime el A/B que autoriza a publicar (`-- --dry` para
-  verificar sin escribir).
+  app. Más los scripts de corte, que corren **una sola vez** cada uno e imprimen el A/B que
+  autoriza a publicar el flip (`-- --dry` para verificar sin escribir): `npm run cortar:referentes`
+  (corte 2/4, va entre la migración `012` y el flip) y `npm run cortar:voces-proyectos` (corte 3/4,
+  sin migración de por medio — el schema `009` ya modelaba bien los dos dominios).
 - `proxy.ts` — refresh de sesión + redirect a login (en Next 16 middleware se llama proxy).
 
 La autoridad de permisos está en el servidor: cada página exige su zona con `exigirZona`, y los
@@ -97,9 +101,16 @@ el costo de la semana solo (zona *Entender*, con la migración 008 aplicada).
 ediciones del equipo de por medio), con las env de Airtable + `SUPABASE_SERVICE_ROLE` en `.env.local`.
 
 **Hecho-cuando de cada corte de D5:** el equipo edita ese dominio solo en la app y su página de
-Airtable queda congelada. El corte 2/4 (Referentes) suma su propia evidencia previa:
-`npm run cortar:referentes` tiene que terminar en verde — mismos referentes por proyecto y mismos
-registros que servía Airtable, en los dos ámbitos — **antes** de publicar el flip.
+Airtable queda congelada. Cada corte suma su propia evidencia previa, que tiene que terminar en
+verde **antes** de publicar el flip: `npm run cortar:referentes` (mismos referentes por proyecto y
+mismos registros que servía Airtable, en los dos ámbitos) y `npm run cortar:voces-proyectos`
+(mismos registros y **mismos proyectos que van a correr**, que es el cruce activo×voz-activa que
+decide qué trabaja de verdad).
+
+⚠️ **En el corte 3/4, "congelar" es para personas, no para la máquina:** `Destilar criterios` del
+archivado le sigue escribiendo `criterios_aprendidos` y `advertencia_criterios` a la tabla
+`Proyectos` de Airtable hasta D7, y la app los lee de ahí (ADR-033). Bloquear la tabla rompe el
+loop de ADR-022.
 
 **Hecho-cuando de D4:** una corrida real del motor produce el mismo plan leyendo la fachada que
 leyendo Airtable (verificado con `test-nodos.mjs` + replay), tras el swap de nodos y el re-import #1.
