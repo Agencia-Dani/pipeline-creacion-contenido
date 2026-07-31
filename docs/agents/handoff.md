@@ -22,36 +22,36 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> 🔴🔴 **EL CORTE 2/4 (Referentes) ESTÁ EN LA RAMA `corte-2-referentes` Y NO PUEDE MERGEARSE
-> TODAVÍA.** Está entero y verde de código, pero **necesita 3 pasos en este orden exacto**, porque
-> el flip ya está adentro y con Vercel deployando `main` un merge prematuro deja al motor
-> **abortando todas las corridas** (fail-closed de ADR-028 — probado local: la fachada da **503**
-> con el mensaje exacto `Could not find the table 'app.referentes_proyectos'`).
+> 🟢 **EL CORTE 2/4 (Referentes) ESTÁ EN PRODUCCIÓN — 2026-07-31.** Los 3 pasos se ejecutaron en
+> orden el mismo día: Mani borró en Airtable la fila `recYQotSNwtcfuY2x` (activa, 2 proyectos,
+> **sin handle**: el motor la ignoraba gratis y el mapeo viejo la habría guardado como
+> `"(sin handle)"`, que para el motor **sí** es handle válido ⇒ un pedido a Apify por corrida) ·
+> aplicó la migración `012` · corrió `npm run cortar:referentes`. **La carga salió verde:**
+> 15 referentes · **33 pares** · los 6 proyectos idénticos de los dos lados (**Storytelling con sus
+> 5**, que es el que el modelo viejo dejaba en 0) · A/B de la fachada idéntico en los dos ámbitos.
+> **Verificado en prod tras el merge:** `?ambito=motor` y `?ambito=completo` → **200**, 3 voces ·
+> 4/6 proyectos · **15 referentes (33 pares)** · 18 ajustes.
 >
-> 1. **Limpiar en Airtable la fila `recYQotSNwtcfuY2x`** — activa, con 2 proyectos y **sin
->    handle**. Completale la cuenta o borrala. *No es burocracia:* hoy el motor la ignora en
->    silencio (`if (!handle) return;`), y el mapeo vieja la habría guardado como `"(sin handle)"`,
->    que **sí** es un handle válido para el motor ⇒ le pediría esa cuenta a Apify en cada corrida.
->    Ahora falla loud a propósito, así que **el script del paso 3 no arranca hasta que se limpie.**
-> 2. **Aplicar [`core/schema/012_referentes_proyectos.sql`](../../core/schema/012_referentes_proyectos.sql)**
->    en el SQL Editor (ADR-032: tabla puente + backfill + `drop` de `referentes.proyecto_id`).
-> 3. **`cd apps/dashboard && npm run cortar:referentes`** — carga los referentes y los **35 pares**
->    reales, y termina imprimiendo el A/B que autoriza a publicar: mismos referentes por proyecto y
->    mismos registros que servía Airtable, en los dos ámbitos. Si sale rojo, **no mergear**.
->    (`npm run cortar:referentes -- --dry` verifica sin escribir.)
+> 🟠 **Lo que queda del corte, y es de Mani (Airtable + aviso al equipo):**
+> 1. **Congelar 3 páginas** (solo-lectura o renombrar `[ARCHIVO] …`): **Referentes**,
+>    **Referentes - Revisar/Flojos** y **Referentes - Sugeridos** (*Referentes Buscados*).
+>    ⚠️ **Se congela la PÁGINA, no la tabla:** `Referentes propuestos` la sigue **escribiendo** el
+>    descubrimiento y la **PATCHea** la app al aprobar; bloquear la tabla rompe las dos cosas.
+>    *(Si las 2 de Ajustes —**Configuración Global** y **Ajustes Dev-Only**— siguen abiertas del
+>    corte 1/4, van en el mismo viaje.)*
+> 2. **Avisarle a Majo y Jero.** El [onboarding §5.3 y §8.1](../onboarding-equipo-redes.md) ya está
+>    reescrito. **Lo que no puede faltar del aviso: aprobar un sugerido desde Airtable ahora es
+>    dañino** — es la única de las páginas congeladas donde editar no es inocuo. Marcar `aprobado`
+>    ahí dispara `POST Referentes (promoción)` del descubrimiento, que siembra la cuenta en la
+>    tabla `Referentes` de Airtable, **que ya no lee nadie**: parecería aprobada y no traería un
+>    solo video. La aprobación va en `Curar → Sugeridos`.
 >
-> **Recién ahí el merge.** Después, los 2 pasos de siempre para cerrarle la puerta vieja al equipo:
-> dejar en solo-lectura (o renombrar `[ARCHIVO] …`) las páginas **Referentes**, **Referentes -
-> Revisar** y **Referentes - Sugeridos**, y avisarle a Majo y Jero — el
-> [onboarding §5.3 y §8.1](../onboarding-equipo-redes.md) ya están reescritos.
-> ⚠️ **Lo más importante del aviso: aprobar un sugerido desde Airtable ahora es dañino** — siembra
-> la cuenta en la tabla que ya nadie lee y parecería aprobada sin traer nada. La aprobación va en
-> `Curar → Sugeridos`.
->
-> **El hecho-cuando del corte** (2 min, después del merge): mover una perilla del banco desde el
-> cockpit —apagar y volver a prender una cuenta— y confirmar que la fachada la refleja
+> **El hecho-cuando del corte** (2 min): apagar y volver a prender una cuenta desde
+> `Curar → Referentes` y confirmar que la fachada lo refleja
 > (`curl "$DASHBOARD_URL/api/engine/run-plan?ambito=motor" -H "$RUN_PLAN_HEADER_NOMBRE: $RUN_PLAN_HEADER_VALOR"`)
-> y que quedó su fila en `app.eventos` (`tipo = 'referentes.editar'`, con anterior y nuevo).
+> y que quedó su fila en `app.eventos` (`tipo = 'referentes.editar'`, con anterior y nuevo). Es
+> además la primera vez que alguien entra a las pantallas nuevas: **no se pudieron probar en el
+> browser** (entrar pide magic link).
 
 > ✅✅ **LA 2ª CORRIDA DE FUEGO (dedup) SE CUMPLIÓ — 2026-07-31 19:18, y con eso los 3 hallazgos del
 > cierre 70 están cerrados EN PRODUCCIÓN, no solo en el repo.** Re-import del motor hecho por Mani,
@@ -308,7 +308,7 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 | **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada · ✅ **devuelve datos desde el 29/07** (estuvo roto desde el día 1 por el grant faltante, cierre 68) |
 | **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ **CORRIDO el 30/07 (cierre 69): espejo perfecto ×2** — voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8 (candidatos y descartes en 0 de los dos lados) · ⏳ falta **el 3er pase con una edición del equipo de por medio** (es de Mani, 2 min) |
 | **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ✅ **la fachada responde 200 en prod desde el 31/07** (par rotado, header ahora `X-Run-Plan-Auth`) · ✅ **re-import #1 HECHO y corrida real entera por la fachada** (cierre 70): hecho-cuando cerrado |
-| **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🔧 **corte 2/4 (Referentes) LISTO EN LA RAMA `corte-2-referentes`, bloqueado por 3 pasos de Mani** (§Pendiente vivo): pantallas `/curar/referentes` (con *A revisar* adentro) y `/curar/sugeridos` + flip + [ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md) (migración `012`: el vínculo con proyectos es N:M — el modelo de `009` tiraba 19 de 35 pares y apagaba *Storytelling*) · A/B de la transformación contra Airtable vivo: **15 referentes · 33 pares idénticos** en los 2 ámbitos · 🔧 **corte 1/4 HECHO Y EN PROD (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ✅ **validado por la corrida real de las 19:18** (`ok`, `n_objetivo` resuelto por la fuente nueva) · ⏳ faltan **los 2 pasos manuales de Mani** (§Pendiente vivo) |
+| **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🔧 **corte 2/4 (Referentes) HECHO Y EN PROD (cierre 73)**: pantallas `/curar/referentes` (con *A revisar* adentro) y `/curar/sugeridos` + flip + [ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md) (migración `012`: el vínculo con proyectos es N:M — el modelo de `009` tiraba 19 de 35 pares y apagaba *Storytelling*) · carga verde (15 referentes · **33 pares**, los 6 proyectos idénticos) y prod sirviéndolos · ⏳ faltan **congelar 3 páginas de Airtable + el aviso al equipo** (§Pendiente vivo) · 🔧 **corte 1/4 HECHO Y EN PROD (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ✅ **validado por la corrida real de las 19:18** (`ok`, `n_objetivo` resuelto por la fuente nueva) · ⏳ faltan **los 2 pasos manuales de Mani** (§Pendiente vivo) |
 | **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ✅ **funciona end-to-end**: `app.transcripciones` tiene 2 filas `listo` con script (una del 30/07) + sus 2 `eventos`. ⚠️ *No se puede saber desde la base si eso corrió en prod o en local, así que **queda por confirmar que `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` estén en Vercel** (mismo viaje que el fix del header).* **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
 
 **Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
