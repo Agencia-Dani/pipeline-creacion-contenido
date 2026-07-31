@@ -129,7 +129,7 @@
 >
 > 🟢 **RE-IMPORT #1 de D4 — listo en el repo, pasos exactos (cierre 69).** Va **después** del
 > re-import del fix del timeout y de una corrida verde (decisión de Mani: separados). **Antes de
-> tocar n8n: arreglá la env de Vercel** (bloqueante rojo, abajo) y confirmá con
+> tocar n8n: la env de Vercel** ya está arreglada (el bloqueante rojo cayó el 31/07, arriba) — confirmá con
 > `curl "$DASHBOARD_URL/api/engine/run-plan?ambito=motor" -H "$RUN_PLAN_HEADER_NOMBRE: $RUN_PLAN_HEADER_VALOR"`
 > → tiene que dar **200**. Después:
 > 1. **Credencial nueva en n8n:** tipo *Header Auth*, nombre **`Run Plan Header`**, con el par
@@ -141,93 +141,14 @@
 > **Verificación en la ejecución:** `Leer plan (fachada)` con **1 ejecución / 1 item** y el mismo
 > embudo de siempre. Si da 403/503, el run **aborta a propósito** — no es un bug, es el fail-closed
 > de ADR-028: revisá la credencial y la env de Vercel, no le pongas `onError`.
->
-> 🟠 **RE-IMPORTAR el motor otra vez (cierre 67).** Trae el fix del timeout que mató ese cron:
-> `executeOnce` + retry ×3 en los 3 nodos de lectura del dedup y la lectura completa de
-> `processed_items`. Reusá el MISMO webhook path/header del gestor (memoria `reimport-eslabon-debil`).
-> **Verificación del re-import:** en la ejecución, `Leer procesados` debe mostrar **1 ejecución / 1
-> item de entrada** (antes: cientos). El run zombie del 27/07 se barre solo al arrancar.
->
-> 🟠 **Las 2 corridas de fuego del cierre 66 SIGUEN pendientes** — el run del 27/07 murió antes de
-> entregar, así que no probaron nada. **#1 (dedup):** disparar dos veces seguidas → la intersección de
-> `external_id` entre ambas debe ser **∅**; mirar `runs.metricas.registro_dedup == 'ok'` y que
-> `processed_items` tenga filas de hoy ANTES que los candidatos. **#2 (sin-guion + entrega):** **cero**
-> títulos `⚠️ SIN GUION` en el feed; `metricas.sin_guion` (ahora = descartados) > 0;
-> `transcripciones_vacias` < 41% baseline (efecto del retry — mirar los logs `[Transcribir] ... VACIA`
-> para la razón cruda de Supadata); `por_proyecto` con `tasa_gate`/`razon_faltante` coherentes con los
-> logs `[Gate]`.
->
-> 🟡 **Suelto, sin diagnosticar:** el run de **descubrimiento** del 27/07 14:00 UTC quedó `en_curso`
-> sin cerrar (igual que el del motor, pero ese tiene causa conocida). Nadie lo miró.
->
-> 🟡 **Decisiones de Mani que quedaron abiertas (cierre 66):**
-> - **TikTok:** la rama TT corre en vacío (`apify_tt:1`, `[{}]`) porque hay **0 handles TT activos**. Se
->   dejó `buscar_referente_tiktok=1` a propósito (apagarlo deshabilitaría TT si el equipo suma handles).
->   Decidí: sembrar handles TT o apagar el toggle en `Config`. Es gasto de Apify menor pero constante.
-> - **Watchdog vs cap_top_n=250:** el techo real de la transcripción es `N8N_RUNNERS_TASK_TIMEOUT`
->   (**900s en el pod**), no el presupuesto (840s, debajo a propósito). Con pool de 8 a ~27s/video, 250
->   videos ≈ 844s: entra justo. Para holgura (o si los videos son lentos), subí el watchdog en el pod o
->   la concurrencia. Si el presupuesto corta, lo no-transcrito ahora se **descarta** (ADR-030) = menos
->   entrega. No subir el presupuesto por encima de 900 (sería inútil: el watchdog mata primero).
-> - **Spike Apify (Fase 6, opcional):** el paso 0 ya está resuelto — el actor IG `apify~instagram-scraper`
->   trae caption/duración/tipo confiables pero **NO** `hasAudio`, y `musicInfo` no discrimina las vacías
->   (39/41 usan audio original). Sin pre-filtro de sin-audio posible con este actor. Si querés comparar
->   actors, corré el spike de 1 tarde en la consola de Apify (criterios en el plan/ADR-030) — no es
->   migración, solo medición.
->
-> 💤 **Someday (no urgente):** **revisar alternativas de actors en Apify si sigue flaqueando** — el
-> transcript vacío / la calidad de scrape. Gatillo: si tras el retry de ADR-030 las vacías siguen altas
-> o el supply queda corto de forma sostenida, correr el spike de arriba y evaluar migrar de actor (ADR
-> aparte).
 
-> ---
-> 🗄️ **DE ACÁ PARA ABAJO, HASTA §Ciclo: COPIA VIEJA DE ESTE MISMO BLOQUE — NO LA SIGAS.**
-> Quedó duplicada al editar el cierre 70 (arriba está la versión al día). La dejamos en vez de
-> borrarla porque su cola tiene detalle histórico que no está arriba, pero **sus instrucciones están
-> vencidas**: dice `ventana_corrida_min` 45 (hoy **60**) y lista re-imports que ya se hicieron el
-> 31/07. Si vas a trabajar, lo vigente es lo de arriba. *(Podarla es un task suelto de 2 minutos.)*
-> ---
-
-> ✅ **RESUELTO el 2026-07-31: la fachada responde 200 en prod.** Era el **valor** de
-> `RUN_PLAN_HEADER_VALOR` en Vercel, que no coincidía con el del gestor (la env estaba presente: lo
-> dijo el `motivo` del 403, que se agregó justo para no tener que adivinar entre "falta" y "está
-> mal"). **En vez de cazar qué valor había, se rotó el par entero** — n8n todavía no consume la
-> fachada, así que rotar salía gratis. **El header pasó a llamarse `X-Run-Plan-Auth`** (antes era
-> `X-Motor-Auth`, igual que el del webhook: dos secretos con el mismo nombre era un pie de banco).
-> **Verificado en prod:** `?ambito=motor` **200** (3 voces · 4 proyectos · 16 referentes · 18
-> ajustes) · `?ambito=completo` **200** · sin header 403 · ambito con typo 400.
-> **El par vive en:** `.env` de la raíz · `apps/dashboard/.env.local` · Vercel (Production) · la
-> credencial **`Run Plan Header`** de n8n · el gestor. **`MOTOR_WEBHOOK_HEADER_*` NO se tocó**: sigue
-> siendo `X-Motor-Auth`, es el del botón "Correr ahora", credencial **`Webhook Motor Header`**.
->
-> 🟠 **PENDIENTE MANUAL (31/07): `ventana_corrida_min` 120 → 45.** Ya está en el repo (`Config` del
-> **motor** y del **archivado**) pero **NO en n8n**. No hace falta re-importar: el nodo `Config` está
-> hecho para editarse a mano — abrí los dos workflows y cambiá el valor. **Por qué:** cuando una
-> corrida **aborta** (p. ej. el fail-closed de la fachada), `Cerrar run` nunca corre y la fila queda
-> `en_curso`; con 120 eso bloqueaba el botón 2 horas. **Por qué 45 y no menos:** el knob hace DOS
-> cosas — el guard bloquea mientras la corrida sea más joven que la ventana, y el barredor marca
-> `fallo` a las más viejas. Si una corrida REAL dura más que la ventana, el barredor la mata en
-> vuelo y el guard deja arrancar una segunda en paralelo (doble gasto + duplicados). Medido sobre
-> 10 corridas: máximo real **23,2 min** ⇒ 45 deja ~2x. ⚠️ **Los caps subieron después de esas
-> mediciones** (`cap_top_n` 100→250, `presupuesto_transcribir_s` 840 = 14 min solo de transcripción),
-> así que una corrida pesada podría acercarse. **Tripwire:** si alguna vez ves dos corridas del motor
-> solapadas en `runs`, la ventana quedó corta — subila, no la bajes más. El arreglo de fondo sería
-> separar el knob en dos (uno para el guard, otro para el barredor), que hoy no existe.
-> *(El valor también está duplicado en `apps/dashboard/domain/corrida.ts` para que la pantalla diga
-> lo mismo que el motor; muere cuando la config viva en Postgres, D5.)*
->
-> 🟠 **LO QUE QUEDA: los 2 re-imports, en este orden.** La fachada ya no bloquea nada.
-> **(1) El fix del timeout (cierre 67)** — es el urgente: el cron está muerto desde el 27/07 y ese fix
-> es el que arregla los duplicados. Después, sus **2 corridas de fuego** (detalle abajo).
-> **(2) Re-import #1 de D4** con una corrida verde de base: credencial `Run Plan Header` en n8n +
-> `<<DASHBOARD_URL>>` en el `Config` de los 3 + re-importar. Verificación: `Leer plan (fachada)` con
-> **1 ejecución / 1 item** y el mismo embudo de siempre. Si diera 403/503 el run **aborta a
-> propósito** (fail-closed de ADR-028) — revisá la credencial, no le pongas `onError`.
->
-> 🟡 **`.env.local` del dashboard tenía 6 placeholders sin reemplazar (cierre 69):** `AIRTABLE_PAT`,
-> `AIRTABLE_BASE_ID` y los 4 de los headers. Ya sincronizados desde el `.env` de la raíz (que es el
-> hub y los tenía todos reales). **Esto corrige el diagnóstico del cierre 68:** el `sombra:import` no
-> falló solo por el `42501` — tampoco tenía credenciales de Airtable.
+> 🔴 **ROTAR EL `service_role` DE SUPABASE — sigue sin hacerse.** La rotación que pedía el cierre 57
+> (PAT de Airtable + `service_role`) **sí se hizo el 2026-07-20** (cierre 64). Pero **el `service_role`
+> se volvió a pegar en un chat el 2026-07-28** (cierre 67, para verificar si el run fallido había
+> guardado IDs): tercera vez de la misma clase de exposición. **La key bypassa RLS: da acceso total a
+> la base.** Rotar y actualizar la credencial `Supabase Registro` de n8n, la env de Vercel y el gestor.
+> Si esto sigue repitiéndose, el fix no es rotar más rápido: es una key de solo-lectura aparte para
+> diagnosticar, o el MCP de Supabase, en vez de pegar la `service_role` en el chat.
 >
 > 🟠 **Revisar el cruce de env vars en Vercel (cierre 68).** En `.env.local` del dashboard la key
 > `sb_secret_` estaba metida en **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** y `SUPABASE_SERVICE_ROLE` tenía el
@@ -237,90 +158,15 @@
 > código cliente las usa. **Si en Vercel está el mismo cruce, es una bomba de tiempo:** el primer
 > `createBrowserClient` publica la key secreta en el bundle. Chequear los valores en el proyecto de
 > Vercel y, de paso, cargar `SUPADATA_API_KEY` y `ANTHROPIC_API_KEY` (las del transcriptor, ADR-031).
-
-> 🔴 **ROTAR CREDENCIALES — martes 21/07, después de la corrida (decisión de Mani, cierre 57).** El
-> **PAT de Airtable** y el **`service_role` de Supabase** se pegaron en un chat el 2026-07-19 (misma
-> clase de exposición que el cierre 36). Rotar los dos y actualizar las credenciales en n8n
-> (`Airtable PAT`, `Supabase Registro`) + el gestor. Se difirió a propósito para no romper la corrida
-> del lunes 20/07. **El `service_role` bypassa RLS: da acceso total a la base.**
-> **↻ Vuelve a pasar: el `service_role` se pegó de nuevo en un chat el 2026-07-28** (cierre 67, para
-> verificar si el run fallido había guardado IDs). Tercera vez. Rotar ya. Si esto sigue repitiéndose,
-> el fix no es rotar más rápido: es una key de solo-lectura aparte para diagnosticar, o el MCP de
-> Supabase, en vez de pegar la `service_role` en el chat.
 >
-> ✅ **Los 3 re-imports: HECHOS por Mani el 2026-07-19** (cierre 57) — motor (spillover + pool de
-> transcripción), archivado y descubrimiento **vivos**. Cae el pendiente de re-import de los cierres
-> 54–55. **Confirmación independiente:** el archivado del domingo 19/07 18:00 corrió **`ok`** y dejó
-> *Descartes* en 0 + 2 filas nuevas en `outputs`.
->
-> ✅ **Feed reseteado para la corrida del 20/07** (cierre 57, por pedido de Mani): borrados los **65
-> `Candidatos`** (todos `nuevo`, cero calificados ⇒ cero trabajo del equipo perdido) y **sus 65 filas
-> de `processed_items`** (match 1:1 por `url_referente` ↔ `processed_items.url`; `Candidatos` no
-> guarda `external_id`). **Alcance elegido por Mani: solo lo del feed actual** — el resto del
-> histórico procesado queda bloqueado a propósito (`processed_items` 298 → **233**). `outputs` (18) y
-> `runs` (22) **intactos**: son el histórico canónico (ADR-014) y la bitácora que el archivado lee.
-> **Qué esperar el lunes:** el pool = los 65 videos liberados (ya habían pasado el gate una vez, así
-> que es buen material para ver el **spillover** repartiendo) + lo publicado desde el 17/07. Los 68
-> videos del 17/07 que el motor vio pero **no** entregó siguen bloqueados, así que el pool es más
-> chico que el del viernes — no leas un número bajo de `colectados` como fallo.
-
-> Lo que está **en el repo pero NO aplicado en n8n / la base viva**. Es el eslabón débil de siempre:
-> los fixes del repo no son live hasta re-importar (ver memoria `reimport-eslabon-debil`).
-
-> ✅ **Re-import de los 3 workflows: HECHO por Mani el 2026-07-17** (cierre 52). Motor, archivado y
-> descubrimiento **publicados y corriendo**. Cae el bloqueante que arrastraba desde el cierre 45: C
-> (motor: N por proyecto, `Voces.activo`, webhook single-flight de C.3, 37 nodos) y D (archivado: D.3b +
-> D.4 + matiz D.2) **ya están vivos**. Path del webhook y credencial `Webhook Motor Header` creados —
-> los dos en el gestor, nunca en git. **N sembrada:** *Trading Psychology* = 20, *Trading fast tips* = 10.
-> Las versiones viejas quedaron **desactivadas** (confirmado por Mani) — sin riesgo de cron doble el lun 20/07.
-> **En cada re-import futuro reusá el MISMO path y el MISMO header** (gestor); valores nuevos = botón 403
-> en silencio (memoria `reimport-eslabon-debil`, versión webhook).
-
-> ⛔ **B.2 — RETIRADA (cierre 54: [ADR-025](../adr/ADR-025-cockpit-producto-propio.md) firmado).** Airtable
-> **free bloquea la acción "Run a script"** — la única forma nativa de hacer POST con header de auth — así
-> que el botón de ADR-023 **no se construye en Airtable** (colisión ADR-023 ↔ NFR4). La dirección quedó en
-> ADR: **producto propio** para toda la superficie; el botón real vivirá ahí, contra el mismo webhook.
-> **Mientras tanto el disparo es *Execute manual* en n8n.** El detalle de abajo queda como referencia
-> histórica del mecanismo (si algún día se quisiera en un plan pago).
-- 🟠 **B.2 — botón + automation en Airtable (la mitad que falta del webhook, es de Mani a mano).** El
-  re-import dejó viva la mitad n8n del disparo on-demand; falta la mitad Airtable, que la API **no** crea:
-  1. Automation con acción "Run script": `fetch(POST)` a la **URL de Producción del webhook** (del gestor),
-     **mandando el mismo header** (nombre + value de la credencial `Webhook Motor Header`)
-     ([contrato §Disparo on-demand](../../core/contracts/airtable-cockpit.md) tiene el snippet).
-  2. Botón "▶ Correr ahora" en la superficie del operador que dispara esa automation.
-  ⚠️ **Si el header de la automation y el de n8n no coinciden, el botón da 403 en silencio** — probalo con
-  un click **antes** de dárselo a Majo/Jero.
-> 🟠 **Guard single-flight — prueba viva el LUNES 20/07 con el cron (decisión de Mani, cierre 54; cero
-> costo extra).** El cron del motor corre 08:00. Mientras esa corrida esté **en ejecución** (n8n →
-> Executions → running), abrí el motor y disparale un **Execute manual**. Esperado: la rama bloqueada
-> muere en el NoOp **sin abrir run** (ninguna fila nueva en `runs`, cero gasto Apify) — el log dice que
-> hay corrida viva. Si en cambio arranca una segunda corrida en paralelo, el guard no quedó vivo en el
-> re-import → parar y revisar. De paso confirmar en Supabase `runs.trigger_type`: la del cron = `cron`,
-> la V-run del 17/07 = `manual` (quedó sin verificar en el cierre 53).
-> 🟠 **Re-import del motor pendiente (cierres 54–55): spillover + pool de transcripción.** Dos cambios
-> en el mismo `workflow.json`: `Armar candidato` con spillover (enmienda ADR-024) y `Transcribir` con
-> **pool de 8 llamadas concurrentes** (cierre 55 — el plan pago de Supadata da 10 req/s; 84 videos
-> pasan de ~38 min a ~5). **El paso de infra de InstaPods del cierre 54 quedó SIN OBJETO:** con el
-> pool, `presupuesto_transcribir_s` volvió a **780** (cubre ~200 videos) y el watchdog de 900s del pod
-> no se toca. Solo re-importar: mismo path y mismo header del webhook (gestor) — regla de siempre.
-> ✅ **V-run — HECHA por Mani el 2026-07-17** (Execute manual, cierre 53). **C.1 (N por proyecto)
-> CONFIRMADO en vivo:** *Trading fast tips* entregó **10 exactos** (su N), no ~100 del global → el
-> re-import del cierre 52 cargó C. Calzó clavo con Airtable (16 records nuevos: TP 6 · TfT 10). **Pero
-> destapó under-delivery** (TP 6/20) por supply fino + un **spillover gap** de C.1 → ver cierre 53 en el
-> log. **Sigue pendiente el guard single-flight** (fue un solo Execute; es httpRequest+IF, no lo cubre
-> `test-nodos.mjs`) y confirmar `trigger_type='manual'` en `runs` (Supabase).
-> ✅ **Los 2 proyectos con 2 voces: RESUELTO por Mani el 2026-07-16** (mismo día del hallazgo). La regla
-> queda firme y es la esencia del refactor: **un proyecto tiene UNA voz; una voz tiene VARIOS
-> proyectos**. Dato limpio, verificado por MCP (6 proyectos, 1 voz cada uno, 2 por voz). *Coletazo a
-> tener presente:* en *Comunicación para lideres* quedó **Rosario** y el motor venía usando **Milena**
-> ⇒ ese proyecto **va a filtrar distinto** cuando se prenda (hoy está inactivo). El aviso por log del
-> motor queda como guarda: el schema no puede forzar un solo link ([mapa-campos §2.6](./mapa-campos.md)).
-
-> ✅ **Re-import de los 3 `workflow.json` + rotación de credenciales: HECHOS por Mani el 2026-07-16**
-> (cierre 42). Cae el bloqueante que arrastraba desde el cierre 37: M1, M2/ADR-022, costos $, contadores
-> Apify/ADR-021 bis y `normLang` **ya están vivos**. Credenciales rotadas (PAT Airtable, service_role
-> Supabase, Anthropic, Supadata) — cierra la exposición del PAT en chat del cierre 36.
-> **Ojo con la primera lectura de Métricas (§Ciclo abajo): el domingo 19 va a salir a medias, y no es un fallo.**
+> 🟠 **Guard single-flight — sigue SIN prueba viva** (decisión de Mani, cierre 54; cero costo extra).
+> Mientras una corrida esté **en ejecución** (n8n → Executions → running), abrí el motor y disparale un
+> **Execute manual**. Esperado: la rama bloqueada muere en el NoOp **sin abrir run** (ninguna fila nueva
+> en `runs`, cero gasto Apify) — el log dice que hay corrida viva. Si en cambio arranca una segunda
+> corrida en paralelo, el guard no quedó vivo en el re-import → parar y revisar. *(La instrucción
+> original lo ataba al cron del lunes 20/07; esa ventana pasó y la prueba nunca se hizo. El otro
+> chequeo que iba pegado, `runs.trigger_type`, ya quedó confirmado: la corrida del 31/07 registró
+> `on_demand` — log del cierre 70.)*
 
 - 🟠 **Los fixes de UI en Airtable** — **confirmado en el cierre 50 barriendo la API entera: el MCP puede
   escribir *records* y publicar el interface, pero NO editar la config de una página** (no existe un
@@ -343,7 +189,6 @@
   (ADR-024) · los 2 toggles del descubrimiento en `ajustesSeed` · `Candidatos.fecha` (el script ahora lo
   crea y **falla con exit 1** si no puede). **Queda solo la racionalización de campos de B.3, que espera
   A.5.**
-
 
 ## Ciclo post-re-import — qué esperar (y qué NO es un fallo)
 
