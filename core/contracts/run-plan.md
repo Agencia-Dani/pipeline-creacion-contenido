@@ -40,22 +40,36 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 }
 ```
 
-> **`id` es opaco en `ajustes`, NO en `referentes`.** Los dos workflows que leen ajustes lo hacen
-> por `fields.clave`, así que cuando `Ajustes` se cortó a Postgres (D5) el `id` pasó a ser la clave
-> misma sin que nada se enterara. **`referentes[].id` sí lo consume alguien:** `Computar salud
-> referentes` del archivado lo usa para PATCHear la tabla `Referentes` de Airtable. Por eso, tras
-> el corte 2/4, la fachada sirve ahí el **record id de Airtable** del referente (y su uuid solo si
-> nació en la app, donde ese PATCH ya no tiene a quién escribirle). Cuando D7 saque esa escritura,
-> el campo vuelve a ser opaco.
+> **`id` es opaco SOLO en `ajustes`.** Los dos workflows que leen ajustes lo hacen por
+> `fields.clave`, así que cuando `Ajustes` se cortó a Postgres (D5) el `id` pasó a ser la clave
+> misma sin que nada se enterara.
 >
-> **`referentes[].fields.proyecto` viaja en el idioma de `proyectos[].id`** — hoy record ids de
-> Airtable, porque Proyectos corta en 4/4. El motor cruza las dos listas por ese id; la traducción
-> la hace la app (`domain/referentes.ts`, `aRegistrosDelPlan`) y se cae sola cuando los dos lados
-> sean uuid. Es **un array**: un referente alimenta N proyectos
+> **En `voces`, `proyectos` y `referentes` el `id` es el record id de Airtable, y lo va a ser
+> hasta D7** ([ADR-033](../../docs/adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md)). No es
+> una comodidad: cuatro nodos vivos lo consumen como record id — `Preparar batch Airtable` escribe
+> `Candidatos.proyecto`/`.voz` como *links*, `Preparar batch Descartes` escribe
+> `Descartes.proyecto`, `Computar salud referentes` PATCHea `Referentes`, y `Destilar criterios`
+> PATCHea `Proyectos`. ⚠️ **Esos POST van con `typecast: true`, así que un uuid no daría error:
+> Airtable crearía un registro fantasma con el uuid de nombre.** Por eso una fila nacida en la app
+> acuña su record id al crearse, y por eso la traducción se cae en **D7** —cuando el motor deje de
+> escribir en Airtable— y no antes. *(Versiones anteriores de este contrato decían "en el corte
+> 4/4". Era falso.)*
+>
+> **`referentes[].fields.proyecto` viaja en el mismo idioma que `proyectos[].id`.** El motor cruza
+> las dos listas por ese id; la traducción la hace la app (`domain/referentes.ts`). Es **un array**:
+> un referente alimenta N proyectos
 > ([ADR-032](../../docs/adr/ADR-032-referente-proyecto-es-n-a-n.md)).
 >
+> **`proyectos[].fields.voz_default` es un array de UN elemento** con el id de la voz — la forma que
+> el motor lee (`voz_default[0]`) y con la que cruza contra `voces[].id`. Que la regla "1 proyecto =
+> 1 voz" ahora sea una FK not null no cambia la forma del contrato.
+>
 > **De qué almacenamiento sale cada dominio hoy lo dice `apps/dashboard/lib/config.ts`**, y no se
-> repite acá para que no quede viejo.
+> repite acá para que no quede viejo. Con una excepción que sí vive acá porque es del contrato:
+> **`criterios_aprendidos` y `advertencia_criterios` NO salen de Postgres aunque `Proyectos` ya sea
+> de Postgres.** Los escribe `Destilar criterios` del archivado en Airtable cada domingo (ADR-022) y
+> se leen de ahí hasta D7 — un dueño por **campo**, no por tabla (ADR-033). Esa lectura es
+> **fail-open**: si Airtable no responde, el plan sale con los criterios manuales.
 
 - **Filtros (ADR-028 §2, y nada más):** solo voces `activo` · solo proyectos `activo` **de voz
   activa** (el gate que hoy hace `Armar plan` cruzando tablas) · solo referentes `activo` ·

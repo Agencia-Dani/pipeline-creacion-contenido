@@ -171,8 +171,7 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 |---|---|---|
 | **Feed de Calificación** | Su bandeja diaria de videos a calificar | `calificacion`, `estado`, `notas_equipo` |
 | **Descartes** | Los ~10 descartes dudosos de la semana (§6.1) | `veredicto` |
-| **Proyectos** | Los temas que se buscan | todo (arman los temas) |
-| **Voces** | Para quién se selecciona | todo |
+| ~~**Proyectos**~~ · ~~**Voces**~~ | Se mudaron al cockpit (**Curar → Voces y proyectos**, §5.1 y §5.2) | **nada acá: lo que escriban no lo lee nadie** |
 | ~~**Referentes**~~ · ~~**Referentes - Revisar**~~ · ~~**Referentes - Sugeridos**~~ | Se mudaron al cockpit (**Curar → Referentes** y **Curar → Sugeridos**, §5.3) | **nada acá: lo que escriban no lo lee nadie** |
 | ~~**Configuración Global**~~ · ~~**Ajustes Dev-Only**~~ | Se mudaron al cockpit (**Curar → Ajustes**, §5.5) | **nada acá: lo que escriban no lo lee nadie** |
 | **Calidad por Proyecto** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
@@ -184,8 +183,13 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 > - Sugeridos* es la tabla **Referentes propuestos**; *Calidad por Proyecto* muestra **Métricas Proyectos**
 > y *Salud del Sistema* / *Costos* muestran **Métricas Global**. Guíense por el nombre del **menú**, no
 > por el de la tabla.
-> También hay un formulario **"Nuevo Proyecto"** para crear un proyecto llenando un formulario en vez
-> de una fila.
+> El formulario **"Nuevo Proyecto"** de Airtable **ya no se usa**: crear un proyecto (o una voz) se
+> hace en el cockpit, abajo de todo en **Curar → Voces y proyectos**.
+
+> ⚠️ **Si abren la página *Proyectos* de Airtable, van a ver dos campos que cambian solos** —
+> *criterios aprendidos* y una revisión de los criterios. Eso **no** es alguien editando: lo escribe
+> la máquina cada domingo, y es lo único que todavía vive ahí. Se lee en el cockpit, en
+> **Criterios** de cada proyecto. Ustedes no tienen que tocar nada en esa página.
 
 En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
 el **idioma original**, la **portada**, el **link al video original**, las **métricas** (views, likes,
@@ -206,8 +210,17 @@ Esto se hace **una sola vez** al arrancar (y cada vez que quieran sumar un tema 
 **Orden recomendado:** Voces → Proyectos → Referentes. (Hay que crear la Voz y el Proyecto
 antes, porque Referentes se "enganchan" a ellos.)
 
-Para crear una fila: entran a la tabla, botón **`+`** abajo de todo (o la fila vacía al final), y llenan
-las columnas. Abajo, columna por columna, qué va en cada una.
+> 🆕 **Voces y Proyectos ya no se cargan en Airtable: se cargan en el cockpit,
+> `Curar → Voces y proyectos`.** Es una sola pantalla: cada voz con sus proyectos adentro, y abajo
+> de todo los formularios para agregar un proyecto o una voz nueva. Los nombres de los campos que
+> siguen son los mismos, así que esta sección se lee igual — solo cambió dónde se escribe.
+>
+> **Dos cosas que la pantalla hace y Airtable no hacía:**
+> - **Avisa cuando algo no va a correr.** Un proyecto prendido cuya voz está apagada aparece con el
+>   cartel *"no corre: su voz está apagada"*; una voz prendida sin ningún proyecto activo se avisa
+>   arriba de todo. Antes eso solo se veía en los logs, o sea no se veía.
+> - **No deja crear un proyecto sin criterios de relevancia.** En Airtable el formulario dejaba, y
+>   un proyecto sin criterios aprueba casi cualquier cosa.
 
 ### 5.1 `Voces` — para quién se selecciona
 

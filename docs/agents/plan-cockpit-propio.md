@@ -259,10 +259,27 @@ Cada corte: pantalla lista → diff en cero → flip → esa página de Airtable
 >    `sombra:import` — que en ese mismo cambio deja de ver la tabla. Corre una vez, imprime el A/B
 >    (referentes por proyecto + registro por registro en los dos ámbitos) y es la evidencia que
 >    ADR-027 §5 pide antes de flipear.
-**La pantalla de Proyectos tiene que mostrar `advertencia_criterios`**, que hoy no muestra ninguna
-superficie: es un campo que existe **solo** para que una persona lo lea (el gate no lo lee, por
-contrato), así que hoy el archivado gasta un Haiku cada domingo para escribir un aviso que nadie ve
-— la mitad humana del loop de ADR-022, muerta por falta de superficie, no por falta de código.
+> **Corte 3/4 — Voces + Proyectos: HECHO (2026-07-31).** Pantalla `/curar/voces` (las voces con sus
+> proyectos adentro: la voz es la espina dorsal y apagarla apaga sus proyectos, así que con dos
+> pantallas la consecuencia del click quedaba en la otra). **`advertencia_criterios` ya se muestra**
+> — es la primera superficie que lo hace desde que ADR-022 existe. Lo que este corte agregó al
+> procedimiento:
+> 1. **Antes de cortar un dominio, listá quién ESCRIBE cada uno de sus campos.** El corte 2/4 dejó
+>    "medí el dato vivo contra el schema"; esta es la otra mitad. De los 8 campos de *Proyectos*,
+>    **2 los escribe una máquina que no se mueve hasta D7** (`Destilar criterios` del archivado
+>    PATCHea `criterios_aprendidos` + `advertencia_criterios` en Airtable, y el motor lee el primero
+>    para el gate). Cortar la tabla entera mataba el loop en silencio. Lo resuelve
+>    [ADR-033](../adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md): **la unidad de propiedad
+>    es el campo, no la tabla** — esos 2 se leen de Airtable, fail-open, hasta D7.
+> 2. **La traducción de ids NO se cae en el corte 4/4: se cae en D7.** El contrato y el código lo
+>    afirmaban y era falso. `Preparar batch Airtable` escribe `Candidatos.proyecto`/`.voz` como
+>    links **con `typecast: true`** ⇒ un uuid no falla, *crea un proyecto fantasma*. De ahí que una
+>    voz o un proyecto nacidos en la app acuñen su record id al crearse.
+> 3. **Este corte no necesitó migración.** El schema `009` ya modelaba bien los dos dominios, y se
+>    verificó contra el dato vivo antes de escribir código (los 6 proyectos con exactamente 1 voz y
+>    los 6 con criterios ⇒ las dos constraints aguantan). Que el corte 2/4 haya necesitado un ADR y
+>    una migración y este ninguno es el resultado de medir, no la suerte.
+
 **Hecho cuando:** el equipo edita config solo en la app; en Airtable esas tablas quedan congeladas.
 
 ### D6 — El espacio de trabajo: Feed de calificación

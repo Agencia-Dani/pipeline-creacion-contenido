@@ -7,6 +7,7 @@ import {
   type DatosReferente,
   type Salud,
 } from "@/domain/referentes";
+import { leerProyectos as leerProyectosDePostgres } from "@/lib/proyectos";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // IO del banco de referentes (D5, corte 2/4). Lee y escribe `app.referentes` +
@@ -37,6 +38,17 @@ const filaSalud = z.object({
 export type Proyecto = { id: string; airtableId: string | null; nombre: string; vozId: string; activo: boolean };
 export type ReferenteDelBanco = z.infer<typeof filaReferente> & { proyectoIds: string[]; salud: Salud };
 
+/** La proyección que la pantalla de referentes necesita: el picker de proyectos y su voz. */
+export async function leerProyectos(): Promise<Proyecto[]> {
+  return (await leerProyectosDePostgres()).map((p) => ({
+    id: p.id,
+    airtableId: p.airtable_id,
+    nombre: p.nombre,
+    vozId: p.voz_id,
+    activo: p.activo,
+  }));
+}
+
 const SIN_SALUD: Salud = { tasa_gate: null, tasa_aprobacion: null, videos_evaluados: null };
 
 async function leerPares(): Promise<Map<string, string[]>> {
@@ -52,20 +64,6 @@ async function leerPares(): Promise<Map<string, string[]>> {
     pares.set(p.referente_id, [...(pares.get(p.referente_id) ?? []), p.proyecto_id]);
   }
   return pares;
-}
-
-export async function leerProyectos(): Promise<Proyecto[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("proyectos")
-    .select("id, airtable_id, nombre, voz_id, activo")
-    .order("nombre");
-  if (error) throw new Error(`Supabase respondió con error leyendo proyectos: ${error.message}`);
-  return z
-    .array(z.object({ id: z.string(), airtable_id: z.string().nullable(), nombre: z.string(), voz_id: z.string(), activo: z.boolean() }))
-    .parse(data)
-    .map((p) => ({ id: p.id, airtableId: p.airtable_id, nombre: p.nombre, vozId: p.voz_id, activo: p.activo }));
 }
 
 /** El banco completo con sus proyectos y su salud: lo que la pantalla necesita, en una pasada. */
@@ -98,9 +96,10 @@ export async function leerBanco(): Promise<ReferenteDelBanco[]> {
  *    sobre una tabla ya congelada y es fail-open, así que el peor caso es un batch descartado
  *    en un lugar que nadie lee. El nodo muere en D7.
  *  · **`fields.proyecto` = record ids de Airtable de los proyectos.** El motor cruza
- *    `referentes[].fields.proyecto` contra `proyectos[].id`, y Proyectos sale de Airtable hasta
- *    el corte 4/4. Cuando Proyectos corte, esta traducción se cae sola (los dos lados pasan a
- *    ser uuid) — es la última costura de este corte.
+ *    `referentes[].fields.proyecto` contra `proyectos[].id`, y ese id sigue siendo el de Airtable
+ *    aunque Proyectos ya viva en Postgres (corte 3/4): el motor escribe `Candidatos.proyecto` como
+ *    link de Airtable, y con `typecast` un uuid crearía un proyecto fantasma en vez de fallar.
+ *    Las dos traducciones se caen juntas en **D7**, no antes (ADR-033).
  */
 export async function leerReferentesComoRegistros(ambito: "motor" | "completo"): Promise<Registro[]> {
   const [banco, proyectos] = await Promise.all([leerBanco(), leerProyectos()]);

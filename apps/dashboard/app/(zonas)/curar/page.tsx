@@ -19,6 +19,18 @@ export default async function CurarPage() {
         </p>
       </div>
 
+      <Link href="/curar/voces" className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Voces y proyectos</CardTitle>
+            <CardDescription>
+              Los clientes y sus temas: qué busca cada uno, con qué criterios y cuántos videos por
+              corrida. Apagar una voz apaga sus proyectos. Ya no se tocan en Airtable.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
       <Link href="/curar/referentes" className="block">
         <Card className="transition-colors hover:bg-accent/40">
           <CardHeader>
@@ -57,10 +69,10 @@ export default async function CurarPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lo demás sigue en Airtable, por ahora</CardTitle>
+          <CardTitle>El feed sigue en Airtable, por ahora</CardTitle>
           <CardDescription>
-            El feed de calificación, las voces y los proyectos se curan como hasta ahora.
-            Van llegando acá uno por uno (D5–D6).
+            Calificar candidatos y revisar los descartes se hace como hasta ahora. Es lo último
+            que falta traer (D6). Toda la configuración ya vive acá.
           </CardDescription>
         </CardHeader>
       </Card>

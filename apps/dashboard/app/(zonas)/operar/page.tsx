@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,7 +43,7 @@ const BADGE_POR_ESTADO: Record<
 export default async function OperarPage() {
   await exigirZona("operar");
 
-  // Cada mitad falla sola: sin Airtable igual se ven las corridas, y al revés.
+  // Cada mitad falla sola: si no se puede leer la config igual se ven las corridas, y al revés.
   const [config, corridas] = await Promise.allSettled([
     leerConfigOperar(),
     ultimasCorridasMotor(),
@@ -72,22 +73,30 @@ export default async function OperarPage() {
           <CardTitle>Qué va a correr</CardTitle>
           <CardDescription>
             Una corrida busca para todos los proyectos activos de voces activas, cada uno
-            hasta su N. Esto se edita por ahora en Airtable; acá se dispara y se mira.
+            hasta su N. Esto se edita en{" "}
+            <Link href="/curar/voces" className="underline">
+              Voces y proyectos
+            </Link>
+            ; acá se dispara y se mira.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!vista ? (
             <Alert variant="destructive">
-              <AlertTitle>No se pudo leer la config de Airtable</AlertTitle>
+              <AlertTitle>No se pudo leer la configuración</AlertTitle>
               <AlertDescription>
-                Se puede disparar igual (el motor lee Airtable por su cuenta), pero
-                revisá antes qué está activo. Si persiste, avisale a un dev.
+                No dispares hasta que vuelva: el motor lee la misma fuente, así que ahora mismo
+                la corrida no arrancaría. Si persiste, avisale a un dev.
               </AlertDescription>
             </Alert>
           ) : vista.porVoz.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay ningún proyecto activo con voz activa: una corrida ahora no
-              entregaría nada. Prendé algo en Airtable primero.
+              No hay ningún proyecto activo con voz activa: una corrida ahora no entregaría nada.
+              Prendé algo en{" "}
+              <Link href="/curar/voces" className="underline">
+                Voces y proyectos
+              </Link>{" "}
+              primero.
             </p>
           ) : (
             vista.porVoz.map(({ voz, proyectos }) => (
