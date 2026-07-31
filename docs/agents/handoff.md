@@ -34,20 +34,15 @@
 > distingue gratis y sin disparar nada — **404** = workflow inactivo o path equivocado ·
 > **403 `Authorization data is wrong!`** = activo, path bien y credencial bien.
 >
-> 🟠 **RE-IMPORTAR el motor otra vez (cierre 67).** Trae el fix del timeout que mató ese cron:
-> `executeOnce` + retry ×3 en los 3 nodos de lectura del dedup y la lectura completa de
-> `processed_items`. Reusá el MISMO webhook path/header del gestor (memoria `reimport-eslabon-debil`).
-> **Verificación del re-import:** en la ejecución, `Leer procesados` debe mostrar **1 ejecución / 1
-> item de entrada** (antes: cientos). El run zombie del 27/07 se barre solo al arrancar.
+> ✅ **Corrida de fuego #2 (sin-guion + entrega): CUMPLIDA por la corrida del 31/07.** **0** títulos
+> `⚠️ SIN GUION` en el feed · `metricas.sin_guion` = **21 descartados** (>0, o sea ADR-030 vivo) · los
+> 4 proyectos con `razon_faltante: supply` y `tasa_gate` coherente. **Queda un solo criterio sin
+> mirar: `transcripciones_vacias` contra el baseline de 41%** (es el efecto del retry de ADR-030).
+> Sale de `runs.metricas` de esa corrida; para la razón cruda de Supadata, los logs
+> `[Transcribir] … VACIA`. No pide corrida nueva: el dato ya está guardado.
 >
-> 🟠 **Las 2 corridas de fuego del cierre 66 SIGUEN pendientes** — el run del 27/07 murió antes de
-> entregar, así que no probaron nada. **#1 (dedup):** disparar dos veces seguidas → la intersección de
-> `external_id` entre ambas debe ser **∅**; mirar `runs.metricas.registro_dedup == 'ok'` y que
-> `processed_items` tenga filas de hoy ANTES que los candidatos. **#2 (sin-guion + entrega):** **cero**
-> títulos `⚠️ SIN GUION` en el feed; `metricas.sin_guion` (ahora = descartados) > 0;
-> `transcripciones_vacias` < 41% baseline (efecto del retry — mirar los logs `[Transcribir] ... VACIA`
-> para la razón cruda de Supadata); `por_proyecto` con `tasa_gate`/`razon_faltante` coherentes con los
-> logs `[Gate]`.
+> 🟠 **La corrida de fuego #1 (dedup) sigue viva** — es la **2ª corrida de fuego** de más abajo, que
+> además arrastra los 3 hallazgos del cierre 71. Es la única que falta.
 >
 > 🟡 **Suelto, sin diagnosticar:** el run de **descubrimiento** del 27/07 14:00 UTC quedó `en_curso`
 > sin cerrar (igual que el del motor, pero ese tiene causa conocida). Nadie lo miró.
@@ -150,15 +145,6 @@
 > Si esto sigue repitiéndose, el fix no es rotar más rápido: es una key de solo-lectura aparte para
 > diagnosticar, o el MCP de Supabase, en vez de pegar la `service_role` en el chat.
 >
-> 🟠 **Revisar el cruce de env vars en Vercel (cierre 68).** En `.env.local` del dashboard la key
-> `sb_secret_` estaba metida en **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** y `SUPABASE_SERVICE_ROLE` tenía el
-> placeholder literal. Local ya se arregló. **El bundle desplegado está limpio** (verificado: HTML +
-> 13 chunks de `/login`, cero `sb_secret_`), pero solo porque el login es un server action y ningún
-> componente cliente referencia esa variable — Next inyecta las `NEXT_PUBLIC_*` únicamente donde el
-> código cliente las usa. **Si en Vercel está el mismo cruce, es una bomba de tiempo:** el primer
-> `createBrowserClient` publica la key secreta en el bundle. Chequear los valores en el proyecto de
-> Vercel y, de paso, cargar `SUPADATA_API_KEY` y `ANTHROPIC_API_KEY` (las del transcriptor, ADR-031).
->
 > 🟠 **Guard single-flight — sigue SIN prueba viva** (decisión de Mani, cierre 54; cero costo extra).
 > Mientras una corrida esté **en ejecución** (n8n → Executions → running), abrí el motor y disparale un
 > **Execute manual**. Esperado: la rama bloqueada muere en el NoOp **sin abrir run** (ninguna fila nueva
@@ -168,27 +154,9 @@
 > chequeo que iba pegado, `runs.trigger_type`, ya quedó confirmado: la corrida del 31/07 registró
 > `on_demand` — log del cierre 70.)*
 
-- 🟠 **Los fixes de UI en Airtable** — **confirmado en el cierre 50 barriendo la API entera: el MCP puede
-  escribir *records* y publicar el interface, pero NO editar la config de una página** (no existe un
-  `update_page`; solo `create_page`/`delete_page`/`publish_interface`). O sea: **estos son de Mani, a mano,
-  y no hay atajo de agente.** Diagnóstico en [mapa-campos.md §5.1](./mapa-campos.md), orden en **B.6**.
-  Lo que queda: **`veredicto` editable** en *Descartes* (sin eso `falsos_negativos` es siempre 0 y el loop
-  de ADR-021 está muerto — hoy `isEditable: false`, verificado por MCP) · **curar *Salud del Sistema***
-  (hoy muestra `calificados`/`aprobados`/`precision` + `diagnostico` — todas de calidad o muertas en filas
-  GLOBAL — y **cero** del embudo) · `precision` como % y `separacion_gate` en *Calidad* · filtro
-  *Referentes propuestos* → `estado=propuesto` · `advertencia_criterios` en *Proyectos* · **B.5**
-  (`Voces.activo` en la página *Voces*: el campo existe y el motor ya lo respeta, pero la página no lo
-  muestra — verificado por MCP).
-- ✅ **Publicada *Costos*** (cierre 50, por MCP, `publish_interface` sobre *Cockpit Redes* entero — Mani
-  autorizó publicar todos los drafts). ⚠️ **Verificá a ojo el filtro de semana**: los 9 `bigNumber` suman
-  con `summaryFunction: sum` y `Métricas Global` no se barre nunca ⇒ sin filtro muestran el costo
-  histórico acumulado, no el de la semana.
-- 🟠 **Equipo:** sembrar 3–5 referentes TikTok (bootstrap del eje TT); aprobar *Referentes propuestos*.
-- ✅ **Pasada única sobre `setup-airtable.mjs` + `airtable-cockpit.md`: 3 de 4 hechas** (cierre 45,
-  desagrupada por decisión de Mani — ver [mapa-campos.md §3](./mapa-campos.md)). Hechas: N por proyecto
-  (ADR-024) · los 2 toggles del descubrimiento en `ajustesSeed` · `Candidatos.fecha` (el script ahora lo
-  crea y **falla con exit 1** si no puede). **Queda solo la racionalización de campos de B.3, que espera
-  A.5.**
+- 🟠 **Equipo (sobrevive la mudanza al cockpit propio — es dato, no herramienta):** sembrar 3–5
+  referentes **TikTok** (bootstrap del eje TT: hoy la rama corre en vacío por 0 handles activos, ver la
+  decisión de TikTok arriba) y aprobar los *Referentes propuestos* que el descubrimiento va dejando.
 
 ## Ciclo post-re-import — qué esperar (y qué NO es un fallo)
 

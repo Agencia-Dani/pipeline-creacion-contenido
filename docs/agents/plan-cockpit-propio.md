@@ -224,12 +224,21 @@ Por dentro de la fachada, cada dominio se mueve a Postgres y su pantalla de edic
 de Airtable. Orden por riesgo creciente: **Ajustes** (chico y aislado, el piloto del procedimiento) →
 **Referentes** (+ la vista de flojos y los Sugeridos) → **Voces + Proyectos** (juntos, van por FK).
 Cada corte: pantalla lista → diff en cero → flip → esa página de Airtable pasa a histórica.
+**La pantalla de Proyectos tiene que mostrar `advertencia_criterios`**, que hoy no muestra ninguna
+superficie: es un campo que existe **solo** para que una persona lo lea (el gate no lo lee, por
+contrato), así que hoy el archivado gasta un Haiku cada domingo para escribir un aviso que nadie ve
+— la mitad humana del loop de ADR-022, muerta por falta de superficie, no por falta de código.
 **Hecho cuando:** el equipo edita config solo en la app; en Airtable esas tablas quedan congeladas.
 
 ### D6 — El espacio de trabajo: Feed de calificación
 Pantalla de calificación (🔥/👍/👎 + estado + notas), Descartes con `veredicto` **por fin editable**,
 y la vista de 🔥 Seleccionados. Es la pantalla que el equipo más usa y la que decide si la migración
 se siente bien.
+**Por qué `veredicto` editable no es cosmético:** es el **único** campo de *Descartes* que lee una
+máquina — el archivado cuenta los "era bueno" para `falsos_negativos`. Con el campo bloqueado ese
+contador da **siempre 0**, y "0 falsos negativos" se lee como *el gate está perfecto*, que es la
+conclusión opuesta a la verdad: el loop de auditoría de ADR-021 no está incompleto, está **muerto**.
+Si la app lo vuelve a dejar de solo-lectura, hereda el mismo agujero.
 **Hecho cuando:** una semana entera de calificación pasa por la app sin que nadie abra Airtable.
 
 ### D7 — Corte de escritura *(re-import #2)*
