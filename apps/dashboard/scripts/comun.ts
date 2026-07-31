@@ -5,6 +5,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import {
+  esFilaFantasma,
   mapearAjuste,
   mapearCandidato,
   mapearDescarte,
@@ -41,7 +42,10 @@ export async function leerTablaAirtable(tabla: string): Promise<RegistroAirtable
     const res = await fetch(url, { headers: { Authorization: `Bearer ${env("AIRTABLE_PAT")}` } });
     if (!res.ok) throw new Error(`Airtable respondió ${res.status} leyendo ${tabla}.`);
     const pagina = (await res.json()) as { records: RegistroAirtable[]; offset?: string };
-    registros.push(...pagina.records);
+    // El filtro va acá y no en los mapear: así el import y el diff ven exactamente la
+    // misma lista (si solo lo filtrara el import, el diff las reportaría como "falta en
+    // Postgres" para siempre y el hecho-cuando de D3 nunca cerraría).
+    registros.push(...pagina.records.filter((r) => !esFilaFantasma(r)));
     offset = pagina.offset;
   } while (offset);
   return registros;

@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
   diffTabla,
+  esFilaFantasma,
   mapearAjuste,
   mapearCandidato,
   mapearProyecto,
@@ -101,5 +102,43 @@ describe("diff esperado ↔ actual", () => {
       new Map([["rec1", fila({ creado_en: "2026-07-20T08:00:00+00:00" })]]),
     );
     assert.equal(sinDiferencias(iguales), true);
+  });
+});
+
+// Las filas fantasma son el ruido estructural de la grilla de Airtable: reaparecen
+// solas, así que el espejo tiene que ignorarlas o el diff nunca da cero (D3).
+describe("esFilaFantasma", () => {
+  it("una fila sin ningún campo cargado no es un registro", () => {
+    assert.equal(esFilaFantasma({ id: "rec1", fields: {} }), true);
+  });
+
+  it("tampoco lo es la que solo trae campos vacíos (string vacío, null, link sin nada)", () => {
+    assert.equal(
+      esFilaFantasma({ id: "rec1", fields: { handle: "", proyecto: [], notas: null } }),
+      true,
+    );
+  });
+
+  it("una fila a medio cargar SÍ es un registro: tiene que fallar loud, no desaparecer", () => {
+    // El caso real que rompió el import: '@' y un referente con handle pero sin plataforma.
+    assert.equal(esFilaFantasma({ id: "rec1", fields: { handle: "@" } }), false);
+    assert.equal(esFilaFantasma({ id: "rec2", fields: { handle: "@the.rumers" } }), false);
+  });
+
+  it("un checkbox destildado no salva a la fila: Airtable lo omite del payload", () => {
+    assert.equal(esFilaFantasma({ id: "rec1", fields: { activo: false } }), false);
+  });
+
+  it("la salud que escribe el archivado no cuenta como contenido: la escribió la máquina", () => {
+    // Caso real: un referente vaciado a mano que conservó su salud computada.
+    assert.equal(
+      esFilaFantasma({ id: "rec1", fields: { tasa_gate: 0.12, videos_evaluados: 26 } }),
+      true,
+    );
+    // Pero con un campo humano encima, vuelve a ser un registro.
+    assert.equal(
+      esFilaFantasma({ id: "rec2", fields: { tasa_gate: 0.12, handle: "@alguien" } }),
+      false,
+    );
   });
 });

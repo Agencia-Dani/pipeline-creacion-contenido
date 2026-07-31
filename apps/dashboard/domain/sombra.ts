@@ -27,6 +27,23 @@ const adjuntoUrl = (v: unknown): string | null => {
   return typeof primero?.url === "string" ? primero.url : null;
 };
 
+// Una fila SIN NINGÚN campo cargado no es un registro: es una celda en blanco que la
+// grilla de Airtable crea sola y regenera cada vez que alguien la abre. Si el import
+// las tratara como dato, el espejo nunca sería estable (habría que limpiar la tabla a
+// mano para siempre). Se saltean en la LECTURA, así el import y el diff ven lo mismo.
+// Ojo: esto NO cubre las filas a medio cargar (un campo suelto) — esas siguen fallando
+// loud en su mapear, porque ahí sí hay una decisión humana que tomar.
+// La salud de un referente la ESCRIBE el archivado, no una persona, y en el schema `app`
+// ni siquiera es columna: es la vista `v_salud_referentes` (plan-cockpit §4). Así que no
+// cuenta como contenido — hay filas vaciadas a mano que solo conservan estos 3 números.
+const CAMPOS_DERIVADOS = new Set(["tasa_gate", "tasa_aprobacion", "videos_evaluados"]);
+
+export const esFilaFantasma = (r: RegistroAirtable): boolean =>
+  Object.entries(r.fields).every(
+    ([k, v]) =>
+      CAMPOS_DERIVADOS.has(k) || v == null || v === "" || (Array.isArray(v) && v.length === 0),
+  );
+
 export function mapearVoz(r: RegistroAirtable): Fila {
   return {
     airtable_id: r.id,
