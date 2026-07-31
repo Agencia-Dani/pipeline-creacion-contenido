@@ -44,10 +44,14 @@ for (const r of runs) {
   const m = r.metricas;
   if (!m) { console.log("   (sin métricas)"); continue; }
 
-  console.log(`   embudo: colectados=${m.colectados ?? "?"} · unicos=${m.unicos ?? "?"} · transcritos=${m.transcritos ?? "?"} · gate_pass=${m.gate_pass ?? "?"} · outputs=${m.outputs ?? "?"}`);
+  // Las claves son las que emite `Resumen del run`, no las del embudo conceptual: `pretrim` es lo
+  // que sobrevivió al pre-trim, `filtrados` la salida del heat-score (= lo que se transcribe) y
+  // `gate` los que pasaron el gate (solo los NO-_descarte).
+  console.log(`   embudo: colectados=${m.colectados ?? "?"} → asignados=${m.asignados ?? "?"} → pretrim=${m.pretrim ?? "?"} → filtrados=${m.filtrados ?? "?"} → gate=${m.gate ?? "?"} → outputs=${m.outputs ?? "?"}`);
   // ADR-030: sin_guion ahora = DESCARTADOS. >0 es lo esperado, no un problema.
   console.log(`   sin_guion (descartados, ADR-030): ${m.sin_guion ?? "?"}`);
-  const tv = m.transcripciones_vacias, tot = m.transcritos ?? m.unicos;
+  // El denominador de las vacías son los videos DISTINTOS que se mandaron a Supadata.
+  const tv = m.transcripciones_vacias, tot = m.llamadas?.supadata;
   console.log(`   transcripciones_vacias: ${tv ?? "?"}${tv != null && tot ? ` (${pct(tv, tot)} · baseline 23/07 = 41%)` : ""}`);
   // `no_corrio` ya no es el estado por defecto: desde la enmienda 2026-07-31 de ADR-029 la memoria
   // se graba en serie aguas arriba, así que verlo significa que el motor todavía corre el JSON viejo.
