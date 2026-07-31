@@ -10,6 +10,14 @@ schema de la config para siempre — Airtable hoy, Postgres en D5, **sin re-impo
 - **`GET <URL del dashboard>/api/engine/run-plan`** con **header compartido** (nombre y valor en el
   gestor de contraseñas, env `RUN_PLAN_HEADER_*` en Vercel y credencial `httpHeaderAuth` en n8n —
   mismo patrón que el webhook de ADR-023). Sin header o con header distinto: **403**.
+- **El 403 dice cuál de los dos casos es**, en `motivo`: `header_ausente_o_distinto` (lo que manda
+  n8n no coincide) vs `sin_credencial_en_el_servidor` (a la app le falta la env; además lo loguea).
+  Los dos siguen siendo 403 y siguen abortando la corrida — esto no afloja el fail-closed, solo lo
+  hace diagnosticable. Desde afuera eran indistinguibles y eso costó una sesión entera de debug.
+  ⚠️ Un espacio o newline de más **en el valor guardado en Vercel** da 403 (se comparan los bytes
+  crudos, y si el largo difiere ni se llega a `timingSafeEqual`); en el header que viaja, en cambio,
+  la capa HTTP lo recorta sola. O sea: cuando hay 403, el sospechoso es el valor **guardado**, no el
+  enviado.
 - **Fail-closed (ADR-028 §4):** cualquier respuesta ≠200 (403, 503, timeout) debe **abortar la
   corrida** — el HTTP Request de n8n se deja SIN continue-on-fail a propósito. Una corrida sin
   config entrega ruido; no entregar es mejor. El registro (`runs`/`outputs`) sigue siendo

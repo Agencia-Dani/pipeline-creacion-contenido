@@ -12,19 +12,34 @@ import { leerRunPlanCrudo } from "@/lib/airtable";
 
 export const dynamic = "force-dynamic";
 
-function headerValido(request: Request): boolean {
+// Devuelve el MOTIVO, no un booleano: desde afuera "el server no tiene la credencial"
+// y "el header no coincide" daban el mismo 403, y distinguirlos a ojo cuesta una sesión
+// entera (pasó: la env faltaba en Vercel y el síntoma era idéntico a un header mal
+// copiado). Decir cuál de los dos es no le sirve a un atacante —no acerca a adivinar el
+// valor— y es el "estado legible, siempre" del plan §3.6. El fail-closed no se toca:
+// los dos casos siguen siendo 403.
+type Auth = "ok" | "sin_credencial_en_el_servidor" | "header_ausente_o_distinto";
+
+function autenticar(request: Request): Auth {
   const nombre = process.env.RUN_PLAN_HEADER_NOMBRE;
   const valor = process.env.RUN_PLAN_HEADER_VALOR;
-  if (!nombre || !valor) return false; // sin config no hay acceso, nunca abierto
+  if (!nombre || !valor) return "sin_credencial_en_el_servidor";
   const recibido = request.headers.get(nombre) ?? "";
   const a = Buffer.from(recibido);
   const b = Buffer.from(valor);
-  return a.length === b.length && timingSafeEqual(a, b);
+  // La comparación de largo va antes a propósito: timingSafeEqual tira si difieren.
+  // Ojo con esto al debuggear: un espacio o newline de más en la env es largo distinto.
+  const ok = a.length === b.length && timingSafeEqual(a, b);
+  return ok ? "ok" : "header_ausente_o_distinto";
 }
 
 export async function GET(request: Request) {
-  if (!headerValido(request)) {
-    return Response.json({ error: "no autorizado" }, { status: 403 });
+  const auth = autenticar(request);
+  if (auth !== "ok") {
+    if (auth === "sin_credencial_en_el_servidor") {
+      console.error("[run-plan] faltan RUN_PLAN_HEADER_NOMBRE/_VALOR en el entorno: nadie puede autenticarse.");
+    }
+    return Response.json({ error: "no autorizado", motivo: auth }, { status: 403 });
   }
 
   // ?ambito=motor (default): filtrado como ADR-028 §2. ?ambito=completo: sin filtros,
