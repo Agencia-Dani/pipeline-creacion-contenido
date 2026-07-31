@@ -22,18 +22,26 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> 🔧 **EN CURSO — Mani tomó el re-import del motor + la 2ª corrida de fuego (dedup)** el 2026-07-31.
-> Son los 3 pasos manuales del cierre 71 (más abajo) y después el verificador:
-> `set -a && source .env && set +a && node Workflows/workflow-short-form-content/verificar-corrida.mjs 2`
+> ✅✅ **LA 2ª CORRIDA DE FUEGO (dedup) SE CUMPLIÓ — 2026-07-31 19:18, y con eso los 3 hallazgos del
+> cierre 70 están cerrados EN PRODUCCIÓN, no solo en el repo.** Re-import del motor hecho por Mani,
+> corrida `on_demand` **`ok` en 9,4 min**. Los 4 criterios, todos:
+> **`registro_dedup: ok`** ← *por primera vez desde que existe ADR-029* (H1: la memoria en serie
+> entró) · **27 `processed_items` nuevas, las 27 con `run_id`** (H3; las 601 viejas siguen en null,
+> total 628) · **intersección de `external_id` con la corrida de las 16:28 = ∅** · feed de 145
+> candidatos con **0 `⚠️ SIN GUION`**, **145/145 con `external_id`** y **0 urls duplicadas**.
 >
-> 🟠 **CORTE 1/4 DE D5 (Ajustes) — commiteado, SIN pushear a propósito.** El código ya está
-> (`bd12a26`): la fachada sirve los 18 knobs desde `app.ajustes` y la pantalla es `/curar/ajustes`.
+> **⏱️ Los 9,4 min contra los 31 de la corrida anterior NO son una corrida a medias: son la medida
+> del dedup funcionando.** El embudo lo dice solo — mismos `colectados=280` y `asignados=635` que a
+> las 16:28 (mismas cuentas, 3 h después, nada nuevo publicado), pero **`filtrados` cae de 361 a 35**.
+> Ese escalón es `Heat-score v1`, que es donde vive el dedup: 456 de 491 se descartaron por estar ya
+> en memoria. Y como lo que se transcribe es lo que sale de ahí, la fase cara pasó de 361 items a 35
+> ⇒ el tiempo se desploma. **6 candidatos nuevos** (los que de verdad eran nuevos) sobre un feed que
+> ya tenía 139. Si esta corrida hubiera durado 31 min y entregado ~139 otra vez, *eso* sí habría sido
+> la alarma: querría decir que re-entregó lo mismo.
 >
-> **⛔ El deploy espera a que la corrida de fuego del dedup esté verificada.** No es un bloqueo
-> técnico —el A/B dio 0 diferencias, la corrida saldría igual— es la misma regla que ya se aplicó en
-> el cierre 69 al separar los dos re-imports: **una corrida, una variable**. Esa corrida existe para
-> juzgar el fix del dedup; si además estrena la fuente de los ajustes y algo sale raro, no se sabe
-> cuál de las dos fue. Push (= deploy) **después** del verificador en verde.
+> 🟢 **CORTE 1/4 DE D5 (Ajustes) — DESBLOQUEADO PARA DEPLOY.** Está commiteado (`bd12a26`) y el
+> deploy esperaba exactamente a esta corrida (regla "una corrida, una variable", cierre 69). Ya no
+> hay nada que esperar: **push = deploy**, y después los 2 pasos de abajo.
 >
 > **Después del deploy, 2 pasos de Mani** — hay que cerrarle la puerta vieja al equipo, porque hasta
 > que se cierre hay dos superficies editables y una de las dos no la lee nadie:
@@ -78,8 +86,8 @@
 > denominador: `llamadas.supadata` es una estimación del `Resumen del run`, así que el 11% es del
 > mismo orden de precisión que el 41% con el que se compara — la caída es grande, la cifra exacta no.*
 >
-> 🟠 **La corrida de fuego #1 (dedup) sigue viva** — es la **2ª corrida de fuego** de más abajo, que
-> además arrastra los 3 hallazgos del cierre 71. Es la única que falta.
+> ✅ **La corrida de fuego #1 (dedup) también está CUMPLIDA** (19:18 del 31/07, arriba). **Ya no
+> queda ninguna corrida de fuego pendiente** — las dos cerraron el mismo día.
 >
 > 🟡 **Suelto, sin diagnosticar:** el run de **descubrimiento** del 27/07 14:00 UTC quedó `en_curso`
 > sin cerrar (igual que el del motor, pero ese tiene causa conocida). Nadie lo miró.
@@ -138,26 +146,11 @@
 > pudo abrir** (es FK a `runs(id)`: un uuid de relleno reventaría el batch entero). 4 casos en
 > `test-nodos.mjs`.
 >
-> 🟠 **LO ÚNICO MANUAL QUE QUEDA — 3 pasos, en orden:**
-> 1. **Re-importar el motor** (solo el motor: archivado y descubrimiento no cambiaron de topología).
->    Mismo path y mismo header del webhook. Truco del cierre 70 para confirmar sin disparar nada: un
->    POST con header inválido da **403 `Authorization data is wrong!`** = activo, path y credencial
->    bien · **404** = inactivo o path equivocado.
-> 2. **Rellenar los placeholders que el re-import borra.** El auditor los lista solo
->    (`node Workflows/auditar-workflows.mjs`): `<<AIRTABLE_BASE_ID>>` `<<DASHBOARD_URL>>` (sin barra
->    final) `<<INSTANCE_ID>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_MOTOR>>` en `Config`, y
->    `<SUPADATA_API_KEY>` ×1 + `<ANTHROPIC_API_KEY>` ×3 en los code nodes. **Activar.**
-> 3. **Archivado: `ventana_corrida_min` 120 → 60 a mano** en su `Config`. No pide re-import.
->
-> 🟠 **2ª CORRIDA DE FUEGO (dedup) — pendiente, y es la que cierra los 3 hallazgos.** Disparar desde ▶
-> del dashboard. En la ejecución: `Preparar procesados` y `POST processed_items` **antes** de
-> `Transcribir`, y `Leer procesados` con **1 ejecución / 1 item**. Después:
-> `set -a && source .env && set +a && node Workflows/workflow-short-form-content/verificar-corrida.mjs 2`
-> Tiene que dar: **`registro_dedup: ok`** (por primera vez en la historia del ADR) · las filas de
-> `processed_items` de la corrida nueva **con `run_id`** · **intersección de `external_id` = ∅** ·
-> 0 `⚠️ SIN GUION` · 0 urls duplicadas. Si `registro_dedup` sigue diciendo `no_corrio`, el motor está
-> corriendo el JSON viejo: el re-import no entró. *(El verificador ya sabe leer la memoria de la
-> corrida del 31/07, que tiene `run_id` null, cayendo a una ventana de `primera_vez`.)*
+> ✅ **Pasos 1 y 2 (re-import del motor + placeholders + activar): HECHOS el 31/07** — la corrida de
+> las 19:18 lo prueba por conducta (`registro_dedup: ok` no puede salir del JSON viejo).
+> ⬜ **Paso 3, EL ÚNICO QUE SIGUE ABIERTO: archivado — `ventana_corrida_min` 120 → 60 a mano** en su
+> `Config`. **No pide re-import** y por eso no vino de arrastre con el del motor. Es el barredor de
+> zombies del archivado: con 120 tarda el doble en desbloquear una corrida que murió sin cerrar.
 >
 > 🟢 **RE-IMPORT #1 de D4 — listo en el repo, pasos exactos (cierre 69).** Va **después** del
 > re-import del fix del timeout y de una corrida verde (decisión de Mani: separados). **Antes de
@@ -331,8 +324,12 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **⚠️ La trampa que este piloto encontró y dejó cerrada:** una tabla cortada tiene que **salir del catálogo de sombra** (`scripts/comun.ts`) en el mismo cambio. Si se queda, el próximo `sombra:import` la pisa con los valores viejos de Airtable —revirtiendo en silencio lo que el equipo editó en la app— y el `sombra:diff` empieza a reportar como error las diferencias legítimas. Anotado como procedimiento en el plan §D5.
 **Detalles chicos con motivo:** `app.ajustes.valor` es `numeric` y PostgREST lo devuelve **string** — se normaliza en `lib/ajustes.ts`, una vez, para que ni el dominio ni la pantalla lo sepan · el `id` del contrato viaja **la clave** (nadie lo consume: los 2 workflows leen por `fields.clave`), así que no hubo que inventarle un record id a Postgres · la acción **revalida el rol contra la fila real** antes de escribir, no confía en lo que la pantalla mostró · cada edición deja `app.eventos` con valor anterior y nuevo, que es la única forma de reconstruir por qué una corrida salió rara tres semanas después.
 **Verificación (todo lectura, cero créditos):** **A/B Airtable ↔ fachada: 18 claves de los dos lados, 0 diferencias** · la fachada local devuelve **200** con 3 voces · 4 proyectos · 16 referentes · **18 ajustes**, y la N por proyecto sigue resolviendo a 100 desde `Candidatos por corrida` · typecheck limpio · dashboard **63/63** (cae 1 test: el de `mapearAjuste`, que se fue con su función) · validador **1454/0**. *No se pudo probar la pantalla en el browser: entrar pide magic link.* Por eso el hecho-cuando del corte es de Mani, y son 2 minutos (§Pendiente vivo).
-**Orden de operaciones (decisión de Mani al cierre de la sesión):** el commit queda **sin pushear** hasta que la **2ª corrida de fuego del dedup** —que Mani tomó en esta misma sesión— esté verificada. Misma regla que separó los dos re-imports en el cierre 69: **una corrida, una variable**. El A/B dice que la corrida saldría igual con la fuente nueva; el punto no es el riesgo, es poder atribuir el resultado.
-**Próximo paso:** corrida de fuego verde → push (= deploy) → los 2 pasos manuales de §Pendiente vivo → **corte 2/4: Referentes** (+ la vista de flojos y los Sugeridos).
+**Orden de operaciones (decisión de Mani):** el commit quedó **sin pushear** hasta que la 2ª corrida de fuego estuviera verificada. Misma regla que separó los dos re-imports en el cierre 69: **una corrida, una variable**. El A/B decía que la corrida saldría igual con la fuente nueva; el punto no era el riesgo, era poder atribuir el resultado. **Esa corrida ya corrió y salió verde (abajo), así que el deploy está desbloqueado.**
+
+**🏁 En la misma sesión, Mani re-importó el motor y disparó la 2ª corrida de fuego: los 3 hallazgos del cierre 70 quedaron cerrados EN PRODUCCIÓN.** Corrida 19:18, `on_demand`, **`ok` en 9,4 min**. Los 4 criterios: **`registro_dedup: ok`** (primera vez desde que existe ADR-029 — H1 vivo) · **27 `processed_items` nuevas, las 27 con `run_id`** (H3; total 628, las 601 viejas siguen null) · **intersección de `external_id` con la corrida previa = ∅** · feed de 145 con **0 `⚠️ SIN GUION`**, **145/145 `external_id`**, **0 urls duplicadas**.
+**🔍 Los 9,4 min contra 31 asustan y no deberían: son la medida del dedup.** Mismos `colectados=280` y `asignados=635` (mismas cuentas, 3 h después), pero **`filtrados` cae de 361 a 35** — ese escalón es `Heat-score v1`, donde vive el dedup: 456 de 491 salieron por estar ya en memoria. Como lo que se transcribe es lo que sale de ahí, la fase cara pasó de 361 items a 35 y el tiempo se desplomó. Entregó **6 candidatos nuevos** sobre un feed que ya tenía 139. **El resultado alarmante habría sido el opuesto:** 31 min y ~139 entregados otra vez = re-entrega de lo mismo. Queda escrito porque la próxima vez que alguien vea una corrida corta va a dudar igual.
+**Sin verificar todavía (no lo tapa esta corrida):** el **guard single-flight** sigue sin prueba viva, y el paso 3 del cierre 71 —**`ventana_corrida_min` 120 → 60 en el `Config` del archivado**— sigue abierto: no pide re-import, así que no vino de arrastre con el del motor.
+**Próximo paso:** push (= deploy) del corte 1/4 → los 2 pasos manuales de §Pendiente vivo → **corte 2/4: Referentes** (+ la vista de flojos y los Sugeridos).
 
 **2026-07-31 (cierre 71) — Los 3 hallazgos del cierre 70, cerrados en el repo + un auditor que caza esta clase de bug sola (Claude, pedido de Mani).**
 **H1 — la memoria del dedup dejó de ser una rama.** Decisión de Mani sobre la alternativa propuesta en el cierre 70: en vez de mover posiciones (`x<4480`), **serializar**: `Heat-score v1 → Preparar procesados → POST processed_items → Transcribir`. El argumento es que mover posiciones deja la garantía central de ADR-029 viviendo en dos coordenadas de canvas, o sea la próxima limpieza visual la rompe otra vez y en silencio; en serie la garantía es **topológica**. Tres detalles la sostienen: `alwaysOutputData` en el POST (PostgREST devuelve body vacío con `resolution=ignore-duplicates`, y sin item de salida `Transcribir` no dispararía), `Transcribir` pasa a leer `$('Heat-score v1').all()` en vez de `$input` (su input ahora es la respuesta del POST), y `onError: continueRegularOutput` **se conserva** — la escritura sigue siendo fail-open, como manda el ADR. **De arrastre, `registro_dedup` revive:** `POST processed_items` es ahora ancestro de `Resumen del run`. Quedó como [enmienda 2026-07-31 de ADR-029](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md), con la decisión #2 original **tachada** — el mecanismo que describía era falso y nadie debería leerlo de buena fe.
