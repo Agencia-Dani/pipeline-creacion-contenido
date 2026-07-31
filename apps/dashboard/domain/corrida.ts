@@ -84,7 +84,14 @@ export const DISPARO_LEGIBLE: Record<string, string> = {
 
 // Misma ventana que el guard single-flight del motor (ADR-023 C.3): una corrida
 // `en_curso` más vieja que la ventana se considera colgada, no viva.
-export const VENTANA_CORRIDA_MIN = 120;
+//
+// ⚠️ Este número está DUPLICADO: el dueño real es `ventana_corrida_min` del nodo
+// `Config` del motor (y del archivado). Si cambia allá, cambia acá, o la pantalla
+// dice "hay una corrida viva" cuando el motor ya la considera zombie. Cuando la
+// config viva en Postgres (D5) esto se lee de ahí y la duplicación muere.
+// 120 → 45 el 2026-07-31: un abort fail-closed deja la fila `en_curso` y con 120
+// bloqueaba 2 h. Máximo real medido de una corrida del motor: 23,2 min.
+export const VENTANA_CORRIDA_MIN = 45;
 
 export function hayCorridaViva(
   corridas: Corrida[],

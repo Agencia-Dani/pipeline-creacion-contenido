@@ -91,6 +91,22 @@
 > credencial **`Run Plan Header`** de n8n · el gestor. **`MOTOR_WEBHOOK_HEADER_*` NO se tocó**: sigue
 > siendo `X-Motor-Auth`, es el del botón "Correr ahora", credencial **`Webhook Motor Header`**.
 >
+> 🟠 **PENDIENTE MANUAL (31/07): `ventana_corrida_min` 120 → 45.** Ya está en el repo (`Config` del
+> **motor** y del **archivado**) pero **NO en n8n**. No hace falta re-importar: el nodo `Config` está
+> hecho para editarse a mano — abrí los dos workflows y cambiá el valor. **Por qué:** cuando una
+> corrida **aborta** (p. ej. el fail-closed de la fachada), `Cerrar run` nunca corre y la fila queda
+> `en_curso`; con 120 eso bloqueaba el botón 2 horas. **Por qué 45 y no menos:** el knob hace DOS
+> cosas — el guard bloquea mientras la corrida sea más joven que la ventana, y el barredor marca
+> `fallo` a las más viejas. Si una corrida REAL dura más que la ventana, el barredor la mata en
+> vuelo y el guard deja arrancar una segunda en paralelo (doble gasto + duplicados). Medido sobre
+> 10 corridas: máximo real **23,2 min** ⇒ 45 deja ~2x. ⚠️ **Los caps subieron después de esas
+> mediciones** (`cap_top_n` 100→250, `presupuesto_transcribir_s` 840 = 14 min solo de transcripción),
+> así que una corrida pesada podría acercarse. **Tripwire:** si alguna vez ves dos corridas del motor
+> solapadas en `runs`, la ventana quedó corta — subila, no la bajes más. El arreglo de fondo sería
+> separar el knob en dos (uno para el guard, otro para el barredor), que hoy no existe.
+> *(El valor también está duplicado en `apps/dashboard/domain/corrida.ts` para que la pantalla diga
+> lo mismo que el motor; muere cuando la config viva en Postgres, D5.)*
+>
 > 🟠 **LO QUE QUEDA: los 2 re-imports, en este orden.** La fachada ya no bloquea nada.
 > **(1) El fix del timeout (cierre 67)** — es el urgente: el cron está muerto desde el 27/07 y ese fix
 > es el que arregla los duplicados. Después, sus **2 corridas de fuego** (detalle abajo).

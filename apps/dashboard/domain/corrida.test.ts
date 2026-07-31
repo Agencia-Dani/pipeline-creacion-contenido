@@ -8,6 +8,7 @@ import {
   haceCuanto,
   hayCorridaViva,
   ultimoEmbudo,
+  VENTANA_CORRIDA_MIN,
   type Corrida,
 } from "./corrida.ts";
 
@@ -74,14 +75,18 @@ const corrida = (extra: Partial<Corrida>): Corrida => ({
 
 describe("hayCorridaViva", () => {
   const ahora = new Date("2026-07-20T09:00:00Z");
+  // Los fixtures se derivan de la ventana, no de un hueco fijo: antes eran 60 min
+  // contra una ventana de 120, y al bajarla a 45 el test se cayó por el fixture, no
+  // por la regla. Así el caso sigue diciendo lo mismo cuando el número cambie.
+  const haceMinutos = (m: number) =>
+    corrida({ inicio: new Date(ahora.getTime() - m * 60_000).toISOString() });
 
   it("en_curso dentro de la ventana → viva", () => {
-    assert.equal(hayCorridaViva([corrida({})], ahora), true);
+    assert.equal(hayCorridaViva([haceMinutos(VENTANA_CORRIDA_MIN - 1)], ahora), true);
   });
 
   it("en_curso más vieja que la ventana → colgada, no viva (misma regla que el guard)", () => {
-    const vieja = corrida({ inicio: "2026-07-20T06:00:00Z" });
-    assert.equal(hayCorridaViva([vieja], ahora), false);
+    assert.equal(hayCorridaViva([haceMinutos(VENTANA_CORRIDA_MIN + 1)], ahora), false);
   });
 
   it("terminadas no cuentan", () => {

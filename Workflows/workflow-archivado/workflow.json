@@ -86,7 +86,7 @@
             {
               "id": "c_ventana",
               "name": "ventana_corrida_min",
-              "value": 120,
+              "value": 45,
               "type": "number"
             }
           ]
