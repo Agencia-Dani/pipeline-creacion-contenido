@@ -52,6 +52,12 @@
               "type": "string"
             },
             {
+              "id": "c_dash",
+              "name": "dashboard_url",
+              "value": "<<DASHBOARD_URL>>",
+              "type": "string"
+            },
+            {
               "id": "c3",
               "name": "instance_id",
               "value": "<<INSTANCE_ID>>",
@@ -191,141 +197,6 @@
       "id": "barrer-runs-zombie",
       "position": [
         1080,
-        380
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Proyectos' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "options": {
-          "timeout": 20000,
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "qs",
-                    "name": "offset",
-                    "value": "={{ $response.body.offset }}"
-                  }
-                ]
-              },
-              "paginationMode": "updateAParameterInEachRequest",
-              "nextURL": "",
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.offset }}",
-              "limitPagesFetched": false
-            }
-          }
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "filterByFormula",
-              "value": "{activo}"
-            }
-          ]
-        }
-      },
-      "name": "Leer Proyectos",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
-        }
-      },
-      "id": "leer-proyectos",
-      "position": [
-        1290,
-        380
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Voces' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "options": {
-          "timeout": 20000,
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "qs",
-                    "name": "offset",
-                    "value": "={{ $response.body.offset }}"
-                  }
-                ]
-              },
-              "paginationMode": "updateAParameterInEachRequest",
-              "nextURL": "",
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.offset }}",
-              "limitPagesFetched": false
-            }
-          }
-        }
-      },
-      "name": "Leer Voces",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
-        }
-      },
-      "id": "leer-voces",
-      "position": [
-        1500,
-        380
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "options": {
-          "timeout": 20000,
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "qs",
-                    "name": "offset",
-                    "value": "={{ $response.body.offset }}"
-                  }
-                ]
-              },
-              "paginationMode": "updateAParameterInEachRequest",
-              "nextURL": "",
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.offset }}",
-              "limitPagesFetched": false
-            }
-          }
-        }
-      },
-      "name": "Leer Referentes",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
-        }
-      },
-      "id": "leer-referentes",
-      "position": [
-        1710,
         380
       ]
     },
@@ -492,31 +363,6 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Ajustes' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "options": {
-          "timeout": 20000
-        }
-      },
-      "name": "Leer Ajustes",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
-        }
-      },
-      "onError": "continueRegularOutput",
-      "id": "leer-ajustes",
-      "position": [
-        450,
-        720
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
         "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,tasa_seleccion,calificados' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
@@ -541,7 +387,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Armar plan de descubrimiento (ADR-020) — semillas rankeadas por señal + set de dedup + knobs.\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst _nrm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();\nconst cfg0 = $('Config').first().json;\n// Knobs del equipo (Ajustes) sobre defaults de Config; caps de costo solo en Config (patrón ADR-011/016).\nconst AJUSTE_MAP = { 'propuestas por corrida': 'propuestas_max', 'afinidad minima de propuesta': 'afinidad_minima', 'descubrir en instagram': 'descubrir_ig', 'descubrir en tiktok': 'descubrir_tt' };\nconst ajustes = {};\nrecs('Leer Ajustes').forEach(a => { const f = a.fields || {}; const k = AJUSTE_MAP[_nrm(f.clave)]; if (k && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[k] = Number(f.valor); });\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst propuestas_max = Math.max(1, Number(pick('propuestas_max', 10)));\nconst afinidad_minima = Number(pick('afinidad_minima', 0.6));\nconst cap_semillas = Math.max(1, Number(cfg0.cap_semillas || 8));\nconst cap_detalle = Math.max(1, Number(cfg0.cap_perfiles_detalle || 20));\n// Toggles de eje del descubrimiento (equipo, Ajustes > Config; default ON). Off = ese eje no genera semillas.\nconst DESCUBRIR_IG = Number(pick('descubrir_ig', 1)) > 0;\nconst DESCUBRIR_TT = Number(pick('descubrir_tt', 1)) > 0;\n\n// Proyectos activos con criterios Proyecto ⊕ Voz (mismo modelo que el gate del motor, ADR-010).\nconst voces = {};\nrecs('Leer Voces').forEach(v => { const f = v.fields || {}; voces[v.id] = (f.criterios_relevancia || '').toString().trim(); });\nconst projects = {};\nrecs('Leer Proyectos').forEach(p => { const f = p.fields || {};\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = { id: p.id, nombre: f.nombre || '', criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: (vozId && voces[vozId]) || '' };\n});\n\n// Dedup: cualquier handle ya conocido no se re-propone (Referentes activo o no + Propuestos en cualquier estado).\n// Dedup por (plataforma, handle): TikTok e Instagram son namespaces distintos, no se cruzan.\nconst conocidos_ig = new Set(); const conocidos_tt = new Set();\nconst referentes = recs('Leer Referentes');\nconst _dedup = (r) => { const f = r.fields || {}; const h = String(f.handle || '').trim().replace(/^@+/, '').toLowerCase(); if (!h) return; (String(f.plataforma || '').toLowerCase().indexOf('tik') >= 0 ? conocidos_tt : conocidos_ig).add(h); };\nreferentes.forEach(_dedup);\nrecs('Leer Propuestos').forEach(_dedup);\nconst conocidos = new Set([...conocidos_ig, ...conocidos_tt]);\n\n// Semillas: referentes IG activos de proyectos activos, rankeados por tasa de selección (fail-open sin señal).\nconst senal = {};\n$('Leer señal selección').all().forEach(it => { const s = it.json || {}; if (s.referente) senal[String(s.referente).toLowerCase()] = { tasa: Number(s.tasa_seleccion || 0), cal: Number(s.calificados || 0) }; });\nconst semMap = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('insta') < 0) return; // v1 solo IG (ADR-020)\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMap[k] = semMap[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMap[k].proyectos.add(id));\n});\nconst semillas = (DESCUBRIR_IG ? Object.entries(semMap) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj = {};\nsemillas.forEach(s => { seed_to_proj[s.handle.toLowerCase()] = s.proyectos; });\nconsole.log('[Descubrimiento] semillas IG (' + semillas.length + '): ' + semillas.map(s => s.handle + '(' + s.tasa.toFixed(2) + ')').join(', '));\n\n// Semillas TikTok (ADR-020 extendido): referentes TT activos, rankeados por señal. El lookalike actor\n// (dataovercoffee) mezcla todas las semillas y devuelve un ranking global con score; la atribución a\n// proyecto la resuelve el vetting Haiku contra los criterios de cada proyecto con semillas TT.\nconst semMapTT = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('tik') < 0) return;\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMapTT[k] = semMapTT[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMapTT[k].proyectos.add(id));\n});\nconst semillasTT = (DESCUBRIR_TT ? Object.entries(semMapTT) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj_tt = {}; const ttProjIds = new Set();\nsemillasTT.forEach(s => { seed_to_proj_tt[s.handle.toLowerCase()] = s.proyectos; s.proyectos.forEach(p => ttProjIds.add(p)); });\nconst cap_detalle_tt = Math.max(1, Number(cfg0.cap_lookalikes_tt || 15));\nconsole.log('[Descubrimiento] semillas TT (' + semillasTT.length + '): ' + semillasTT.map(s => s.handle).join(', '));\n\nreturn [{ json: { semillas: semillas.map(s => s.handle), seed_to_proj, conocidos: [...conocidos], conocidos_ig: [...conocidos_ig], conocidos_tt: [...conocidos_tt], projects, propuestas_max, afinidad_minima, cap_detalle, tt_semillas: semillasTT.map(s => s.handle), seed_to_proj_tt, tt_project_ids: [...ttProjIds], cap_detalle_tt } }];"
+        "jsCode": "// Armar plan de descubrimiento (ADR-020) — semillas rankeadas por señal + set de dedup + knobs.\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst _nrm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();\nconst cfg0 = $('Config').first().json;\n// Knobs del equipo (Ajustes) sobre defaults de Config; caps de costo solo en Config (patrón ADR-011/016).\nconst AJUSTE_MAP = { 'propuestas por corrida': 'propuestas_max', 'afinidad minima de propuesta': 'afinidad_minima', 'descubrir en instagram': 'descubrir_ig', 'descubrir en tiktok': 'descubrir_tt' };\nconst plan = $('Leer plan (fachada)').first().json;\nconst ajustes = {};\n(plan.ajustes || []).forEach(a => { const f = a.fields || {}; const k = AJUSTE_MAP[_nrm(f.clave)]; if (k && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[k] = Number(f.valor); });\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst propuestas_max = Math.max(1, Number(pick('propuestas_max', 10)));\nconst afinidad_minima = Number(pick('afinidad_minima', 0.6));\nconst cap_semillas = Math.max(1, Number(cfg0.cap_semillas || 8));\nconst cap_detalle = Math.max(1, Number(cfg0.cap_perfiles_detalle || 20));\n// Toggles de eje del descubrimiento (equipo, Ajustes > Config; default ON). Off = ese eje no genera semillas.\nconst DESCUBRIR_IG = Number(pick('descubrir_ig', 1)) > 0;\nconst DESCUBRIR_TT = Number(pick('descubrir_tt', 1)) > 0;\n\n// Proyectos activos con criterios Proyecto ⊕ Voz (mismo modelo que el gate del motor, ADR-010).\nconst voces = {};\n(plan.voces || []).forEach(v => { const f = v.fields || {}; voces[v.id] = (f.criterios_relevancia || '').toString().trim(); });\nconst projects = {};\n(plan.proyectos || []).forEach(p => { const f = p.fields || {};\n  if (!f.activo) return; // ambito=completo no filtra: la regla vive acá, explicita\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = { id: p.id, nombre: f.nombre || '', criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: (vozId && voces[vozId]) || '' };\n});\n\n// Dedup: cualquier handle ya conocido no se re-propone (Referentes activo o no + Propuestos en cualquier estado).\n// Dedup por (plataforma, handle): TikTok e Instagram son namespaces distintos, no se cruzan.\nconst conocidos_ig = new Set(); const conocidos_tt = new Set();\nconst referentes = plan.referentes || [];\nconst _dedup = (r) => { const f = r.fields || {}; const h = String(f.handle || '').trim().replace(/^@+/, '').toLowerCase(); if (!h) return; (String(f.plataforma || '').toLowerCase().indexOf('tik') >= 0 ? conocidos_tt : conocidos_ig).add(h); };\nreferentes.forEach(_dedup);\nrecs('Leer Propuestos').forEach(_dedup);\nconst conocidos = new Set([...conocidos_ig, ...conocidos_tt]);\n\n// Semillas: referentes IG activos de proyectos activos, rankeados por tasa de selección (fail-open sin señal).\nconst senal = {};\n$('Leer señal selección').all().forEach(it => { const s = it.json || {}; if (s.referente) senal[String(s.referente).toLowerCase()] = { tasa: Number(s.tasa_seleccion || 0), cal: Number(s.calificados || 0) }; });\nconst semMap = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('insta') < 0) return; // v1 solo IG (ADR-020)\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMap[k] = semMap[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMap[k].proyectos.add(id));\n});\nconst semillas = (DESCUBRIR_IG ? Object.entries(semMap) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj = {};\nsemillas.forEach(s => { seed_to_proj[s.handle.toLowerCase()] = s.proyectos; });\nconsole.log('[Descubrimiento] semillas IG (' + semillas.length + '): ' + semillas.map(s => s.handle + '(' + s.tasa.toFixed(2) + ')').join(', '));\n\n// Semillas TikTok (ADR-020 extendido): referentes TT activos, rankeados por señal. El lookalike actor\n// (dataovercoffee) mezcla todas las semillas y devuelve un ranking global con score; la atribución a\n// proyecto la resuelve el vetting Haiku contra los criterios de cada proyecto con semillas TT.\nconst semMapTT = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('tik') < 0) return;\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMapTT[k] = semMapTT[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMapTT[k].proyectos.add(id));\n});\nconst semillasTT = (DESCUBRIR_TT ? Object.entries(semMapTT) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj_tt = {}; const ttProjIds = new Set();\nsemillasTT.forEach(s => { seed_to_proj_tt[s.handle.toLowerCase()] = s.proyectos; s.proyectos.forEach(p => ttProjIds.add(p)); });\nconst cap_detalle_tt = Math.max(1, Number(cfg0.cap_lookalikes_tt || 15));\nconsole.log('[Descubrimiento] semillas TT (' + semillasTT.length + '): ' + semillasTT.map(s => s.handle).join(', '));\n\nreturn [{ json: { semillas: semillas.map(s => s.handle), seed_to_proj, conocidos: [...conocidos], conocidos_ig: [...conocidos_ig], conocidos_tt: [...conocidos_tt], projects, propuestas_max, afinidad_minima, cap_detalle, tt_semillas: semillasTT.map(s => s.handle), seed_to_proj_tt, tt_project_ids: [...ttProjIds], cap_detalle_tt } }];"
       },
       "name": "Armar plan de descubrimiento",
       "type": "n8n-nodes-base.code",
@@ -799,6 +645,35 @@
         2550,
         720
       ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=completo' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "leer-plan-fachada-desc",
+      "name": "Leer plan (fachada)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1290,
+        380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Run Plan Header"
+        }
+      },
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "notes": "La config del cockpit (ADR-028), ambito=completo: SIN filtros de activo, el total tal cual, porque este workflow aplica su propia logica encima. FAIL-CLOSED: sin onError, !=200 tras 3 intentos aborta el run. execute-once: lookup de corrida, no de item (cierre 67)."
     }
   ],
   "pinData": {},
@@ -851,40 +726,7 @@
       "main": [
         [
           {
-            "node": "Leer Proyectos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leer Proyectos": {
-      "main": [
-        [
-          {
-            "node": "Leer Voces",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leer Voces": {
-      "main": [
-        [
-          {
-            "node": "Leer Referentes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leer Referentes": {
-      "main": [
-        [
-          {
-            "node": "Leer Propuestos",
+            "node": "Leer plan (fachada)",
             "type": "main",
             "index": 0
           }
@@ -913,7 +755,7 @@
         ],
         [
           {
-            "node": "Leer Ajustes",
+            "node": "Leer señal selección",
             "type": "main",
             "index": 0
           }
@@ -943,17 +785,6 @@
       ]
     },
     "PATCH Propuestos promovidos": {
-      "main": [
-        [
-          {
-            "node": "Leer Ajustes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leer Ajustes": {
       "main": [
         [
           {
@@ -1104,6 +935,17 @@
         [
           {
             "node": "Armar propuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer plan (fachada)": {
+      "main": [
+        [
+          {
+            "node": "Leer Propuestos",
             "type": "main",
             "index": 0
           }

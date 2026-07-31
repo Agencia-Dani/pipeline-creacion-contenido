@@ -37,14 +37,14 @@ const seccion = (t) => console.log('\n── ' + t);
 // ════════════════════════════════════════════════════════════════════════════
 const CFG_PLAN = { top_n: 100, dias_recencia: 7, resultados_referente: 20, cap_resultados_referente: 50, cap_top_n: 100, buscar_referente_ig: 1, buscar_referente_tiktok: 1 };
 
-// OJO: 'Leer Voces' viene filtrado por {activo} server-side (C.2), así que el mock recibe SOLO las
-// voces activas — igual que en n8n. Una voz apagada = una voz que no está en la lista.
+// OJO: las voces vienen filtradas por {activo} — antes lo hacía Airtable server-side, ahora la
+// fachada con ?ambito=motor (D4). Igual que en n8n: una voz apagada = una voz que no está en la
+// lista. El mock devuelve la respuesta del run-plan (ADR-028), no las 4 lecturas de Airtable.
 const runPlan = ({ proyectos = [], vocesActivas = [], referentes = [], ajustes = [], cfg = {} } = {}) => {
-  const wrap = (recs) => [{ json: { records: recs } }];
-  const tablas = { 'Leer Proyectos': proyectos, 'Leer Voces': vocesActivas, 'Leer Referentes': referentes, 'Leer Ajustes': ajustes };
+  const fachada = { version: 1, voces: vocesActivas, proyectos, referentes, ajustes };
   const $ = (n) => {
     if (n === 'Config') return { first: () => ({ json: Object.assign({}, CFG_PLAN, cfg) }) };
-    if (tablas[n]) return { all: () => wrap(tablas[n]) };
+    if (n === 'Leer plan (fachada)') return { first: () => ({ json: fachada }) };
     throw new Error('nodo no mockeado: ' + n);
   };
   const logs = [];

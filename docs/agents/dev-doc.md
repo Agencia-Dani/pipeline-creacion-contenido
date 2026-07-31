@@ -26,7 +26,7 @@
 > resultados_keyword` (el de perfiles sigue con `resultados_referente`). **Piso por cuenta fuente**
 > `piso_referente` (Config, 5): `Armar candidato` hace round-robin hasta `piso` videos por cuenta antes
 > de rellenar por heat global hasta `top_n` (fail-open con 0). **Barredor de zombies del motor**: nodo
-> nuevo `Barrer runs zombie` entre `Abrir run` y `Leer Proyectos`, y `Abrir run` ahora taggea
+> nuevo `Barrer runs zombie` entre `Abrir run` y las lecturas de config, y `Abrir run` ahora taggea
 > `params.workflow='motor'`. **Motor: 35 → 36 nodos.**
 >
 > ⚠️ **Enmienda 2026-07-09 (ADR-019) — remoción total del eje keyword; motor 36 → 30 nodos.** El motor
@@ -93,7 +93,7 @@
 > Dos ramas laterales nuevas colgadas de `Cerrar run` (§4.2): **`Destilar criterios` → `PATCH Proyectos
 > criterios`** escribe `Proyectos.criterios_aprendidos` con lo aprendido de la curación, y el motor lo
 > lee (`Armar plan de corrida` + `Gate de relevancia`) → el loop cierra; **`Leer señal selección
-> (archivado)` → `Leer Referentes (archivado)` → `Computar salud referentes` → `PATCH Referentes salud`**
+> (archivado)` → `Computar salud referentes` → `PATCH Referentes salud`**
 > escribe la salud por referente. Suma **`Leer runs descubrimiento`** (costos, cierre 37) entre `Leer runs
 > de la semana` y `Leer Descartes del gate`. El **motor no gana nodos** (sigue en 33): ADR-022 le cambia
 > qué lee, no su topología.
@@ -136,7 +136,7 @@ archivado.
 
 ---
 
-## 2. Motor (`short-form-content`) — 38 nodos
+## 2. Motor (`short-form-content`) — 35 nodos
 
 ### 2.1 Orden de ejecución (topología real)
 
@@ -148,9 +148,9 @@ Disparo       │               > ventana)                              (libre)�
 on-demand ────┘                                                         Abrir run    Bloqueada (NoOp, fin)
 (webhook,                                                                    │
  ADR-023)                                                                    ▼
-                                                    Leer Proyectos ─► Leer Voces
-                                                                          │
-                                            Armar plan ◄─ Leer Ajustes ◄─ Leer Referentes
+                                                    Leer plan (fachada) ─► Armar plan
+                                                    (1 GET a /api/engine/  │
+                                                     run-plan?ambito=motor)│
                                                         │  (fan-out a 2 ramas Apify)
                              ┌──────────────────────────┴───────────────┐
                              ▼                                          ▼
@@ -270,11 +270,8 @@ Notas de orden que muerden si las ignorás:
 | 4b | Leer corridas vivas | http GET | **Guard single-flight, mitad lectura (C.3, ADR-023).** `GET runs` con `estado=en_curso` + `inicio>=now−ventana_corrida_min`, `limit=1` → si devuelve fila, hay corrida viva. `alwaysOutputData` + continue-on-fail (Supabase caído = item sin `id` = pasa, fail-open). |
 | 4c | Guard single-flight | if | Evalúa `Boolean($json.id)`: **false** (no hay corrida viva) → `Abrir run` y la corrida sigue; **true** → `Bloqueada: ya hay corrida viva` (NoOp) y la ejecución muere ahí — **sin abrir run**, así un click bloqueado no ensucia `runs_fallo` ni las métricas de salud. Aplica a los 3 triggers (decisión Mani 2026-07-16). |
 | 4d | Abrir run en el registro | http POST | `POST runs` (`instance_id`, **`trigger_type` real: `on_demand`/`manual`/`cron`** vía `isExecuted` del trigger — C.3; antes siempre `'cron'`), `estado:'en_curso'`, `params:{workflow:'motor'}`, `Prefer: return=representation` → devuelve `id`. continue-on-fail. El tag `workflow:'motor'` es lo que scopea el barredor (4) y el guard (4b). |
-| 5 | Leer Proyectos | http GET | Airtable `Proyectos` con `filterByFormula={activo}`. **Pagina** (`options.pagination` sigue el `offset` → todas las páginas, #4). |
-| 6 | Leer Voces | http GET | Airtable `Voces` con `filterByFormula={activo}` (**C.2, 2026-07-16** — antes traía todas). Da el id→nombre y `criterios_relevancia`; lo que **no** llega está apagado y sus proyectos se saltean en `Armar plan`. Pagina (#4). |
-| 7 | Leer Referentes | http GET | Airtable `Referentes` con `{activo}`. Pagina (#4). |
-| 8 | Leer Ajustes | http GET | Airtable `Ajustes` (todas). Pagina (#4). continue-on-fail → fail-open: sin tabla, usa los defaults de Config. |
-| 9 | Armar plan de corrida | code | El cerebro de la config. Construye `projects{}` (con `criterios`, `voz_criterios`, **`n`** = `Proyectos.N` con fallback al global `top_n` — ADR-024), **saltea los proyectos con la voz apagada** (C.2; loguea cuál) y **avisa si un proyecto tiene >1 voz linkeada** (usa la primera). Arma las listas de descubrimiento (`ig_urls` de referentes, `tt_profiles`), los mapas `*_owner_to_proj`, los knobs globales (`top_n`, `dias_recencia`, `resultados_referente` con su cap) y `ajustes` (traduce la `clave` española → key interna vía **`AJUSTE_MAP`**). Gatea cada plataforma por su toggle (`buscar_referente_ig`/`buscar_referente_tiktok`). Los consumidores de las lecturas 5–8 agregan todas las páginas (`flatMap` sobre `.records`). **Solo referentes** (ADR-019): no arma hashtags ni mapas de keyword. |
+| 5 | Leer plan (fachada) | http GET | **D4 (ADR-028): reemplaza a los 4 nodos Airtable que había acá** (`Leer Proyectos`/`Voces`/`Referentes`/`Ajustes`). Un GET a `{dashboard_url}/api/engine/run-plan?ambito=motor` con credencial `httpHeaderAuth` (`Run Plan Header`) → `{version, voces, proyectos, referentes, ajustes}` en la **misma forma `{id, fields}`** que devolvía Airtable. Los filtros de `activo` y la N resuelta ahora los aplica la app ([contrato](../../core/contracts/run-plan.md)). **FAIL-CLOSED a propósito: SIN `onError`** — retry ×3 / 2s, timeout 30 s, y si tras eso no hay config el run **aborta** (una corrida sin config entrega ruido). **`executeOnce`**: es un lookup de corrida, no de item (la regla del cierre 67). *Ojo: el motor ya no conoce el schema de la config — de D5 en adelante la fuente pasa a Postgres sin volver a tocar n8n.* |
+| 9 | Armar plan de corrida | code | El cerebro de la config. Construye `projects{}` (con `criterios`, `voz_criterios`, **`n`** = `Proyectos.N` con fallback al global `top_n` — ADR-024), **saltea los proyectos con la voz apagada** (C.2; loguea cuál) y **avisa si un proyecto tiene >1 voz linkeada** (usa la primera). Arma las listas de descubrimiento (`ig_urls` de referentes, `tt_profiles`), los mapas `*_owner_to_proj`, los knobs globales (`top_n`, `dias_recencia`, `resultados_referente` con su cap) y `ajustes` (traduce la `clave` española → key interna vía **`AJUSTE_MAP`**). Gatea cada plataforma por su toggle (`buscar_referente_ig`/`buscar_referente_tiktok`). Lee las 4 listas del nodo 5 (`$('Leer plan (fachada)').first().json`) — antes agregaba las páginas de 4 nodos Airtable con `flatMap` sobre `.records`. **Solo referentes** (ADR-019): no arma hashtags ni mapas de keyword. |
 | 10 | Split IG referentes | code | Emite **1 item por referente IG** → hace que `Apify — IG Reels` corra una vez por cuenta. Por eso el límite de resultados es cap **por-referente**, no global. |
 | 11 | Apify — IG Reels | apify | Actor `apify~instagram-scraper`, `directUrls` = la URL del referente del item (vía Split), `searchType:'user'`, `resultsLimit`, `onlyPostsNewerThan` si hay ventana. |
 | 12 | Apify — TikTok Perfil | apify | Actor `clockworks~free-tiktok-scraper`, `profiles=tt_profiles` (referentes TikTok), `resultsPerPage=resultados_referente`. |
@@ -327,8 +324,8 @@ límites: ADR-010 + handoff §Mejoras #13/#18.
 Cron semanal (lun 9am) ┐
                        ├─► Config ─► Abrir run ─► Barrer runs zombie
 Ejecutar manual        ┘                                │
-        Leer Proyectos ─► Leer Voces ─► Leer Referentes ─► Leer Propuestos
-                                                                │
+                       Leer plan (fachada) ─► Leer Propuestos
+                    (?ambito=completo, D4)          │
                                                         Preparar promoción
                                                                 │
                                                         IF — hay aprobados
@@ -338,7 +335,7 @@ Ejecutar manual        ┘                                │
                                    ▼                            │
                      PATCH Propuestos promovidos ──────────────►│
                                                                 ▼
-              Leer Ajustes ─► Leer señal selección ─► Armar plan de descubrimiento
+                             Leer señal selección ─► Armar plan de descubrimiento
                                                                 │
                   Apify — Perfiles semilla ─► Agregar sugeridos ─► Apify — Detalle sugeridos
                                                                             │
@@ -390,13 +387,12 @@ Notas de diseño que muerden si las ignorás:
 | 3 | Config | set | IDs (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`) + defaults/caps: `cap_semillas` 8, `cap_perfiles_detalle` 20, `cap_lookalikes_tt` 15 (dev-only), `propuestas_max` 10, `afinidad_minima` 0.6, toggles `descubrir_ig`/`descubrir_tt` 1 (pisables desde Ajustes). |
 | 4 | Abrir run en el registro | http POST | `POST runs` con `params:{workflow:'descubrimiento'}`, `return=representation`. continue-on-fail. |
 | 5 | Barrer runs zombie | http PATCH | Marca `fallo` los runs de descubrimiento previos colgados `en_curso` (scoped `params->>workflow=eq.descubrimiento` + `id=neq.<run actual>`). continue-on-fail. |
-| 6–8 | Leer Proyectos / Voces / Referentes | http GET | Airtable; Proyectos con `{activo}`, Voces y Referentes completas (Referentes SIN filtro `{activo}`: el dedup necesita también los inactivos). **Paginan.** |
+| 6 | Leer plan (fachada) | http GET | **D4 (ADR-028): reemplaza a `Leer Proyectos`/`Voces`/`Referentes` y a `Leer Ajustes` (nodo 14).** `?ambito=**completo**` — sin filtros de `activo`, el total tal cual, porque este workflow aplica su propia lógica encima (el descubrimiento **ignora `Voces.activo` a propósito**, cierre 49, y el dedup necesita los referentes inactivos). ⚠️ **El `{activo}` de Proyectos, que antes hacía el `filterByFormula`, ahora es una línea explícita en `Armar plan de descubrimiento`** — sin ella se propondría para proyectos apagados. Fail-closed (sin `onError`), retry ×3, `executeOnce`. |
 | 9 | Leer Propuestos | http GET | Airtable `Referentes propuestos` completa (cualquier estado — el dedup + la promoción la necesitan entera). Pagina. continue-on-fail (1ª corrida: tabla vacía). |
 | 10 | Preparar promoción | code | Filtra los `estado=aprobado` (máx 10) → arma `crear[]` (records de `Referentes`: handle, plataforma, proyecto, `activo:true`, `notas` con fecha+afinidad+razón) y `marcar[]` (PATCH a `promovido`). Emite `{hay, crear, marcar}`. |
-| 11 | IF — hay aprobados | if | `crear.length > 0` → rama de promoción; si no → directo a `Leer Ajustes`. |
+| 11 | IF — hay aprobados | if | `crear.length > 0` → rama de promoción; si no → directo a `Leer señal selección` (antes: a `Leer Ajustes`, que murió en D4). |
 | 12 | POST Referentes (promoción) | http POST | `POST Referentes` con `crear`, `typecast:true`. **stop-on-fail** (si la siembra falla, no marcar `promovido`). |
-| 13 | PATCH Propuestos promovidos | http PATCH | `PATCH Referentes propuestos` con `marcar` → los aprobados quedan `promovido`. Reconverge a `Leer Ajustes`. |
-| 14 | Leer Ajustes | http GET | Airtable `Ajustes` — 4 knobs propios vía `AJUSTE_MAP`: `Propuestas por corrida`→`propuestas_max`, `Afinidad mínima de propuesta`→`afinidad_minima`, `Descubrir en Instagram`→`descubrir_ig`, `Descubrir en TikTok`→`descubrir_tt`. continue-on-fail → defaults de Config. |
+| 13 | PATCH Propuestos promovidos | http PATCH | `PATCH Referentes propuestos` con `marcar` → los aprobados quedan `promovido`. Reconverge a `Leer señal selección`. |
 | 15 | Leer señal selección | http GET | Supabase `v_senal_seleccion` (`referente`, `tasa_seleccion`, `calificados`). continue-on-fail → fail-open (sin señal, todas las semillas valen igual). |
 | 16 | Armar plan de descubrimiento | code | El cerebro: **semillas IG** y **semillas TT** = referentes activos de proyectos activos de esa plataforma, rankeados por `tasa_seleccion` (desempate `calificados`), corte a `cap_semillas`, gateados por su toggle (`descubrir_ig`/`descubrir_tt`: off ⇒ semillas = []); **dedup por (plataforma, handle)**: `conocidos_ig`/`conocidos_tt` (Referentes todos + Propuestos todos, separados por plataforma); `projects{}` con criterios Proyecto⊕Voz (ADR-010); `tt_project_ids` (proyectos con semilla TT); knobs con `pick` (Ajustes > Config). Emite `{semillas, seed_to_proj, conocidos_ig, conocidos_tt, projects, propuestas_max, afinidad_minima, cap_detalle, tt_semillas, seed_to_proj_tt, tt_project_ids, cap_detalle_tt}`. |
 | 17 | Apify — Perfiles semilla | apify | Actor `apify~instagram-profile-scraper`, `usernames = semillas`. **1ª pasada paga:** trae cada perfil semilla con sus `relatedProfiles` (~20 sugeridos del propio algoritmo de IG por cuenta). alwaysOutputData + continue-on-fail. |
@@ -421,7 +417,7 @@ perfiles), TT 1 Apify (≤15 lookalikes, $0.20 c/u; $0 sin semillas TT), 1 Haiku
 
 ---
 
-## 4. Archivado (`archivado`) — 37 nodos
+## 4. Archivado (`archivado`) — 35 nodos
 
 > **Validado para producción (cierre 19).** Corrió end-to-end con calificados reales (run `687027e2`):
 > idempotencia, paginación, split de estados, barrido de zombies, cierre robusto y curación completa. El
@@ -431,7 +427,7 @@ perfiles), TT 1 Apify (≤15 lookalikes, $0.20 c/u; $0 sin semillas TT), 1 Haiku
 
 ```
 Cron semanal (dom 6pm) ┐
-                ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos calificados
+                ├─► Config ─► Abrir run ─► Barrer runs zombie ─► Leer plan (fachada) ─► Leer Candidatos calificados
 Ejecutar manual ┘                                                                                              │
                                                                                                                ▼
                                                                                                    IF — hay calificados
@@ -467,7 +463,7 @@ Ejecutar manual ┘                                                             
       (higiene 2026-07-14)          ├─► Leer Candidatos nuevos viejos ─► Preparar barrido nuevos ─► Barrer Candidatos nuevos viejos
       (higiene 2026-07-14)          ├─► Leer Metricas viejas ─► Preparar barrido Metricas ─► Barrer Metricas viejas
       (ADR-022, M2)                 ├─► Destilar criterios ─► PATCH Proyectos criterios
-      (ADR-022, M2)                 └─► Leer señal selección (archivado) ─► Leer Referentes (archivado)
+      (ADR-022, M2)                 └─► Leer señal selección (archivado)
                                             ─► Computar salud referentes ─► PATCH Referentes salud
 ```
 
@@ -500,7 +496,7 @@ borran en lotes de 10 vía un code node de `Preparar barrido`, mismo patrón que
 
 *Loop de aprendizaje (ADR-022, M2):* **Destilar criterios → PATCH Proyectos criterios** escribe
 `Proyectos.criterios_aprendidos` (lo que el motor lee en `Armar plan` + `Gate` → el loop cierra).
-**Leer señal selección (archivado) → Leer Referentes (archivado) → Computar salud referentes → PATCH
+**Leer señal selección (archivado) → Computar salud referentes → PATCH
 Referentes salud** escribe la salud por referente.
 
 ### 4.2 Nodo por nodo
@@ -512,8 +508,7 @@ Referentes salud** escribe la salud por referente.
 | 3 | Config | set | `airtable_base_id`, `supabase_url`, `instance_id`, `sheet_id`, `sheet_tab` (placeholders `<<…>>`) + `min_muestra_referente` 10, `min_muestra_destilar` 4 (ADR-022) + `ventana_corrida_min` 120 (matiz D.2: frontera vivo/zombie al contar `runs_ok/fallo` — mismo nombre y semántica que en el motor). |
 | 4 | Abrir run en el registro | http POST | `POST runs` con `params:{workflow:'archivado'}`, `return=representation`. continue-on-fail. |
 | 5 | Barrer runs zombie | http PATCH | **Auto-sanador (B5, cierre 19).** `PATCH runs` → marca `fallo` los runs de archivado anteriores colgados `en_curso` (scoped `params->>workflow=eq.archivado` + `id=neq.<run actual>`). Repara la integridad de `runs` cuando una corrida previa falló antes de *Cerrar run*. continue-on-fail. |
-| 6 | Leer Proyectos | http GET | Airtable `Proyectos` (`pageSize 100`) → mapa `id→nombre`. **Pagina** (sigue el `offset`, #4). |
-| 7 | Leer Voces | http GET | Airtable `Voces` (`pageSize 100`) → mapa `id→nombre`. Pagina (#4). |
+| 6 | Leer plan (fachada) | http GET | **D4 (ADR-028): reemplaza a `Leer Proyectos`, `Leer Voces` y `Leer Referentes (archivado)` (nodo 23).** `?ambito=**completo**` — el archivado necesita TODAS las voces y proyectos para resolver nombres al archivar, y la salud se le escribe también a referentes pausados. Sus 3 lecturas no tenían filtro, así que `completo` calza exacto (verificado campo por campo contra Airtable). Fail-closed (sin `onError`), retry ×3, `executeOnce`. Lo consumen 4 code nodes: `Armar filas archivado`, `Computar métricas semana`, `Destilar criterios` y `Computar salud referentes`. |
 | 8 | Leer Candidatos calificados | http GET | Airtable `Candidatos` con `filterByFormula=NOT({estado}='nuevo')` (trae aprobado/descartado), `pageSize 100`. **Pagina** (sigue el `offset` → todas las páginas, no trunca a 100, #4). `Armar filas` agrega todas las páginas (`flatMap`). |
 | 9 | IF — hay calificados | if | `records.length > 0` → Armar filas; si no → **Leer runs de la semana** (la cadena de métricas corre igual — ADR-021). |
 | 10 | Armar filas archivado | code | Por cada decidido arma `{record_id, output, sheet}`. Normaliza `estado` (aprobado/descartado, default descartado), resuelve proyecto/voz por nombre, `calificado_en = fecha_calificacion`. **`output.external_id = r.id`** (el id del record de Airtable, ver §8). `metadata` lleva `calificacion` **+ `relevancia_score`/`relevancia_razon`** (ADR-021) **+ `notas_equipo`/`viral_por_tamano`** (D.3(b), 2026-07-16 — el porqué del equipo y la marca viral dejan de morir con el record; construyen el corpus para decidir si entran al destilado). Las lecturas vestigiales `tema`/`link_doc` (no existían en `Candidatos`, archivaban `''` desde siempre) **se podaron** (D.4). El Sheet gana las keys `RELEVANCIA SCORE`/`RELEVANCIA RAZON` (pueblan solo si el Sheet tiene esas columnas — autoMap ignora las que falten). |
@@ -535,7 +530,7 @@ Referentes salud** escribe la salud por referente.
 | 20 | Leer Metricas viejas → Preparar barrido Metricas → Barrer Metricas viejas | http GET + code + http DELETE | *Higiene (2026-07-14).* Purga filas con `semana` >84 días, en lotes de 10. Apunta **solo a `Métricas Proyectos`** (hardcodeado en los 2 nodos): `Métricas Global` no se barre **a propósito** (ver §4.1). Rama lateral, continue-on-fail. |
 | 21 | Destilar criterios | code + Haiku | **El loop de aprendizaje (ADR-022/M2).** Por proyecto, Haiku resume los calificados de la semana en patrones (lo que SÍ / lo que NO), priorizando los 🔥 como ejemplos positivos (fallback: aprobados). La **misma llamada** lintea los criterios manuales y deja `advertencia_criterios`. No destila con menos de `min_muestra_destilar` (4) calificados. **NUNCA pisa `criterios_relevancia` manual** — escribe al campo aparte `criterios_aprendidos`. Fail-soft: si Haiku falla, ese proyecto se salta. `<ANTHROPIC_API_KEY>`. |
 | 22 | PATCH Proyectos criterios | http PATCH | `PATCH Proyectos` con `criterios_aprendidos` + `advertencia_criterios`. **Cierra el loop:** el motor lo lee en `Armar plan de corrida` + `Gate de relevancia`. continue-on-fail. |
-| 23 | Leer señal selección (archivado) → Leer Referentes (archivado) | http GET ×2 | Supabase `v_senal_seleccion` (tasa acumulada por referente) + Airtable `Referentes` (pagina) → insumos de la salud por referente. Fail-soft. |
+| 23 | Leer señal selección (archivado) | http GET | Supabase `v_senal_seleccion` (tasa acumulada por referente) → insumo de la salud por referente. Fail-soft. Los referentes ya no se leen acá: salen del nodo 6. |
 | 24 | Computar salud referentes → PATCH Referentes salud | code + http PATCH | **La mitad-archivado de la higiene de fuentes (ADR-022).** Por referente: `tasa_gate` (`gate_pass/evaluados` del desglose `por_referente` de `runs.metricas` de la semana — 17b), `tasa_aprobacion` (acumulada de `v_senal_seleccion`) y `videos_evaluados`. Exige `min_muestra_referente` (10) para no juzgar con pocos videos. Matchea por **handle normalizado** (sin `@`, minúscula). Escribe la salud a `Referentes`. continue-on-fail. |
 
 ---

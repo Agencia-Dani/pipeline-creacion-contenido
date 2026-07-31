@@ -14,7 +14,7 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 
 ---
 
-## Qué hace (37 nodos, 3 entradas: cron + manual + webhook on-demand)
+## Qué hace (35 nodos, 3 entradas: cron + manual + webhook on-demand)
 
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 
@@ -108,7 +108,7 @@ nodo `Config` al importar (placeholders `<<...>>`), no se commitean.
 > El registro a Supabase (`Abrir run` / `Cerrar run`) es **continue-on-fail**: sin Supabase el motor
 > entrega igual a Airtable, solo no reporta — y el guard single-flight **deja pasar** (fail-open).
 > El arranque va **en serie**: `Config → Barrer runs zombie → Leer corridas vivas → Guard
-> single-flight → Abrir run → Leer Proyectos`. El guard (ADR-023) bloquea si hay una corrida viva
+> single-flight → Abrir run → Leer plan (fachada)`. El guard (ADR-023) bloquea si hay una corrida viva
 > (`en_curso` más joven que `ventana_corrida_min`, 120 min) y aplica a los 3 triggers; el barrido
 > corre antes, así un zombie nunca deja el motor trabado. `Abrir run` en serie es lo que permite que
 > `Cerrar run` referencie el `run_id` (en paralelo, n8n lo ejecutaría después y la referencia rompe).

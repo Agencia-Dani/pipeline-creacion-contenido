@@ -7,10 +7,10 @@ el contrato en [workflow.yaml](./workflow.yaml), el uso en [README.md](./README.
 
 ## Qué es
 
-Un único workflow de **n8n** (`workflow.json`, 38 nodos, 3 entradas: cron semanal + Execute manual +
+Un único workflow de **n8n** (`workflow.json`, 35 nodos, 3 entradas: cron semanal + Execute manual +
 webhook on-demand con guard single-flight — ADR-023)
-que es el **motor de reels** del MVP. Lee la config del equipo en **Airtable** (Proyectos, Voces,
-Referentes) → descubre reels IG + TikTok (Apify, solo por referentes — ADR-019) → prescore métrico (`Heat-score v1`) →
+que es el **motor de reels** del MVP. Lee la config del equipo por la **fachada del cockpit**
+(`/api/engine/run-plan`, D4/ADR-028 — ya no toca Airtable para config) → descubre reels IG + TikTok (Apify, solo por referentes — ADR-019) → prescore métrico (`Heat-score v1`) →
 transcribe (Supadata) → **traduce literal al español con Claude Haiku solo si no está en español** →
 **gate de relevancia** (Haiku estricto contra `criterios_relevancia`, compone el `heat_score`) →
 entrega **candidatos a Airtable** (estado `nuevo`) + registra la corrida en **Supabase**
@@ -35,7 +35,7 @@ ADR-009); el "link" es la URL del video original.
 - **Apify por community node** `@apify/n8n-nodes-apify.apify` (op "Run actor and get dataset", sin tope
   de 5 min). NO `httpRequest` sync. Credencial `apifyApi`.
 - **Orden de ejecución:** el arranque es `Config → Barrer runs zombie → Leer corridas vivas → Guard
-  single-flight → Abrir run → Leer Proyectos` (C.3, ADR-023): el barrido va antes del guard (un zombie
+  single-flight → Abrir run → Leer plan (fachada)` (C.3, ADR-023): el barrido va antes del guard (un zombie
   jamás traba el motor) y el guard aplica a los 3 triggers. `Abrir run en el registro` va **en serie**
   (no en paralelo), porque `Cerrar run` lo referencia por nombre y n8n ejecuta las ramas en orden de
   conexión. Si lo ponés en paralelo, corre **después** del pipeline y la referencia rompe
@@ -48,6 +48,11 @@ ADR-009); el "link" es la URL del video original.
   transcript se descarta** en el `Gate` (`descarte_razon: 'sin_guion'`), no pasa marcado — el fail-open
   ya no cubre el *insumo* transcript (revierte la decisión #6). Si Supadata se cae entera, la corrida
   entrega 0 y lo avisa.
+- **La config NO se lee de Airtable (D4, ADR-028).** `Leer plan (fachada)` hace **un** GET a
+  `{dashboard_url}/api/engine/run-plan?ambito=motor` y devuelve voces/proyectos/referentes/ajustes en
+  la misma forma `{id, fields}`. Es **fail-closed a propósito: no le pongas `onError`** — sin config
+  el run tiene que abortar. Si necesitás un dato de config nuevo, se agrega **en la app** (y en el
+  [contrato](../../core/contracts/run-plan.md)), no con un nodo Airtable nuevo acá.
 - **Un `httpRequest` corre una vez POR ITEM.** Después del fan-out entran cientos de items, así que
   cualquier lookup **de corrida** (URL igual para todos) necesita `executeOnce: true` o dispara
   cientos de requests idénticos y muere por timeout. Ya pasó: mató el cron del 27/07 en `Leer
@@ -63,7 +68,8 @@ ADR-009); el "link" es la URL del video original.
 ## Convención de placeholders
 
 Lo que se completa al importar: API keys `<ANTHROPIC_API_KEY>` / `<SUPADATA_API_KEY>` (en los Code
-nodes), e IDs `<<AIRTABLE_BASE_ID>>` / `<<SUPABASE_URL>>` / `<<INSTANCE_ID>>` (en el nodo `Config`).
+nodes), e IDs `<<AIRTABLE_BASE_ID>>` / `<<SUPABASE_URL>>` / `<<INSTANCE_ID>>` / `<<DASHBOARD_URL>>`
+(en el nodo `Config`).
 Listarlos:
 
 ```sh

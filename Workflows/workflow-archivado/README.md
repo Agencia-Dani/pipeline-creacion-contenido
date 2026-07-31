@@ -12,7 +12,7 @@
 ```
 Cron semanal (dom 6pm) ─┐
 Ejecutar manual ─┴─► Config ─► Abrir run (Supabase, continue-on-fail) ─► Barrer runs zombie
-   └─► Leer Proyectos ─► Leer Voces ─► Leer Candidatos decididos ─► IF ¿hay?
+   └─► Leer plan (fachada) ─► Leer Candidatos decididos ─► IF ¿hay?
           ├─ no ──────────────────────────────────────► (cadena de métricas)
           └─ sí ─► Armar filas ─► Registrar outputs (Supabase, continue-on-fail, TODOS)
                        └─► Append al Sheet Histórico (SOLO aprobado/publicado) ─┐

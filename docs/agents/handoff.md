@@ -26,6 +26,21 @@
 > 27/07 **abortó** en `Leer procesados`, que es exactamente el camino fail-closed de ADR-029 — con el
 > motor viejo (fail-open) el timeout se tragaba en silencio. ADR-029/030 están vivos.
 >
+> 🟢 **RE-IMPORT #1 de D4 — listo en el repo, pasos exactos (cierre 69).** Va **después** del
+> re-import del fix del timeout y de una corrida verde (decisión de Mani: separados). **Antes de
+> tocar n8n: arreglá la env de Vercel** (bloqueante rojo, abajo) y confirmá con
+> `curl "$DASHBOARD_URL/api/engine/run-plan?ambito=motor" -H "$RUN_PLAN_HEADER_NOMBRE: $RUN_PLAN_HEADER_VALOR"`
+> → tiene que dar **200**. Después:
+> 1. **Credencial nueva en n8n:** tipo *Header Auth*, nombre **`Run Plan Header`**, con el par
+>    `RUN_PLAN_HEADER_NOMBRE`/`_VALOR` **exacto** del gestor (distinto = 403 en silencio, misma
+>    trampa de siempre).
+> 2. **`<<DASHBOARD_URL>>`** en el nodo `Config` de **los 3** workflows (sin barra final:
+>    el nodo concatena `/api/engine/run-plan`).
+> 3. Re-importar los 3 (mismo path y mismo header del webhook del motor, regla de siempre).
+> **Verificación en la ejecución:** `Leer plan (fachada)` con **1 ejecución / 1 item** y el mismo
+> embudo de siempre. Si da 403/503, el run **aborta a propósito** — no es un bug, es el fail-closed
+> de ADR-028: revisá la credencial y la env de Vercel, no le pongas `onError`.
+>
 > 🟠 **RE-IMPORTAR el motor otra vez (cierre 67).** Trae el fix del timeout que mató ese cron:
 > `executeOnce` + retry ×3 en los 3 nodos de lectura del dedup y la lectura completa de
 > `processed_items`. Reusá el MISMO webhook path/header del gestor (memoria `reimport-eslabon-debil`).
@@ -64,6 +79,21 @@
 > o el supply queda corto de forma sostenida, correr el spike de arriba y evaluar migrar de actor (ADR
 > aparte).
 
+> 🔴 **BLOQUEANTE DEL RE-IMPORT #1: en prod, `/api/engine/run-plan` responde 403 (cierre 69).** Con el
+> par `RUN_PLAN_HEADER_*` del `.env` de la raíz, **local responde 200** (y 403 sin header, 400 con
+> ambito typo) — o sea el código está bien y el par es consistente. **Lo que no calza es Vercel:** o le
+> falta `RUN_PLAN_HEADER_VALOR`/`_NOMBRE`, o tiene otro valor (`headerValido` devuelve false si la env
+> está ausente, así que "falta" y "distinto" dan el mismo 403). **Si re-importás D4 con esto así, el
+> motor aborta en TODAS las corridas** — es fail-closed por diseño. Arreglar en Vercel **antes** del
+> re-import y re-verificar con curl. *(Ojo también: en el `.env` de la raíz `RUN_PLAN_HEADER_NOMBRE` y
+> `MOTOR_WEBHOOK_HEADER_NOMBRE` son los dos `X-Motor-Auth`; los valores sí difieren, pero el contrato
+> pide un par NUEVO — conviene un nombre distinto para no confundirlos nunca.)*
+>
+> 🟡 **`.env.local` del dashboard tenía 6 placeholders sin reemplazar (cierre 69):** `AIRTABLE_PAT`,
+> `AIRTABLE_BASE_ID` y los 4 de los headers. Ya sincronizados desde el `.env` de la raíz (que es el
+> hub y los tenía todos reales). **Esto corrige el diagnóstico del cierre 68:** el `sombra:import` no
+> falló solo por el `42501` — tampoco tenía credenciales de Airtable.
+>
 > 🟠 **Revisar el cruce de env vars en Vercel (cierre 68).** En `.env.local` del dashboard la key
 > `sb_secret_` estaba metida en **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** y `SUPABASE_SERVICE_ROLE` tenía el
 > placeholder literal. Local ya se arregló. **El bundle desplegado está limpio** (verificado: HTML +
@@ -250,11 +280,11 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 
 | Fase | Qué | Estado |
 |---|---|---|
-| **D0** Fundación | login magic link · 3 zonas con guardia por rol · migración `007` | ✅ código · ✅ infra · ✅ **login funcionando** (Resend SMTP + dominio `contact.retiagrowth.com`, cierre 65) |
-| **D1** Operar | qué corre + ▶ Correr ahora + corridas recientes | ✅ código · env cargadas |
+| **D0** Fundación | login magic link · 3 zonas con guardia por rol · migración `007` | ✅ código · ✅ infra · ✅ **login funcionando** (Resend SMTP + dominio `contact.retiagrowth.com`, cierre 65) · ✅ **equipo invitado**: `app.usuarios` tiene **5 filas** (Mani ×2, Alejandro `dev`, Jero `operador`, Alejo `operador`) |
+| **D1** Operar | qué corre + ▶ Correr ahora + corridas recientes | ✅ código · env cargadas · ⏳ falta el hecho-cuando en vivo (Jero disparando una corrida real) |
 | **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada · ✅ **devuelve datos desde el 29/07** (estuvo roto desde el día 1 por el grant faltante, cierre 68) |
-| **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ código · 🔓 **desbloqueado el 29/07** por `011` — nunca pudo correr (42501); `app.voces`/`app.proyectos` siguen vacías · ⏳ falta correr contra la base viva (diff cero ×3) |
-| **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ **mitad-app VERIFICADA en prod con curl** (devolvió voces/proyectos/referentes/ajustes reales) · ⏳ falta swap de nodos n8n + re-import #1 |
+| **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ **CORRIDO el 30/07 (cierre 69): espejo perfecto ×2** — voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8 (candidatos y descartes en 0 de los dos lados) · ⏳ falta **el 3er pase con una edición del equipo de por medio** (es de Mani, 2 min) |
+| **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ⏳ falta **re-import #1** (de Mani) · 🔴 **y antes: arreglar `RUN_PLAN_HEADER_VALOR` en Vercel — hoy prod da 403** (ver §Pendiente vivo) |
 | **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ⏳ falta cargar `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` en Vercel y pegar el primer lote real. **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
 
 **Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
@@ -307,6 +337,18 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-30 (cierre 69) — D3 cerrado (el espejo vive) + el swap de D4 hecho en los 3 workflows y verificado con replay A/B; el re-import queda listo pero bloqueado por una env de Vercel (Claude, pedido de Mani).**
+**Lo que se hizo, en orden:** cerrar D3 (correr el modo sombra de verdad) y hacer la mitad-n8n de D4 (los 3 `workflow.json` dejan de leer la config). Decisión de Mani al arrancar: el re-import de D4 va **separado** del re-import del fix del timeout (cierre 67), que sigue siendo lo urgente — así, si una corrida falla, se sabe cuál de los dos fue.
+**🔑 D3 — por qué nunca había corrido, y no era solo el `42501`:** el `.env.local` del dashboard tenía **6 placeholders sin reemplazar** (`AIRTABLE_PAT`, `AIRTABLE_BASE_ID` y los 4 de headers; `AIRTABLE_BASE_ID` era literalmente `TU-...`). El cierre 68 lo atribuyó todo al grant faltante — era eso **y** esto. Sincronizados desde el `.env` de la raíz, que es el hub y los tenía reales. **Espejo perfecto ×2:** voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8.
+**🗑️ El dato sucio que lo destapó (decisión de Mani: las dos cosas).** `app.referentes` reventaba por `plataforma NOT NULL`: de 21 filas de Airtable, **5 eran basura**. Se separaron en dos clases con tratamiento distinto: **(a) filas fantasma** — sin ningún campo humano — que las **genera sola la grilla de Airtable y reaparecen**, así que el espejo las ignora (`esFilaFantasma` en `domain/sombra.ts`, filtrado en `leerTablaAirtable` para que **import y diff vean lo mismo**: si solo filtrara el import, el diff las reportaría como faltantes para siempre); **(b) filas a medio cargar** (`'@'` y `@the.rumers` sin plataforma), que **siguen fallando loud** porque ahí sí hay una decisión humana — esas 2 se borraron en Airtable (backup en el scratchpad). **El caso que obligó a afinar la regla:** un referente vaciado a mano cuyo único contenido era `tasa_gate: 0.12` / `videos_evaluados: 26` — **salud que escribe el archivado, no una persona**, y que en `app.referentes` ni siquiera es columna (es la vista `v_salud_referentes`, plan §4). Por eso los 3 campos derivados no cuentan como contenido. **Verificado de paso: el motor nunca estuvo afectado** — `Armar plan de corrida:55` hace `if (!handle) return;`. Dato suelto: `recYQot…` está `activo=true` con proyectos pero **sin handle**, o sea el equipo lo cree vivo y el motor lo ignora en silencio.
+**🔧 D4 — el swap, workflow por workflow.** Nodo nuevo idéntico en los 3: **`Leer plan (fachada)`**, GET a `{dashboard_url}/api/engine/run-plan`, credencial `httpHeaderAuth` (`Run Plan Header`), **`executeOnce`** (la regla del cierre 67 aplicada aunque hoy entre 1 item), retry ×3 / 2s, timeout 30s y **SIN `onError`** — fail-closed como manda el contrato. `dashboard_url` entra en `Config` con placeholder `<<DASHBOARD_URL>>` (misma convención que `supabase_url`). **Motor** (`?ambito=motor`): mueren 4 nodos en cadena, 1 code node tocado. **Descubrimiento** (`?ambito=completo`): mueren 4. **Archivado** (`?ambito=completo`): mueren 3, 4 code nodes consumidores.
+**⚠️ El hallazgo del swap, que casi cambia la conducta en silencio:** el `Leer Proyectos` del **descubrimiento** filtraba `{activo}` server-side y su code node **NO** re-filtraba — pero sus `Leer Voces`/`Leer Referentes` no filtraban nada. O sea **ningún ámbito calzaba tal cual**: `completo` lo habría puesto a proponer referentes para proyectos apagados. Se resolvió como manda el contrato (*"cada workflow aplica su propia lógica sobre el total"*): una línea explícita `if (!f.activo) return;` en `Armar plan de descubrimiento`, igual que los referentes ya hacían 20 líneas abajo. **La regla dejó de estar escondida en un query param.** El archivado, en cambio, no filtraba nada en sus 3 lecturas ⇒ `completo` calza exacto (verificado campo por campo).
+**Topología: los nodos muertos NO estaban todos en cadena.** En descubrimiento `Leer Ajustes` era un **punto de join** (lo alimentaban `IF — hay aprobados` rama false y `PATCH Propuestos promovidos`) y en archivado `Leer Referentes (archivado)` estaba a mitad de flujo. El builder hace **bypass** de cada muerto (cada arista que le entraba va a su propio destino vivo, preservando los índices de salida del IF) y recién ahí **inserta** la fachada tras `Barrer runs zombie`. Un guard que compara destinos abortó el primer intento — por eso está.
+**Verificación (todo sin gastar un crédito):** **replay A/B del motor** — code node viejo (`git show HEAD`) alimentado por las 4 lecturas de Airtable con sus filtros originales vs. code node nuevo alimentado por la **fachada real** ⇒ **mismo plan, byte a byte** (`assert.deepStrictEqual`). **Replay A/B del descubrimiento** (el que más lo necesitaba, por el filtro nuevo): fachada devuelve 6 proyectos, el código filtra a los mismos 4 ⇒ **mismo plan**. **Archivado:** comparación a nivel dato, `?ambito=completo` **== lecturas sin filtro, campo por campo** en las 3 tablas (cubre sus 4 code nodes, cuyos cambios son sustituciones de la misma expresión). Además: `test-nodos.mjs` **todo verde con los asserts intactos** (solo cambió el mock de `$`, que es justo la prueba de que la lógica no se movió) · grafo de los 3: **0 rotas / 0 huérfanos / 0 inalcanzables** · **31/31 code nodes compilan como AsyncFunction** · validador **1436/0** · dashboard **49/49** + typecheck limpio.
+**🔴 El bloqueante que apareció al verificar:** la fachada en **prod responde 403** con el par del `.env`; **local responde 200** (y 403 sin header, 400 con typo). El código está bien: lo que no calza es la env en Vercel (ausente o distinta — `headerValido` da false en los dos casos). **Con esto así, re-importar D4 deja al motor abortando en todas las corridas.** Va a §Pendiente vivo. No pude mirarlo yo: la cuenta de Vercel conectada por MCP no tiene ese proyecto.
+**Archivos:** `Workflows/*/workflow.json` ×3 · `test-nodos.mjs` (mock) · `domain/sombra.ts` + `.test.ts` (+5 casos) · `scripts/comun.ts`. Docs: dev-doc (nodo nuevo ×3, diagramas, tablas, nodos que mueren), CLAUDE.md y README del motor, README del archivado, este handoff.
+**Próximo paso:** (1) **arreglar la env de Vercel** y re-verificar con curl · (2) el re-import del fix del timeout + las 2 corridas de fuego (sigue pendiente del cierre 67) · (3) **re-import #1 de D4** con la credencial `Run Plan Header` y `<<DASHBOARD_URL>>` en `Config` · (4) el 3er pase del diff de D3 con una edición del equipo · (5) **D5**, que el swap acaba de desbloquear: de acá en adelante la config migra a Postgres **sin volver a tocar n8n**. **Y rotar el `service_role`**, que sigue sin hacerse desde el 19/07.
 
 **2026-07-29 (cierre 68) — El transcriptor (ADR-031, 4ª zona) + el bug que tenía a todo el BFF sin poder leer el schema `app` (Claude, con Mani).**
 **Lo que se construyó:** la zona **Transcribir** del cockpit — el equipo pega N links en un textarea (uno por línea, con comas, o el chat de WhatsApp copiado entero: se extraen con regex) y recibe el **script literal** en español. Los enlaces entran al **dedup del motor**, que era el requisito duro del pedido.
