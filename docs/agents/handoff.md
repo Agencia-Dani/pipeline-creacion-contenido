@@ -22,10 +22,21 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> 🟠 **CORTE 1/4 DE D5 (Ajustes) — 2 pasos manuales, después del deploy.** El código ya está: la
-> fachada sirve los 18 knobs desde `app.ajustes` y la pantalla es `/curar/ajustes`. Lo que falta es
-> **cerrarle la puerta vieja al equipo**, porque hasta que se cierre hay dos superficies editables y
-> una de las dos no la lee nadie:
+> 🔧 **EN CURSO — Mani tomó el re-import del motor + la 2ª corrida de fuego (dedup)** el 2026-07-31.
+> Son los 3 pasos manuales del cierre 71 (más abajo) y después el verificador:
+> `set -a && source .env && set +a && node Workflows/workflow-short-form-content/verificar-corrida.mjs 2`
+>
+> 🟠 **CORTE 1/4 DE D5 (Ajustes) — commiteado, SIN pushear a propósito.** El código ya está
+> (`bd12a26`): la fachada sirve los 18 knobs desde `app.ajustes` y la pantalla es `/curar/ajustes`.
+>
+> **⛔ El deploy espera a que la corrida de fuego del dedup esté verificada.** No es un bloqueo
+> técnico —el A/B dio 0 diferencias, la corrida saldría igual— es la misma regla que ya se aplicó en
+> el cierre 69 al separar los dos re-imports: **una corrida, una variable**. Esa corrida existe para
+> juzgar el fix del dedup; si además estrena la fuente de los ajustes y algo sale raro, no se sabe
+> cuál de las dos fue. Push (= deploy) **después** del verificador en verde.
+>
+> **Después del deploy, 2 pasos de Mani** — hay que cerrarle la puerta vieja al equipo, porque hasta
+> que se cierre hay dos superficies editables y una de las dos no la lee nadie:
 > 1. **En Airtable: dejar las páginas *Configuración Global* y *Ajustes Dev-Only* en solo-lectura**
 >    (o renombrarlas `[ARCHIVO] …`). El dato viejo se conserva; lo que importa es que nadie edite ahí
 >    creyendo que aplica. **Avisarle a Majo y Jero** — el [onboarding §5.5](../onboarding-equipo-redes.md)
@@ -34,6 +45,11 @@
 >    devuelve —
 >    `curl "$DASHBOARD_URL/api/engine/run-plan?ambito=motor" -H "$RUN_PLAN_HEADER_NOMBRE: $RUN_PLAN_HEADER_VALOR"`
 >    — y que quedó su fila en `app.eventos` (`tipo = 'ajustes.editar'`, con valor anterior y nuevo).
+>
+> **En Supabase no hay NADA que hacer para este corte** (la pregunta salió, queda escrita): la tabla
+> `app.ajustes` existe desde la migración `009` —aplicada el 30/07— y sus 18 filas las cargó el
+> import de sombra. El 31/07 se verificaron contra Airtable: **0 diferencias**. No hay SQL nuevo, no
+> hay env var nueva, no hay credencial nueva. El corte es código, y el código ya está.
 >
 > ⚠️ **`sombra:import` ya NO toca `app.ajustes`** (salió del catálogo de `scripts/comun.ts`): con
 > Postgres de dueño, un import pisaría en silencio lo que el equipo editó. Es el procedimiento para
@@ -311,7 +327,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **⚠️ La trampa que este piloto encontró y dejó cerrada:** una tabla cortada tiene que **salir del catálogo de sombra** (`scripts/comun.ts`) en el mismo cambio. Si se queda, el próximo `sombra:import` la pisa con los valores viejos de Airtable —revirtiendo en silencio lo que el equipo editó en la app— y el `sombra:diff` empieza a reportar como error las diferencias legítimas. Anotado como procedimiento en el plan §D5.
 **Detalles chicos con motivo:** `app.ajustes.valor` es `numeric` y PostgREST lo devuelve **string** — se normaliza en `lib/ajustes.ts`, una vez, para que ni el dominio ni la pantalla lo sepan · el `id` del contrato viaja **la clave** (nadie lo consume: los 2 workflows leen por `fields.clave`), así que no hubo que inventarle un record id a Postgres · la acción **revalida el rol contra la fila real** antes de escribir, no confía en lo que la pantalla mostró · cada edición deja `app.eventos` con valor anterior y nuevo, que es la única forma de reconstruir por qué una corrida salió rara tres semanas después.
 **Verificación (todo lectura, cero créditos):** **A/B Airtable ↔ fachada: 18 claves de los dos lados, 0 diferencias** · la fachada local devuelve **200** con 3 voces · 4 proyectos · 16 referentes · **18 ajustes**, y la N por proyecto sigue resolviendo a 100 desde `Candidatos por corrida` · typecheck limpio · dashboard **63/63** (cae 1 test: el de `mapearAjuste`, que se fue con su función) · validador **1454/0**. *No se pudo probar la pantalla en el browser: entrar pide magic link.* Por eso el hecho-cuando del corte es de Mani, y son 2 minutos (§Pendiente vivo).
-**Próximo paso:** deploy + los 2 pasos manuales, y después el **corte 2/4: Referentes** (+ la vista de flojos y los Sugeridos). Sigue pendiente, aparte y sin relación, la 2ª corrida de fuego del dedup.
+**Orden de operaciones (decisión de Mani al cierre de la sesión):** el commit queda **sin pushear** hasta que la **2ª corrida de fuego del dedup** —que Mani tomó en esta misma sesión— esté verificada. Misma regla que separó los dos re-imports en el cierre 69: **una corrida, una variable**. El A/B dice que la corrida saldría igual con la fuente nueva; el punto no es el riesgo, es poder atribuir el resultado.
+**Próximo paso:** corrida de fuego verde → push (= deploy) → los 2 pasos manuales de §Pendiente vivo → **corte 2/4: Referentes** (+ la vista de flojos y los Sugeridos).
 
 **2026-07-31 (cierre 71) — Los 3 hallazgos del cierre 70, cerrados en el repo + un auditor que caza esta clase de bug sola (Claude, pedido de Mani).**
 **H1 — la memoria del dedup dejó de ser una rama.** Decisión de Mani sobre la alternativa propuesta en el cierre 70: en vez de mover posiciones (`x<4480`), **serializar**: `Heat-score v1 → Preparar procesados → POST processed_items → Transcribir`. El argumento es que mover posiciones deja la garantía central de ADR-029 viviendo en dos coordenadas de canvas, o sea la próxima limpieza visual la rompe otra vez y en silencio; en serie la garantía es **topológica**. Tres detalles la sostienen: `alwaysOutputData` en el POST (PostgREST devuelve body vacío con `resolution=ignore-duplicates`, y sin item de salida `Transcribir` no dispararía), `Transcribir` pasa a leer `$('Heat-score v1').all()` en vez de `$input` (su input ahora es la respuesta del POST), y `onError: continueRegularOutput` **se conserva** — la escritura sigue siendo fail-open, como manda el ADR. **De arrastre, `registro_dedup` revive:** `POST processed_items` es ahora ancestro de `Resumen del run`. Quedó como [enmienda 2026-07-31 de ADR-029](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md), con la decisión #2 original **tachada** — el mecanismo que describía era falso y nadie debería leerlo de buena fe.
