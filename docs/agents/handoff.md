@@ -22,6 +22,18 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 📋 **El viaje a Airtable que se viene acumulando, junto, para hacerlo de una** (los 3 cortes de
+> D5 dejaron su parte y ninguna se hizo todavía). **7 páginas a congelar** —solo-lectura o
+> renombrar `[ARCHIVO] …`— y **ninguna tabla a bloquear**:
+> *Configuración Global* · *Ajustes Dev-Only* (corte 1/4) · *Referentes* · *Referentes - Revisar* ·
+> *Referentes - Sugeridos* (corte 2/4) · *Voces* · *Proyectos* (corte 3/4, después del merge).
+> **La regla es la misma en los tres: se congela la PÁGINA, nunca la tabla.** Tres tablas siguen
+> recibiendo escrituras de máquina — `Referentes propuestos` (la escribe el descubrimiento y la
+> PATCHea la app), `Proyectos` (`criterios_aprendidos`/`advertencia_criterios`, ADR-033) y
+> `Candidatos`/`Descartes` (el motor). Bloquear cualquiera de esas rompe algo vivo.
+> **Y el aviso al equipo, que es la mitad que no es Airtable:** lo único peligroso de todo esto es
+> **aprobar un sugerido desde Airtable** (detalle abajo, corte 2/4). El resto es inocuo pero inútil.
+
 > 🔵 **EL CORTE 3/4 (Voces + Proyectos) ESTÁ CONSTRUIDO Y VERIFICADO, EN LA RAMA
 > `corte-3-voces-proyectos`.** No está en `main` todavía: el flip vive en la rama porque la unidad
 > de aislamiento es la rama (aprendizaje del cierre 72). **No hay migración ni carga previa** — a
@@ -347,13 +359,22 @@ devuelve la config real; sin header 403; ambito typo 400.
 > real se diagnostica en **Supabase → Auth Logs** (500 = SMTP falló para invitado · 422 = mail no
 > invitado, esperado), no en Vercel (salía `{}`). Detalle en el log del cierre 65.
 
-**Lo que queda del cockpit (orden sugerido):** (1) **cerrar hecho-cuando D0 con el equipo** (invitar
-Majo/Jero: *Authentication → Users* + fila en `app.usuarios`; el login ya funciona, cierre 65) ·
-(2) correr `sombra:import`/`sombra:diff` hasta cero ×3 (D3) · (3) **swap de nodos en los 3
-`workflow.json`** (4+ nodos de lectura → 1 HTTP Request a la fachada, con `?ambito=motor` en motor y
-`?ambito=completo` en archivado/descubrimiento) + **re-import #1** → verificar mismo plan con
-`test-nodos.mjs` + replay (hecho-cuando D4) · (4) **D5**: corte de config dominio por dominio
-(Ajustes → Referentes → Voces+Proyectos), cada uno pantalla → diff cero → flip.
+**Lo que queda del cockpit, al 2026-07-31 (cierre 74).** D0–D4 están vivos en producción y D5 va 3
+de 4 (el 3/4 construido, en rama). El orden de acá en adelante:
+
+1. **Publicar el corte 3/4** — los 3 pasos de §Pendiente vivo (script → merge → hecho-cuando) + el
+   congelado de *Voces* y *Proyectos* en Airtable, que en este corte tiene un matiz (ADR-033).
+2. **Corte 4/4** — *(y acá hay una pregunta abierta: el plan lo llama "corte 3/4 y 4/4" pero Voces y
+   Proyectos se cortaron juntos porque van por FK. **No queda un cuarto dominio de config.** Con
+   Ajustes, Referentes, Voces y Proyectos adentro, D5 está completo — lo que queda de Airtable son
+   las 3 tablas que ESCRIBE n8n, y eso es D7. Vale confirmarlo con Mani antes de buscar un 4/4 que
+   probablemente no exista.)*
+3. **D6 — el feed de calificación.** La pantalla que el equipo más usa. `veredicto` de *Descartes*
+   **tiene que quedar editable**: con el campo bloqueado, `falsos_negativos` da siempre 0 y eso se
+   lee como "el gate está perfecto", que es lo contrario de la verdad (ADR-021).
+4. **D7 — corte de escritura** (re-import #2). Es el que mata las 3 llamadas que le quedan a
+   Airtable en la app y la traducción de ids del contrato (ADR-033 §3).
+5. **D8 — apagado.**
 
 **Las 2 decisiones abiertas se CERRARON el 2026-07-16 (cierre 49, consultadas a Mani):**
 el **descubrimiento NO respeta `Voces.activo` a propósito** (despensa para voces pausadas —
@@ -392,7 +413,9 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **ℹ️ La única diferencia real, y queda anotada porque va a reaparecer:** el **orden** de las listas. Airtable devuelve el orden del grid (que cambia si alguien arrastra una fila), Postgres ordena por nombre. Entra en `ig_urls` (en qué secuencia se le piden las cuentas a Apify) y en `ig_owner_to_proj` (qué copia de un video se crea primero). Lo único que podría cambiar por eso es un **empate exacto** de relevancia y heat entre dos proyectos para el mismo video — un desempate que ya era arbitrario. El orden nuevo, además, es estable; el viejo no lo era.
 **🖥️ Y por primera vez las pantallas se probaron EN EL BROWSER.** Los 3 cortes anteriores se publicaron sin verlas ("entrar pide magic link"). Se resuelve con `auth.admin.generateLink` y el service_role, que **no manda ningún mail**: devuelve el token, se pega en `/auth/confirm` y hay sesión local. Encontró 3 cosas que ningún test iba a encontrar: (a) el nombre de una voz y el de un proyecto eran dos inputs idénticos y **la jerarquía —que es la regla del sistema— no se veía**: se arregló con la etiqueta `VOZ`, el input más grande y un borde izquierdo con `SUS PROYECTOS`; (b) en *Agregar un proyecto* el botón Crear estaba **arriba** del campo obligatorio de criterios, o sea se clickeaba antes de haber visto lo que lo iba a rechazar; (c) el placeholder del nombre era "Storytelling", que es un proyecto que ya existe. **Esto queda como procedimiento: la pantalla se mira antes de publicarla.**
 **Suelto que apareció mirando el plan y no es de este corte:** `Días de recencia = 100`, con `Mínimo de vistas`, `Mínimo de likes` y `Relevancia mínima` en **0**. Las perillas están abiertas del todo — coherente con que los 4 proyectos reporten `razon_faltante: supply`, pero conviene saberlo antes de leer una corrida.
+**❓ Una pregunta para Mani que salió de terminar este corte: no existe un "corte 4/4".** La numeración salió del cierre 72 contando Voces y Proyectos por separado, pero van juntos por FK y ya están adentro. Con Ajustes, Referentes, Voces y Proyectos cortados, **D5 está completo**: lo que queda en Airtable son las 3 tablas que ESCRIBE n8n (`Candidatos`, `Descartes del gate`, `Referentes propuestos`), y esas son D7, no D5. Conviene confirmarlo antes de que alguien salga a buscar un dominio que no existe.
 **Próximo paso:** los 3 pasos de §Pendiente vivo → congelar *Voces* y *Proyectos* en Airtable (⚠️ para personas: la máquina sigue escribiendo ahí) → **D6, el feed de calificación**, que es la pantalla que el equipo más usa y la última pieza de config ya está. Ojo con lo que D6 ya tiene escrito: `veredicto` de *Descartes* **tiene que quedar editable** — con el campo bloqueado, `falsos_negativos` da siempre 0 y "0 falsos negativos" se lee como *el gate está perfecto*, que es la conclusión opuesta a la verdad.
+**Skills para la próxima sesión:** `/grill-with-docs` antes de arrancar D6 (es la pantalla que decide si la migración se siente bien, y el PRD pide validarla con Jero y Majo con la pantalla en la mano) · `/tdd` para el dominio de la calificación · `/handoff` al cerrar. Para las pantallas, **el login local ya no es un bloqueo**: `auth.admin.generateLink` con el service_role devuelve el token sin mandar mail (receta en este mismo cierre).
 
 **2026-07-31 (cierre 73) — D5 corte 2/4: Referentes, y el bug de modelo que casi apaga un proyecto entero (Claude, pedido de Mani).**
 **Lo que se construyó:** el segundo corte de config. Pantallas **`/curar/referentes`** (el banco: alta, poda, proyectos por cuenta, notas, con la salud read-only al lado y la vista *A revisar* **adentro** en vez de en otra página — separarlas obligaba a saltar de pantalla para hacer justo la acción que la lista existe para provocar) y **`/curar/sugeridos`** (la bandeja del descubrimiento), más el flip en `lib/config.ts`. **Va en la rama `corte-2-referentes`: el flip no puede vivir en `main` hasta que la migración y la carga estén hechas** (§Pendiente vivo tiene los 3 pasos en orden). La unidad de aislamiento es la rama — aprendizaje del cierre 72, aplicado.
