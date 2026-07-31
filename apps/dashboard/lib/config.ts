@@ -1,20 +1,22 @@
 import type { Proyecto, Voz } from "@/domain/corrida";
 import { leerConfigAirtable, leerTabla } from "@/lib/airtable";
 import { leerAjustes, leerAjustesComoRegistros } from "@/lib/ajustes";
+import { leerReferentesComoRegistros } from "@/lib/referentes";
 
 // La costura del corte de D5: acá, y solo acá, se decide de qué almacenamiento sale cada
-// dominio de la config. Hoy Ajustes ya vive en Postgres y Voces/Proyectos/Referentes siguen
-// en Airtable; cada corte que falta mueve UNA línea de este archivo (más su pantalla).
+// dominio de la config. Hoy Ajustes y Referentes ya viven en Postgres y Voces/Proyectos siguen
+// en Airtable; el corte que falta mueve UNA línea de este archivo (más su pantalla).
 //
 // Lo que no cambia nunca es la FORMA: la fachada devuelve `{id, fields}` (contrato
 // core/contracts/run-plan.md), así que ningún corte obliga a re-importar workflows.
 
 export async function leerRunPlanCrudo(ambito: "motor" | "completo" = "motor") {
-  const [airtable, ajustes] = await Promise.all([
+  const [airtable, ajustes, referentes] = await Promise.all([
     leerConfigAirtable(ambito),
     leerAjustesComoRegistros(), // ← Postgres (D5, corte 1/4)
+    leerReferentesComoRegistros(ambito), // ← Postgres (D5, corte 2/4)
   ]);
-  return { ...airtable, ajustes };
+  return { ...airtable, ajustes, referentes };
 }
 
 const texto = (v: unknown): string => (typeof v === "string" ? v : "");

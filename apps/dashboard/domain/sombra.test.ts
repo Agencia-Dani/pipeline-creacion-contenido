@@ -5,7 +5,9 @@ import {
   esFilaFantasma,
   mapearCandidato,
   mapearProyecto,
+  mapearReferente,
   normalizar,
+  proyectosDeReferente,
   sinDiferencias,
   type Fila,
 } from "./sombra.ts";
@@ -55,6 +57,37 @@ describe("mapeos Airtable → app", () => {
     assert.equal(fila.creado_en, "2026-07-20T08:30:00.000Z");
   });
 
+});
+
+describe("referentes: N:M y filas a medio cargar (ADR-032)", () => {
+  const referente = (fields: Record<string, unknown>) => ({ id: "recR", fields });
+
+  it("los proyectos NO se truncan a uno: es la regresión que motivó el ADR", () => {
+    // Con `link()` (el mapeo viejo) esto devolvía solo recA, y el corte apagaba proyectos
+    // enteros: 35 pares vivos → 16.
+    assert.deepEqual(proyectosDeReferente(referente({ proyecto: ["recA", "recB", "recC"] })), [
+      "recA",
+      "recB",
+      "recC",
+    ]);
+  });
+
+  it("sin proyectos linkeados devuelve lista vacía, no null", () => {
+    assert.deepEqual(proyectosDeReferente(referente({})), []);
+  });
+
+  it("un referente sin handle falla loud, no se guarda con un placeholder", () => {
+    // En Airtable el campo viene ausente y el motor hace `if (!handle) return;` — la ignora
+    // sin gastar. Guardarla como "(sin handle)" la volvería un handle válido y el motor le
+    // pediría esa cuenta a Apify. Hay 1 fila así en la base viva, activa y con 2 proyectos.
+    assert.throws(() => mapearReferente(referente({ plataforma: "instagram", activo: true })), /sin handle/);
+  });
+
+  it("el handle se guarda como Airtable lo tenía, con su arroba", () => {
+    const fila = mapearReferente(referente({ handle: "@simonsinek", plataforma: "instagram" }));
+    assert.equal(fila.handle, "@simonsinek");
+    assert.equal(fila.proyecto_id, undefined); // el vínculo ya no es columna de esta fila
+  });
 });
 
 describe("diff esperado ↔ actual", () => {

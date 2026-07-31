@@ -137,7 +137,7 @@ no podía hacer cumplir:
 |---|---|---|
 | `app.voces` | `Voces` | — |
 | `app.proyectos` | `Proyectos` | `voz_id` **FK not null** (la regla "1 proyecto = 1 voz" deja de ser convención) · `criterios_relevancia` **not null** (cierra la trampa del form, §5.1-6) |
-| `app.referentes` | `Referentes` | `plataforma` como enum · las 3 columnas de salud pasan a **vista** (las computa el archivado hoy; se derivan de `runs.metricas`) |
+| `app.referentes` | `Referentes` | `plataforma` como enum · las 3 columnas de salud pasan a **vista** (las computa el archivado hoy; se derivan de `runs.metricas`) · el vínculo con proyectos es **N:M explícito** en `app.referentes_proyectos` ([ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md)) |
 | `app.ajustes` | `Ajustes` | `clave` con check contra el mapa conocido · `visibilidad` (equipo/dev) explícita |
 | `app.candidatos` | `Candidatos` | sin cuota de 1.000 records: dejan de borrarse por presión de espacio · FK a `outputs` |
 | `app.descartes` | `Descartes del gate` | `veredicto` editable de verdad (hoy bloqueado por una limitación de Airtable, §5.1-1) |
@@ -236,6 +236,29 @@ Cada corte: pantalla lista → diff en cero → flip → esa página de Airtable
 >    editó en la app, en silencio, y el `sombra:diff` empieza a llamar error a lo correcto.
 > 3. **El `id` del contrato es opaco** (nadie lo consume): `app.ajustes` no tiene record id de
 >    Airtable y no hizo falta inventarle uno — viaja la clave. Ver `core/contracts/run-plan.md`.
+
+> **Corte 2/4 — Referentes: HECHO (2026-07-31).** Pantallas `/curar/referentes` (el banco, con
+> *A revisar* adentro en vez de en otra página) y `/curar/sugeridos`. Lo que este corte agregó al
+> procedimiento, y que el piloto no podía anticipar:
+> 1. **Antes de cortar un dominio, medí el dato vivo contra el schema que lo va a recibir.** Acá
+>    `app.referentes` modelaba 1 proyecto por referente y la realidad son 2–4: el flip tal cual
+>    tiraba 19 de 35 pares y dejaba *Storytelling* con cero fuentes. Lo arregla
+>    [ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md) (tabla puente, migración `012`).
+>    **Y el modo sombra no podía avisar:** su diff compara Airtable-ya-mapeado contra Postgres, así
+>    que es ciego a lo que el mapeo tira. *Un diff que pasa por el mapper valida el transporte, no
+>    el modelo.*
+> 2. **El `id` dejó de ser opaco.** A diferencia de `ajustes`, `referentes[].id` **sí** lo consume
+>    alguien: `Computar salud referentes` del archivado PATCHea Airtable con él. Por eso la fachada
+>    sirve el `airtable_id` mientras Airtable siga recibiendo esa escritura (muere en D7).
+> 3. **Si el corte rompe un loop que cierra n8n, el loop se mueve en el mismo cambio.** Aprobar un
+>    sugerido sembraba el referente **en Airtable** (`POST Referentes (promoción)`), o sea nacía
+>    invisible. La aprobación pasó a la app y marca la propuesta `promovido` **salteando
+>    `aprobado`**, que es el estado que dispara el camino viejo: el nodo queda sin trabajo, sin
+>    tocar n8n.
+> 4. **La carga de datos de un corte es un script propio** (`scripts/cortar-referentes.ts`), no el
+>    `sombra:import` — que en ese mismo cambio deja de ver la tabla. Corre una vez, imprime el A/B
+>    (referentes por proyecto + registro por registro en los dos ámbitos) y es la evidencia que
+>    ADR-027 §5 pide antes de flipear.
 **La pantalla de Proyectos tiene que mostrar `advertencia_criterios`**, que hoy no muestra ninguna
 superficie: es un campo que existe **solo** para que una persona lo lea (el gate no lo lee, por
 contrato), así que hoy el archivado gasta un Haiku cada domingo para escribir un aviso que nadie ve

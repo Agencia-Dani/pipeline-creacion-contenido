@@ -10,7 +10,6 @@ import {
   mapearDescarte,
   mapearPropuesto,
   mapearProyecto,
-  mapearReferente,
   mapearVoz,
   type Fila,
   type RegistroAirtable,
@@ -57,8 +56,10 @@ export async function leerTablaAirtable(tabla: string): Promise<RegistroAirtable
 // ⚠️ Una tabla que ya se cortó (D5) SALE de esta lista y no vuelve. Con Postgres de dueño, un
 // import la pisaría con los valores viejos de Airtable y revertiría en silencio lo que el
 // equipo editó en la app; el diff, por el mismo motivo, reportaría diferencias legítimas como
-// error. **Ya cortada: `Ajustes` → `app.ajustes`** (su `mapearAjuste` se fue con ella; está en
-// git si hiciera falta volver atrás).
+// error. **Ya cortadas: `Ajustes` → `app.ajustes`** (corte 1/4; su `mapearAjuste` se fue con
+// ella, está en git si hiciera falta volver atrás) y **`Referentes` → `app.referentes` +
+// `app.referentes_proyectos`** (corte 2/4; su carga inicial la hizo `cortar-referentes.ts`,
+// que corre una sola vez — `mapearReferente` sobrevive ahí, no acá).
 export type TablaSombra = {
   airtable: string;
   pg: string;
@@ -72,10 +73,6 @@ export const TABLAS: TablaSombra[] = [
   {
     airtable: "Proyectos", pg: "proyectos", mapear: mapearProyecto, conflicto: "airtable_id",
     fks: [{ placeholder: "_voz", columna: "voz_id", padre: "voces" }],
-  },
-  {
-    airtable: "Referentes", pg: "referentes", mapear: mapearReferente, conflicto: "airtable_id",
-    fks: [{ placeholder: "_proyecto", columna: "proyecto_id", padre: "proyectos" }],
   },
   {
     airtable: "Candidatos", pg: "candidatos", mapear: mapearCandidato, conflicto: "airtable_id",

@@ -32,7 +32,7 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/airtable-cockpit.md](core/contracts/airtable-cockpit.md) — modelo de datos del cockpit (las 6 tablas Airtable).
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–009; se aplican en el SQL Editor).
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–012; se aplican en el SQL Editor).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*

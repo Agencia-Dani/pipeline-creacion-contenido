@@ -79,15 +79,42 @@ export function mapearProyecto(r: RegistroAirtable): Fila {
   };
 }
 
+// ⚠️ Referentes ya NO está en el catálogo de sombra: se cortó a Postgres (D5, corte 2/4). Este
+// mapeo sobrevive porque lo usa el script de corte (scripts/cortar-referentes.ts), que es la
+// carga de datos que se corre UNA vez antes del flip. Muere con Airtable en D8.
+//
+// Sin `_proyecto`: el vínculo referente↔proyecto es N:M (ADR-032) y vive en su propia tabla, así
+// que no es una columna de esta fila. Lo devuelve `proyectosDeReferente`.
 export function mapearReferente(r: RegistroAirtable): Fila {
+  // Falla loud, como `mapearProyecto`: un referente sin handle es una fila a medio cargar y ahí
+  // hay una decisión humana (completarla o borrarla), no un default que inventar.
+  // El `"(sin handle)"` que este mapeo ponía antes era peor que nada: en Airtable el campo viene
+  // ausente y el motor hace `if (!handle) return;` — la ignora sin gastar. Con un placeholder
+  // guardado, el motor lo ve como handle válido y le pide esa cuenta a Apify. Lo detectó el A/B
+  // del corte 2/4 contra el dato vivo (hay 1 fila así, activa y con 2 proyectos).
+  const handle = texto(r.fields.handle);
+  if (!handle) {
+    throw new Error(`Referente ${r.id} sin handle, con proyectos linkeados: completalo o borralo en Airtable (el motor hoy lo ignora en silencio).`);
+  }
   return {
     airtable_id: r.id,
-    handle: texto(r.fields.handle) ?? "(sin handle)",
+    handle,
     plataforma: texto(r.fields.plataforma),
-    _proyecto: link(r.fields.proyecto),
     activo: booleano(r.fields.activo),
     notas: texto(r.fields.notas),
   };
+}
+
+/**
+ * Los proyectos que alimenta un referente, como los ve el motor: `Referentes.proyecto` es un
+ * link MÚLTIPLE y `Armar plan de corrida` lo recorre entero. Tomar `[0]` —lo que hacía este
+ * módulo hasta ADR-032— tiraba 19 de los 35 pares vivos y dejaba un proyecto activo sin ninguna
+ * fuente. Devuelve record ids de Airtable; el script los traduce a uuid.
+ */
+export function proyectosDeReferente(r: RegistroAirtable): string[] {
+  const v = r.fields.proyecto;
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.filter((x): x is string => typeof x === "string"))];
 }
 
 // (Ajustes ya no se mapea: se cortó en D5 y Postgres es su dueño — ver scripts/comun.ts.)

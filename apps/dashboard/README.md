@@ -11,20 +11,25 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
 - `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 4 zonas en `(zonas)/`:
   `operar` · `curar` · `transcribir` · `entender` (plan-cockpit §2.1 + ADR-031), y
   `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
-  [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed,
-  hoy lee Airtable por dentro.
+  [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed.
+  De qué almacenamiento sale cada dominio lo decide `lib/config.ts` — la costura de los cortes de
+  D5 (Ajustes y Referentes ya en Postgres; Voces y Proyectos todavía en Airtable).
 - `domain/` — reglas puras sin IO (C3): roles y zonas, la vista de corrida (qué corre, N
   resuelta, estado legible) y `enlace.ts` (de un pegote de texto a `external_id`). Se testea con
   `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
-  `airtable.ts` (lectura read-only de la config mientras viva en Airtable; muere en D5),
+  `airtable.ts` (lo que todavía vive en Airtable; muere en D8), `ajustes.ts` y `referentes.ts` (los
+  dos dominios ya cortados a Postgres), `sugeridos.ts` (la bandeja del descubrimiento),
   `runs.ts` (últimas corridas del motor), `transcripciones.ts` + `transcribir.ts` (el transcriptor:
   la cola y las llamadas a Supadata/Haiku), `eventos.ts` (auditoría, sumidero) y `auth.ts`
   (guardias `usuarioActual`/`exigirZona`).
 - `components/ui/` — shadcn, código propio editable (C9).
 - `scripts/` — el modo sombra de D3: `npm run sombra:import` (espejo idempotente Airtable → schema
-  `app`) y `npm run sombra:diff` (compara los dos mundos; exit 1 si difieren). Airtable sigue siendo
-  el dueño hasta que el diff dé cero 3 corridas seguidas (plan-cockpit §6/D3).
+  `app`) y `npm run sombra:diff` (compara los dos mundos; exit 1 si difieren). **Una tabla ya
+  cortada sale del catálogo** (`comun.ts`) para que un import no pise lo que el equipo editó en la
+  app. Más `npm run cortar:referentes`, la carga de datos del corte 2/4: corre **una sola vez**,
+  entre la migración `012` y el flip, e imprime el A/B que autoriza a publicar (`-- --dry` para
+  verificar sin escribir).
 - `proxy.ts` — refresh de sesión + redirect a login (en Next 16 middleware se llama proxy).
 
 La autoridad de permisos está en el servidor: cada página exige su zona con `exigirZona`, y los
@@ -46,10 +51,13 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    [`008_entender_tarifas_y_vistas.sql`](../../core/schema/008_entender_tarifas_y_vistas.sql),
    [`009_app_config_sombra.sql`](../../core/schema/009_app_config_sombra.sql) y
    [`010_transcripciones.sql`](../../core/schema/010_transcripciones.sql) y
-   [`011_grants_app_service_role.sql`](../../core/schema/011_grants_app_service_role.sql)** en el
+   [`011_grants_app_service_role.sql`](../../core/schema/011_grants_app_service_role.sql) y
+   [`012_referentes_proyectos.sql`](../../core/schema/012_referentes_proyectos.sql)** en el
    SQL Editor de Supabase (en ese orden), y agregar `app` a *Settings → API → Exposed schemas*
    (sin esto la app no lee roles ni las vistas analíticas).
-   La 010 es la del transcriptor (ADR-031). La **011 es obligatoria**: sin ella el BFF recibe
+   La 010 es la del transcriptor (ADR-031); la **012 es el corte 2/4** (ADR-032: el vínculo
+   referente↔proyecto pasa a tabla puente) y va **antes** de `npm run cortar:referentes`.
+   La **011 es obligatoria**: sin ella el BFF recibe
    `42501 permission denied for schema app` en TODO lo que lee de `app.*` — *Entender*,
    *Transcribir* y los scripts de sombra. El login no lo delata porque va por la anon key.
 2. **Invitar a los usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
@@ -87,6 +95,11 @@ el costo de la semana solo (zona *Entender*, con la migración 008 aplicada).
 
 **Hecho-cuando de D3:** `npm run sombra:diff` da cero diferencias 3 corridas seguidas (una con
 ediciones del equipo de por medio), con las env de Airtable + `SUPABASE_SERVICE_ROLE` en `.env.local`.
+
+**Hecho-cuando de cada corte de D5:** el equipo edita ese dominio solo en la app y su página de
+Airtable queda congelada. El corte 2/4 (Referentes) suma su propia evidencia previa:
+`npm run cortar:referentes` tiene que terminar en verde — mismos referentes por proyecto y mismos
+registros que servía Airtable, en los dos ámbitos — **antes** de publicar el flip.
 
 **Hecho-cuando de D4:** una corrida real del motor produce el mismo plan leyendo la fachada que
 leyendo Airtable (verificado con `test-nodos.mjs` + replay), tras el swap de nodos y el re-import #1.

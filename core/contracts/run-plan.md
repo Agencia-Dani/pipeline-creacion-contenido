@@ -40,11 +40,22 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 }
 ```
 
-> **`id` es opaco: nadie lo consume.** Los dos workflows que leen ajustes lo hacen por
-> `fields.clave`. Por eso, cuando `Ajustes` se cortó a Postgres (D5), el `id` pasó de ser el
-> record id de Airtable a la clave misma sin que nada se enterara — que es exactamente la
-> libertad que promete el versionado. **De qué almacenamiento sale cada dominio hoy lo dice
-> `apps/dashboard/lib/config.ts`**, y no se repite acá para que no quede viejo.
+> **`id` es opaco en `ajustes`, NO en `referentes`.** Los dos workflows que leen ajustes lo hacen
+> por `fields.clave`, así que cuando `Ajustes` se cortó a Postgres (D5) el `id` pasó a ser la clave
+> misma sin que nada se enterara. **`referentes[].id` sí lo consume alguien:** `Computar salud
+> referentes` del archivado lo usa para PATCHear la tabla `Referentes` de Airtable. Por eso, tras
+> el corte 2/4, la fachada sirve ahí el **record id de Airtable** del referente (y su uuid solo si
+> nació en la app, donde ese PATCH ya no tiene a quién escribirle). Cuando D7 saque esa escritura,
+> el campo vuelve a ser opaco.
+>
+> **`referentes[].fields.proyecto` viaja en el idioma de `proyectos[].id`** — hoy record ids de
+> Airtable, porque Proyectos corta en 4/4. El motor cruza las dos listas por ese id; la traducción
+> la hace la app (`domain/referentes.ts`, `aRegistrosDelPlan`) y se cae sola cuando los dos lados
+> sean uuid. Es **un array**: un referente alimenta N proyectos
+> ([ADR-032](../../docs/adr/ADR-032-referente-proyecto-es-n-a-n.md)).
+>
+> **De qué almacenamiento sale cada dominio hoy lo dice `apps/dashboard/lib/config.ts`**, y no se
+> repite acá para que no quede viejo.
 
 - **Filtros (ADR-028 §2, y nada más):** solo voces `activo` · solo proyectos `activo` **de voz
   activa** (el gate que hoy hace `Armar plan` cruzando tablas) · solo referentes `activo` ·

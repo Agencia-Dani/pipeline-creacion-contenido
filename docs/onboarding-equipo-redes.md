@@ -27,10 +27,11 @@
   una corrida a demanda** cuando la necesiten (§3.1) — ya no dependen del lunes.
 - ✅ Poner en cada candidato dos cosas: la **calificación** (🔥/👍/👎) y el **estado** (aprobado/descartado).
 - ✅ Calificar **también lo que descartan** (👎 + descartado): así la máquina aprende y mejora.
-- ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**).
-  Esa lista es de dónde sale **todo** el contenido: cuentas buenas = candidatos buenos.
-- ✅ Revisar **una vez por semana** la tabla **Referentes propuestos**: la máquina les sugiere cuentas
-  nuevas; ustedes marcan `aprobado` o `descartado` y las aprobadas se siembran solas (§8.1).
+- ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**), en
+  el cockpit, `Curar → Referentes`. Esa lista es de dónde sale **todo** el contenido: cuentas
+  buenas = candidatos buenos.
+- ✅ Revisar **una vez por semana** `Curar → Sugeridos`: la máquina les sugiere cuentas nuevas;
+  ustedes aprueban o descartan, y las aprobadas entran al banco solas (§8.1).
 - ✅ Escribir buenos `criterios_relevancia` en cada Proyecto (es lo que decide la calidad de lo que llega).
 
 **Lo que NO hacen (nunca):**
@@ -68,7 +69,7 @@ saber que existen para entender de dónde sale cada cosa que ven:
 | Robot | Cuándo corre | Qué hace | Qué ven ustedes después |
 |---|---|---|---|
 | **El motor** | Lunes 8:00 am **y a demanda** (§3.1) | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Feed de Calificación** + los dudosos en **Descartes**. |
-| **El buscador de cuentas** | Lunes 9:00 am | Mira sus mejores Referentes y busca cuentas **parecidas** para sumar. | Sugerencias en **Referentes propuestos**. |
+| **El buscador de cuentas** | Lunes 9:00 am | Mira sus mejores Referentes y busca cuentas **parecidas** para sumar. | Sugerencias en el cockpit, **Curar → Sugeridos**. |
 | **El archivador** | Domingo 6:00 pm | Se lleva al Histórico todo lo que ya calificaron, limpia la lista y cuenta el desempeño de la semana. | La lista queda limpia + se actualizan las **Métricas**. |
 | **El transcriptor** | Cuando ustedes le pegan links (§8.2) | Le saca el script en español a videos que traen ustedes, no la máquina. | Los scripts en la pestaña **Transcribir**, y esos videos dejan de aparecer en el Feed. |
 
@@ -100,7 +101,7 @@ de redes.
 6. Lo que aprueban queda guardado en el Histórico **automáticamente** y sale de la lista. Lo que no
    tocaron sigue esperando.
 7. Una vez por semana (2 min): pasan por **Descartes** y marcan el `veredicto` (§6.1), y
-   revisan los **Referentes propuestos** (§8.1).
+   revisan los sugeridos en el cockpit, `Curar → Sugeridos` (§8.1).
 
 Regla mental: **Airtable es su bandeja de entrada.** La máquina la llena, ustedes la vacían decidiendo.
 Lo que califican desaparece de pendientes y queda archivado.
@@ -149,8 +150,9 @@ Piénsenlas en tres grupos.
 
 - **Candidatos** — los videos que llegaron, esperando que ustedes los califiquen. Acá viven (todos
   los días).
-- **Referentes propuestos** — las cuentas nuevas que la máquina les sugiere para sumar a Referentes.
-  La revisan **una vez por semana** (§8.1).
+- **Referentes propuestos** — las cuentas nuevas que la máquina les sugiere para sumar al banco. Las
+  escribe acá, pero **la revisan y las deciden en el cockpit**, `Curar → Sugeridos`, **una vez por
+  semana** (§8.1).
 - **Descartes del gate** — los ~10 videos más dudosos que la máquina descartó, para que auditen si se
   equivocó. También **una vez por semana**, 2 minutos (§6.1).
 
@@ -168,12 +170,10 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 | Página (lo que ven en el menú) | Para qué | Qué editan ahí |
 |---|---|---|
 | **Feed de Calificación** | Su bandeja diaria de videos a calificar | `calificacion`, `estado`, `notas_equipo` |
-| **Referentes - Sugeridos** | Cuentas nuevas que sugiere el buscador (§8.1) | `estado` (aprobado / descartado) |
 | **Descartes** | Los ~10 descartes dudosos de la semana (§6.1) | `veredicto` |
-| **Referentes** | El banco de cuentas de IG y TikTok que se rastrean | todo (arman la lista) |
 | **Proyectos** | Los temas que se buscan | todo (arman los temas) |
 | **Voces** | Para quién se selecciona | todo |
-| **Referentes - Revisar** | Las cuentas que vienen flojas (la máquina las señala, §5.3) | solo `activo` (podar es decisión de ustedes) |
+| ~~**Referentes**~~ · ~~**Referentes - Revisar**~~ · ~~**Referentes - Sugeridos**~~ | Se mudaron al cockpit (**Curar → Referentes** y **Curar → Sugeridos**, §5.3) | **nada acá: lo que escriban no lo lee nadie** |
 | ~~**Configuración Global**~~ · ~~**Ajustes Dev-Only**~~ | Se mudaron al cockpit (**Curar → Ajustes**, §5.5) | **nada acá: lo que escriban no lo lee nadie** |
 | **Calidad por Proyecto** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
 | **Salud del Sistema** | Los números de la máquina (§6.2) | **nada — solo lectura** |
@@ -275,26 +275,32 @@ con los de otro.
 > miren primero si es **poca fuente** (pocos Referentes activos) o **criterio muy fuerte** (tasa de gate
 > baja): el dashboard lo dice con una etiqueta (`supply` / `gate` / `mixta`).
 
-### 5.3 `Referentes` — las cuentas de Instagram y TikTok que se siguen
+### 5.3 Referentes — las cuentas de Instagram y TikTok que se siguen
 
-Cada fila es una cuenta de la que la máquina trae videos. **Es la fuente más importante y de mejor calidad**
-(cuentas que ustedes eligieron a mano).
+> **⚠️ CAMBIÓ DE LUGAR (2026-07-31): los Referentes se cargan y se podan en el cockpit,
+> en `Curar → Referentes`.** Las páginas de Airtable *Referentes*, *Referentes - Revisar* y
+> *Referentes - Sugeridos* quedan como archivo: **lo que escriban ahí no lo lee nadie.**
 
-| Columna | Qué escriben |
+Cada cuenta es una fuente de la que la máquina trae videos. **Es la fuente más importante y de mejor
+calidad** (cuentas que ustedes eligieron a mano).
+
+| Campo | Qué escriben |
 |---|---|
-| `handle` | la cuenta con **una sola** arroba. Ej: `@simonsinek` |
-| `plataforma` | `instagram` o `tiktok` (lista) |
-| `proyecto` | a qué Proyecto alimenta (lista). **Puede ser más de uno** (de la misma voz): la máquina garantiza que cada video llega UNA sola vez, al proyecto donde mejor pega |
-| `notas` | por qué la agregaron (opcional) |
-| `activo` | ✅ para rastrearla |
+| Cuenta | el nombre de usuario, sin el link. Ej: `@simonsinek` |
+| Plataforma | `instagram` o `tiktok` |
+| Proyectos | a cuáles alimenta. **Puede ser más de uno**: la máquina garantiza que cada video llega UNA sola vez, al proyecto donde mejor pega |
+| Rastrear | destildá para dejar de traer sus videos, sin perder la cuenta |
+| Notas | por qué la agregaron (opcional) |
 
-> **No llenen `seguidores` ni `viral_por_tamano`.** Esas las completa la máquina sola. El flag de viral solo
-> **marca** las cuentas muy grandes (+700K); no las excluye.
+> **La máquina califica sus cuentas.** Al lado de cada una ven tres números que ella misma calcula:
+> qué proporción de sus videos **pasa el filtro**, qué proporción terminan **aprobando** ustedes, y
+> **sobre cuántos videos** salen esas cuentas (con pocos, no saquen conclusiones). Las que traen
+> bastante y pasan poco aparecen arriba de todo, en **A revisar**. **La máquina nunca desactiva una
+> cuenta sola** — solo la señala; podarla es decisión de ustedes.
 >
-> **La máquina califica sus cuentas.** Cada domingo actualiza tres columnas por cuenta (las llena sola):
-> `tasa_gate` (qué fracción de sus videos pasa el filtro), `tasa_aprobacion` (qué fracción terminan
-> aprobando) y `videos_evaluados`. Una vista **"A revisar"** junta las de números bajos. **La máquina
-> nunca desactiva una cuenta sola** — solo la señala; podarla (destildar `activo`) es decisión de ustedes.
+> **Cuentas nuevas: `Curar → Sugeridos`.** Ahí caen las que propone el buscador cada lunes, con la
+> razón por la que las propone. **Aprobar una la suma al banco y empieza a traer videos en la
+> corrida siguiente** (§8.1); descartarla es definitivo.
 >
 > **🟠 Falta sembrar TikTok.** Hoy casi todos los Referentes cargados son de Instagram. Para que la máquina
 > traiga videos de TikTok hacen falta **dos cosas**: cargar cuentas de TikTok acá **y** que el toggle
@@ -518,34 +524,36 @@ transcripción en videos que después se descartaban.)*
 Resumen: **la calidad de lo que llega depende de qué tan buena sea su lista de Referentes. Quieren
 más/mejor → curen esa tabla.**
 
-### 8.1 El buscador de cuentas nuevas (Referentes propuestos)
+### 8.1 El buscador de cuentas nuevas (`Curar → Sugeridos`)
 
 Para que la lista de Referentes no se agote, hay un segundo robot que corre **los lunes a la mañana**
 y les propone cuentas nuevas. Cómo las encuentra: toma sus referentes que **mejor están funcionando**
 (los que más aprueban ustedes), busca cuentas **parecidas** en Instagram **y en TikTok**, filtra las
-que ya conocen y las que no pegan con los temas, y les deja **hasta 10 por semana** en la tabla
-**Referentes propuestos**.
+que ya conocen y las que no pegan con los temas, y les deja **hasta 10 por semana** en el cockpit,
+en **Curar → Sugeridos**.
 
-Cada propuesta llega con todo para decidir sin salir de Airtable:
+Cada propuesta llega con todo para decidir sin salir de la pantalla:
 
-| Columna | Qué es |
+| Qué ven | Qué es |
 |---|---|
-| `handle` | la cuenta propuesta (con link en `url`) |
-| `afinidad` | qué tan bien pega con el tema, de 0 a 1 (solo llegan las de 0.6 para arriba) |
-| `razon` | **por qué** la propone, en español — léanla primero |
-| `bio` / `seguidores` | contexto de la cuenta |
-| `semillas` | cuáles de SUS referentes la "recomendaron" |
-| **`estado`** | lo único que tocan ustedes |
+| La cuenta | con link al perfil: ábranlo y mírenla antes de decidir |
+| Afinidad | qué tan bien pega con el tema, de 0 a 1 (solo llegan las de 0.6 para arriba) |
+| La razón | **por qué** la propone, en español — léanla primero, decide la mayoría de los casos |
+| Bio y seguidores | contexto de la cuenta |
+| Quién la recomendó | cuáles de SUS referentes la "recomendaron" |
+| Los proyectos | vienen premarcados los que sugiere; **cámbienlos antes de aprobar** si va mejor en otro |
 
-**Su trabajo (una vez por semana, 5 minutos):** revisar las filas en `propuesto` y cambiar el
-`estado`:
-- **aprobado** — la quieren. **No hay que hacer nada más**: el lunes siguiente la máquina la crea
-  sola en Referentes (activa, con la razón en las notas). Empieza a traer videos en esa misma corrida.
-- **descartado** — no va. **Ojo: es definitivo** — esa cuenta no se les vuelve a proponer nunca
-  (si se arrepienten, siempre pueden agregarla a mano en Referentes).
+**Su trabajo (una vez por semana, 5 minutos):** revisar las que están pendientes y decidir:
+- **Aprobar y empezar a rastrear** — la quieren. **No hay que hacer nada más:** queda en el banco de
+  Referentes, activa y con la razón en las notas, y empieza a traer videos en la corrida siguiente.
+- **Descartar** — no va. **Ojo: es definitivo** — esa cuenta no se les vuelve a proponer nunca
+  (si se arrepienten, siempre pueden agregarla a mano en `Curar → Referentes`).
 
-Apenas marcan una fila (aprobado o descartado), **desaparece de la lista**: la página muestra solo las
-que están en `propuesto`, o sea lo que les falta revisar. No se borró, solo se fue de la bandeja.
+Apenas deciden una, **desaparece de la lista**: la pantalla muestra solo lo que falta revisar.
+
+> **⚠️ No aprueben desde Airtable.** La página vieja *Referentes - Sugeridos* quedó como archivo, y
+> aprobar ahí siembra la cuenta en un lugar que la máquina ya no lee: parecería aprobada y no
+> traería nada. La decisión va en el cockpit.
 
 Tres cosas para saber:
 - **Propone Instagram y TikTok.** Para TikTok necesita que ya tengan **algunas cuentas de TikTok
@@ -641,12 +649,12 @@ puede ser que la cuenta no publicó en la ventana de días (§5.5). Denle una se
 **¿Puedo borrar un Proyecto/Referente?** Mejor **desmárquenle `activo`** en vez de borrar: así queda
 guardado por si lo quieren de vuelta, y no rompen nada. Borrar también se puede, pero es definitivo.
 
-**Aprobé una cuenta en Referentes propuestos, ¿cuándo empieza a traer videos?** El lunes siguiente:
-el buscador la crea en Referentes a la mañana y desde esa misma semana entra en las corridas. No
-tienen que copiar nada a mano (§8.1).
+**Aprobé una cuenta en Sugeridos, ¿cuándo empieza a traer videos?** En la corrida siguiente: al
+aprobarla queda en el banco de Referentes, activa. No tienen que copiar nada a mano (§8.1).
 
 **Descarté una cuenta propuesta y me arrepentí.** El buscador no la vuelve a proponer (descartar es
-definitivo), pero pueden agregarla a mano en Referentes cuando quieran, como cualquier otra cuenta.
+definitivo), pero pueden agregarla a mano en `Curar → Referentes` cuando quieran, como cualquier
+otra cuenta.
 
 **¿Qué es "heat score", en serio importa el número?** No el número exacto, solo el orden (§7). Arriba = más
 prometedor. Punto.

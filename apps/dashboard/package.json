@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test \"domain/**/*.test.ts\"",
     "sombra:import": "node --env-file=.env.local scripts/importar-airtable.ts",
-    "sombra:diff": "node --env-file=.env.local scripts/diff-airtable.ts"
+    "sombra:diff": "node --env-file=.env.local scripts/diff-airtable.ts",
+    "cortar:referentes": "node --env-file=.env.local scripts/cortar-referentes.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
