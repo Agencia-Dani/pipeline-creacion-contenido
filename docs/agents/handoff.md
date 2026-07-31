@@ -39,11 +39,23 @@
 > ya tenía 139. Si esta corrida hubiera durado 31 min y entregado ~139 otra vez, *eso* sí habría sido
 > la alarma: querría decir que re-entregó lo mismo.
 >
-> 🟢 **CORTE 1/4 DE D5 (Ajustes) — DESBLOQUEADO PARA DEPLOY.** Está commiteado (`bd12a26`) y el
-> deploy esperaba exactamente a esta corrida (regla "una corrida, una variable", cierre 69). Ya no
-> hay nada que esperar: **push = deploy**, y después los 2 pasos de abajo.
+> 🟢 **CORTE 1/4 DE D5 (Ajustes) — DEPLOYADO Y VALIDADO POR ESTA MISMA CORRIDA.**
 >
-> **Después del deploy, 2 pasos de Mani** — hay que cerrarle la puerta vieja al equipo, porque hasta
+> ⚠️ **Y acá hay un aprendizaje de proceso que importa más que el corte:** el plan era pushear
+> *después* de la corrida (regla "una corrida, una variable", cierre 69). **No pasó: los commits
+> llegan a `origin/main` solos, ~40 s después de cada uno** (reflog: `bd12a26` commiteado 18:51:24
+> UTC, en el remoto 18:52:03; la corrida arrancó 19:18:16). Con Vercel deployando `main`, **en este
+> repo commitear ES deployar** — no hay estado intermedio "listo pero sin publicar". Cualquier plan
+> futuro que dependa de "lo dejo commiteado y lo publico después" **no se puede ejecutar acá**: si
+> algo no debe estar vivo todavía, va en **rama**, no en `main`.
+>
+> **Lo bueno del accidente:** la corrida de las 19:18 corrió **con la fachada sirviendo los ajustes
+> desde Postgres**, salió `ok`, y los 4 proyectos resolvieron `n_objetivo: 100` (que es
+> `Candidatos por corrida` viajando por la fuente nueva). O sea el corte quedó **validado por una
+> corrida real**, que era el hecho-cuando de la mitad-motor. Lo que falta del hecho-cuando es la
+> mitad humana: editar una perilla desde el cockpit y verla llegar.
+>
+> 🟠 **2 pasos de Mani, YA EXIGIBLES (el deploy está hecho)** — hay que cerrarle la puerta vieja al equipo, porque hasta
 > que se cierre hay dos superficies editables y una de las dos no la lee nadie:
 > 1. **En Airtable: dejar las páginas *Configuración Global* y *Ajustes Dev-Only* en solo-lectura**
 >    (o renombrarlas `[ARCHIVO] …`). El dato viejo se conserva; lo que importa es que nadie edite ahí
@@ -263,7 +275,7 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 | **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada · ✅ **devuelve datos desde el 29/07** (estuvo roto desde el día 1 por el grant faltante, cierre 68) |
 | **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ **CORRIDO el 30/07 (cierre 69): espejo perfecto ×2** — voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8 (candidatos y descartes en 0 de los dos lados) · ⏳ falta **el 3er pase con una edición del equipo de por medio** (es de Mani, 2 min) |
 | **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ✅ **la fachada responde 200 en prod desde el 31/07** (par rotado, header ahora `X-Run-Plan-Auth`) · ✅ **re-import #1 HECHO y corrida real entera por la fachada** (cierre 70): hecho-cuando cerrado |
-| **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🔧 **corte 1/4 HECHO en el repo (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ⏳ falta **deploy + los 2 pasos manuales de Mani** (§Pendiente vivo) |
+| **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🔧 **corte 1/4 HECHO Y EN PROD (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ✅ **validado por la corrida real de las 19:18** (`ok`, `n_objetivo` resuelto por la fuente nueva) · ⏳ faltan **los 2 pasos manuales de Mani** (§Pendiente vivo) |
 | **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ✅ **funciona end-to-end**: `app.transcripciones` tiene 2 filas `listo` con script (una del 30/07) + sus 2 `eventos`. ⚠️ *No se puede saber desde la base si eso corrió en prod o en local, así que **queda por confirmar que `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` estén en Vercel** (mismo viaje que el fix del header).* **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
 
 **Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
@@ -324,7 +336,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **⚠️ La trampa que este piloto encontró y dejó cerrada:** una tabla cortada tiene que **salir del catálogo de sombra** (`scripts/comun.ts`) en el mismo cambio. Si se queda, el próximo `sombra:import` la pisa con los valores viejos de Airtable —revirtiendo en silencio lo que el equipo editó en la app— y el `sombra:diff` empieza a reportar como error las diferencias legítimas. Anotado como procedimiento en el plan §D5.
 **Detalles chicos con motivo:** `app.ajustes.valor` es `numeric` y PostgREST lo devuelve **string** — se normaliza en `lib/ajustes.ts`, una vez, para que ni el dominio ni la pantalla lo sepan · el `id` del contrato viaja **la clave** (nadie lo consume: los 2 workflows leen por `fields.clave`), así que no hubo que inventarle un record id a Postgres · la acción **revalida el rol contra la fila real** antes de escribir, no confía en lo que la pantalla mostró · cada edición deja `app.eventos` con valor anterior y nuevo, que es la única forma de reconstruir por qué una corrida salió rara tres semanas después.
 **Verificación (todo lectura, cero créditos):** **A/B Airtable ↔ fachada: 18 claves de los dos lados, 0 diferencias** · la fachada local devuelve **200** con 3 voces · 4 proyectos · 16 referentes · **18 ajustes**, y la N por proyecto sigue resolviendo a 100 desde `Candidatos por corrida` · typecheck limpio · dashboard **63/63** (cae 1 test: el de `mapearAjuste`, que se fue con su función) · validador **1454/0**. *No se pudo probar la pantalla en el browser: entrar pide magic link.* Por eso el hecho-cuando del corte es de Mani, y son 2 minutos (§Pendiente vivo).
-**Orden de operaciones (decisión de Mani):** el commit quedó **sin pushear** hasta que la 2ª corrida de fuego estuviera verificada. Misma regla que separó los dos re-imports en el cierre 69: **una corrida, una variable**. El A/B decía que la corrida saldría igual con la fuente nueva; el punto no era el riesgo, era poder atribuir el resultado. **Esa corrida ya corrió y salió verde (abajo), así que el deploy está desbloqueado.**
+**⚠️ Orden de operaciones: se planeó y NO se ejecutó — el aprendizaje de proceso de la sesión.** La decisión fue no pushear hasta que la 2ª corrida de fuego estuviera verificada (regla "una corrida, una variable", cierre 69). **Pero en este repo los commits llegan a `origin/main` solos, ~40 s después de cada uno**, y Vercel deploya `main`: el flip estuvo vivo **26 minutos antes** de que arrancara la corrida (reflog `bd12a26`: commit 18:51:24 UTC, remoto 18:52:03; corrida 19:18:16). O sea **commitear es deployar**, y todo plan del tipo "lo dejo listo y lo publico después" es inejecutable acá: si algo no debe estar vivo, va en **rama**, no en `main`. La conclusión que se sacó al descubrirlo —y que vale para los cortes 2/4, 3/4 y 4/4— es que **la unidad de aislamiento es la rama, no el momento del push**.
+**No hizo daño, y de hecho pagó:** la corrida de las 19:18 corrió con los ajustes saliendo de Postgres, terminó `ok` y los 4 proyectos resolvieron `n_objetivo: 100` por la fuente nueva ⇒ el corte quedó **validado por una corrida real**, no solo por el A/B estático.
 
 **🏁 En la misma sesión, Mani re-importó el motor y disparó la 2ª corrida de fuego: los 3 hallazgos del cierre 70 quedaron cerrados EN PRODUCCIÓN.** Corrida 19:18, `on_demand`, **`ok` en 9,4 min**. Los 4 criterios: **`registro_dedup: ok`** (primera vez desde que existe ADR-029 — H1 vivo) · **27 `processed_items` nuevas, las 27 con `run_id`** (H3; total 628, las 601 viejas siguen null) · **intersección de `external_id` con la corrida previa = ∅** · feed de 145 con **0 `⚠️ SIN GUION`**, **145/145 `external_id`**, **0 urls duplicadas**.
 **🔍 Los 9,4 min contra 31 asustan y no deberían: son la medida del dedup.** Mismos `colectados=280` y `asignados=635` (mismas cuentas, 3 h después), pero **`filtrados` cae de 361 a 35** — ese escalón es `Heat-score v1`, donde vive el dedup: 456 de 491 salieron por estar ya en memoria. Como lo que se transcribe es lo que sale de ahí, la fase cara pasó de 361 items a 35 y el tiempo se desplomó. Entregó **6 candidatos nuevos** sobre un feed que ya tenía 139. **El resultado alarmante habría sido el opuesto:** 31 min y ~139 entregados otra vez = re-entrega de lo mismo. Queda escrito porque la próxima vez que alguien vea una corrida corta va a dudar igual.
