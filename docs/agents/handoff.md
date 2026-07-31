@@ -85,7 +85,16 @@
 > falta `RUN_PLAN_HEADER_VALOR`/`_NOMBRE`, o tiene otro valor (`headerValido` devuelve false si la env
 > está ausente, así que "falta" y "distinto" dan el mismo 403). **Si re-importás D4 con esto así, el
 > motor aborta en TODAS las corridas** — es fail-closed por diseño. Arreglar en Vercel **antes** del
-> re-import y re-verificar con curl. *(Ojo también: en el `.env` de la raíz `RUN_PLAN_HEADER_NOMBRE` y
+> re-import y re-verificar con curl.
+> **Los 4 pasos (no hay CLI ni proyecto linkeado: es a mano en el dashboard):** (1) copiar el valor sin
+> pasarlo por un chat — `grep '^RUN_PLAN_HEADER_VALOR=' .env | cut -d= -f2- | tr -d '"'"'"' \n' | pbcopy`;
+> (2) Settings → Environment Variables → **Production**: `RUN_PLAN_HEADER_NOMBRE` = `X-Motor-Auth` y
+> `RUN_PLAN_HEADER_VALOR` = lo copiado; (3) **REDEPLOY — este es el que se olvida: Vercel NO aplica
+> cambios de env a deployments ya hechos**, así que sin esto el 403 sigue igual aunque la variable esté
+> bien; (4) curl → tiene que dar **200**.
+> **De paso, en la misma pantalla:** que `NEXT_PUBLIC_SUPABASE_ANON_KEY` **no** empiece con `sb_secret_`
+> (el cruce del cierre 68, la bomba de tiempo real), que `SUPABASE_SERVICE_ROLE` no tenga el
+> placeholder, y que estén `SUPADATA_API_KEY` + `ANTHROPIC_API_KEY`. *(Ojo también: en el `.env` de la raíz `RUN_PLAN_HEADER_NOMBRE` y
 > `MOTOR_WEBHOOK_HEADER_NOMBRE` son los dos `X-Motor-Auth`; los valores sí difieren, pero el contrato
 > pide un par NUEVO — conviene un nombre distinto para no confundirlos nunca.)*
 >
@@ -285,7 +294,7 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 | **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada · ✅ **devuelve datos desde el 29/07** (estuvo roto desde el día 1 por el grant faltante, cierre 68) |
 | **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ **CORRIDO el 30/07 (cierre 69): espejo perfecto ×2** — voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8 (candidatos y descartes en 0 de los dos lados) · ⏳ falta **el 3er pase con una edición del equipo de por medio** (es de Mani, 2 min) |
 | **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ⏳ falta **re-import #1** (de Mani) · 🔴 **y antes: arreglar `RUN_PLAN_HEADER_VALOR` en Vercel — hoy prod da 403** (ver §Pendiente vivo) |
-| **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ⏳ falta cargar `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` en Vercel y pegar el primer lote real. **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
+| **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ✅ **funciona end-to-end**: `app.transcripciones` tiene 2 filas `listo` con script (una del 30/07) + sus 2 `eventos`. ⚠️ *No se puede saber desde la base si eso corrió en prod o en local, así que **queda por confirmar que `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` estén en Vercel** (mismo viaje que el fix del header).* **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
 
 **Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
 en *Exposed schemas* · 2 usuarios en `app.usuarios` (cuentas de Mani; Majo/Jero en el beta) ·

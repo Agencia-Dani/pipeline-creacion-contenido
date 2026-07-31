@@ -1,0 +1,95 @@
+// Dominio puro (C3): las reglas de los knobs del equipo, para D5 (corte de config).
+//
+// Por qué existe: la migración `009` valida la CLAVE (check contra los 18 knobs) pero no
+// el VALOR, y Airtable tampoco validaba nada. Hoy alguien puede escribir "Peso de
+// relevancia = 5" (es una proporción 0–1) y nadie se entera hasta que el motor ordena
+// raro. Este módulo es la regla que faltaba, del lado del servidor.
+//
+// Lo que deliberadamente NO valida: los TOPES (`cap_top_n`, `cap_resultados_referente`).
+// Son dev-only y viven en el `Config` de cada workflow (ADR-016); duplicarlos acá sería
+// dos dueños para el mismo dato. El motor los sigue aplicando con Math.min, y el tope va
+// escrito en la `descripcion` del knob (que el equipo ve) — informa, no manda.
+
+export type TipoAjuste = "proporcion" | "entero" | "entero_positivo" | "toggle";
+
+export type Knob = {
+  /** Qué workflow lo consume. El equipo no lo ve; sirve para agrupar la pantalla. */
+  consume: "motor" | "descubrimiento";
+  tipo: TipoAjuste;
+};
+
+// Las claves son EXACTAMENTE las del check de `009` y las de los AJUSTE_MAP de los dos
+// workflows. Una clave nueva se agrega en los tres lados o no existe.
+export const CATALOGO: Record<string, Knob> = {
+  "Peso de vistas": { consume: "motor", tipo: "proporcion" },
+  "Peso de likes": { consume: "motor", tipo: "proporcion" },
+  "Peso de interacción": { consume: "motor", tipo: "proporcion" },
+  "Peso de relevancia": { consume: "motor", tipo: "proporcion" },
+  "Bonus idioma extranjero": { consume: "motor", tipo: "proporcion" },
+  "Relevancia mínima": { consume: "motor", tipo: "proporcion" },
+  "Seguidores para marcar viral": { consume: "motor", tipo: "entero" },
+  "Mínimo de vistas": { consume: "motor", tipo: "entero" },
+  "Mínimo de likes": { consume: "motor", tipo: "entero" },
+  "Candidatos por corrida": { consume: "motor", tipo: "entero_positivo" },
+  "Días de recencia": { consume: "motor", tipo: "entero_positivo" },
+  "Resultados por cuenta de referente": { consume: "motor", tipo: "entero_positivo" },
+  "Buscar por referentes en Instagram": { consume: "motor", tipo: "toggle" },
+  "Buscar por referentes en TikTok": { consume: "motor", tipo: "toggle" },
+  "Propuestas por corrida": { consume: "descubrimiento", tipo: "entero_positivo" },
+  "Afinidad mínima de propuesta": { consume: "descubrimiento", tipo: "proporcion" },
+  "Descubrir en Instagram": { consume: "descubrimiento", tipo: "toggle" },
+  "Descubrir en TikTok": { consume: "descubrimiento", tipo: "toggle" },
+};
+
+export type Validacion = { ok: true; valor: number } | { ok: false; error: string };
+
+const entero = (v: number) => Number.isInteger(v);
+
+/**
+ * Valida un valor contra su knob. Los mensajes son para el equipo de redes, no para un
+ * dev: dicen qué se esperaba, no qué constraint falló.
+ */
+export function validarAjuste(clave: string, valor: unknown): Validacion {
+  const knob = CATALOGO[clave];
+  if (!knob) return { ok: false, error: `"${clave}" no es un ajuste conocido.` };
+
+  // Un input de HTML siempre llega como string; el borde lo normaliza acá, una vez.
+  const n = typeof valor === "number" ? valor : Number(String(valor ?? "").trim());
+  if (!Number.isFinite(n)) return { ok: false, error: "Tiene que ser un número." };
+
+  switch (knob.tipo) {
+    case "proporcion":
+      return n >= 0 && n <= 1
+        ? { ok: true, valor: n }
+        : { ok: false, error: "Va de 0 a 1 (por ejemplo 0.4). Un 40 acá no es 40%." };
+    case "toggle":
+      return n === 0 || n === 1
+        ? { ok: true, valor: n }
+        : { ok: false, error: "Solo 1 (sí) o 0 (no)." };
+    case "entero":
+      return entero(n) && n >= 0
+        ? { ok: true, valor: n }
+        : { ok: false, error: "Tiene que ser un número entero de 0 para arriba." };
+    case "entero_positivo":
+      return entero(n) && n >= 1
+        ? { ok: true, valor: n }
+        : { ok: false, error: "Tiene que ser un número entero de 1 para arriba." };
+  }
+}
+
+/**
+ * Los knobs que un rol puede EDITAR. `visibilidad` viaja en la fila (la decide quien
+ * cura la config, no el código), así que se pasa desde afuera. El dev ve todo; el
+ * operador solo los de equipo. Regla del plan §3.2: la UI esconde, el servidor impide —
+ * esto es el lado del servidor, y la pantalla se limita a reflejarlo.
+ */
+export function ajustesVisibles<T extends { clave: string; visibilidad: string }>(
+  filas: T[],
+  rol: "operador" | "dev" | "sponsor",
+): T[] {
+  if (rol === "dev") return filas.filter((f) => f.clave in CATALOGO);
+  if (rol === "operador") {
+    return filas.filter((f) => f.clave in CATALOGO && f.visibilidad === "equipo");
+  }
+  return []; // el sponsor no toca config: su zona es Entender
+}
