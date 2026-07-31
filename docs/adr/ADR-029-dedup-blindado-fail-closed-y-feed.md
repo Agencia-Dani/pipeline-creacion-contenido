@@ -1,5 +1,18 @@
 # ADR-029 — Dedup blindado: lectura fail-closed, memoria antes de entregar, `external_id` en el feed
 
+> 🔴 **BANDERA 2026-07-31 (cierre 70): la parte "memoria ANTES de entregar" de este ADR NO ESTÁ EN
+> VIGOR.** El reorden se hizo en el **array de conexiones**, pero el motor corre con
+> `executionOrder: v1`, que ordena las ramas paralelas por **posición en el canvas** (y, luego x).
+> Posiciones reales: `POST Airtable Candidatos` x=7560 · `Resumen del run` x=8200 ·
+> `POST processed_items` x=8960 ⇒ **se entrega primero y se graba después**. Verificado con datos de
+> la corrida del 31/07: `registro_dedup` reportó `no_corrio` (el nodo aún no había ejecutado al
+> consultarlo) y aun así las 191 filas se escribieron. **Corolario:** el tripwire `registro_dedup`
+> **nunca puede dispararse** — dice `no_corrio` en toda corrida. **La decisión de este ADR sigue
+> siendo la correcta; lo que falta es hacerla efectiva** moviendo `Preparar procesados` y
+> `POST processed_items` a x < 4480. Se ataca con un plan aparte (handoff §Pendiente vivo).
+> *No borres esta bandera hasta que el fix esté re-importado y una corrida real muestre
+> `registro_dedup: 'ok'`.*
+
 - **Estado:** aceptada — 2026-07-24 (audit del run manual de Jero, con Mani). Endurece el dedup del
   motor sin tocar su semántica. No enmienda una decisión previa; cubre un modo de falla que
   [ADR-018](./ADR-018-un-candidato-por-video-dedup-salida.md) (dedup del fan-out **intra-corrida**) no
