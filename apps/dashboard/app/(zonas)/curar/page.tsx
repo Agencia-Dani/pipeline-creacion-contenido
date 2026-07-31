@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Card,
   CardDescription,
@@ -17,13 +18,25 @@ export default async function CurarPage() {
           Acá vas a calificar candidatos y mantener referentes, voces y proyectos.
         </p>
       </div>
+
+      <Link href="/curar/ajustes" className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Ajustes</CardTitle>
+            <CardDescription>
+              Las perillas del sistema: cuántos candidatos trae cada corrida, qué tan
+              exigente es el filtro, en qué plataformas busca. Ya no se tocan en Airtable.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
       <Card>
         <CardHeader>
-          <CardTitle>Todavía no hay nada para curar</CardTitle>
+          <CardTitle>Lo demás sigue en Airtable, por ahora</CardTitle>
           <CardDescription>
-            Mientras tanto, el feed de calificación sigue en Airtable como hasta
-            ahora. Esta pantalla lo reemplaza más adelante (D5–D6), cuando esté a
-            la altura.
+            El feed de calificación, los referentes, las voces y los proyectos se curan
+            como hasta ahora. Van llegando acá uno por uno (D5–D6).
           </CardDescription>
         </CardHeader>
       </Card>

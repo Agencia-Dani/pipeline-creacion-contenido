@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import {
   diffTabla,
   esFilaFantasma,
-  mapearAjuste,
   mapearCandidato,
   mapearProyecto,
   normalizar,
@@ -56,14 +55,6 @@ describe("mapeos Airtable → app", () => {
     assert.equal(fila.creado_en, "2026-07-20T08:30:00.000Z");
   });
 
-  it("ajuste: 'Mostrar al equipo' tildado = visibilidad equipo; sin tildar = dev", () => {
-    const base = { clave: "Candidatos por corrida", valor: 100 };
-    assert.equal(
-      mapearAjuste({ id: "r1", fields: { ...base, "Mostrar al equipo": true } }).visibilidad,
-      "equipo",
-    );
-    assert.equal(mapearAjuste({ id: "r2", fields: base }).visibilidad, "dev");
-  });
 });
 
 describe("diff esperado ↔ actual", () => {

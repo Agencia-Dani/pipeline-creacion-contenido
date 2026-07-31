@@ -21,7 +21,7 @@ import {
   type Corrida,
   type VistaOperar,
 } from "@/domain/corrida";
-import { leerConfigOperar } from "@/lib/airtable";
+import { leerConfigOperar } from "@/lib/config";
 import { exigirZona } from "@/lib/auth";
 import { ultimasCorridasMotor } from "@/lib/runs";
 import { AutoRefresh } from "./auto-refresh";

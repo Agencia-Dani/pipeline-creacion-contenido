@@ -6,7 +6,6 @@
 import { createClient } from "@supabase/supabase-js";
 import {
   esFilaFantasma,
-  mapearAjuste,
   mapearCandidato,
   mapearDescarte,
   mapearPropuesto,
@@ -51,8 +50,15 @@ export async function leerTablaAirtable(tabla: string): Promise<RegistroAirtable
   return registros;
 }
 
-// El catálogo, en orden de import (padres primero). `fks` dice qué placeholder del
-// mapeo se resuelve contra qué tabla padre; el diff los traduce en sentido inverso.
+// El catálogo de tablas TODAVÍA EN SOMBRA, en orden de import (padres primero). `fks` dice
+// qué placeholder del mapeo se resuelve contra qué tabla padre; el diff los traduce en
+// sentido inverso.
+//
+// ⚠️ Una tabla que ya se cortó (D5) SALE de esta lista y no vuelve. Con Postgres de dueño, un
+// import la pisaría con los valores viejos de Airtable y revertiría en silencio lo que el
+// equipo editó en la app; el diff, por el mismo motivo, reportaría diferencias legítimas como
+// error. **Ya cortada: `Ajustes` → `app.ajustes`** (su `mapearAjuste` se fue con ella; está en
+// git si hiciera falta volver atrás).
 export type TablaSombra = {
   airtable: string;
   pg: string;
@@ -71,7 +77,6 @@ export const TABLAS: TablaSombra[] = [
     airtable: "Referentes", pg: "referentes", mapear: mapearReferente, conflicto: "airtable_id",
     fks: [{ placeholder: "_proyecto", columna: "proyecto_id", padre: "proyectos" }],
   },
-  { airtable: "Ajustes", pg: "ajustes", mapear: mapearAjuste, conflicto: "clave", fks: [] },
   {
     airtable: "Candidatos", pg: "candidatos", mapear: mapearCandidato, conflicto: "airtable_id",
     fks: [

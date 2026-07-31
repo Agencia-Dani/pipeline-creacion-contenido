@@ -1,10 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import { armarRunPlan, armarRunPlanCompleto } from "@/domain/run-plan";
-import { leerRunPlanCrudo } from "@/lib/airtable";
+import { leerRunPlanCrudo } from "@/lib/config";
 
 // La fachada de ADR-028: el motor pregunta qué correr ANTES de gastar créditos.
-// Hoy lee Airtable por dentro (D4); en D5 la fuente pasa a Postgres dominio por
-// dominio sin que el motor se entere (la forma la fija core/contracts/run-plan.md).
+// De qué almacenamiento sale cada dominio lo decide lib/config.ts, y va cambiando en D5
+// (Ajustes ya es Postgres) sin que el motor se entere: la forma la fija
+// core/contracts/run-plan.md y no se mueve.
 //
 // Fail-closed a propósito: cualquier problema responde ≠200 y la corrida NO arranca
 // (una corrida sin config entrega ruido; no entregar es mejor). Auth por header

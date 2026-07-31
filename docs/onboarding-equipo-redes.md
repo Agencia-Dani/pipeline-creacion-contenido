@@ -140,8 +140,8 @@ Piénsenlas en tres grupos.
 - **Voces** — para quién se selecciona (un personaje o marca). Organiza y afina el filtro.
 - **Referentes** — las **cuentas** (de Instagram **y** TikTok) que se siguen. **De ahí sale todo:**
   la máquina solo trae videos de estas cuentas.
-- **Ajustes** + página **Configuración Global** — las "perillas" (cuánto trae por corrida, días, qué ejes
-  se prenden). **Ya vienen con valores razonables; casi no se tocan.** Más en §5.5.
+- **Las perillas** (cuánto trae por corrida, días, qué ejes se prenden) — **ya no están en Airtable: se
+  tocan en el cockpit, Curar → Ajustes.** Vienen con valores razonables; casi no se tocan. Más en §5.5.
 
 > Estas las arman una vez y las van ajustando. **No hace falta tocarlas para el trabajo del día.**
 
@@ -174,14 +174,13 @@ falta. Este es el menú completo y qué pueden tocar en cada uno:
 | **Proyectos** | Los temas que se buscan | todo (arman los temas) |
 | **Voces** | Para quién se selecciona | todo |
 | **Referentes - Revisar** | Las cuentas que vienen flojas (la máquina las señala, §5.3) | solo `activo` (podar es decisión de ustedes) |
-| **Configuración Global** | Las perillas del día a día (§5.5) | solo el `valor` de cada perilla |
-| **Ajustes Dev-Only** | Las perillas avanzadas | **nada — solo lectura** (avisen antes de tocar) |
+| ~~**Configuración Global**~~ · ~~**Ajustes Dev-Only**~~ | Se mudaron al cockpit (**Curar → Ajustes**, §5.5) | **nada acá: lo que escriban no lo lee nadie** |
 | **Calidad por Proyecto** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
 | **Salud del Sistema** | Los números de la máquina (§6.2) | **nada — solo lectura** |
 | **Costos** | Cuánto gastó la semana, por servicio | **nada — solo lectura** |
 
 > **Ojo con los nombres.** Algunas páginas se llaman distinto a la tabla que muestran: *Feed de
-> Calificación* es la tabla **Candidatos**; *Configuración Global* es la tabla **Ajustes**; *Referentes
+> Calificación* es la tabla **Candidatos**; *Referentes
 > - Sugeridos* es la tabla **Referentes propuestos**; *Calidad por Proyecto* muestra **Métricas Proyectos**
 > y *Salud del Sistema* / *Costos* muestran **Métricas Global**. Guíense por el nombre del **menú**, no
 > por el de la tabla.
@@ -331,14 +330,20 @@ cada columna que van a ver:
 > video (audio raro, sin voz, o falló el transcriptor). No es un error de ustedes. Qué hacer: **miren el
 > video original** (el link `url_referente`) y la portada, y decidan igual; o si no vale la pena, **descártenlo**.
 
-### 5.5 `Ajustes` y la página **Configuración Global** — las perillas
+### 5.5 Las perillas — **ahora se tocan en el cockpit, no en Airtable**
+
+> ⚠️ **Cambió de lugar (2026-07-31).** Las perillas ya **no** se editan en Airtable: viven en el cockpit,
+> en **Curar → Ajustes**. La tabla `Ajustes` y la página *Configuración Global* quedan como archivo: lo
+> que escriban ahí **no lo lee nadie**. Lo que cambien en el cockpit aplica en la corrida siguiente.
+>
+> En el cockpit ven **solo las perillas de equipo**; las avanzadas ya no aparecen "en gris para mirar",
+> directamente no están (para moverlas, avisen). El cockpit además **no deja guardar un valor imposible**
+> — antes Airtable aceptaba cualquier cosa y la máquina ordenaba raro sin decir nada.
 
 La máquina ya viene con valores por defecto razonables. **No hace falta tocar nada para arrancar.** Es una
-tabla de "clave = valor" en español claro. Si borran o escriben mal una fila, la máquina usa el valor por
-defecto, no se rompe.
+lista de "perilla = valor" en español claro.
 
-Las perillas que sí van a querer tocar viven en la página **Configuración Global** (las mismas para todos
-los proyectos):
+Las perillas que sí van a querer tocar (las mismas para todos los proyectos):
 
 **Volumen y ventana:**
 - **Candidatos por corrida** — el valor **por defecto** de la `N` de cada proyecto: se usa para los
@@ -361,9 +366,9 @@ los proyectos):
 > **apagar una plataforma** si no la están usando (si todavía no cargaron cuentas de TikTok, no pasa nada
 > por dejarlos prendidos: corren vacíos). No hace falta tocarlos para el día a día.
 
-El resto de las perillas (pesos de orden, bonus de idioma, mínimos) son **avanzadas** y viven en la página
-**Ajustes Dev-Only**. **No las toquen sin avisarnos la primera vez.** Igual, todas tienen un tope de
-seguridad para que nadie dispare el gasto sin querer.
+El resto de las perillas (pesos de orden, bonus de idioma, mínimos) son **avanzadas**: no aparecen en su
+cockpit. Si necesitan mover una, avísennos. Igual, todas tienen un tope de seguridad para que nadie
+dispare el gasto sin querer.
 
 ---
 

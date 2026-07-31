@@ -22,6 +22,23 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🟠 **CORTE 1/4 DE D5 (Ajustes) — 2 pasos manuales, después del deploy.** El código ya está: la
+> fachada sirve los 18 knobs desde `app.ajustes` y la pantalla es `/curar/ajustes`. Lo que falta es
+> **cerrarle la puerta vieja al equipo**, porque hasta que se cierre hay dos superficies editables y
+> una de las dos no la lee nadie:
+> 1. **En Airtable: dejar las páginas *Configuración Global* y *Ajustes Dev-Only* en solo-lectura**
+>    (o renombrarlas `[ARCHIVO] …`). El dato viejo se conserva; lo que importa es que nadie edite ahí
+>    creyendo que aplica. **Avisarle a Majo y Jero** — el [onboarding §5.5](../onboarding-equipo-redes.md)
+>    ya está reescrito con el cambio de lugar.
+> 2. **El hecho-cuando del corte:** mover una perilla desde el cockpit y confirmar que la fachada la
+>    devuelve —
+>    `curl "$DASHBOARD_URL/api/engine/run-plan?ambito=motor" -H "$RUN_PLAN_HEADER_NOMBRE: $RUN_PLAN_HEADER_VALOR"`
+>    — y que quedó su fila en `app.eventos` (`tipo = 'ajustes.editar'`, con valor anterior y nuevo).
+>
+> ⚠️ **`sombra:import` ya NO toca `app.ajustes`** (salió del catálogo de `scripts/comun.ts`): con
+> Postgres de dueño, un import pisaría en silencio lo que el equipo editó. Es el procedimiento para
+> los 3 cortes que faltan, no un detalle de este.
+
 > ✅ **El re-import del cierre 66 está HECHO** (confirmado por conducta, no por memoria): el cron del
 > 27/07 **abortó** en `Leer procesados`, que es exactamente el camino fail-closed de ADR-029 — con el
 > motor viejo (fail-open) el timeout se tragaba en silencio. ADR-029/030 están vivos.
@@ -232,7 +249,8 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 | **D1** Operar | qué corre + ▶ Correr ahora + corridas recientes | ✅ código · env cargadas · ⏳ falta el hecho-cuando en vivo (Jero disparando una corrida real) |
 | **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada · ✅ **devuelve datos desde el 29/07** (estuvo roto desde el día 1 por el grant faltante, cierre 68) |
 | **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ **CORRIDO el 30/07 (cierre 69): espejo perfecto ×2** — voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8 (candidatos y descartes en 0 de los dos lados) · ⏳ falta **el 3er pase con una edición del equipo de por medio** (es de Mani, 2 min) |
-| **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ✅ **la fachada responde 200 en prod desde el 31/07** (par rotado, header ahora `X-Run-Plan-Auth`) · ⏳ falta **el re-import #1**, y nada más |
+| **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ✅ **la fachada responde 200 en prod desde el 31/07** (par rotado, header ahora `X-Run-Plan-Auth`) · ✅ **re-import #1 HECHO y corrida real entera por la fachada** (cierre 70): hecho-cuando cerrado |
+| **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🔧 **corte 1/4 HECHO en el repo (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ⏳ falta **deploy + los 2 pasos manuales de Mani** (§Pendiente vivo) |
 | **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ✅ **funciona end-to-end**: `app.transcripciones` tiene 2 filas `listo` con script (una del 30/07) + sus 2 `eventos`. ⚠️ *No se puede saber desde la base si eso corrió en prod o en local, así que **queda por confirmar que `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` estén en Vercel** (mismo viaje que el fix del header).* **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
 
 **Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
@@ -285,6 +303,15 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-31 (cierre 72) — D5 arranca: Ajustes cortado de Airtable, pantalla + flip en el mismo cambio (Claude, pedido de Mani).**
+**Qué se hizo:** el primer corte de config del plan del cockpit. Pantalla **`/curar/ajustes`** (los 18 knobs agrupados por quién los consume, el operador ve solo los de `visibilidad=equipo`, el botón Guardar aparece solo si el valor cambió) y, **en el mismo cambio**, el flip: la fachada sirve `ajustes` desde `app.ajustes`, no desde Airtable.
+**La decisión que vale para los 3 cortes que faltan: pantalla y flip son un solo paso.** La alternativa —publicar la pantalla y flipear después— deja una ventana con **dos superficies editables** para el mismo dato, que es exactamente lo que prohíbe el principio §3.1 del plan, y la mitad de esa ventana el equipo estaría editando en la superficie que ya no lee nadie. El flip es reversible con un revert; la divergencia de datos, no.
+**🔧 La costura, que es lo que hace baratos los cortes 2/4, 3/4 y 4/4:** `apps/dashboard/lib/config.ts`. Acá y solo acá se decide de qué almacenamiento sale cada dominio; `lib/airtable.ts` se achica en cada corte hasta morir en D8. Mover Referentes es una línea más su pantalla.
+**⚠️ La trampa que este piloto encontró y dejó cerrada:** una tabla cortada tiene que **salir del catálogo de sombra** (`scripts/comun.ts`) en el mismo cambio. Si se queda, el próximo `sombra:import` la pisa con los valores viejos de Airtable —revirtiendo en silencio lo que el equipo editó en la app— y el `sombra:diff` empieza a reportar como error las diferencias legítimas. Anotado como procedimiento en el plan §D5.
+**Detalles chicos con motivo:** `app.ajustes.valor` es `numeric` y PostgREST lo devuelve **string** — se normaliza en `lib/ajustes.ts`, una vez, para que ni el dominio ni la pantalla lo sepan · el `id` del contrato viaja **la clave** (nadie lo consume: los 2 workflows leen por `fields.clave`), así que no hubo que inventarle un record id a Postgres · la acción **revalida el rol contra la fila real** antes de escribir, no confía en lo que la pantalla mostró · cada edición deja `app.eventos` con valor anterior y nuevo, que es la única forma de reconstruir por qué una corrida salió rara tres semanas después.
+**Verificación (todo lectura, cero créditos):** **A/B Airtable ↔ fachada: 18 claves de los dos lados, 0 diferencias** · la fachada local devuelve **200** con 3 voces · 4 proyectos · 16 referentes · **18 ajustes**, y la N por proyecto sigue resolviendo a 100 desde `Candidatos por corrida` · typecheck limpio · dashboard **63/63** (cae 1 test: el de `mapearAjuste`, que se fue con su función) · validador **1454/0**. *No se pudo probar la pantalla en el browser: entrar pide magic link.* Por eso el hecho-cuando del corte es de Mani, y son 2 minutos (§Pendiente vivo).
+**Próximo paso:** deploy + los 2 pasos manuales, y después el **corte 2/4: Referentes** (+ la vista de flojos y los Sugeridos). Sigue pendiente, aparte y sin relación, la 2ª corrida de fuego del dedup.
 
 **2026-07-31 (cierre 71) — Los 3 hallazgos del cierre 70, cerrados en el repo + un auditor que caza esta clase de bug sola (Claude, pedido de Mani).**
 **H1 — la memoria del dedup dejó de ser una rama.** Decisión de Mani sobre la alternativa propuesta en el cierre 70: en vez de mover posiciones (`x<4480`), **serializar**: `Heat-score v1 → Preparar procesados → POST processed_items → Transcribir`. El argumento es que mover posiciones deja la garantía central de ADR-029 viviendo en dos coordenadas de canvas, o sea la próxima limpieza visual la rompe otra vez y en silencio; en serie la garantía es **topológica**. Tres detalles la sostienen: `alwaysOutputData` en el POST (PostgREST devuelve body vacío con `resolution=ignore-duplicates`, y sin item de salida `Transcribir` no dispararía), `Transcribir` pasa a leer `$('Heat-score v1').all()` en vez de `$input` (su input ahora es la respuesta del POST), y `onError: continueRegularOutput` **se conserva** — la escritura sigue siendo fail-open, como manda el ADR. **De arrastre, `registro_dedup` revive:** `POST processed_items` es ahora ancestro de `Resumen del run`. Quedó como [enmienda 2026-07-31 de ADR-029](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md), con la decisión #2 original **tachada** — el mecanismo que describía era falso y nadie debería leerlo de buena fe.

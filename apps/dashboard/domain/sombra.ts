@@ -90,15 +90,7 @@ export function mapearReferente(r: RegistroAirtable): Fila {
   };
 }
 
-export function mapearAjuste(r: RegistroAirtable): Fila {
-  return {
-    airtable_id: r.id,
-    clave: texto(r.fields.clave) ?? "(sin clave)",
-    valor: numero(r.fields.valor),
-    descripcion: texto(r.fields.descripcion),
-    visibilidad: booleano(r.fields["Mostrar al equipo"]) ? "equipo" : "dev",
-  };
-}
+// (Ajustes ya no se mapea: se cortó en D5 y Postgres es su dueño — ver scripts/comun.ts.)
 
 export function mapearCandidato(r: RegistroAirtable): Fila {
   return {

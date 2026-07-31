@@ -224,6 +224,18 @@ Por dentro de la fachada, cada dominio se mueve a Postgres y su pantalla de edic
 de Airtable. Orden por riesgo creciente: **Ajustes** (chico y aislado, el piloto del procedimiento) →
 **Referentes** (+ la vista de flojos y los Sugeridos) → **Voces + Proyectos** (juntos, van por FK).
 Cada corte: pantalla lista → diff en cero → flip → esa página de Airtable pasa a histórica.
+
+> **Corte 1/4 — Ajustes: HECHO (2026-07-31).** La pantalla es `/curar/ajustes` y la fuente de la
+> fachada la decide **`apps/dashboard/lib/config.ts`**, que es la costura del corte: los 3 que
+> faltan mueven una línea ahí más su pantalla. Tres cosas que este piloto dejó como
+> **procedimiento** para los que siguen:
+> 1. **El flip y la pantalla van en el mismo cambio.** Una pantalla editable mientras Airtable
+>    sigue mandando son dos dueños para el mismo dato — justo lo que el principio §3.1 prohíbe.
+> 2. **La tabla cortada SALE de `scripts/comun.ts`** (el catálogo de sombra) en ese mismo cambio.
+>    Si no, el próximo `sombra:import` pisa con los valores viejos de Airtable lo que el equipo
+>    editó en la app, en silencio, y el `sombra:diff` empieza a llamar error a lo correcto.
+> 3. **El `id` del contrato es opaco** (nadie lo consume): `app.ajustes` no tiene record id de
+>    Airtable y no hizo falta inventarle uno — viaja la clave. Ver `core/contracts/run-plan.md`.
 **La pantalla de Proyectos tiene que mostrar `advertencia_criterios`**, que hoy no muestra ninguna
 superficie: es un campo que existe **solo** para que una persona lo lea (el gate no lo lee, por
 contrato), así que hoy el archivado gasta un Haiku cada domingo para escribir un aviso que nadie ve

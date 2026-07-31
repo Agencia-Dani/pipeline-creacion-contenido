@@ -36,9 +36,15 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
   "voces":      [{ "id": "rec…", "fields": { "nombre": "…", "criterios_relevancia": "…", "activo": true } }],
   "proyectos":  [{ "id": "rec…", "fields": { "nombre": "…", "criterios_relevancia": "…", "voz_default": ["rec…"], "N": 20, "…": "…" } }],
   "referentes": [{ "id": "rec…", "fields": { "handle": "@…", "plataforma": "instagram", "proyecto": ["rec…"], "activo": true } }],
-  "ajustes":    [{ "id": "rec…", "fields": { "clave": "Candidatos por corrida", "valor": 100 } }]
+  "ajustes":    [{ "id": "Candidatos por corrida", "fields": { "clave": "Candidatos por corrida", "valor": 100 } }]
 }
 ```
+
+> **`id` es opaco: nadie lo consume.** Los dos workflows que leen ajustes lo hacen por
+> `fields.clave`. Por eso, cuando `Ajustes` se cortó a Postgres (D5), el `id` pasó de ser el
+> record id de Airtable a la clave misma sin que nada se enterara — que es exactamente la
+> libertad que promete el versionado. **De qué almacenamiento sale cada dominio hoy lo dice
+> `apps/dashboard/lib/config.ts`**, y no se repite acá para que no quede viejo.
 
 - **Filtros (ADR-028 §2, y nada más):** solo voces `activo` · solo proyectos `activo` **de voz
   activa** (el gate que hoy hace `Armar plan` cruzando tablas) · solo referentes `activo` ·
