@@ -34,12 +34,19 @@ ADR-009); el "link" es la URL del video original.
   tocar la API de Anthropic, consultá el skill `claude-api`.
 - **Apify por community node** `@apify/n8n-nodes-apify.apify` (op "Run actor and get dataset", sin tope
   de 5 min). NO `httpRequest` sync. Credencial `apifyApi`.
+- 🔴 **El orden de las ramas paralelas lo decide la POSICIÓN EN EL CANVAS, no el JSON.** Con
+  `executionOrder: v1`, cuando un nodo abre dos ramas n8n elige cuál corre primero por la posición de
+  cada destino (arriba primero, después izquierda) y recorre esa rama entera antes de empezar la otra.
+  **Reordenar el array de `connections` no hace nada.** Costó 3 corridas: el *"grabar la memoria antes
+  de entregar"* de ADR-029 se implementó así y nunca entró en vigor. **La regla: si B depende de que A
+  ya haya corrido, B va DETRÁS de A en serie, no en una rama hermana.** Chequeo automático:
+  `node ../auditar-workflows.mjs` (todo `$('X')` tiene que apuntar a un ancestro).
 - **Orden de ejecución:** el arranque es `Config → Barrer runs zombie → Leer corridas vivas → Guard
   single-flight → Abrir run → Leer plan (fachada)` (C.3, ADR-023): el barrido va antes del guard (un zombie
-  jamás traba el motor) y el guard aplica a los 3 triggers. `Abrir run en el registro` va **en serie**
-  (no en paralelo), porque `Cerrar run` lo referencia por nombre y n8n ejecuta las ramas en orden de
-  conexión. Si lo ponés en paralelo, corre **después** del pipeline y la referencia rompe
-  ("hasn't been executed").
+  jamás traba el motor) y el guard aplica a los 3 triggers. Dos dependencias van **en serie** por la
+  regla de arriba: `Abrir run en el registro` (porque `Cerrar run` lo referencia por nombre) y
+  `Preparar procesados → POST processed_items`, que se metió entre `Heat-score v1` y `Transcribir`
+  para que la memoria del dedup se grabe **antes** de entregar (ADR-029, enmienda 2026-07-31).
 - **Gates fail-open, con dos excepciones:** si Haiku falla, el item pasa (invariante #1: no conviertas
   un fallo externo en dependencia de ejecución). Fail-open aplica a los gates de *juicio* y a las
   *escrituras* de registro. **Excepción 1 (ADR-029):** la *lectura* de `processed_items`
@@ -79,11 +86,13 @@ node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log(
 ## Validar
 
 `cd core/scripts && npm run validate` (contrato del manifest + escaneo de secretos) y
-`node test-nodos.mjs` (ejercita `Armar plan`, `Armar candidato` y `Transcribir` fuera de n8n con `$` y
-`this.helpers` mockeados — corrélo SIEMPRE antes de re-importar si tocaste esos nodos). La conducta
-final igual se valida por **re-import + Execute** (el motor corre en n8n). Tras editar, confirmá que el
-JSON parsea, `w.connections` sigue con keys, y los `jsCode` compilan **como AsyncFunction** (un
-`new Function()` pelado da falsos positivos por los `await` de nivel superior).
+`node test-nodos.mjs` (ejercita `Armar plan`, `Armar candidato`, `Transcribir`, `Heat-score`, `Gate` y
+`Preparar procesados` fuera de n8n con `$` y `this.helpers` mockeados — corrélo SIEMPRE antes de
+re-importar si tocaste esos nodos). Si tocaste **conexiones, posiciones o cualquier `$('X')`**, corré
+además `node ../auditar-workflows.mjs`: chequea conexiones rotas, inalcanzables, refs a no-ancestros,
+que los `jsCode` compilen **como AsyncFunction** (un `new Function()` pelado da falsos positivos por
+los `await` de nivel superior) y te lista los placeholders del re-import. La conducta final igual se
+valida por **re-import + Execute** (el motor corre en n8n).
 
 ## Git
 

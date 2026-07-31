@@ -302,9 +302,13 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, 
   } } };
   const $ = (n) => {
     if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto } }) };
+    if (n === 'Heat-score v1') return { all: () => items.map((j) => ({ json: j })) };
     throw new Error('nodo no mockeado: ' + n);
   };
-  const $input = { all: () => items.map((j) => ({ json: j })) };
+  // Desde el cierre 70 la memoria se graba EN SERIE antes de transcribir (ADR-029), así que el input
+  // real de este nodo es la respuesta de `POST processed_items`, no los videos. El mock lo refleja:
+  // si alguien revierte a `$input.all()`, los 8 casos de abajo se quedan sin videos y fallan fuerte.
+  const $input = { all: () => [{ json: {} }] };
   const logs = [];
   const out = await new AsyncFn('$', '$input', 'console', jsCode('Transcribir (Supadata)'))
     .call(thisMock, $, $input, { log: (m) => logs.push(m) });
@@ -415,6 +419,44 @@ seccion('Heat-score v1 — dedup blindado (ADR-029)');
   const items = []; for (let i = 0; i < 5; i++) items.push(hvid('c' + i, 'P1', { reproducciones: 100 - i, likes: 100 - i }));
   const { out } = runHeat({ items, cfg: { cap_top_n: 2 } });
   check('cap_top_n corta a 2 videos distintos (regresión)', out.length === 2, 'entregó ' + out.length);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Preparar procesados — la fila que se graba en la memoria del dedup (ADR-029).
+// `run_id` es FK a runs(id): si el run no se pudo abrir, tiene que viajar NULL. Un uuid de relleno
+// haría fallar el INSERT del batch entero, o sea la corrida entregaría sin memorizar (cierre 70, H3).
+// ════════════════════════════════════════════════════════════════════════════
+const runPreparar = ({ videos, runId, abrirRunFalla = false }) => {
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: { instance_id: '<<INSTANCE_ID>>' } }) };
+    if (n === 'Abrir run en el registro') {
+      if (abrirRunFalla) throw new Error('nodo sin ejecutar (mock)');
+      return { first: () => ({ json: runId ? { id: runId } : {} }) };
+    }
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const $input = { all: () => videos.map((j) => ({ json: j })) };
+  const out = new Function('$', '$input', jsCode('Preparar procesados'))($, $input);
+  return out[0].json.batch;
+};
+const pvid = (id, extra = {}) => Object.assign({ external_id: id, plataforma: 'instagram', url: 'https://v/' + id }, extra);
+
+seccion('Preparar procesados — atribuir la memoria a su corrida (H3, cierre 70)');
+{
+  const batch = runPreparar({ videos: [pvid('a'), pvid('b')], runId: 'r-1' });
+  check('cada fila viaja con el run_id de la corrida', batch.length === 2 && batch.every((r) => r.run_id === 'r-1'), JSON.stringify(batch.map((r) => r.run_id)));
+}
+{
+  const batch = runPreparar({ videos: [pvid('a')], abrirRunFalla: true });
+  check('si Abrir run no corrió, run_id va NULL y no un uuid de relleno (FK a runs)', batch[0].run_id === null, JSON.stringify(batch[0].run_id));
+}
+{
+  const batch = runPreparar({ videos: [pvid('a')], runId: null });
+  check('Abrir run sin id (continue-on-fail) también da NULL', batch[0].run_id === null, JSON.stringify(batch[0].run_id));
+}
+{
+  const batch = runPreparar({ videos: [pvid('a'), { url: 'https://v/x' }], runId: 'r-1' });
+  check('sigue filtrando lo que no tiene external_id (la clave del dedup)', batch.length === 1, 'quedaron ' + batch.length);
 }
 
 // ════════════════════════════════════════════════════════════════════════════

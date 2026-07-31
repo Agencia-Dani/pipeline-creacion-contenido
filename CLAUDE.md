@@ -74,6 +74,11 @@ módulos), `/handoff` (compactar una sesión).
   `npm test` (dominio con `node:test`, corre los `.ts` directo en Node 26). Si tocaste rutas o
   auth, además `npm run build`. Cómo correrlo y sus pasos manuales:
   [apps/dashboard/README.md](apps/dashboard/README.md).
+- **Audit estructural de los 3 workflows:** `node Workflows/auditar-workflows.mjs` — conexiones rotas,
+  nodos inalcanzables, **`$('X')` que apunte a un nodo que no es ancestro suyo** (la clase de bug que
+  dejó el dedup de ADR-029 sin efecto durante 3 corridas: en n8n el orden de las ramas lo decide la
+  posición en el canvas, no el array de conexiones), `jsCode` que compile como AsyncFunction, e
+  inventario de placeholders del re-import. **Corrélo si tocaste conexiones o posiciones.** Solo lee.
 - **Test de los code nodes del motor:** `node Workflows/workflow-short-form-content/test-nodos.mjs` —
   ejercita `Armar plan de corrida` y `Armar candidato` fuera de n8n con un `$` mockeado (N por proyecto,
   gate por `Voces.activo`, orden dedup→corte, piso, y las regresiones que ya nos mordieron). **Corrélo

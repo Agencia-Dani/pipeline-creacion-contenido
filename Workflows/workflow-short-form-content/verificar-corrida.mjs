@@ -6,11 +6,9 @@
 // entre las 2 últimas = ∅, cero `⚠️ SIN GUION` en el feed (ADR-030), `external_id` escrito
 // en todos los candidatos y cero urls repetidas (ADR-029).
 //
-// ⚠️ El chequeo de dedup cruza por `run_id`, que HOY VIENE NULL (`Preparar procesados` no lo
-// setea — hallazgo 3 del cierre 70). Hasta que se arregle, va a decir 0 processed_items por
-// corrida aunque se hayan escrito: verificá por ventana de `primera_vez` en su lugar.
-// ⚠️ `registro_dedup` dice `no_corrio` SIEMPRE por el hallazgo 1 (orden de ramas por posición
-// de canvas, no por el array). No lo leas como fallo hasta que ese fix esté re-importado.
+// El chequeo de dedup cruza por `run_id`. Las corridas ANTERIORES al re-import de la enmienda
+// 2026-07-31 de ADR-029 lo tienen `null`, así que para esas se cae a la ventana de `primera_vez`
+// (entre `inicio` y `fin` del run) — si no, la intersección daría ∅ por vacío y no por dedup.
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE, AIRTABLE_PAT, AIRTABLE_BASE_ID } = process.env;
 const N = Number(process.argv[2] || 2);
 
@@ -51,7 +49,11 @@ for (const r of runs) {
   console.log(`   sin_guion (descartados, ADR-030): ${m.sin_guion ?? "?"}`);
   const tv = m.transcripciones_vacias, tot = m.transcritos ?? m.unicos;
   console.log(`   transcripciones_vacias: ${tv ?? "?"}${tv != null && tot ? ` (${pct(tv, tot)} · baseline 23/07 = 41%)` : ""}`);
-  console.log(`   registro_dedup: ${m.registro_dedup ?? "(ausente)"} ${m.registro_dedup === "ok" ? "✓" : "⚠️"}`);
+  // `no_corrio` ya no es el estado por defecto: desde la enmienda 2026-07-31 de ADR-029 la memoria
+  // se graba en serie aguas arriba, así que verlo significa que el motor todavía corre el JSON viejo.
+  const rd = m.registro_dedup;
+  const nota = rd === "ok" ? "✓" : rd === "no_corrio" ? "⚠️ el motor corre el workflow SIN el fix de la enmienda 2026-07-31 (falta re-import)" : "⚠️";
+  console.log(`   registro_dedup: ${rd ?? "(ausente)"} ${nota}`);
   if (m.avisos?.length) console.log(`   avisos: ${JSON.stringify(m.avisos).slice(0, 220)}`);
 
   const pp = m.por_proyecto;
@@ -64,13 +66,33 @@ for (const r of runs) {
 }
 
 // ── Dedup entre las 2 últimas: la intersección tiene que ser ∅ ──────────────────
+// La memoria de una corrida son sus filas de `processed_items`. Se piden por `run_id`; si esa
+// corrida es anterior al fix del hallazgo 3 (run_id null), se cae a la ventana de `primera_vez`.
+//
+// La ventana NO puede cerrar en `fin`: antes del fix del hallazgo 1 la memoria se grababa DESPUÉS de
+// `Cerrar run` (en la corrida del 31/07, 2 segundos después). El techo es el arranque de la corrida
+// siguiente — todo lo escrito entre dos arranques pertenece a la primera.
+// Ojo con lo que la ventana NO puede distinguir: `processed_items` tiene DOS escritores desde
+// ADR-031 (el motor y el transcriptor a pedido de la app), así que puede sumar de más algún enlace
+// que el equipo pegó a mano entre dos corridas. Por `run_id` no pasa: ahí la atribución es exacta.
+const memoriaDe = async (r, hasta) => {
+  const porRun = await sb(`processed_items?select=external_id&run_id=eq.${r.id}`);
+  if (porRun.length) return { filas: porRun, via: "run_id" };
+  const porVentana = await sb(
+    `processed_items?select=external_id&primera_vez=gte.${encodeURIComponent(r.inicio)}&primera_vez=lt.${encodeURIComponent(hasta)}`,
+  );
+  return { filas: porVentana, via: "ventana primera_vez (run_id null: corrida previa al fix)" };
+};
+
 if (runs.length >= 2 && runs.every((r) => r.estado === "ok")) {
   console.log("\n═══ DEDUP ENTRE LAS 2 ÚLTIMAS ═══");
   const ids = [];
-  for (const r of runs.slice(0, 2)) {
-    const filas = await sb(`processed_items?select=external_id&run_id=eq.${r.id}`);
+  for (const [i, r] of runs.slice(0, 2).entries()) {
+    // techo = arranque de la corrida siguiente (la de índice i-1, más nueva); para la última, ahora
+    const hasta = i === 0 ? new Date().toISOString() : runs[i - 1].inicio;
+    const { filas, via } = await memoriaDe(r, hasta);
     ids.push(new Set(filas.map((f) => f.external_id)));
-    console.log(`   ${r.inicio.slice(0, 16)}: ${filas.length} processed_items`);
+    console.log(`   ${r.inicio.slice(0, 16)}: ${filas.length} processed_items · por ${via}`);
   }
   const inter = [...ids[0]].filter((x) => ids[1].has(x));
   console.log(`   intersección: ${inter.length} ${inter.length === 0 ? "✓ (∅, el dedup funciona)" : "✖ HAY SOLAPE: " + inter.slice(0, 5)}`);

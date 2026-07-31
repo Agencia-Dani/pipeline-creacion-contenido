@@ -1,17 +1,11 @@
 # ADR-029 — Dedup blindado: lectura fail-closed, memoria antes de entregar, `external_id` en el feed
 
-> 🔴 **BANDERA 2026-07-31 (cierre 70): la parte "memoria ANTES de entregar" de este ADR NO ESTÁ EN
-> VIGOR.** El reorden se hizo en el **array de conexiones**, pero el motor corre con
-> `executionOrder: v1`, que ordena las ramas paralelas por **posición en el canvas** (y, luego x).
-> Posiciones reales: `POST Airtable Candidatos` x=7560 · `Resumen del run` x=8200 ·
-> `POST processed_items` x=8960 ⇒ **se entrega primero y se graba después**. Verificado con datos de
-> la corrida del 31/07: `registro_dedup` reportó `no_corrio` (el nodo aún no había ejecutado al
-> consultarlo) y aun así las 191 filas se escribieron. **Corolario:** el tripwire `registro_dedup`
-> **nunca puede dispararse** — dice `no_corrio` en toda corrida. **La decisión de este ADR sigue
-> siendo la correcta; lo que falta es hacerla efectiva** moviendo `Preparar procesados` y
-> `POST processed_items` a x < 4480. Se ataca con un plan aparte (handoff §Pendiente vivo).
-> *No borres esta bandera hasta que el fix esté re-importado y una corrida real muestre
-> `registro_dedup: 'ok'`.*
+> 🟠 **BANDERA 2026-07-31: la parte "memoria ANTES de entregar" está ARREGLADA EN EL REPO y espera
+> el re-import.** Estuvo sin efecto desde que se escribió este ADR — ver la
+> [enmienda del 2026-07-31](#enmienda-2026-07-31--la-memoria-antes-de-entregar-no-se-ordena-con-el-array-sino-con-la-topología),
+> que cuenta por qué. *No borres esta bandera hasta que el motor esté re-importado y una corrida
+> real muestre `registro_dedup: 'ok'`* — hasta entonces, en producción sigue entregándose antes de
+> grabar.
 
 - **Estado:** aceptada — 2026-07-24 (audit del run manual de Jero, con Mani). Endurece el dedup del
   motor sin tocar su semántica. No enmienda una decisión previa; cubre un modo de falla que
@@ -38,9 +32,12 @@
      protege las **escrituras** al registro (observar sin bloquear). La **lectura** de `processed_items`
      no es registro: es un **insumo** del pipeline, igual que `Leer Proyectos` o `Leer Referentes`, que
      ya son fail-closed. Sin memoria, la única salida honesta es no entregar.
-  2. **La memoria se graba antes de entregar.** Se invierte el orden de las ramas de `Heat-score v1` a
+  2. **La memoria se graba antes de entregar.** ~~Se invierte el orden de las ramas de `Heat-score v1` a
      `[Preparar procesados, Transcribir]`: con execution order v1 (depth-first), `POST processed_items`
-     corre **primero**, antes de gastar Supadata/Haiku y antes del `POST Airtable Candidatos`.
+     corre **primero**~~ — **el mecanismo era falso y nunca funcionó** (enmienda 2026-07-31: el orden
+     de las ramas lo decide la posición en el canvas, no el array). La decisión se mantiene y hoy se
+     implementa **en serie**: `Heat-score v1 → Preparar procesados → POST processed_items →
+     Transcribir`, o sea antes de gastar Supadata/Haiku y antes del `POST Airtable Candidatos`.
      `processed_items` siempre significó "evaluado" (registra la salida de Heat-score, no la de Armar
      candidato); solo cambia el momento. `POST processed_items` **queda fail-open**: la escritura sí es
      sumidero. `Resumen del run` verifica el resultado y lo reporta en `metricas.registro_dedup`
@@ -133,3 +130,48 @@
 - **Toca:** `Leer señal selección`, `Leer procesados` (URL + settings), `Leer feed vivo` (settings),
   `Heat-score v1` (tripwire de truncado). Probado en `test-nodos.mjs` (+1 caso). Sin nodos nuevos, sin
   conexiones nuevas, sin cambio de schema ni de contrato.
+
+## Enmienda (2026-07-31) — la "memoria antes de entregar" no se ordena con el array, sino con la topología
+
+- **Estado:** aceptada — 2026-07-31 (cierre 70/71, con Mani). No cambia la decisión de arriba: la hace
+  **efectiva**, porque durante 3 corridas no lo estuvo.
+- **Contexto — la decisión #2 nunca entró en vigor.** El "se invierte el orden de las ramas de
+  `Heat-score v1`" se implementó reordenando el **array de `connections`**. Eso no hace nada: el motor
+  corre con `executionOrder: v1`, y **cuando un nodo abre dos ramas n8n elige cuál va primero por la
+  POSICIÓN de cada destino en el canvas** (arriba primero, después izquierda), recorriendo esa rama
+  entera antes de empezar la otra. Las posiciones reales dejaban la entrega a la izquierda de la
+  memoria (`POST Airtable Candidatos` x=7560 · `POST processed_items` x=8960), o sea exactamente al
+  revés de lo decidido. **Probado con datos de la corrida del 31/07:** `Resumen del run` reportó
+  `registro_dedup: 'no_corrio'` —su `$('POST processed_items')` tiró porque ese nodo todavía no había
+  ejecutado— **y aun así las 191 filas de memoria existen**. Dos consecuencias vividas: el tripwire
+  `registro_dedup` era **incapaz de dispararse** (decía `no_corrio` siempre, así que la alarma que
+  este ADR puso para detectar el fallo de dedup no servía), y la ventana de riesgo de los 15
+  duplicados **seguía abierta** — si el motor moría entre entregar y grabar, esos videos volvían a
+  entregarse en la corrida siguiente.
+- **Decisión — la rama de memoria deja de ser una rama.** `Heat-score v1 → Preparar procesados →
+  POST processed_items → Transcribir (Supadata)`, en serie. Se descartó la alternativa barata (mover
+  las dos posiciones a la izquierda de `Transcribir`): funciona, pero deja la garantía central del ADR
+  viviendo en dos coordenadas de canvas, o sea la próxima limpieza visual la rompe otra vez y en
+  silencio. **En serie, "la memoria se graba antes de entregar" es una propiedad de la topología.**
+- **Consecuencias:**
+  - (+) La garantía es verificable estáticamente y **está verificada**: `node Workflows/auditar-workflows.mjs`
+    exige que todo `$('X')` apunte a un ancestro topológico. Ese chequeo marcaba **exactamente este
+    bug** (`Resumen del run` → `POST processed_items`) y hoy los 3 workflows dan cero.
+  - (+) `registro_dedup` **revive**: `POST processed_items` pasó a ser ancestro de `Resumen del run`,
+    así que el tripwire por fin puede reportar `ok`/`fallo`.
+  - (−) Con la memoria antes de la entrega, un abort **en** la entrega deja videos recordados y no
+    entregados (supply quemado). Es el trade que este ADR ya había elegido: mejor perder supply que
+    duplicar.
+  - (−) `Transcribir` ya no recibe los videos por `$input` (su input es la respuesta del POST): los
+    lee con `$('Heat-score v1').all()`. Y `POST processed_items` necesita `alwaysOutputData`, porque
+    PostgREST devuelve body vacío con `resolution=ignore-duplicates` y sin item de salida el nodo
+    siguiente no dispararía.
+- **La regla que sobrevive al fix, y vale para cualquier cambio futuro:** **si B depende de que A ya
+  haya corrido, B va detrás de A en serie.** Reordenar el array de conexiones no ordena nada.
+  Anotado en el [CLAUDE.md del motor](../../Workflows/workflow-short-form-content/CLAUDE.md) y en
+  [dev-doc §2.1](../agents/dev-doc.md), y chequeado por el auditor.
+- **Toca:** `connections` de `Heat-score v1` y `POST processed_items`, `alwaysOutputData` del POST,
+  1 línea de `Transcribir`, y las posiciones (ya cosméticas). De paso, `Preparar procesados` empieza a
+  escribir **`run_id`** (`null` si el run no se abrió: la columna es FK a `runs(id)`), sin lo cual la
+  memoria no se puede atribuir a su corrida. Probado en `test-nodos.mjs` (+4 casos). Sin nodos nuevos,
+  sin cambio de schema ni de contrato. **Pide re-import del motor.**

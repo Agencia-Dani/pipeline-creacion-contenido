@@ -109,9 +109,11 @@ nodo `Config` al importar (placeholders `<<...>>`), no se commitean.
 > entrega igual a Airtable, solo no reporta — y el guard single-flight **deja pasar** (fail-open).
 > El arranque va **en serie**: `Config → Barrer runs zombie → Leer corridas vivas → Guard
 > single-flight → Abrir run → Leer plan (fachada)`. El guard (ADR-023) bloquea si hay una corrida viva
-> (`en_curso` más joven que `ventana_corrida_min`, 120 min) y aplica a los 3 triggers; el barrido
-> corre antes, así un zombie nunca deja el motor trabado. `Abrir run` en serie es lo que permite que
-> `Cerrar run` referencie el `run_id` (en paralelo, n8n lo ejecutaría después y la referencia rompe).
+> (`en_curso` más joven que `ventana_corrida_min` — el valor vigente vive en
+> [workflow.yaml](./workflow.yaml)) y aplica a los 3 triggers; el barrido corre antes, así un zombie
+> nunca deja el motor trabado. `Abrir run` en serie es lo que permite que `Cerrar run` referencie el
+> `run_id`: colgado en paralelo, **el orden lo decidiría la posición en el canvas** y la referencia
+> puede romper (`hasn't been executed`). Toda dependencia entre nodos va en serie — cierre 70.
 
 ---
 

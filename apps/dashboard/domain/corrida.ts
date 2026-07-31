@@ -89,9 +89,12 @@ export const DISPARO_LEGIBLE: Record<string, string> = {
 // `Config` del motor (y del archivado). Si cambia allá, cambia acá, o la pantalla
 // dice "hay una corrida viva" cuando el motor ya la considera zombie. Cuando la
 // config viva en Postgres (D5) esto se lee de ahí y la duplicación muere.
-// 120 → 45 el 2026-07-31: un abort fail-closed deja la fila `en_curso` y con 120
-// bloqueaba 2 h. Máximo real medido de una corrida del motor: 23,2 min.
-export const VENTANA_CORRIDA_MIN = 45;
+// 120 → 45 → 60 el 2026-07-31: un abort fail-closed deja la fila `en_curso` y con
+// 120 bloqueaba 2 h. 45 se eligió sobre un máximo medido de 23,2 min, pero la
+// corrida del 31/07 duró 31 (margen 1,45x, no 2x). La ventana tiene que quedar
+// POR ENCIMA de la corrida más larga posible: si queda debajo, el barredor mata
+// una corrida en vuelo y el guard deja arrancar otra en paralelo.
+export const VENTANA_CORRIDA_MIN = 60;
 
 export function hayCorridaViva(
   corridas: Corrida[],

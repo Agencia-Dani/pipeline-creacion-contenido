@@ -61,7 +61,8 @@
      cron del lunes 8am podía arrancar encima de una corrida on-demand viva: el barredor zombie la
      marcaba `fallo` y las dos corrían en paralelo (doble Apify). Costo aceptado: si hay corrida viva
      a la hora del cron, esa semana el barrido automático se saltea (recuperable con el botón).
-  2. **Vivo vs. zombie lo decide `ventana_corrida_min`** (knob del Config, 120): un run `en_curso`
+  2. **Vivo vs. zombie lo decide `ventana_corrida_min`** (knob del Config; 120 al decidir esto, hoy
+     60 — el valor vigente vive en el manifest del motor, no acá): un run `en_curso`
      más joven que la ventana es corrida viva (el guard bloquea); más viejo es zombie. El barredor
      zombie se movió **antes** del guard y solo barre los más viejos que la ventana → un zombie
      nunca deja el motor trabado.

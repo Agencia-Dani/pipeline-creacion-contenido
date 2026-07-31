@@ -84,39 +84,48 @@
 > credencial **`Run Plan Header`** de n8n · el gestor. **`MOTOR_WEBHOOK_HEADER_*` NO se tocó**: sigue
 > siendo `X-Motor-Auth`, es el del botón "Correr ahora", credencial **`Webhook Motor Header`**.
 >
-> 🔴 **LOS 3 HALLAZGOS DEL CIERRE 70 — a atacar con un plan aparte (decisión de Mani).** El detalle
-> completo, con la evidencia, está en el log del cierre 70. Resumen para arrancar el plan:
+> ✅ **LOS 3 HALLAZGOS DEL CIERRE 70 ESTÁN ARREGLADOS EN EL REPO (cierre 71).** Lo que queda es
+> **un re-import del motor y una corrida** — los detalles abajo. Qué cambió:
 >
-> **(1) `executionOrder: v1` ordena las ramas paralelas por POSICIÓN EN EL CANVAS, no por el array de
-> conexiones.** Por eso el *"grabar la memoria antes de entregar"* de ADR-029 **nunca entró en vigor**:
-> `POST Airtable Candidatos` está en x=7560 y `POST processed_items` en x=8960, o sea se entrega
-> primero. Y `Resumen del run` (x=8200) lee `$('POST processed_items')` antes de que exista, así que
-> **`registro_dedup` dice `no_corrio` siempre**: la alarma de ADR-029 no puede dispararse nunca.
-> *Fix propuesto:* mover `Preparar procesados` + `POST processed_items` a **x < 4480** (izquierda de
-> `Transcribir`). Solo `position`, arregla las dos cosas, pide re-import.
-> **⚠️ La regla general que sale de acá y vale para cualquier cambio futuro de ramas: en este repo el
-> orden de ejecución lo decide la POSICIÓN, no el JSON.** Reordenar el array no hace nada.
+> **(1) La memoria del dedup dejó de ser una rama paralela: va EN SERIE.** `Heat-score v1 → Preparar
+> procesados → POST processed_items → Transcribir`. Se descartó el fix propuesto (mover posiciones a
+> x<4480): funciona, pero deja la garantía central de ADR-029 viviendo en dos coordenadas del canvas,
+> o sea la próxima limpieza visual la rompe otra vez y en silencio. En serie es **topológica**.
+> De arrastre, `POST processed_items` pasó a ser ancestro de `Resumen del run`, así que
+> **`registro_dedup` revive** (deja de decir `no_corrio` siempre). Enmienda 2026-07-31 de ADR-029.
+> **⚠️ La regla general, que sigue valiendo para cualquier cambio de ramas: el orden de ejecución lo
+> decide la POSICIÓN EN EL CANVAS, no el JSON.** Reordenar el array no hace nada. Ahora hay un
+> chequeo que lo caza solo: `node Workflows/auditar-workflows.mjs`.
 >
-> **(2) `ventana_corrida_min` = 45 quedó corta.** Se eligió sobre un máximo medido de 23,2 min y la
-> corrida del 31/07 duró **31 min** ⇒ margen 1,45x. **Recomendación: 60.** Si la ventana queda por
-> debajo de una corrida real, el barredor la mata en vuelo y el guard deja arrancar una segunda en
-> paralelo (doble gasto + duplicados).
+> **(2) `ventana_corrida_min` = 60** en el repo (motor + archivado + manifest + `domain/corrida.ts` +
+> las docs rezagadas). 45 se había elegido sobre un máximo medido de 23,2 min y la corrida del 31/07
+> duró 31 (margen 1,45x). La ventana tiene que quedar **por encima de la corrida más larga posible**:
+> debajo, el barredor mata una corrida en vuelo y el guard deja arrancar otra en paralelo.
 >
-> **(3) `processed_items.run_id` viene `null`** — `Preparar procesados` no lo setea. No rompe el dedup
-> (clave `platform+external_id`) pero impide atribuir memoria a corridas, que es justo lo que hace
-> falta para auditar duplicados. Barato de arreglar si se toca ese nodo igual por (1).
+> **(3) `processed_items.run_id`** lo escribe `Preparar procesados`, y viaja **`null` si el run no se
+> pudo abrir** (es FK a `runs(id)`: un uuid de relleno reventaría el batch entero). 4 casos en
+> `test-nodos.mjs`.
 >
-> 🟠 **PENDIENTE MANUAL: `ventana_corrida_min` 120 → 45 en n8n.** Ya está en el repo (`Config` del
-> **motor** y del **archivado**) pero **NO en n8n**; no hace falta re-importar, el `Config` se edita a
-> mano. **Ojo:** si vas a atacar el hallazgo (2), poné **60** directamente en los dos lados en vez de
-> 45. *(El valor está duplicado en `apps/dashboard/domain/corrida.ts` para que la pantalla diga lo
-> mismo que el motor; muere cuando la config viva en Postgres, D5.)*
+> 🟠 **LO ÚNICO MANUAL QUE QUEDA — 3 pasos, en orden:**
+> 1. **Re-importar el motor** (solo el motor: archivado y descubrimiento no cambiaron de topología).
+>    Mismo path y mismo header del webhook. Truco del cierre 70 para confirmar sin disparar nada: un
+>    POST con header inválido da **403 `Authorization data is wrong!`** = activo, path y credencial
+>    bien · **404** = inactivo o path equivocado.
+> 2. **Rellenar los placeholders que el re-import borra.** El auditor los lista solo
+>    (`node Workflows/auditar-workflows.mjs`): `<<AIRTABLE_BASE_ID>>` `<<DASHBOARD_URL>>` (sin barra
+>    final) `<<INSTANCE_ID>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_MOTOR>>` en `Config`, y
+>    `<SUPADATA_API_KEY>` ×1 + `<ANTHROPIC_API_KEY>` ×3 en los code nodes. **Activar.**
+> 3. **Archivado: `ventana_corrida_min` 120 → 60 a mano** en su `Config`. No pide re-import.
 >
-> 🟠 **2ª CORRIDA DE FUEGO (dedup) — sigue pendiente y ahora vale más.** Con 191 videos en
-> `processed_items` de la corrida del 31/07, disparar de nuevo tiene que dar **intersección ∅** de
-> `external_id` entre ambas y **cero urls repetidas** en el feed. Script listo:
+> 🟠 **2ª CORRIDA DE FUEGO (dedup) — pendiente, y es la que cierra los 3 hallazgos.** Disparar desde ▶
+> del dashboard. En la ejecución: `Preparar procesados` y `POST processed_items` **antes** de
+> `Transcribir`, y `Leer procesados` con **1 ejecución / 1 item**. Después:
 > `set -a && source .env && set +a && node Workflows/workflow-short-form-content/verificar-corrida.mjs 2`
-> (solo lee; trae escritas las 2 advertencias de los hallazgos 1 y 3).
+> Tiene que dar: **`registro_dedup: ok`** (por primera vez en la historia del ADR) · las filas de
+> `processed_items` de la corrida nueva **con `run_id`** · **intersección de `external_id` = ∅** ·
+> 0 `⚠️ SIN GUION` · 0 urls duplicadas. Si `registro_dedup` sigue diciendo `no_corrio`, el motor está
+> corriendo el JSON viejo: el re-import no entró. *(El verificador ya sabe leer la memoria de la
+> corrida del 31/07, que tiene `run_id` null, cayendo a una ventana de `primera_vez`.)*
 >
 > 🟢 **RE-IMPORT #1 de D4 — listo en el repo, pasos exactos (cierre 69).** Va **después** del
 > re-import del fix del timeout y de una corrida verde (decisión de Mani: separados). **Antes de
@@ -170,6 +179,14 @@
 > transcript vacío / la calidad de scrape. Gatillo: si tras el retry de ADR-030 las vacías siguen altas
 > o el supply queda corto de forma sostenida, correr el spike de arriba y evaluar migrar de actor (ADR
 > aparte).
+
+> ---
+> 🗄️ **DE ACÁ PARA ABAJO, HASTA §Ciclo: COPIA VIEJA DE ESTE MISMO BLOQUE — NO LA SIGAS.**
+> Quedó duplicada al editar el cierre 70 (arriba está la versión al día). La dejamos en vez de
+> borrarla porque su cola tiene detalle histórico que no está arriba, pero **sus instrucciones están
+> vencidas**: dice `ventana_corrida_min` 45 (hoy **60**) y lista re-imports que ya se hicieron el
+> 31/07. Si vas a trabajar, lo vigente es lo de arriba. *(Podarla es un task suelto de 2 minutos.)*
+> ---
 
 > ✅ **RESUELTO el 2026-07-31: la fachada responde 200 en prod.** Era el **valor** de
 > `RUN_PLAN_HEADER_VALOR` en Vercel, que no coincidía con el del gestor (la env estaba presente: lo
@@ -455,6 +472,16 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-07-31 (cierre 71) — Los 3 hallazgos del cierre 70, cerrados en el repo + un auditor que caza esta clase de bug sola (Claude, pedido de Mani).**
+**H1 — la memoria del dedup dejó de ser una rama.** Decisión de Mani sobre la alternativa propuesta en el cierre 70: en vez de mover posiciones (`x<4480`), **serializar**: `Heat-score v1 → Preparar procesados → POST processed_items → Transcribir`. El argumento es que mover posiciones deja la garantía central de ADR-029 viviendo en dos coordenadas de canvas, o sea la próxima limpieza visual la rompe otra vez y en silencio; en serie la garantía es **topológica**. Tres detalles la sostienen: `alwaysOutputData` en el POST (PostgREST devuelve body vacío con `resolution=ignore-duplicates`, y sin item de salida `Transcribir` no dispararía), `Transcribir` pasa a leer `$('Heat-score v1').all()` en vez de `$input` (su input ahora es la respuesta del POST), y `onError: continueRegularOutput` **se conserva** — la escritura sigue siendo fail-open, como manda el ADR. **De arrastre, `registro_dedup` revive:** `POST processed_items` es ahora ancestro de `Resumen del run`. Quedó como [enmienda 2026-07-31 de ADR-029](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md), con la decisión #2 original **tachada** — el mecanismo que describía era falso y nadie debería leerlo de buena fe.
+**🔧 El auditor, que es lo que hace que esto no vuelva a pasar:** `node Workflows/auditar-workflows.mjs` (sin dependencias, solo lee). 5 chequeos sobre los 3 workflows: conexiones rotas · inalcanzables · **todo `$('X')` tiene que apuntar a un ancestro topológico** · `jsCode` que compile como AsyncFunction · inventario de placeholders del re-import. **El tercero es el que importa:** corrido contra el repo ANTES del fix marcaba **exactamente 1 hallazgo en todo el pipeline — `Resumen del run` → `POST processed_items`**, o sea el bug del cierre 70 y nada más. Después del fix: **0**. Estos chequeos ya se habían escrito a mano y tirado dos veces (cierres 67 y 69); a la tercera se commitean. Enganchado en §Feedback loops del CLAUDE.md raíz.
+**H2 — `ventana_corrida_min` 45 → 60** en los 5 lugares que lo tienen (motor, archivado, manifest, `domain/corrida.ts`, docs). De paso se podó la duplicación del número en prosa: el README del motor, `airtable-cockpit.md` y ADR-023 ahora **apuntan al manifest** en vez de repetir un valor que se les quedaba viejo (los tres decían 120).
+**H3 — `run_id` en `Preparar procesados`**, `null` si el run no se abrió: la columna es FK a `runs(id)` y un uuid de relleno haría fallar el INSERT del batch entero, o sea la corrida entregaría sin memorizar — peor que el bug original. 4 casos nuevos en `test-nodos.mjs`.
+**🔍 El hallazgo del audit, que salió de probar el verificador contra la base viva y no de leer código:** el fallback por ventana de `primera_vez` devolvía **0 filas** para la corrida del 31/07. Razón: sus 191 filas de memoria se escribieron a las **16:59:10**, y `Cerrar run` había cerrado el run a las **16:59:08** — la memoria aterrizó **2 segundos después de cerrar la corrida**. Es la medida exacta del hallazgo 1, y de paso la prueba de que el techo de la ventana no puede ser `fin`: se cambió al **arranque de la corrida siguiente**. Con eso el fallback encuentra las 191. *(Límite anotado en el propio script: `processed_items` tiene dos escritores desde ADR-031 — el motor y el transcriptor de la app — así que la ventana puede sumar de más algún enlace pegado a mano entre corridas. Por `run_id` la atribución es exacta, que es justo lo que H3 desbloquea.)*
+**Suelto que se cierra sin tocar nada:** el run de **descubrimiento** del 27/07 en `en_curso` **no es un bug**. Su `Barrer runs zombie` no filtra por antigüedad (`estado=eq.en_curso&id=neq.<propio>`), así que la corrida del lunes 03/08 lo marca `fallo` sola. Queda escrito para que nadie lo re-diagnostique.
+**Verificación (todo estático, sin gastar un crédito):** auditor **0 hallazgos** en los 3 workflows · `test-nodos.mjs` **verde con los asserts de Transcribir intactos** (solo cambió el mock, que es la prueba de que la lógica no se movió) · validador **1454/0** · dashboard **64/64** + typecheck limpio. Contra la base viva, solo lecturas: 601 `processed_items` (**601 con `run_id` null** — la corrida nueva va a ser la primera con atribución) y la corrida del 31/07 medida en **31,0 min**, que es lo que condena a 45.
+**Próximo paso:** el re-import del motor + la corrida de fuego (§Pendiente vivo, 3 pasos manuales). Después **D5**, que sigue desbloqueado: la config migra a Postgres sin volver a tocar n8n. Arrancar por **Ajustes**, que ya tiene su base en [`domain/ajustes.ts`](../../apps/dashboard/domain/ajustes.ts) (valida los 18 knobs). Sigue pendiente el 3er pase del diff de D3.
 
 **2026-07-31 (cierre 70) — Re-import #1 vivo y la primera corrida con la fachada (139 candidatos); aparecieron 2 hallazgos que quedan para atacar (Mani ejecutó, Claude diagnosticó).**
 **Los 3 workflows re-importados y el motor corriendo por la fachada.** Antes hubo una cadena de 5 fallos, **todos de configuración, ninguno de código** — el swap de D4 y el fix del timeout entraron bien de una: (1) Vercel tenía **otro valor** en `RUN_PLAN_HEADER_VALOR` (lo dijo el `motivo` del 403 que agregamos ese mismo día) ⇒ se **rotó el par** y el header pasó a llamarse **`X-Run-Plan-Auth`**, que además mata la colisión de nombre con el del webhook; (2) `MOTOR_WEBHOOK_URL` apuntaba a la **URL de _test_ de n8n** (`/webhook-test/`), que solo responde con *Listen for test event* armado — **el botón nunca había funcionado, y no era culpa del re-import**; (3) el motor re-importado **no estaba `Active`**, y sin eso toda URL de producción da 404; (4) el **path del webhook cambió** en el re-import ⇒ se adoptó el nuevo (más barato: la variable de Vercel se editaba igual); (5) la credencial `Run Plan Header` tenía el par viejo. **Método que ahorró horas y sirve para la próxima:** un **POST con header inválido** distingue gratis y sin disparar nada — **404** = workflow inactivo o path equivocado · **403 `Authorization data is wrong!`** = activo, path bien y credencial bien.

@@ -321,7 +321,8 @@ El equipo puede disparar una corrida **a demanda** sin esperar el cron. La caden
    entrega solo lo nuevo — que puede ser nada — pero **igual paga** el scrape de Apify y el pre-trim
    (el dedup corta después). El botón no es gratis aunque no entregue.
 4. **Single-flight** (enmienda C.3 del ADR): si ya hay una corrida viva (`runs` de Supabase con
-   `estado=en_curso` más joven que `ventana_corrida_min`, 120 min), el motor no arranca otra — y el
+   `estado=en_curso` más joven que `ventana_corrida_min` — el valor vigente vive en el manifest del
+   motor, no acá), el motor no arranca otra — y el
    guard aplica también al cron y al Execute manual. El click bloqueado responde 200 igual (la
    respuesta es "señal recibida", no el veredicto).
 
