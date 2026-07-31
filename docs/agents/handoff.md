@@ -67,12 +67,16 @@
 > distingue gratis y sin disparar nada — **404** = workflow inactivo o path equivocado ·
 > **403 `Authorization data is wrong!`** = activo, path bien y credencial bien.
 >
-> ✅ **Corrida de fuego #2 (sin-guion + entrega): CUMPLIDA por la corrida del 31/07.** **0** títulos
-> `⚠️ SIN GUION` en el feed · `metricas.sin_guion` = **21 descartados** (>0, o sea ADR-030 vivo) · los
-> 4 proyectos con `razon_faltante: supply` y `tasa_gate` coherente. **Queda un solo criterio sin
-> mirar: `transcripciones_vacias` contra el baseline de 41%** (es el efecto del retry de ADR-030).
-> Sale de `runs.metricas` de esa corrida; para la razón cruda de Supadata, los logs
-> `[Transcribir] … VACIA`. No pide corrida nueva: el dato ya está guardado.
+> ✅ **Corrida de fuego #2 (sin-guion + entrega): CUMPLIDA ENTERA por la corrida del 31/07.** **0**
+> títulos `⚠️ SIN GUION` en el feed · `metricas.sin_guion` = **21 descartados** (>0, o sea ADR-030
+> vivo) · los 4 proyectos con `razon_faltante: supply` y `tasa_gate` coherente.
+> **✅ El último criterio también cerró (cierre 72): `transcripciones_vacias` = 21 sobre 191
+> llamadas a Supadata = **11%**, contra el baseline de **41%** del 23/07.** El retry de ADR-030
+> funciona y no hace falta el spike de actors por esta razón (el gatillo del 💤 Someday de más abajo
+> era justamente "si las vacías siguen altas": no siguen). Salió del verificador, que ya calcula el
+> cociente solo — `node Workflows/workflow-short-form-content/verificar-corrida.mjs`. *Ojo con el
+> denominador: `llamadas.supadata` es una estimación del `Resumen del run`, así que el 11% es del
+> mismo orden de precisión que el 41% con el que se compara — la caída es grande, la cifra exacta no.*
 >
 > 🟠 **La corrida de fuego #1 (dedup) sigue viva** — es la **2ª corrida de fuego** de más abajo, que
 > además arrastra los 3 hallazgos del cierre 71. Es la única que falta.
