@@ -26,7 +26,7 @@
 > D5 dejaron su parte y ninguna se hizo todavía). **7 páginas a congelar** —solo-lectura o
 > renombrar `[ARCHIVO] …`— y **ninguna tabla a bloquear**:
 > *Configuración Global* · *Ajustes Dev-Only* (corte 1/4) · *Referentes* · *Referentes - Revisar* ·
-> *Referentes - Sugeridos* (corte 2/4) · *Voces* · *Proyectos* (corte 3/4, después del merge).
+> *Referentes - Sugeridos* (corte 2/4) · *Voces* · *Proyectos* (corte 3/4, ya deployado).
 > **La regla es la misma en los tres: se congela la PÁGINA, nunca la tabla.** Tres tablas siguen
 > recibiendo escrituras de máquina — `Referentes propuestos` (la escribe el descubrimiento y la
 > PATCHea la app), `Proyectos` (`criterios_aprendidos`/`advertencia_criterios`, ADR-033) y
@@ -34,20 +34,26 @@
 > **Y el aviso al equipo, que es la mitad que no es Airtable:** lo único peligroso de todo esto es
 > **aprobar un sugerido desde Airtable** (detalle abajo, corte 2/4). El resto es inocuo pero inútil.
 
-> 🔵 **EL CORTE 3/4 (Voces + Proyectos) ESTÁ CONSTRUIDO Y VERIFICADO, EN LA RAMA
-> `corte-3-voces-proyectos`.** No está en `main` todavía: el flip vive en la rama porque la unidad
-> de aislamiento es la rama (aprendizaje del cierre 72). **No hay migración ni carga previa** — a
-> diferencia del corte 2/4, el schema `009` ya modelaba bien los dos dominios y el espejo de D3 ya
-> los tenía. Los 3 pasos, en orden:
-> 1. **`cd apps/dashboard && npm run cortar:voces-proyectos`** (re-sincroniza el espejo e imprime el
->    A/B; con `--dry` ya salió verde: 3 voces · 6 proyectos idénticos en los dos ámbitos).
-> 2. **Merge a `main`** (= deploy).
-> 3. **El hecho-cuando, 2 min:** apagar y volver a prender un proyecto desde `/curar/voces`,
->    confirmar que la fachada lo refleja
->    (`curl "$DASHBOARD_URL/api/engine/run-plan?ambito=motor" -H "$RUN_PLAN_HEADER_NOMBRE: $RUN_PLAN_HEADER_VALOR"`)
->    y que quedó su fila en `app.eventos` (`tipo = 'proyectos.editar'`, con anterior y nuevo).
+> 🟢 **EL CORTE 3/4 (Voces + Proyectos) ESTÁ EN PRODUCCIÓN — 2026-07-31.** Se corrió
+> `npm run cortar:voces-proyectos` (3 voces · 6 proyectos idénticos a Airtable en los dos ámbitos ·
+> los mismos 4 proyectos corriendo de los dos lados) y se mergeó a `main`. **No hubo migración**: a
+> diferencia del corte 2/4, el schema `009` ya modelaba bien los dos dominios.
 >
-> 🟠 **Y después, el paso de Airtable — que en este corte NO es "congelar y listo":**
+> **Verificado en prod tras el deploy:** `?ambito=motor` → **3 voces · 4 proyectos · 15 referentes ·
+> 18 ajustes**, con la **N resuelta a 100** por el global y *Storytelling* con sus **5 referentes**
+> (el que el modelo viejo dejaba en 0) · `?ambito=completo` → 6 proyectos, y los 2 de Trading con
+> sus **862 y 1048 caracteres de `criterios_aprendidos` llegando desde Airtable**, que es ADR-033
+> funcionando en vivo · fail-closed intacto (sin header 403 · ámbito con typo 400) ·
+> `/curar/voces` responde y redirige a login sin sesión.
+>
+> 🟠 **Lo que queda, y es de Mani (2 min + el viaje a Airtable):**
+> **El hecho-cuando:** apagar y volver a prender un proyecto desde `/curar/voces`, confirmar que la
+> fachada lo refleja
+> (`curl "$DASHBOARD_URL/api/engine/run-plan?ambito=motor" -H "$RUN_PLAN_HEADER_NOMBRE: $RUN_PLAN_HEADER_VALOR"`)
+> y que quedó su fila en `app.eventos` (`tipo = 'proyectos.editar'`, con anterior y nuevo). Es
+> además la primera vez que alguien que no sea Claude entra a la pantalla.
+>
+> 🟠 **Y el paso de Airtable — que en este corte NO es "congelar y listo":**
 > **Congelar las páginas *Voces* y *Proyectos*** (solo-lectura o `[ARCHIVO] …`). ⚠️ **Pero la tabla
 > `Proyectos` sigue recibiendo escrituras de la máquina:** `Destilar criterios` del archivado le
 > PATCHea `criterios_aprendidos` y `advertencia_criterios` cada domingo, y la app los lee de ahí
@@ -341,7 +347,7 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 | **D2** Entender | calidad/embudo/costos sobre migración `008` (3 vistas + tarifas) | ✅ código · migración aplicada · ✅ **devuelve datos desde el 29/07** (estuvo roto desde el día 1 por el grant faltante, cierre 68) |
 | **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ **CORRIDO el 30/07 (cierre 69): espejo perfecto ×2** — voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8 (candidatos y descartes en 0 de los dos lados) · ⏳ falta **el 3er pase con una edición del equipo de por medio** (es de Mani, 2 min) |
 | **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ✅ **la fachada responde 200 en prod desde el 31/07** (par rotado, header ahora `X-Run-Plan-Auth`) · ✅ **re-import #1 HECHO y corrida real entera por la fachada** (cierre 70): hecho-cuando cerrado |
-| **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🔵 **corte 3/4 (Voces + Proyectos) CONSTRUIDO Y VERIFICADO, en la rama `corte-3-voces-proyectos` (cierre 74)**: pantalla `/curar/voces` (voces con sus proyectos adentro) + flip + [ADR-033](../adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md) (un dueño por **campo**: `criterios_aprendidos`/`advertencia_criterios` siguen siendo de Airtable hasta D7, si no el loop de ADR-022 moría en silencio) · **sin migración** (el schema `009` ya modelaba bien los dos dominios, medido contra el dato vivo) · A/B contra la fachada de producción: **mismo plan, 0 diferencias** · ⏳ faltan los **3 pasos de §Pendiente vivo** (script → merge → hecho-cuando) · 🔧 **corte 2/4 (Referentes) HECHO Y EN PROD (cierre 73)**: pantallas `/curar/referentes` (con *A revisar* adentro) y `/curar/sugeridos` + flip + [ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md) (migración `012`: el vínculo con proyectos es N:M — el modelo de `009` tiraba 19 de 35 pares y apagaba *Storytelling*) · carga verde (15 referentes · **33 pares**, los 6 proyectos idénticos) y prod sirviéndolos · ⏳ faltan **congelar 3 páginas de Airtable + el aviso al equipo** (§Pendiente vivo) · 🔧 **corte 1/4 HECHO Y EN PROD (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ✅ **validado por la corrida real de las 19:18** (`ok`, `n_objetivo` resuelto por la fuente nueva) · ⏳ faltan **los 2 pasos manuales de Mani** (§Pendiente vivo) |
+| **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🟢 **corte 3/4 (Voces + Proyectos) HECHO Y EN PROD (cierre 74)**: pantalla `/curar/voces` (voces con sus proyectos adentro) + flip + [ADR-033](../adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md) (un dueño por **campo**: `criterios_aprendidos`/`advertencia_criterios` siguen siendo de Airtable hasta D7, si no el loop de ADR-022 moría en silencio) · **sin migración** (el schema `009` ya modelaba bien los dos dominios, medido contra el dato vivo) · A/B contra la fachada de producción: **mismo plan, 0 diferencias** · carga verde y **verificado en prod**: `?ambito=motor` con 3 voces · 4 proyectos · N resuelta a 100 · *Storytelling* con sus 5 referentes, y los `criterios_aprendidos` llegando desde Airtable (ADR-033 vivo) · ⏳ faltan el **hecho-cuando** y el congelado de Airtable (§Pendiente vivo) · 🔧 **corte 2/4 (Referentes) HECHO Y EN PROD (cierre 73)**: pantallas `/curar/referentes` (con *A revisar* adentro) y `/curar/sugeridos` + flip + [ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md) (migración `012`: el vínculo con proyectos es N:M — el modelo de `009` tiraba 19 de 35 pares y apagaba *Storytelling*) · carga verde (15 referentes · **33 pares**, los 6 proyectos idénticos) y prod sirviéndolos · ⏳ faltan **congelar 3 páginas de Airtable + el aviso al equipo** (§Pendiente vivo) · 🔧 **corte 1/4 HECHO Y EN PROD (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ✅ **validado por la corrida real de las 19:18** (`ok`, `n_objetivo` resuelto por la fuente nueva) · ⏳ faltan **los 2 pasos manuales de Mani** (§Pendiente vivo) |
 | **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ✅ **funciona end-to-end**: `app.transcripciones` tiene 2 filas `listo` con script (una del 30/07) + sus 2 `eventos`. ⚠️ *No se puede saber desde la base si eso corrió en prod o en local, así que **queda por confirmar que `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` estén en Vercel** (mismo viaje que el fix del header).* **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
 
 **Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
@@ -362,8 +368,8 @@ devuelve la config real; sin header 403; ambito typo 400.
 **Lo que queda del cockpit, al 2026-07-31 (cierre 74).** D0–D4 están vivos en producción y D5 va 3
 de 4 (el 3/4 construido, en rama). El orden de acá en adelante:
 
-1. **Publicar el corte 3/4** — los 3 pasos de §Pendiente vivo (script → merge → hecho-cuando) + el
-   congelado de *Voces* y *Proyectos* en Airtable, que en este corte tiene un matiz (ADR-033).
+1. ~~Publicar el corte 3/4~~ ✅ **hecho el 31/07.** Queda su hecho-cuando (2 min) y el congelado de
+   *Voces* y *Proyectos* en Airtable, que en este corte tiene un matiz (ADR-033).
 2. **Corte 4/4** — *(y acá hay una pregunta abierta: el plan lo llama "corte 3/4 y 4/4" pero Voces y
    Proyectos se cortaron juntos porque van por FK. **No queda un cuarto dominio de config.** Con
    Ajustes, Referentes, Voces y Proyectos adentro, D5 está completo — lo que queda de Airtable son
@@ -414,7 +420,7 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **🖥️ Y por primera vez las pantallas se probaron EN EL BROWSER.** Los 3 cortes anteriores se publicaron sin verlas ("entrar pide magic link"). Se resuelve con `auth.admin.generateLink` y el service_role, que **no manda ningún mail**: devuelve el token, se pega en `/auth/confirm` y hay sesión local. Encontró 3 cosas que ningún test iba a encontrar: (a) el nombre de una voz y el de un proyecto eran dos inputs idénticos y **la jerarquía —que es la regla del sistema— no se veía**: se arregló con la etiqueta `VOZ`, el input más grande y un borde izquierdo con `SUS PROYECTOS`; (b) en *Agregar un proyecto* el botón Crear estaba **arriba** del campo obligatorio de criterios, o sea se clickeaba antes de haber visto lo que lo iba a rechazar; (c) el placeholder del nombre era "Storytelling", que es un proyecto que ya existe. **Esto queda como procedimiento: la pantalla se mira antes de publicarla.**
 **Suelto que apareció mirando el plan y no es de este corte:** `Días de recencia = 100`, con `Mínimo de vistas`, `Mínimo de likes` y `Relevancia mínima` en **0**. Las perillas están abiertas del todo — coherente con que los 4 proyectos reporten `razon_faltante: supply`, pero conviene saberlo antes de leer una corrida.
 **❓ Una pregunta para Mani que salió de terminar este corte: no existe un "corte 4/4".** La numeración salió del cierre 72 contando Voces y Proyectos por separado, pero van juntos por FK y ya están adentro. Con Ajustes, Referentes, Voces y Proyectos cortados, **D5 está completo**: lo que queda en Airtable son las 3 tablas que ESCRIBE n8n (`Candidatos`, `Descartes del gate`, `Referentes propuestos`), y esas son D7, no D5. Conviene confirmarlo antes de que alguien salga a buscar un dominio que no existe.
-**Próximo paso:** los 3 pasos de §Pendiente vivo → congelar *Voces* y *Proyectos* en Airtable (⚠️ para personas: la máquina sigue escribiendo ahí) → **D6, el feed de calificación**, que es la pantalla que el equipo más usa y la última pieza de config ya está. Ojo con lo que D6 ya tiene escrito: `veredicto` de *Descartes* **tiene que quedar editable** — con el campo bloqueado, `falsos_negativos` da siempre 0 y "0 falsos negativos" se lee como *el gate está perfecto*, que es la conclusión opuesta a la verdad.
+**Próximo paso (actualizado el mismo día: el corte ya se publicó):** el hecho-cuando de 2 min → congelar *Voces* y *Proyectos* en Airtable (⚠️ para personas: la máquina sigue escribiendo ahí) → **D6, el feed de calificación**, que es la pantalla que el equipo más usa y la última pieza de config ya está. Ojo con lo que D6 ya tiene escrito: `veredicto` de *Descartes* **tiene que quedar editable** — con el campo bloqueado, `falsos_negativos` da siempre 0 y "0 falsos negativos" se lee como *el gate está perfecto*, que es la conclusión opuesta a la verdad.
 **Skills para la próxima sesión:** `/grill-with-docs` antes de arrancar D6 (es la pantalla que decide si la migración se siente bien, y el PRD pide validarla con Jero y Majo con la pantalla en la mano) · `/tdd` para el dominio de la calificación · `/handoff` al cerrar. Para las pantallas, **el login local ya no es un bloqueo**: `auth.admin.generateLink` con el service_role devuelve el token sin mandar mail (receta en este mismo cierre).
 
 **2026-07-31 (cierre 73) — D5 corte 2/4: Referentes, y el bug de modelo que casi apaga un proyecto entero (Claude, pedido de Mani).**
