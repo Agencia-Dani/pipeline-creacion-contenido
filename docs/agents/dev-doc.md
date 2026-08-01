@@ -117,9 +117,9 @@
 
 | Workflow | Trigger | Cadencia | Nodos | Qué hace |
 |---|---|---|---|---|
-| **Motor** (`short-form-content`) | Cron + Execute manual + **webhook on-demand (ADR-023)** | **Semanal**, lunes 8am + a demanda (botón Airtable) | 37 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **Candidatos** + los descartes borderline (**Descartes del gate**, ADR-021) en Airtable + registra la corrida en Supabase. §2. |
-| **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 27 | Promueve a `Referentes` los propuestos que el equipo marcó `aprobado` → busca cuentas nuevas parecidas a las que funcionan (IG: sugeridos, 2 pasadas Apify; TikTok: lookalike, rama paralela — ADR-020 §8) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **Referentes propuestos**. §3. |
-| **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 37 | Toma los Candidatos **calificados** en Airtable → los archiva en Supabase (`outputs`, con relevancia — ADR-021) + append al **Sheet Histórico** → los borra de Airtable → **computa las filas semanales de `Métricas Proyectos` + `Métricas Global`** (calidad / salud+costos, routea por `_tabla`), limpia `Descartes del gate`, y **destila criterios aprendidos + salud por referente** (ADR-022). §4. |
+| **Motor** (`short-form-content`) | Cron + Execute manual + **webhook on-demand (ADR-023)** | **Semanal**, lunes 8am + a demanda (webhook) | 35 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **`app.candidatos`** + los descartes borderline (**`app.descartes`**, ADR-021) por PostgREST (ADR-035) + registra la corrida en Supabase. §2. |
+| **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 22 | Busca cuentas nuevas parecidas a las que funcionan (IG: sugeridos, 2 pasadas Apify; TikTok: lookalike, rama paralela — ADR-020 §8) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **`app.referentes_propuestos`** + su tabla puente N:M. La promoción la hace la app, no este workflow (D7 borró esa cadena de 4 nodos). §3. |
+| **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 20 | Toma los candidatos **calificados** de `app.candidatos` → los archiva en `outputs` (con relevancia — ADR-021) + append al **Sheet Histórico** → los borra → **destila criterios aprendidos** y los PATCHea en `app.proyectos` (ADR-022). Las Métricas y la salud de referentes **murieron en D7**: son vistas SQL. §4. |
 
 Los tres comparten el patrón de registro `runs` en Supabase (abre `en_curso` con `params.workflow`
 propio, cierra `ok` con métricas; el barredor marca `fallo` los zombies de su propio workflow).
@@ -329,7 +329,7 @@ límites: ADR-010 + handoff §Mejoras #13/#18.
 
 ---
 
-## 3. Descubrimiento de referentes (`descubrimiento-referentes`) — 27 nodos
+## 3. Descubrimiento de referentes (`descubrimiento-referentes`) — 22 nodos
 
 > **Nuevo por [ADR-020](../adr/ADR-020-motor-descubrimiento-referentes.md) (2026-07-10).** Propone
 > cuentas nuevas parecidas a los referentes que mejor convierten, y promueve a `Referentes` las que
@@ -438,7 +438,7 @@ perfiles), TT 1 Apify (≤15 lookalikes, $0.20 c/u; $0 sin semillas TT), 1 Haiku
 
 ---
 
-## 4. Archivado (`archivado`) — 35 nodos
+## 4. Archivado (`archivado`) — 20 nodos
 
 > **Validado para producción (cierre 19).** Corrió end-to-end con calificados reales (run `687027e2`):
 > idempotencia, paginación, split de estados, barrido de zombies, cierre robusto y curación completa. El
@@ -556,11 +556,41 @@ Referentes salud** escribe la salud por referente.
 
 ---
 
-## 5. Conexión con Airtable (mapa lee/escribe)
+## 5. Conexión con Airtable — **NINGUNA (D7, 2026-08-01)**
+
+> 🪦 **Esta sección describía el corazón del sistema y ya no describe nada.** Desde D7 los tres
+> workflows tienen **cero** llamadas a `api.airtable.com`, y `<<AIRTABLE_BASE_ID>>` dejó de ser un
+> placeholder del re-import. Chequeo mecánico:
+>
+> ```sh
+> grep -c "api.airtable.com" Workflows/*/workflow.json   # 0 0 0
+> ```
+>
+> **Dónde vive ahora cada cosa:**
+>
+> | Antes (tabla Airtable) | Ahora | Quién la escribe |
+> |---|---|---|
+> | `Candidatos` | `app.candidatos` | motor (`POST Candidatos`) |
+> | `Descartes del gate` | `app.descartes` — **ya no se barre** (ADR-036) | motor (`POST Descartes`) |
+> | `Referentes propuestos` | `app.referentes_propuestos` + puente N:M | descubrimiento |
+> | `Proyectos.criterios_aprendidos` | `app.proyectos` (mismas columnas) | archivado (`PATCH Proyectos criterios`) — **murió ADR-033** |
+> | `Referentes` (3 columnas de salud) | vista `app.v_salud_referentes` | nadie: se deriva |
+> | `Métricas Proyectos` / `Métricas Global` | vistas `v_metricas_calidad` · `v_embudo_semana` · `v_costos_semana` · `v_auditoria_descartes` · `v_embudo_descubrimiento` | nadie: se derivan |
+>
+> El **cómo** (headers de schema, `Prefer`, política de fallo por nodo) vive en
+> [`ingesta-registro.md §5`](../../core/contracts/ingesta-registro.md), que es el dueño del contrato
+> de escritura desde [ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md). El **qué**
+> (columnas) vive en [`core/schema/`](../../core/schema/).
+>
+> Lo de abajo queda como **registro histórico** de cómo era hasta el 2026-08-01. No lo uses para
+> trabajar; sirve para entender los ADR-008/021/022 y para el export final de D8.
+
+<details>
+<summary>El mapa Airtable como era hasta D7 (histórico)</summary>
 
 Base "Reels Cockpit", 9 tablas (contrato completo en
-[`airtable-cockpit.md`](../../core/contracts/airtable-cockpit.md)). La API es REST: el motor pega a
-`https://api.airtable.com/v0/<base_id>/<Tabla>`. Quién toca qué:
+[`airtable-cockpit.md`](../../core/contracts/airtable-cockpit.md)). La API es REST: el motor pegaba a
+`https://api.airtable.com/v0/<base_id>/<Tabla>`. Quién tocaba qué:
 
 > **La superficie del equipo (páginas del interface) tiene su propio spec:**
 > [mapa-campos §6](./mapa-campos.md) — qué campo se muestra en cada página, en qué orden, y qué es
@@ -600,6 +630,8 @@ Base "Reels Cockpit", 9 tablas (contrato completo en
 el motor como `nuevo` y luego lo cambia el equipo.
 
 ---
+
+</details>
 
 ## 6. Esquema Supabase (cada tabla/vista, quién la escribe/lee)
 

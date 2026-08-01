@@ -31,9 +31,20 @@
 > **`grep -c api.airtable.com Workflows/*/workflow.json` da 0 en los tres**, `lib/airtable.ts` no
 > existe y `<<AIRTABLE_BASE_ID>>` ya no es placeholder de nadie.
 >
-> **Lo NO verificado, y es honesto decirlo:** nada corrió contra Supabase ni contra n8n. La
-> migración `013` no está aplicada, así que **ninguna consulta nueva se ejecutó nunca**. Todo lo de
-> abajo es la primera vez que este código toca datos reales.
+> **Verificado CONTRA DATOS REALES (2026-08-01, sesión de cierre):**
+> · `npm run cortar:feed -- --dry` contra Airtable + Supabase vivos → **145 candidatos, 0 sin
+>   `external_id`, 0 sin proyecto resoluble** (o sea la resolución record id → uuid funciona contra
+>   la base real) · **20 descartes, 0 auditados** (confirma que el loop de ADR-021 estaba muerto) ·
+>   **8 propuestas, 16 pares, las 8 con 2 proyectos** — el hallazgo 6 reproducido por el script.
+> · La **fachada corriendo en local contra Supabase real**: `?ambito=motor` → 3 voces · 4 proyectos ·
+>   15 referentes · 18 ajustes, con `fields.uuid` en **todos** y el `id` viejo intacto.
+> · **`criterios_aprendidos`: Postgres y Airtable son idénticos** (los 862/1048 están en los dos
+>   Trading, que están inactivos). El corte **no pierde nada** — la duda salió y se midió.
+> · La app levanta, `/login` renderiza, cero errores de consola y de servidor.
+>
+> **Lo que sigue SIN verificar:** la migración `013` no está aplicada, así que **ninguna consulta
+> que la necesite se ejecutó jamás** — ni las 2 vistas nuevas, ni los embeds de PostgREST
+> (`proyectos(nombre)`, la puente), ni un solo insert de n8n. Y n8n no se re-importó.
 >
 > ### El orden, que importa más que el contenido
 >
@@ -55,11 +66,17 @@
 > en Airtable y la app ya estaría leyendo Postgres: los candidatos nuevos no aparecerían en el feed.
 > Si el cron del domingo cae en el medio, desactivalo antes.
 >
-> ⚠️ **Pre-flight del re-import, que no está en ningún otro doc:** hay **8 nodos con
-> `nodeCredentialType` pero SIN el bloque `credentials`** (7 de Airtable + 2 de Supabase en el
-> archivado, y uno en el motor). Al importar quedan sin credencial asignada y fallan en ejecución.
-> Varios se fueron con los borrados de D7, pero **revisá nodo por nodo que cada `httpRequest` tenga
-> su credencial** antes de activar.
+> ✅ **El pre-flight de credenciales YA NO HACE FALTA — verificado.** `main` tenía **10** nodos con
+> `nodeCredentialType` pero sin el bloque `credentials` (9 en el archivado, 1 en el motor): al
+> importar quedaban sin credencial y fallaban en ejecución. **Los 10 se fueron con D7**, borrados o
+> reescritos. Chequeo, por si alguien duda:
+> ```sh
+> python3 -c "
+> import json,glob
+> for f in glob.glob('Workflows/*/workflow.json'):
+>     w=json.load(open(f))
+>     print(f, [n['name'] for n in w['nodes'] if n.get('parameters',{}).get('nodeCredentialType') and not n.get('credentials')])"
+> ```
 >
 > **4. El hecho-cuando, después de una corrida on-demand completa:**
 > ```sql
