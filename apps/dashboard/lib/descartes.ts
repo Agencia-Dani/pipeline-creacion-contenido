@@ -1,57 +1,70 @@
+import { z } from "zod";
 import { esVeredicto, ordenarDescartes, type DescarteFeed, type Veredicto } from "@/domain/feed";
-import { leerTabla, parchearRegistro, urlDeMiniatura } from "@/lib/airtable";
-import { leerProyectos } from "@/lib/referentes";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Los descartes del gate (ADR-021): los top-K rechazos por score de cada corrida, o sea los
 // near-miss. El equipo dice si la máquina hizo bien en matarlos, y los "era bueno" son los
-// **falsos negativos** que `Computar métricas semana` cuenta al cerrar la semana.
+// **falsos negativos** — la única medida de recall que tiene el sistema.
 //
-// 🚨 Por qué esta pantalla es la mitad más valiosa de D6: `veredicto` está en 0 auditorías
-// desde que la tabla existe. No era una decisión de diseño — Airtable no deja configurar el
-// permiso de un campo sin records en la página (mapa-campos §5.1-1), así que el equipo nunca
-// pudo marcarlo. La API sí lo escribe. Mientras esté en 0, `falsos_negativos` da siempre 0 y
-// "0 falsos negativos" se lee como *el gate está perfecto*: la conclusión opuesta a la verdad.
+// 🚨 Por qué esta pantalla es la mitad más valiosa de D6: `veredicto` estuvo en 0 auditorías desde
+// que la tabla existe. No era una decisión de diseño — Airtable no dejaba configurar el permiso de
+// un campo sin records en la página (mapa-campos §5.1-1), así que el equipo nunca pudo marcarlo.
+// Mientras esté en 0, `falsos_negativos` da 0 y "0 falsos negativos" se lee como *el gate está
+// perfecto*: la conclusión opuesta a la verdad.
 //
-// ⚠️ La tabla se BORRA ENTERA cada domingo (`Preparar borrado Descartes`), y es deliberado
-// (ADR-021). O sea la ventana de auditoría es de una semana: un descarte sin marcar es una
-// auditoría perdida para siempre, no postergada. De ahí que la pantalla vaya encadenada al
-// final del feed, cuando el operador ya está calibrado.
+// ✅ Lo que cambió en D7 (ADR-036): **la tabla ya no se borra los domingos.** El barrido existía
+// por la cuota de 1.000 records de Airtable, no por diseño; en Postgres no hay razón. Con eso la
+// auditoría deja de ser una ventana de una semana —donde un descarte sin marcar era una auditoría
+// perdida para siempre— y pasa a ser una cola honesta. `falsos_negativos` se computa como vista
+// (`app.v_auditoria_descartes`) sobre esta tabla viva, no como un snapshot semanal.
+// La pantalla igual va encadenada al final del feed: ahí el operador ya está calibrado.
 
-export const TABLA = "Descartes del gate";
+const filaDescarte = z.object({
+  id: z.string(),
+  titulo: z.string(),
+  script: z.string().nullable(),
+  thumbnail_url: z.string().nullable(),
+  referente: z.string().nullable(),
+  url_referente: z.string().nullable(),
+  relevancia_score: z.coerce.number().nullable(),
+  relevancia_razon: z.string().nullable(),
+  veredicto: z.string().nullable(),
+  proyectos: z.object({ nombre: z.string() }).nullable(),
+});
 
-const texto = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
-const numero = (v: unknown): number | null => (typeof v === "number" ? v : null);
-
-function primerLink(v: unknown): string | null {
-  return Array.isArray(v) && typeof v[0] === "string" ? v[0] : null;
-}
+const COLUMNAS =
+  "id, titulo, script, thumbnail_url, referente, url_referente, relevancia_score, " +
+  "relevancia_razon, veredicto, proyectos(nombre)";
 
 export async function leerDescartes(): Promise<DescarteFeed[]> {
-  const [registros, proyectos] = await Promise.all([leerTabla(TABLA, ""), leerProyectos()]);
-  const nombrePorAirtableId = new Map(
-    proyectos.filter((p) => p.airtableId).map((p) => [p.airtableId!, p.nombre]),
-  );
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.schema("app").from("descartes").select(COLUMNAS);
+  if (error) throw new Error(`Supabase respondió con error leyendo los descartes: ${error.message}`);
 
-  const descartes = registros.map((r) => {
-    const f = r.fields;
-    const proyectoId = primerLink(f.proyecto);
-    return {
+  return ordenarDescartes(
+    z.array(filaDescarte).parse(data).map((r) => ({
       id: r.id,
-      titulo: texto(f.titulo) ?? "(sin título)",
-      script: texto(f.script),
-      thumbnail: urlDeMiniatura(f.thumbnail),
-      proyecto: (proyectoId && nombrePorAirtableId.get(proyectoId)) ?? "",
-      referente: texto(f.referente),
-      urlReferente: texto(f.url_referente),
-      relevanciaScore: numero(f.relevancia_score),
-      relevanciaRazon: texto(f.relevancia_razon),
-      veredicto: esVeredicto(f.veredicto) ? f.veredicto : null,
-    } satisfies DescarteFeed;
-  });
-
-  return ordenarDescartes(descartes);
+      titulo: r.titulo,
+      script: r.script,
+      thumbnail: r.thumbnail_url,
+      proyecto: r.proyectos?.nombre ?? "",
+      referente: r.referente,
+      urlReferente: r.url_referente,
+      relevanciaScore: r.relevancia_score,
+      relevanciaRazon: r.relevancia_razon,
+      veredicto: esVeredicto(r.veredicto) ? r.veredicto : null,
+    } satisfies DescarteFeed)),
+  );
 }
 
 export async function marcarVeredicto(id: string, veredicto: Veredicto): Promise<void> {
-  await parchearRegistro(TABLA, id, { veredicto });
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .schema("app")
+    .from("descartes")
+    .update({ veredicto })
+    .eq("id", id)
+    .select("id");
+  if (error) throw new Error(`Supabase respondió con error guardando el veredicto: ${error.message}`);
+  if (!data || data.length === 0) throw new Error("Ese descarte ya no existe.");
 }

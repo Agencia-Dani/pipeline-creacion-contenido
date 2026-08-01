@@ -7,7 +7,7 @@ import { registrarEvento } from "@/lib/eventos";
 
 export type Resultado = { ok: boolean; mensaje: string };
 
-// Auditar un descarte del gate (ADR-021). Escribe `veredicto` en Airtable, que es el único
+// Auditar un descarte del gate (ADR-021). Escribe `veredicto` en Postgres, que es el único
 // campo de esa tabla que lee una máquina: `Computar métricas semana` cuenta los "era bueno"
 // como `falsos_negativos` al cerrar la semana.
 //

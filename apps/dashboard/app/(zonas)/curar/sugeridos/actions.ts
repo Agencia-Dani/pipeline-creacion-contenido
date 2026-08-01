@@ -9,10 +9,10 @@ import { leerPendientes, marcarResuelto, notaDePromocion } from "@/lib/sugeridos
 
 export type Resultado = { ok: boolean; mensaje: string };
 
-// Aprobar = sembrar el referente EN POSTGRES y cerrar la propuesta en Airtable. Es el trabajo
-// que hacían `Preparar promoción` + `POST Referentes (promoción)` del descubrimiento, movido
-// acá porque el banco ya no vive en Airtable. La propuesta va directo a `promovido`, nunca a
-// `aprobado`: ese estado es el que dispara el camino viejo (ver lib/sugeridos.ts).
+// Aprobar = sembrar el referente en el banco y cerrar la propuesta. Es el trabajo que hacían
+// `Preparar promoción` + `POST Referentes (promoción)` del descubrimiento — 4 nodos que D7
+// terminó de borrar. La propuesta va directo a `promovido`, nunca a `aprobado` (ver
+// lib/sugeridos.ts: el vocabulario sobrevivió a la razón que lo creó, y está bien así).
 //
 // El orden importa: primero se crea el referente, después se cierra la propuesta. Si falla el
 // segundo paso, la propuesta reaparece en la bandeja y el segundo intento avisa "ya está en el

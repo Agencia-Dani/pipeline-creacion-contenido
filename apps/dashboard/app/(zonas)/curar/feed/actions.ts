@@ -8,7 +8,7 @@ import { registrarEvento } from "@/lib/eventos";
 
 export type Resultado = { ok: boolean; mensaje: string };
 
-// Calificar un candidato. Escribe en Airtable, que sigue siendo el dueño de la tabla hasta D7
+// Calificar un candidato. Escribe en Postgres, que desde D7 es el dueño de la tabla
 // (D6 cambia la superficie, no la propiedad).
 //
 // No se revalida la ruta a propósito: la tarjeta calificada tiene que **quedarse marcada en su

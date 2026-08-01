@@ -67,3 +67,36 @@
   diff) · `apps/dashboard/scripts/` (import en dos tablas) · `apps/dashboard/lib/config.ts` (la
   costura del corte) · las pantallas del banco y de Sugeridos. **No toca los `workflow.json`:** el
   contrato de la fachada no cambia de forma.
+
+---
+
+## Enmienda 2026-08-01 (D7) — la misma regla vale para `Referentes propuestos`
+
+Al planear el corte de escritura (D7) se midió el dato vivo de `Referentes propuestos` contra el
+schema que lo iba a recibir, aplicando la regla que este mismo ADR dejó escrita. El resultado:
+
+```
+total propuestas: 8 · cardinalidad del campo proyecto: {2: 8} · con más de 1 proyecto: 8
+```
+
+**Las 8 propuestas tienen exactamente 2 proyectos**, y `app.referentes_propuestos.proyecto_id`
+(migración `009`) es un uuid simple. El corte tal como estaba diseñado tiraba **8 de 16 pares: el
+100% de las propuestas perdía la mitad de su atribución** — peor que el caso original de este ADR,
+que era 19 de 35.
+
+Tiene sentido a posteriori: una propuesta **hereda los proyectos del referente-semilla que la trajo**
+(ADR-020), y los referentes son N:M desde este ADR. Modelar la propuesta como 1:1 era contradecir
+el modelo de su propia fuente.
+
+**No es una decisión nueva** —es esta misma, aplicada al dominio hermano— así que se registra acá en
+vez de en un ADR propio: tabla puente `app.referentes_propuestos_proyectos` (espejo exacto de
+`app.referentes_proyectos`) y `drop column proyecto_id`, en la migración `013`.
+
+Dos notas para el que venga:
+
+1. **El daño estaba contenido en el schema.** `lib/sugeridos.ts` ya modelaba `proyectosAirtable:
+   string[]` —plural— porque el corte 2/4 tuvo que promover hacia la puente N:M. La capa de app ya
+   estaba bien; el schema en sombra era el que mentía, y nadie lo notó porque nadie lo leía.
+2. **El modo sombra tampoco podía avisar de esto**, por la misma razón que dice el cuerpo de este
+   ADR: su diff compara Airtable-ya-mapeado contra Postgres, así que es ciego a lo que el mapeo
+   tira. Es la segunda vez que la misma ceguera cuesta un hallazgo tardío.

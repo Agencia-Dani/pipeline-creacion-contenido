@@ -6,9 +6,8 @@ import { leerProyectos } from "@/lib/referentes";
 import { leerPendientes } from "@/lib/sugeridos";
 import { Tarjeta } from "./tarjeta";
 
-// La bandeja del descubrimiento (ADR-020). Las propuestas siguen viviendo en Airtable —las
-// escribe el workflow, y las escrituras de n8n cortan en D7— pero la DECISIÓN se toma acá,
-// porque aprobar ahora significa sembrar la cuenta en Postgres (corte 2/4).
+// La bandeja del descubrimiento (ADR-020). Desde D7 las propuestas viven en Postgres, igual que
+// el banco: el buscador las escribe por PostgREST (ADR-035) y la decisión se toma acá.
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,6 @@ export default async function SugeridosPage() {
   await exigirZona("curar");
 
   const [proyectos, pendientes] = await Promise.all([leerProyectos(), leerPendientes()]);
-  const porAirtableId = new Map(proyectos.filter((p) => p.airtableId).map((p) => [p.airtableId!, p.id]));
   const opciones = proyectos.map((p) => ({ id: p.id, nombre: p.nombre, activo: p.activo }));
 
   return (
@@ -50,15 +48,9 @@ export default async function SugeridosPage() {
             {pendientes.map((p) => (
               <Tarjeta
                 key={p.id}
-                propuesta={{
-                  ...p,
-                  // El buscador propone en el idioma de Airtable; la pantalla y la escritura
-                  // trabajan en uuid. Un proyecto que no exista de este lado simplemente no
-                  // viene premarcado: la persona elige.
-                  proyectoIdsSugeridos: p.proyectosAirtable
-                    .map((a) => porAirtableId.get(a))
-                    .filter((id): id is string => id !== undefined),
-                }}
+                // Desde D7 los ids ya son uuid de los dos lados: se acabó la traducción de record
+                // ids que hacía esta pantalla mientras el buscador escribía en Airtable.
+                propuesta={{ ...p, proyectoIdsSugeridos: p.proyectoIds }}
                 proyectos={opciones}
               />
             ))}

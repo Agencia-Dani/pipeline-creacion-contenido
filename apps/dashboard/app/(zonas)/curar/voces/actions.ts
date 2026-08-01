@@ -143,8 +143,7 @@ export async function crearProyectoNuevo(form: FormProyecto): Promise<Resultado>
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
 
   try {
-    const voz = (await leerVoces()).find((v) => v.id === validacion.valor.vozId);
-    const id = await crearProyecto(validacion.valor, voz?.airtable_id ?? null);
+    const id = await crearProyecto(validacion.valor);
     await registrarEvento(usuario.id, "proyectos.crear", { id, ...validacion.valor });
   } catch (e) {
     console.error("[proyectos] falló crear:", e);

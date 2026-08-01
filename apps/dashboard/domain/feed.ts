@@ -1,16 +1,18 @@
 // Dominio puro (C3): las reglas del espacio de trabajo de D6 — el feed de calificación y la
-// auditoría de descartes. Sin IO: lo que pega contra Airtable vive en lib/candidatos.ts y
+// auditoría de descartes. Sin IO: lo que pega contra Postgres vive en lib/candidatos.ts y
 // lib/descartes.ts.
 //
-// La regla central es ADR-034: **calificar es UN solo acto y el Estado se deriva**. Los dos
-// campos se siguen escribiendo en Airtable con el vocabulario de siempre, porque el archivado
-// filtra por `estado` y `Destilar criterios` elige por el 🔥 — ninguna máquina se entera del
-// cambio, que es la condición de D6 (la fase no puede obligar a re-importar workflows).
+// La regla central es ADR-034: **calificar es UN solo acto y el Estado se deriva**. El
+// vocabulario (`nuevo`/`aprobado`/`descartado`, 🔥/👍/👎) no cambió con D7: el archivado sigue
+// filtrando por `estado` y `Destilar criterios` sigue eligiendo por el 🔥, solo que ahora leen
+// Postgres.
 //
 // ⚠️ Un Descarte del gate NO es un Candidato (ADR-021: se descartó explícitamente modelarlo
 // como "candidato con estado especial"). Comparte archivo porque comparte pantalla y ciclo de
-// trabajo, no modelo: tiene su propio tipo, su propio acto (`veredicto`) y su propia vida — la
-// tabla se borra entera cada domingo.
+// trabajo, no modelo: tiene su propio tipo, su propio acto (`veredicto`) y su propia vida. Y
+// desde ADR-036 **su vida es más larga que la de un candidato**: el candidato se borra al
+// archivarse (su historia queda en `outputs`), el descarte no se borra nunca — si se borrara,
+// nadie más guardaría lo que se tiró.
 
 // ─────────────────────────── Calificar un Candidato ───────────────────────────
 
@@ -35,12 +37,30 @@ export function estadoDe(calificacion: Calificacion): EstadoDecidido {
   return calificacion === "👎" ? "descartado" : "aprobado";
 }
 
-/** Lo que se le manda a Airtable por una calificación: los dos campos, siempre juntos. */
-export function camposDeCalificacion(calificacion: Calificacion): {
+/**
+ * Lo que se escribe por una calificación: los **tres** campos, siempre juntos.
+ *
+ * `fecha_calificacion` está acá por una razón que no se ve: en Airtable era un campo
+ * `lastModified` que se calculaba **solo**, así que ningún código lo escribía nunca. Al pasar a
+ * Postgres la columna se queda sin autor — y de ella cuelga toda la analítica de calidad
+ * (`fecha_calificacion` → `outputs.calificado_en` → `v_metricas_calidad`, que filtra
+ * `calificado_en is not null` y agrupa por su semana). Sin esta línea la vista devuelve **cero
+ * filas** y muere la *precisión de entrega*, la métrica norte de ADR-021. No falla: queda en cero,
+ * que es peor.
+ */
+export function camposDeCalificacion(
+  calificacion: Calificacion,
+  ahora: Date = new Date(),
+): {
   calificacion: Calificacion;
   estado: EstadoDecidido;
+  fecha_calificacion: string;
 } {
-  return { calificacion, estado: estadoDe(calificacion) };
+  return {
+    calificacion,
+    estado: estadoDe(calificacion),
+    fecha_calificacion: ahora.toISOString(),
+  };
 }
 
 // ─────────────────────────── El mazo: filtro y orden ───────────────────────────
@@ -177,7 +197,7 @@ export type DescarteFeed = {
 /**
  * Los near-miss primero: son los top-K rechazos por score (enmienda 2026-07-13 de ADR-021), o
  * sea los que más cerca estuvieron de pasar — donde viven los falsos negativos. Sin auditar
- * antes que auditados, porque lo pendiente es lo que se pierde el domingo.
+ * antes que auditados, porque lo pendiente es lo que hay que decidir.
  */
 export function ordenarDescartes<T extends { id: string; relevanciaScore: number | null; veredicto: Veredicto | null }>(
   descartes: T[],

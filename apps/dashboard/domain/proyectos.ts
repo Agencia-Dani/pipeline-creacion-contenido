@@ -172,21 +172,21 @@ export function aRegistrosDeVoces(
  * cosmético: es el modelo nuevo hablando el idioma viejo, y sobrevive hasta D7 por lo mismo que
  * el `id`.
  *
- * `criterios_aprendidos` y `advertencia_criterios` NO salen de Postgres: los escribe el archivado
- * en Airtable cada domingo y este corte no mueve ese escritor (ADR-033). Entran acá desde
- * `destilados`, que los trae de donde su único autor los deja.
+ * `criterios_aprendidos` y `advertencia_criterios` **salen de Postgres desde D7**, como todo lo
+ * demás. Durante la coexistencia venían de Airtable porque su único escritor —`Destilar criterios`
+ * del archivado— vivía ahí (ADR-033: un dueño por CAMPO, no por tabla). D7 movió ese escritor a
+ * PostgREST, así que el campo y su autor volvieron a estar en el mismo lugar y ADR-033 se cumplió
+ * entera: era una regla con fecha de vencimiento, y esta es la fecha.
  */
 export function aRegistrosDeProyectos(
   proyectos: ProyectoGuardado[],
   airtablePorVoz: Map<string, string | null>,
-  destilados: Map<string, { criterios_aprendidos: string | null; advertencia_criterios: string | null }>,
   ambito: "motor" | "completo",
 ): { id: string; fields: Record<string, unknown> }[] {
   return proyectos
     .filter((p) => ambito === "completo" || p.activo)
     .map((p) => {
       const vozAirtable = airtablePorVoz.get(p.voz_id) ?? p.voz_id;
-      const destilado = destilados.get(p.airtable_id ?? "");
       return {
         id: p.airtable_id ?? p.id,
         fields: {
@@ -194,8 +194,8 @@ export function aRegistrosDeProyectos(
           nombre: p.nombre,
           descripcion: p.descripcion,
           criterios_relevancia: p.criterios_relevancia,
-          criterios_aprendidos: destilado?.criterios_aprendidos ?? null,
-          advertencia_criterios: destilado?.advertencia_criterios ?? null,
+          criterios_aprendidos: p.criterios_aprendidos,
+          advertencia_criterios: p.advertencia_criterios,
           voz_default: [vozAirtable],
           activo: p.activo,
           N: p.n,
