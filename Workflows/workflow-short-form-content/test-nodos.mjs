@@ -381,8 +381,10 @@ const runHeat = ({ items = [], procesados = [], feed = [], senal = [], cfg = {},
   const out = new Function('$', 'console', jsCode('Heat-score v1'))($, { log: (m) => logs.push(m) });
   return { out: out.map((i) => i.json), logs };
 };
-// el shape del feed vivo = una página de Airtable: { records: [{ fields: { external_id } }] }
-const feedPage = (...ids) => ({ records: ids.map((id) => ({ fields: { external_id: id } })) });
+// D7: el feed vivo es PostgREST, o sea filas planas — { external_id } — y no la página de
+// Airtable { records: [{ fields }] } de antes. El nodo lo lee con el helper `rows()`, que
+// tolera tanto un array por item como un item por fila.
+const feedPage = (...ids) => ids.map((id) => ({ external_id: id }));
 const hvid = (id, pid = 'P1', extra = {}) => Object.assign({ external_id: id, proyecto_id: pid, reproducciones: 100, likes: 10, engagement_rate: 0.1, descripcion: 'hola ' + id, username: 'ref' }, extra);
 
 seccion('Heat-score v1 — dedup blindado (ADR-029)');
