@@ -3,26 +3,25 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "weeks",
-              "triggerAtDay": [
-                1
-              ],
-              "triggerAtHour": 9
-            }
-          ]
-        }
+        "httpMethod": "POST",
+        "path": "<<WEBHOOK_PATH_DESCUBRIMIENTO>>",
+        "responseMode": "onReceived",
+        "options": {},
+        "authentication": "headerAuth"
       },
-      "name": "Cron — semanal (lunes 9am)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.1,
-      "id": "cron-semanal-lunes-9am",
+      "id": "disparo-descubrimiento-webhook",
+      "name": "Buscar ahora (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
         240,
         380
-      ]
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Webhook Descubrimiento Header"
+        }
+      }
     },
     {
       "parameters": {},
@@ -133,7 +132,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"cron\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"descubrimiento\" } }",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Ejecutar manual').isExecuted ? 'manual' : 'on_demand' }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"descubrimiento\" } }",
         "options": {
           "timeout": 15000
         }
@@ -612,17 +611,6 @@
   ],
   "pinData": {},
   "connections": {
-    "Cron — semanal (lunes 9am)": {
-      "main": [
-        [
-          {
-            "node": "Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Ejecutar manual": {
       "main": [
         [
@@ -851,6 +839,17 @@
         [
           {
             "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar ahora (webhook)": {
+      "main": [
+        [
+          {
+            "node": "Config",
             "type": "main",
             "index": 0
           }

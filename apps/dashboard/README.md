@@ -82,11 +82,13 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 3. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
    env vars de `.env.example` (del gestor). Producción en `main`, preview por rama (ADR-026).
    En Supabase, *Authentication → URL Configuration*: agregar la URL de Vercel a *Redirect URLs*.
-4. **Env vars de D1/D4** (también del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` ·
-   `AIRTABLE_PAT` + `AIRTABLE_BASE_ID` · `MOTOR_WEBHOOK_URL` + los 2 del header (el par exacto de
-   la credencial `Webhook Motor Header` de n8n — si difiere en algo, el botón da 403) · los 2
-   `RUN_PLAN_HEADER_*` (el par que n8n mandará a la fachada; generar nuevo, no reusar el del
-   webhook).
+4. **Env vars** (del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` · `MOTOR_WEBHOOK_URL` +
+   los 2 del header (el par exacto de la credencial `Webhook Motor Header` de n8n — si difiere en
+   algo, el botón da 403) · los 2 `RUN_PLAN_HEADER_*` (el par que n8n manda a la fachada) · los 3
+   `DESCUBRIMIENTO_WEBHOOK_*` (el botón «Buscar cuentas nuevas»). **Son tres pares de header
+   distintos a propósito: no se reusan.**
+   ⚠️ `AIRTABLE_PAT` y `AIRTABLE_BASE_ID` **salen en D7**, en cuanto la corrida verde cierre el
+   paso 3 del expand/contract. Hasta entonces siguen en Vercel sin que nadie los use.
 
 **Hecho-cuando de D0:** Majo entra desde su mail, ve su nombre y su rol `operador`, navega Operar y
 Curar, y `/entender` la devuelve a su zona.

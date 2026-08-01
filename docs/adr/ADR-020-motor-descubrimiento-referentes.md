@@ -82,3 +82,39 @@
   knobs nuevos en `Ajustes`) y `core/scripts/setup-airtable.mjs` (seed de la tabla + las 2 filas).
   Supabase **no se toca** (el workflow solo lee `v_senal_seleccion` y escribe `runs`, ambas
   existentes).
+
+---
+
+## Enmienda 2026-08-01 (D7) — el buscador pierde el cron: corre solo cuando se lo pide
+
+**Qué cambia:** se retira el trigger `Cron — semanal (lunes 9am)` y entra un webhook
+(`Buscar ahora`), disparado por un botón en *Curar → Sugeridos*. El buscador pasa a ser
+**on-demand puro**: no queda cadencia automática.
+
+**Por qué, y es medido:** al cortar la tabla en D7 se contó la bandeja viva — **8 propuestas, las 8
+en `propuesto`, cero resueltas**. La cadencia semanal venía produciendo más rápido de lo que el
+equipo consume, y cada corrida paga tres actores de Apify más el vetting con Haiku. Seguir
+proponiendo cada lunes sobre una bandeja que nadie vacía es gasto sin destino.
+
+Hay además una razón de calidad, no solo de costo: las semillas salen de la **señal de selección**,
+o sea de lo que el equipo aprobó. Buscar *después* de que terminaron de decidir usa una señal más
+fresca que buscar todos los lunes a las 9 pase lo que pase.
+
+**Lo que NO cambia:** el embudo, el dedup, el vetting fail-closed, el umbral de afinidad y la
+aprobación manual siguen exactamente igual. La promoción ya había salido del workflow en el corte
+2/4 (la hace la app) y D7 borró esos 4 nodos muertos.
+
+**Consecuencias:**
+- (+) El gasto del buscador pasa a ser una decisión con dueño y momento, en vez de un débito fijo.
+- (+) El botón avisa cuántas propuestas quedan sin decidir antes de confirmar: la pregunta
+  "¿ya resolviste lo anterior?" queda en la superficie, no en la cabeza de alguien.
+- (−) Si nadie aprieta el botón, el banco de referentes deja de crecer. Es el riesgo aceptado: un
+  banco que no crece es visible (la bandeja está vacía y el botón está ahí), y una bandeja que se
+  llena sola sin que nadie la mire no lo era.
+- `runs.trigger_type` del descubrimiento pasa de `cron` a `on_demand`. `v_embudo_descubrimiento`
+  agrupa por semana sin mirar el trigger, así que la métrica no se entera.
+
+**Nota de implementación:** el guard contra doble click vive en la Server Action
+(`hayBusquedaViva`), no adentro del workflow como el single-flight del motor (ADR-023). El motor lo
+necesita adentro porque tiene 3 triggers y corre ~30 min; acá hay **un solo camino de entrada** y
+el peor caso de un doble click es una corrida de Apify repetida. Menos nodos, mismo resultado.

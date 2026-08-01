@@ -59,6 +59,21 @@
 > auditados, y las propuestas con **2 proyectos cada una** (si dice "con más de 1 proyecto: 0",
 > algo está mal: se midió 8/8). Después sin `--dry`.
 >
+> ➕ **El buscador de referentes perdió el cron y ahora es un botón** (enmienda de ADR-020, decidida
+> el 2026-08-01 y aprovechando que este re-import ya estaba pago). Al re-importar el descubrimiento
+> hay **dos cosas nuevas que preparar**:
+> 1. **En n8n:** el workflow trae un trigger `Buscar ahora (webhook)` con placeholder
+>    `<<WEBHOOK_PATH_DESCUBRIMIENTO>>`, y pide una credencial *Header Auth* nueva llamada
+>    **`Webhook Descubrimiento Header`**. Es un **tercer par** de header, distinto del webhook del
+>    motor y del run-plan: no se reusan. **Activá el workflow** (si no, el webhook no existe).
+> 2. **En Vercel:** 3 env vars nuevas — `DESCUBRIMIENTO_WEBHOOK_URL` (la URL de *Producción* del
+>    webhook) + `DESCUBRIMIENTO_WEBHOOK_HEADER_NOMBRE` + `..._VALOR`, con el par EXACTO de la
+>    credencial. Si difieren en algo, el botón devuelve 403 y lo dice con esas palabras.
+>
+> **Truco que ya ahorró horas y sirve igual acá:** un POST con header inválido al webhook distingue
+> gratis y sin disparar nada — **404** = workflow inactivo o path equivocado · **403
+> `Authorization data is wrong!`** = activo, path bien y credencial bien.
+
 > **3. Mergear la rama** (deploy) **y re-importar los 3 workflows en la misma ventana.** Orden:
 >    **descubrimiento → archivado → motor** (barato → medio → caro).
 >
