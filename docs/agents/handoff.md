@@ -23,10 +23,14 @@
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
 > 📋 **El viaje a Airtable que se viene acumulando, junto, para hacerlo de una** (los 3 cortes de
-> D5 dejaron su parte y ninguna se hizo todavía). **7 páginas a congelar** —solo-lectura o
+> D5 y D6 dejaron su parte y ninguna se hizo todavía). **9 páginas a congelar** —solo-lectura o
 > renombrar `[ARCHIVO] …`— y **ninguna tabla a bloquear**:
 > *Configuración Global* · *Ajustes Dev-Only* (corte 1/4) · *Referentes* · *Referentes - Revisar* ·
-> *Referentes - Sugeridos* (corte 2/4) · *Voces* · *Proyectos* (corte 3/4, ya deployado).
+> *Referentes - Sugeridos* (corte 2/4) · *Voces* · *Proyectos* (corte 3/4) · **y las 2 que suma D6:
+> *Feed* y *Descartes*** (cierre 75 — calificar y auditar ya se hacen en `/curar/feed` y
+> `/curar/descartes`). ⚠️ Las 2 de D6 son **las menos urgentes de las nueve**: la app y Airtable
+> escriben la misma tabla, así que mientras las dos estén abiertas no hay divergencia posible, solo
+> dos lugares para hacer lo mismo. Congelarlas es higiene, no seguridad.
 > **La regla es la misma en los tres: se congela la PÁGINA, nunca la tabla.** Tres tablas siguen
 > recibiendo escrituras de máquina — `Referentes propuestos` (la escribe el descubrimiento y la
 > PATCHea la app), `Proyectos` (`criterios_aprendidos`/`advertencia_criterios`, ADR-033) y
@@ -348,6 +352,7 @@ https://pipeline-creacion-contenido.vercel.app (root `apps/dashboard`).
 | **D3** Sombra | migración `009` (schema `app` completo) + `sombra:import`/`sombra:diff` | ✅ **CORRIDO el 30/07 (cierre 69): espejo perfecto ×2** — voces 3 · proyectos 6 · referentes 16 · ajustes 18 · propuestos 8 (candidatos y descartes en 0 de los dos lados) · ⏳ falta **el 3er pase con una edición del equipo de por medio** (es de Mani, 2 min) |
 | **D4** Fachada | `GET /api/engine/run-plan` (ADR-028), `?ambito=motor`/`completo` | ✅ mitad-app · ✅ **swap de nodos HECHO en los 3 `workflow.json` (cierre 69)**, verificado con replay A/B contra config real · ✅ **la fachada responde 200 en prod desde el 31/07** (par rotado, header ahora `X-Run-Plan-Auth`) · ✅ **re-import #1 HECHO y corrida real entera por la fachada** (cierre 70): hecho-cuando cerrado |
 | **D5** Corte de config | dominio por dominio a Postgres, sin tocar n8n: Ajustes → Referentes → Voces+Proyectos | 🟢 **corte 3/4 (Voces + Proyectos) HECHO Y EN PROD (cierre 74)**: pantalla `/curar/voces` (voces con sus proyectos adentro) + flip + [ADR-033](../adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md) (un dueño por **campo**: `criterios_aprendidos`/`advertencia_criterios` siguen siendo de Airtable hasta D7, si no el loop de ADR-022 moría en silencio) · **sin migración** (el schema `009` ya modelaba bien los dos dominios, medido contra el dato vivo) · A/B contra la fachada de producción: **mismo plan, 0 diferencias** · carga verde y **verificado en prod**: `?ambito=motor` con 3 voces · 4 proyectos · N resuelta a 100 · *Storytelling* con sus 5 referentes, y los `criterios_aprendidos` llegando desde Airtable (ADR-033 vivo) · ⏳ faltan el **hecho-cuando** y el congelado de Airtable (§Pendiente vivo) · 🔧 **corte 2/4 (Referentes) HECHO Y EN PROD (cierre 73)**: pantallas `/curar/referentes` (con *A revisar* adentro) y `/curar/sugeridos` + flip + [ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md) (migración `012`: el vínculo con proyectos es N:M — el modelo de `009` tiraba 19 de 35 pares y apagaba *Storytelling*) · carga verde (15 referentes · **33 pares**, los 6 proyectos idénticos) y prod sirviéndolos · ⏳ faltan **congelar 3 páginas de Airtable + el aviso al equipo** (§Pendiente vivo) · 🔧 **corte 1/4 HECHO Y EN PROD (cierre 72): Ajustes.** Pantalla `/curar/ajustes` + la fachada sirve los 18 knobs desde `app.ajustes` · A/B Airtable↔fachada **0 diferencias** · ✅ **validado por la corrida real de las 19:18** (`ok`, `n_objetivo` resuelto por la fuente nueva) · ⏳ faltan **los 2 pasos manuales de Mani** (§Pendiente vivo) |
+| **D6** Feed de calificación | el espacio de trabajo: mazo de tarjetas + auditoría de descartes + históricos | 🟢 **HECHO Y EN PROD (cierre 75).** 3 pantallas: `/curar/feed` (tarjetas compactas que se abren, agrupadas por proyecto y heat desc, filtro sin-calificar/🔥/aprobados/todos), `/curar/descartes` (el `veredicto` que **nunca se pudo marcar** — no era diseño, Airtable no deja configurar el permiso de un campo sin records en la página) y `/curar/historicos` (lo aprobado de todas las semanas, sobre `outputs`, de a 25). Gobernado por [ADR-034](../adr/ADR-034-calificar-es-un-solo-acto.md): **calificar es un solo acto y el Estado se deriva** · **NO es un corte** — Airtable sigue siendo el dueño de `Candidatos` y `Descartes` hasta D7, así que las 2 tablas **siguen** en el catálogo de sombra (al revés del procedimiento del corte 1/4) y no hubo migración ni re-import · verificado en vivo: escritura de los 2 campos + `app.eventos`, `veredicto` escrito por primera vez, paginado sin saltos, los 2 registros de prueba restaurados · ⏳ falta el **hecho-cuando** (una semana de calificación real) y congelar 2 páginas más de Airtable |
 | **+ Transcribir** | 4ª zona: pegar enlaces → script literal + dedup, migraciones `010`/`011` ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)) | ✅ código · ✅ migraciones aplicadas · ✅ la zona lee · ✅ **funciona end-to-end**: `app.transcripciones` tiene 2 filas `listo` con script (una del 30/07) + sus 2 `eventos`. ⚠️ *No se puede saber desde la base si eso corrió en prod o en local, así que **queda por confirmar que `SUPADATA_API_KEY`/`ANTHROPIC_API_KEY` estén en Vercel** (mismo viaje que el fix del header).* **Fuera de D0–D8**: pedido nuevo del equipo, no toca la migración de Airtable |
 
 **Infra HECHA (cierres 63–64, Mani):** migraciones 007–009 corridas (9 tablas + 4 vistas) · `app`
@@ -365,21 +370,23 @@ devuelve la config real; sin header 403; ambito typo 400.
 > real se diagnostica en **Supabase → Auth Logs** (500 = SMTP falló para invitado · 422 = mail no
 > invitado, esperado), no en Vercel (salía `{}`). Detalle en el log del cierre 65.
 
-**Lo que queda del cockpit, al 2026-07-31 (cierre 74).** D0–D4 están vivos en producción y D5 va 3
-de 4 (el 3/4 construido, en rama). El orden de acá en adelante:
+**Lo que queda del cockpit, al 2026-08-01 (cierre 75).** D0–D4 y **D5 y D6 completos y en
+producción**. El orden de acá en adelante:
 
 1. ~~Publicar el corte 3/4~~ ✅ **hecho el 31/07.** Queda su hecho-cuando (2 min) y el congelado de
    *Voces* y *Proyectos* en Airtable, que en este corte tiene un matiz (ADR-033).
-2. **Corte 4/4** — *(y acá hay una pregunta abierta: el plan lo llama "corte 3/4 y 4/4" pero Voces y
-   Proyectos se cortaron juntos porque van por FK. **No queda un cuarto dominio de config.** Con
-   Ajustes, Referentes, Voces y Proyectos adentro, D5 está completo — lo que queda de Airtable son
-   las 3 tablas que ESCRIBE n8n, y eso es D7. Vale confirmarlo con Mani antes de buscar un 4/4 que
-   probablemente no exista.)*
-3. **D6 — el feed de calificación.** La pantalla que el equipo más usa. `veredicto` de *Descartes*
-   **tiene que quedar editable**: con el campo bloqueado, `falsos_negativos` da siempre 0 y eso se
-   lee como "el gate está perfecto", que es lo contrario de la verdad (ADR-021).
+2. ~~Corte 4/4~~ ✅ **CONFIRMADO CON MANI: no existe.** La numeración salió de contar Voces y
+   Proyectos por separado, pero van juntos por FK. Con Ajustes, Referentes, Voces y Proyectos
+   adentro, **D5 está completo** — verificable en `lib/config.ts`, donde los 4 dominios salen de
+   Postgres. Lo que queda en Airtable son las 3 tablas que **escribe n8n**, y eso es D7.
+3. ~~D6 — el feed de calificación~~ ✅ **hecho el 01/08 y en prod** (fila D6 de la tabla de arriba).
+   Queda su hecho-cuando, que es el único que no se puede apurar: **una semana entera de
+   calificación pasando por la app**.
 4. **D7 — corte de escritura** (re-import #2). Es el que mata las 3 llamadas que le quedan a
-   Airtable en la app y la traducción de ids del contrato (ADR-033 §3).
+   Airtable en la app y la traducción de ids del contrato (ADR-033 §3). **D6 le dejó dos cosas
+   preparadas:** `/curar/historicos` ya lee `outputs`, o sea no cambia en D7; y las 2 tablas que
+   D7 corta ya tienen su superficie propia, así que el corte es mover el almacenamiento, no
+   construir pantallas.
 5. **D8 — apagado.**
 
 **Las 2 decisiones abiertas se CERRARON el 2026-07-16 (cierre 49, consultadas a Mani):**
@@ -409,6 +416,18 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-01 (cierre 75) — D6: el feed de calificación, y el dato que corrigió el diagnóstico a mitad de camino (Claude, pedido de Mani).**
+**Lo que se construyó:** las 3 pantallas del espacio de trabajo. **`/curar/feed`** (mazo de tarjetas compactas que se abren como el expand de Airtable, agrupadas por proyecto y por heat descendente adentro, con filtro sin-calificar/🔥/aprobados/todos), **`/curar/descartes`** (la auditoría del gate) y **`/curar/historicos`** (todo lo aprobado de todas las semanas, de a 25). Directo a `main`.
+**🚨 La medición que decidió la forma, y el error que corrigió a mitad de sesión.** Arranqué diciendo que el loop de calificación "nunca arrancó" porque los 145 candidatos vivos estaban todos en `nuevo`. **Era falso y lo desmintió `outputs`: hay 79 candidatos calificados entre el 01 y el 26 de julio** (24 aprobados / 55 descartados = 30% de precisión de entrega). Los 145 en `nuevo` eran de las corridas de ese mismo día. Lo que el dato sí mostró, y sostiene el diseño: **11 de 79 (14%) tienen `estado` decidido y ningún emoji** — la fricción de dos campos es medible, y el que se pierde es siempre el emoji, o sea justo el campo del que depende ADR-022 para elegir ejemplos. **La lección de método: medí antes de diagnosticar, y medí en la tabla correcta — el feed vivo dice qué falta hacer, no qué se hizo.**
+**La decisión de diseño, que es [ADR-034](../adr/ADR-034-calificar-es-un-solo-acto.md): calificar es UN acto y el Estado se deriva** (🔥/👍 ⇒ aprobado · 👎 ⇒ descartado). Enmienda el glosario, que los declaraba "distintos a propósito". Los dos campos se siguen escribiendo con el mismo vocabulario, así que **ninguna máquina se entera** — el archivado sigue filtrando `NOT nuevo` y `Destilar` sigue eligiendo los 🔥. El precio, explícito: se pierde "buen video pero no lo quiero", que ahora vive en `notas_equipo`.
+**🚨 El otro hallazgo, y es el que más valor entrega: `veredicto` nunca se escribió, y no era una decisión.** 0 auditorías desde que la tabla existe, contra 79 candidatos calificados en el mismo período. La causa está en mapa-campos §5.1-1: **Airtable no deja configurar el permiso de un campo sin records en la página**, así que el equipo nunca *pudo* marcarlo. La API sí lo escribe — se verificó en vivo. Mientras estuvo en 0, `falsos_negativos` daba siempre 0 y eso se lee como *el gate está perfecto*. Por eso la pantalla va **encadenada al pie del feed**, no suelta.
+**⚠️ D6 NO es un corte, y eso invierte una regla del procedimiento.** Airtable sigue siendo el **dueño** de `Candidatos` y `Descartes` hasta D7 (los escribe el motor y los lee el archivado en **7 nodos**), así que la app cambia la superficie, no la propiedad. Consecuencia contraintuitiva: las 2 tablas **SIGUEN** en el catálogo de sombra de `scripts/comun.ts` — la regla del corte 1/4 ("la tabla cortada sale del catálogo") no aplica porque no hay flip, y Postgres tiene que seguir siendo su espejo. Sin migración, sin re-import, sin tocar n8n.
+**🖥️ Las pantallas se miraron en el browser antes de publicarlas** (procedimiento del corte 3/4, aplicado). Encontró 4 cosas que ningún test iba a encontrar: **(a)** las miniaturas se servían a **resolución completa** — 144 imágenes de 1080×1920 son ~15 MB por carga para mostrar recuadros de 200 px; Airtable ofrece `thumbnails.large` (512 px) y ahora sale de `urlDeMiniatura`, en `lib/airtable.ts`, una sola vez. **(b)** las tarjetas con la proporción real del video (9:16) hacían que **una fila llenara la pantalla**, que es exactamente lo que Mani pidió evitar: se recortan a 4:5. **(c)** el `<dialog>` nativo no se centraba — el reset de Tailwind pisa el `margin: auto` que trae `showModal()`; se arregla con `m-auto` y se verificó midiendo el DOM, no mirando el screenshot (la captura a scroll profundo engaña). **(d)** la razón del descarte estaba clampada a 3 líneas y se desbordaba: **es el dato con el que se decide el veredicto**, así que se muestra entera.
+**🐛 Y un defecto de diseño propio, encontrado releyendo lo que había escrito:** la invitación a auditar descartes estaba condicionada a *"calificaste los 145"*. Con 145 semanales nadie los despacha de una sentada, así que **no se dispararía casi nunca** — la invitación faltaría justo en las sesiones normales. Ahora va siempre al pie del mazo; lo que cambia con la cola vacía es el énfasis, no la existencia.
+**Verificación (en vivo, contra datos reales, y los 2 registros de prueba restaurados):** los 4 grupos con sus conteos exactos (53/23/31/38) y heat descendente adentro · **la calificación escribe los DOS campos** (`👍` + `aprobado`) y Airtable llena `fecha_calificacion` sola, con su fila en `app.eventos` · **`veredicto` escrito por primera vez** en la historia de la tabla, con su evento · el diálogo con header fijo, 462 px de scroll sobre 629 de contenido y el pie alcanzable · **el paginado del histórico verificado simulando páginas de 10 contra las 24 filas reales: sin saltos, sin repetidos, y el bucle termina** (con 24 registros el "Cargar más" no aparece, así que el borde no se probaba solo) · dashboard **128/128** (+19) · typecheck y `build` limpios con las 3 rutas · validador **1490/0** · auditor de workflows **0 hallazgos** · las 3 rutas redirigen a `/login` sin sesión.
+**Próximo paso:** el hecho-cuando de D6 es el único que no se puede apurar — **una semana entera de calificación pasando por la app**. En Airtable quedan 2 páginas más para congelar (*Feed* y *Descartes*), que ahora entran en el mismo viaje que las 7 de §Pendiente vivo. Después, **D7**: el corte de escritura y el re-import #2. D6 le dejó el camino hecho — `/curar/historicos` ya lee `outputs` y no cambia, y las 2 tablas que D7 corta ya tienen superficie propia.
+**Skills para la próxima sesión:** `/grill-with-docs` antes de D7 (hay un ADR sin escribir: endpoint de la app vs. insert directo a Postgres desde n8n) · `/handoff` al cerrar. Para mirar pantallas, la receta del cierre 74 sigue andando: `auth.admin.generateLink` con el service_role devuelve el token sin mandar mail.
 
 **2026-07-31 (cierre 74) — D5 corte 3/4: Voces + Proyectos, y el loop de ADR-022 que el corte habría matado en silencio (Claude, pedido de Mani).**
 **Lo que se construyó:** el tercer corte de config. Pantalla **`/curar/voces`** — las voces con sus proyectos **adentro**, no en dos páginas: la voz es la espina dorsal (apagarla apaga sus proyectos sin tocarlos), así que separarlas dejaba la consecuencia del click en la otra pantalla. Trae alta de voz y de proyecto, la N por proyecto con el global de placeholder, los criterios plegados (son 400–650 caracteres cada uno; con 6 abiertos la pantalla dejaba de ser una lista), el aviso de *voz prendida sin proyectos activos* y el de *proyecto activo cuya voz está apagada* — que es la trampa que hoy solo se ve en los logs de n8n. **Y `advertencia_criterios` por fin se muestra:** es la primera superficie que lo hace desde que existe ADR-022. Va en la rama `corte-3-voces-proyectos`.

@@ -286,6 +286,44 @@ Cada corte: pantalla lista → diff en cero → flip → esa página de Airtable
 Pantalla de calificación (🔥/👍/👎 + estado + notas), Descartes con `veredicto` **por fin editable**,
 y la vista de 🔥 Seleccionados. Es la pantalla que el equipo más usa y la que decide si la migración
 se siente bien.
+
+> **D6 NO es un corte de D5.** Airtable sigue siendo el **dueño** de `Candidatos` y
+> `Descartes del gate` hasta D7: la app lee esas tablas por PAT y escribe ahí mismo los campos del
+> equipo. Lo que cambia es la superficie, no la propiedad — por eso las dos tablas **siguen** en el
+> catálogo de sombra (`scripts/comun.ts`) y el `sombra:diff` las sigue espejando, al revés de lo que
+> mandaba el procedimiento del corte 1/4. Consecuencia buena: cero cambios en n8n, y los 7 nodos del
+> archivado que leen esas tablas ni se enteran.
+
+> **Diseño acordado (grilling 2026-07-31).** La medición que lo gobierna: una corrida entrega
+> **145 candidatos** en 4 proyectos (53/38/31/23) con ~1145 caracteres de script cada uno; el equipo
+> **sí** califica (79 calificados del 01 al 26 de julio, 30% de precisión de entrega), pero los
+> **descartes tienen 0 auditorías desde que existe la tabla**.
+>
+> 1. **Un gesto por candidato** — 🔥/👍/👎, el Estado se deriva ([ADR-034](../adr/ADR-034-calificar-es-un-solo-acto.md)).
+> 2. **Mazo de tarjetas compactas que se abren.** Cerrada muestra lo mínimo para decidir (thumbnail,
+>    título, proyecto, referente, heat) **con los tres botones ahí mismo**; abierta muestra todo
+>    (script completo, razón y score del gate, métricas, notas). Abrir es opcional: los fáciles se
+>    despachan de un click y el script se lee solo cuando hace falta.
+> 3. **Agrupado por proyecto, heat descendente adentro.** Los criterios de relevancia son por
+>    proyecto: mezclarlos obliga a rotar de criterio cada tarjeta y vuelve inconsistente el juicio.
+>    Además deja repartir el trabajo entre Majo y Jero sin pisarse.
+> 4. **La tarjeta calificada se queda marcada y atenuada en su lugar**, hasta recargar o cambiar de
+>    filtro. Volver a clickear otro emoji la re-califica: eso *es* el deshacer, sin toast ni undo.
+> 5. **Filtro sobre el mismo mazo** (sin calificar · 🔥 · aprobados · todos): la vista de
+>    🔥 Seleccionados no es una pantalla, es un filtro. Se vacía el domingo con el barrido, que está
+>    bien porque responde "¿qué producimos esta semana?".
+> 6. **Históricos, aparte y sobre Supabase:** todos los aprobados de todas las semanas leídos de
+>    `outputs` (no de Airtable), de a **25 con "cargar más"**. Sobrevive al barrido del domingo y
+>    **no muere en D7** porque ya lee la fuente definitiva.
+> 7. **Descartes en `/curar/descartes`, encadenado al final del feed.** Al terminar la cola, la app
+>    ofrece auditar los ~20 descartes. Una página suelta a la que hay que acordarse de entrar es
+>    exactamente lo que lleva 0 de 20 desde que la tabla existe, y el archivado los borra cada
+>    domingo: un descarte sin auditar es una auditoría perdida para siempre.
+>
+> ⚠️ **Restricción técnica que condiciona el mazo:** las URLs de `thumbnail` son attachments de
+> Airtable y **vencen a las ~2 h** (`v5.airtableusercontent.com`, con el expiry en el path). Nunca se
+> cachean: se re-piden en cada carga (`leerTabla` ya usa `cache: "no-store"`). Si la página se
+> cachea o las URLs pasan por el optimizador de imágenes, las tarjetas quedan rotas.
 **Por qué `veredicto` editable no es cosmético:** es el **único** campo de *Descartes* que lee una
 máquina — el archivado cuenta los "era bueno" para `falsos_negativos`. Con el campo bloqueado ese
 contador da **siempre 0**, y "0 falsos negativos" se lee como *el gate está perfecto*, que es la

@@ -19,6 +19,42 @@ export default async function CurarPage() {
         </p>
       </div>
 
+      <Link href="/curar/feed" className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Feed</CardTitle>
+            <CardDescription>
+              Los videos que el motor trajo, para calificar. 🔥 y 👍 lo aprueban, 👎 lo descarta:
+              con un click alcanza. Ya no se califica en Airtable.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href="/curar/descartes" className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Descartes</CardTitle>
+            <CardDescription>
+              Los que el filtro mató por poco. Marcar cuáles eran buenos es lo que corrige los
+              criterios — y la lista se borra cada domingo.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href="/curar/historicos" className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Históricos</CardTitle>
+            <CardDescription>
+              Todo lo aprobado, de todas las semanas, con su transcripción. El feed se vacía; esto
+              no.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
       <Link href="/curar/voces" className="block">
         <Card className="transition-colors hover:bg-accent/40">
           <CardHeader>
@@ -67,15 +103,6 @@ export default async function CurarPage() {
         </Card>
       </Link>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>El feed sigue en Airtable, por ahora</CardTitle>
-          <CardDescription>
-            Calificar candidatos y revisar los descartes se hace como hasta ahora. Es lo último
-            que falta traer (D6). Toda la configuración ya vive acá.
-          </CardDescription>
-        </CardHeader>
-      </Card>
     </div>
   );
 }

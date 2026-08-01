@@ -128,9 +128,12 @@ El on-demand se suma; no retira al cron (decisión 2026-07-15). Cada corrida dej
 **Estado**:
 El campo canónico de "decidido" de un Candidato: **nuevo → aprobado | descartado** (binario tras
 calificar; ya no existe "publicado"). Es lo que el archivado levanta (`NOT nuevo`) y lo que alimenta
-el aprendizaje (`aprobado` = seleccionado; `descartado` = clase negativa).
+el aprendizaje (`aprobado` = seleccionado; `descartado` = clase negativa). **Se deriva de la
+Calificación**, no se decide aparte: un Candidato calificado está decidido.
 
 **Calificación**:
-El emoji 🔥/👍/👎 que el equipo le pone a un Candidato. Cue visual para curar y ordenar. **No**
-alimenta la señal de selección (eso lo hace el Estado), pero el 🔥 **sí** prioriza qué aprobados se
-usan como ejemplos al destilar los criterios aprendidos (ADR-022). Distinto del Estado a propósito.
+El emoji 🔥/👍/👎 que el equipo le pone a un Candidato, y **el único acto que el equipo hace sobre
+él**: 🔥 = aprobado y ejemplar · 👍 = aprobado · 👎 = descartado. De ahí sale el Estado. El 🔥 no
+cambia el Estado respecto del 👍; lo que agrega es prioridad como ejemplo positivo al destilar los
+criterios aprendidos (ADR-022). Un Candidato sin calificar es un Candidato **sin decidir**, y como
+tal se pierde: el archivado nunca lo lleva al histórico.

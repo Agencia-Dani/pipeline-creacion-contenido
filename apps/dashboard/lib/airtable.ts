@@ -81,6 +81,25 @@ export async function crearRegistro(tabla: string, fields: Record<string, unknow
   return creado.id;
 }
 
+/**
+ * La URL de un campo de adjuntos, en tamaño de miniatura.
+ *
+ * ⚠️ Prefiere SIEMPRE `thumbnails.large` (512 px) sobre `url` (el original, 1080×1920 y ~100 KB).
+ * Medido en el feed: 144 tarjetas a resolución completa son ~15 MB por carga de página, y lo que
+ * se muestra es un recuadro de 200 px.
+ *
+ * ⚠️ Estas URLs **vencen a las ~2 h** (el expiry va en el path). No se cachean ni se guardan: se
+ * re-piden con cada lectura del record, que es lo que hace `leerTabla` con `cache: "no-store"`.
+ * Si una página que las usa se vuelve estática, las miniaturas se rompen a las dos horas.
+ */
+export function urlDeMiniatura(campo: unknown): string | null {
+  if (!Array.isArray(campo) || campo.length === 0) return null;
+  const adjunto = campo[0] as { url?: unknown; thumbnails?: { large?: { url?: unknown } } };
+  const grande = adjunto?.thumbnails?.large?.url;
+  if (typeof grande === "string") return grande;
+  return typeof adjunto?.url === "string" ? adjunto.url : null;
+}
+
 export type Destilado = { criterios_aprendidos: string | null; advertencia_criterios: string | null };
 
 /**
