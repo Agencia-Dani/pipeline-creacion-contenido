@@ -33,35 +33,57 @@
 > (activo, path y credencial OK) · en Postgres hay 145 candidatos, 20 descartes y 8 propuestas con
 > sus 16 pares.
 >
-> 🟠 **LO ÚNICO QUE FALTA, Y ES LO QUE NO SE PROBÓ NUNCA: una corrida.** Todas las **escrituras** de
-> n8n a Postgres (`POST Candidatos`, `POST Descartes`, `POST Propuestos`, el `PATCH` de criterios,
-> los `DELETE` del archivado) están escritas y auditadas pero **jamás se ejecutaron**. La lectura sí
-> se probó contra datos reales; la escritura se estrena en la primera corrida.
+> ✅ **PASO 1 CUMPLIDO — corrida `on_demand` `ok` el 2026-08-01 17:24 UTC.** Las escrituras de n8n a
+> Postgres se estrenaron y funcionan: **2 candidatos** (147 en total) con `proyecto_id`/`voz_id`
+> como **FK uuid de verdad**, **1 descarte** (21), **3 `processed_items` con `run_id`**,
+> `registro_dedup: ok`. Corrida barata a propósito (`Días de recencia` 7 y `Resultados por cuenta`
+> 10): 140 results de Apify, **≈$0.39**. ⚠️ **Los dos knobs quedaron recortados** — hay que
+> devolverlos a **100** y **40** en `/curar/ajustes` o el cron del lunes 08:00 corre a media máquina.
 >
-> **Si algo va a fallar, el síntoma más probable es un `404` contra una tabla que existe**: es el
-> header de schema (`Content-Profile: app` para escribir, `Accept-Profile: app` para leer). Está en
-> [`ingesta-registro.md §5`](../../core/contracts/ingesta-registro.md).
+> ✅ **PASO 3 CUMPLIDO Y EN PRODUCCIÓN — 2026-08-01 (commit `2260ec0`).** El `id` del contrato es el
+> uuid en `voces`, `proyectos` y `referentes`. **No hizo falta un tercer re-import**, y esa fue la
+> decisión de diseño: los consumidores en n8n resuelven el uuid con `uuidDe[x.id] = x.fields.uuid`,
+> así que sirviendo los dos ids **iguales** ese mapa queda identidad. Por eso `fields.uuid` **no se
+> borró** — sacarlo sí obligaría a re-importar; muere en el próximo re-import que haga falta por
+> otra cosa. Las columnas `airtable_id` **siguen en las tablas** (traza al export y las usa
+> `scripts/cortar-feed.ts`): se caen con la limpieza de D8. A/B contra prod: mismo reparto
+> referente→proyecto (3/3/6/5), mismos 16 pares fuera de ámbito, demás campos idénticos.
 >
-> ### Los 3 pasos que quedan, en orden
+> 🚨 **Y de paso apareció la CUARTA pérdida silenciosa de D7, ya arreglada por el paso 3.**
+> `Destilar criterios` del archivado indexa `projMeta` por el `id` del plan y después busca por
+> `candidatos.proyecto_id`, que desde D7 **es uuid**. Con el `id` en record id **nunca matcheaba**
+> ⇒ `byProj` vacío ⇒ **cero destilaciones, en verde y sin avisar**: ADR-022 muerto. No se había
+> notado porque destilar pide ≥4 calificados por proyecto y hay 0. Con el `id` en uuid, las dos
+> puntas coinciden. *Es la misma familia que los 3 hallazgos del grilling: no falla, sale verde y
+> deja un número en cero.*
 >
-> **1. Disparar una corrida on-demand del motor** (botón ▶ en *Operar*). Es lo que estrena las
-> escrituras.
+> ### 🟠 Lo que queda, y es de Mani
 >
-> **2. Verificar que no se perdió analítica** — esta clase de bug **sale verde en todo lo demás**,
-> hay que ir a buscarla:
+> **1. Calificar 2 o 3 en `/curar/feed` — 2 minutos, gratis, y tiene fecha.** Es lo único que
+> prueba el **hallazgo 4** (`fecha_calificacion`), porque ese campo lo escribe **la app al
+> calificar**, no n8n: una corrida del motor no lo toca. Hoy `estado <> 'nuevo'` devuelve `[]`.
+> Y el **archivado corre solo los domingos 18:00** (`0 18 * * 0`): si llega con la cola en cero,
+> `Leer Candidatos calificados` vuelve vacío, no escribe un solo `output` y la cadena
+> `fecha_calificacion` → `outputs.calificado_en` → `v_metricas_calidad` se queda otra semana sin
+> probar. Con la cola cargada, ese archivado cierra el loop entero de una.
+>
+> **2. Devolver los 2 knobs** (`Días de recencia` → 100, `Resultados por cuenta de referente` → 40).
+>
+> **3. Sacar `AIRTABLE_PAT` y `AIRTABLE_BASE_ID` de Vercel.** Ya no los lee **ningún** código de la
+> app (verificado por grep): es higiene, no un corte.
+>
+> **Las queries de verificación**, para cuando la cola tenga algo:
 > ```sql
 > select id, calificacion, estado, fecha_calificacion from app.candidatos where estado <> 'nuevo' limit 5;
 > select * from app.v_metricas_calidad order by semana desc limit 5;
 > select * from app.v_auditoria_descartes order by semana desc limit 3;
-> select * from app.v_embudo_descubrimiento order by semana desc limit 3;
 > ```
-> `fecha_calificacion` **no puede ser null** después de calificar algo, y `v_metricas_calidad` **no
-> puede dar cero filas** una vez que el archivado corrió. Si alguna falla, es el hallazgo 4 sin
-> arreglar y la precisión de entrega —la métrica norte— quedó muda.
+> `fecha_calificacion` **no puede ser null** después de calificar, y `v_metricas_calidad` **no puede
+> dar cero filas** una vez que el archivado corrió sobre algo calificado.
 >
-> **3. El paso 3 del expand/contract** (lo hace Claude, gateado por la corrida verde): `id` pasa a
-> ser el uuid, se borran `fields.uuid` y `airtable_id` del contrato, y **sale `AIRTABLE_PAT` de
-> Vercel**. Ahí D7 cierra del todo.
+> **Si algo falla, el síntoma más probable es un `404` contra una tabla que existe**: es el header
+> de schema (`Content-Profile: app` para escribir, `Accept-Profile: app` para leer). Está en
+> [`ingesta-registro.md §5`](../../core/contracts/ingesta-registro.md).
 >
 > ### Dos cosas para medir en esa primera corrida
 > · **El thumbnail** (hallazgo 2): agarrá un `thumbnail_url` nuevo y pedilo con `curl -I` al día
@@ -480,6 +502,15 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-01 (cierre 77) — La corrida que estrenó las escrituras, y el paso 3: D7 cierra (Claude, pedido de Mani).**
+**Qué se hizo:** Mani disparó la corrida que faltaba y con eso las escrituras de D7 dejaron de ser teoría; después salió el **paso 3 del expand/contract** a producción (commit `2260ec0`). D7 está cerrado del lado del código.
+**La corrida (17:24 UTC, `ok`):** 2 candidatos con `proyecto_id`/`voz_id` como FK uuid, 1 descarte, 3 `processed_items` con `run_id`, `registro_dedup: ok`. **Se corrió barata a propósito** —`Días de recencia` 7 + `Resultados por cuenta` 10 ⇒ 140 results de Apify en vez de 280, **≈$0.39**— y eso vino de medir antes: con las tarifas de `app.tarifas`, una corrida sale ~$1 y **la mitad es Apify, que se paga ANTES del dedup**. El knob que da ganas de tocar, `Candidatos por corrida`, **no ahorra un peso**: corta en `Armar candidato`, después de transcribir. ⚠️ Los 2 knobs quedaron recortados; hay que devolverlos.
+**El paso 3, y la decisión que lo hizo barato:** el `id` del contrato pasa a ser el uuid en voces/proyectos/referentes. **No hizo falta un tercer re-import**, y no por suerte: los cuatro consumidores en n8n resuelven el uuid con `uuidDe[x.id] = x.fields.uuid`, así que sirviendo los dos ids **iguales** el mapa queda **identidad**. De ahí que `fields.uuid` **no se borre** (sacarlo sí obligaría a re-importar) y que las columnas `airtable_id` sigan en las tablas hasta D8. *La regla que deja: cuando dos lados no se deployan juntos, un campo redundante cuesta menos que una corrida.*
+**🚨 Y apareció la CUARTA pérdida silenciosa de D7 — la arregla el mismo paso 3.** `Destilar criterios` indexa `projMeta` por el `id` del plan y busca por `candidatos.proyecto_id`, que desde D7 es uuid: con el `id` en record id **nunca matcheaba** ⇒ `byProj` vacío ⇒ **cero destilaciones, en verde, sin avisar** (ADR-022 muerto). No se había notado porque destilar pide ≥4 calificados y hay 0 — o sea habría aparecido la **primera semana que el equipo calificara**, que es peor. Misma familia que los 3 del grilling: no falla, sale verde, deja un número en cero. **El corolario de método: un corte de ids no termina cuando el contrato compila, termina cuando listaste quién INDEXA por ese id, no solo quién lo escribe.**
+**Verificación:** A/B contra la fachada de producción — mismo reparto referente→proyecto (3/3/6/5), mismos 16 pares fuera de ámbito (referentes de los 2 proyectos de Trading, apagados; el motor los saltea con `if (!projects[proy]) return`), demás campos idénticos. 114/114 tests · typecheck · build · validador (1517 checks) · `auditar-workflows.mjs` sin hallazgos. Y post-deploy contra prod: todos los ids uuid, `fields.uuid == id`, cruces válidos.
+**⚠️ Lo que sigue sin probarse, y es lo único:** `fecha_calificacion` (hallazgo 4). Lo escribe **la app al calificar**, no n8n, así que ninguna corrida del motor lo toca — hay 0 candidatos calificados. Son 2 min en `/curar/feed` y conviene hacerlo **antes de un domingo 18:00**, para que el archivado tenga trabajo real y cierre la cadena `fecha_calificacion` → `outputs.calificado_en` → `v_metricas_calidad` de una.
+**Siguiente sesión:** con el hallazgo 4 verde, arranca **D7.5** (que la app escriba `outputs` al calificar, para matar el archivado — enmienda ADR-014, es `core/`, va con `/grill-with-docs`) o **D8** (apagado de Airtable + la migración `014` de limpieza: balde 2 + las columnas `airtable_id`).
 
 **2026-08-01 (cierre 76) — D7: Airtable sale del sistema. El corte de escritura, de punta a punta (Claude, pedido de Mani).**
 **Qué se hizo:** el grilling completo de D7 y después su implementación entera — 9 commits en `d7-corte-escritura`, mergeados a `main`, con la migración `013` aplicada, el dato migrado y los 3 workflows re-importados por Mani. **Cero `api.airtable.com` en los 3 workflows y en toda la app**; `lib/airtable.ts`, `domain/sombra.ts` y los 4 scripts del modo sombra se borraron. El archivado bajó de 35 nodos a 20.
