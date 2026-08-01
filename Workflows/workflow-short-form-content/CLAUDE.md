@@ -13,12 +13,12 @@ que es el **motor de reels** del MVP. Lee la config del equipo por la **fachada 
 (`/api/engine/run-plan`, D4/ADR-028 — ya no toca Airtable para config) → descubre reels IG + TikTok (Apify, solo por referentes — ADR-019) → prescore métrico (`Heat-score v1`) →
 transcribe (Supadata) → **traduce literal al español con Claude Haiku solo si no está en español** →
 **gate de relevancia** (Haiku estricto contra `criterios_relevancia`, compone el `heat_score`) →
-entrega **candidatos a Airtable** (estado `nuevo`) + registra la corrida en **Supabase**
-(continue-on-fail). **El motor no usa ninguna credencial de Google.** Ver el flujo de 8 etapas y el
+entrega **candidatos a Postgres** por PostgREST (`app.candidatos`, estado `nuevo` — ADR-035) +
+registra la corrida en **Supabase** (continue-on-fail). **El motor no usa ninguna credencial de Google.** Ver el flujo de 8 etapas y el
 mapa de descubrimiento en el README.
 
-El equipo de redes (Majo, Jero) **solo toca Airtable**: arma la búsqueda (Referentes), ve
-el mapa de calor (vista 🔥), y califica/selecciona scripts. El script es **texto** (sin Google Doc —
+El equipo de redes (Majo, Jero) **solo toca el cockpit**: arma la búsqueda (Referentes), ve el
+feed y califica/selecciona scripts. Airtable salió del sistema en D7. El script es **texto** (sin Google Doc —
 ADR-009); el "link" es la URL del video original.
 
 > **Construido por builder Node, no a mano.** Para cambios estructurales: cargá el JSON, mutá
@@ -51,7 +51,7 @@ ADR-009); el "link" es la URL del video original.
   un fallo externo en dependencia de ejecución). Fail-open aplica a los gates de *juicio* y a las
   *escrituras* de registro. **Excepción 1 (ADR-029):** la *lectura* de `processed_items`
   (`Leer procesados`) es fail-closed — sin memoria, el run aborta en vez de re-entregar todo
-  (`Leer feed vivo` sí es fail-open, defensa secundaria). **Excepción 2 (ADR-030):** un video **sin
+  (`Leer feed vivo` —ahora contra `app.candidatos`— sí es fail-open, defensa secundaria). **Excepción 2 (ADR-030):** un video **sin
   transcript se descarta** en el `Gate` (`descarte_razon: 'sin_guion'`), no pasa marcado — el fail-open
   ya no cubre el *insumo* transcript (revierte la decisión #6). Si Supadata se cae entera, la corrida
   entrega 0 y lo avisa.
@@ -65,7 +65,7 @@ ADR-009); el "link" es la URL del video original.
   cientos de requests idénticos y muere por timeout. Ya pasó: mató el cron del 27/07 en `Leer
   procesados`. Los 3 del segmento de dedup lo tienen + retry ×3 (dev-doc §2.1).
 - **`heat_score` es composite** (ADR-010): `peso_relevancia·score_haiku + (1-peso)·percentil(prescore
-  métrico)`. El gate también guarda `relevancia_score`/`relevancia_razon` (se suben a Airtable). El
+  métrico)`. El gate también guarda `relevancia_score`/`relevancia_razon` (se escriben en `app.candidatos`). El
   substring de tema **no existe** (salió en el refactor de relevancia).
 - **Passthrough de campos:** los Code nodes intermedios hacen `Object.assign({}, d, {...})` → un campo
   agregado en `Normalizar` (ej. `thumbnail_url`) sobrevive hasta `Armar candidato`, que **reconstruye**
@@ -75,8 +75,8 @@ ADR-009); el "link" es la URL del video original.
 ## Convención de placeholders
 
 Lo que se completa al importar: API keys `<ANTHROPIC_API_KEY>` / `<SUPADATA_API_KEY>` (en los Code
-nodes), e IDs `<<AIRTABLE_BASE_ID>>` / `<<SUPABASE_URL>>` / `<<INSTANCE_ID>>` / `<<DASHBOARD_URL>>`
-(en el nodo `Config`).
+nodes), e IDs `<<SUPABASE_URL>>` / `<<INSTANCE_ID>>` / `<<DASHBOARD_URL>>` / `<<WEBHOOK_PATH_MOTOR>>`
+(en el nodo `Config`). **`<<AIRTABLE_BASE_ID>>` murió en D7.**
 Listarlos:
 
 ```sh
