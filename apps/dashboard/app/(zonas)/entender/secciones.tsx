@@ -35,8 +35,13 @@ export function ErrorLectura({ que }: { que: string }) {
 
 // ── Calidad por proyecto (reemplaza la página Calidad de Airtable) ──────────────
 
-export function Calidad({ filas }: { filas: FilaCalidad[] }) {
-  if (filas.length === 0) {
+// `activos` son TODOS los proyectos prendidos, no solo los que tienen fila esa semana.
+// La vista `v_metricas_calidad` solo devuelve proyectos con calificaciones, así que un proyecto
+// sin calificar simplemente no aparecía — y un proyecto ausente se lee como "no existe", no como
+// "nadie lo calificó". Es la misma familia de silencio que la card de auditoría ya advierte:
+// un número que falta no es un cero, y un cero sin muestra no es una buena noticia.
+export function Calidad({ filas, activos }: { filas: FilaCalidad[]; activos: string[] }) {
+  if (filas.length === 0 && activos.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
         Todavía no hay semanas con calificaciones. Aparecen cuando el equipo califica
@@ -44,13 +49,17 @@ export function Calidad({ filas }: { filas: FilaCalidad[] }) {
       </p>
     );
   }
-  const ultimaSemana = filas[0].semana;
-  const actuales = filas.filter((f) => f.semana === ultimaSemana);
-  const historia = filas.filter((f) => f.semana !== ultimaSemana);
+  const ultimaSemana = filas[0]?.semana ?? null;
+  const actuales = ultimaSemana ? filas.filter((f) => f.semana === ultimaSemana) : [];
+  const historia = ultimaSemana ? filas.filter((f) => f.semana !== ultimaSemana) : [];
+  const conDatos = new Set(actuales.map((f) => f.proyecto));
+  const sinCalificar = activos.filter((p) => !conDatos.has(p));
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-medium">{semanaDel(ultimaSemana)}</p>
+      <p className="text-sm font-medium">
+        {ultimaSemana ? semanaDel(ultimaSemana) : "Todavía sin calificaciones"}
+      </p>
       {actuales.map((f) => {
         const d = diagnosticoCriterio(f.separacion_gate, f.precision);
         return (
@@ -66,6 +75,14 @@ export function Calidad({ filas }: { filas: FilaCalidad[] }) {
           </div>
         );
       })}
+      {sinCalificar.map((proyecto) => (
+        <div key={`sin-${proyecto}`} className="flex flex-wrap items-baseline gap-x-3 text-sm">
+          <span className="font-medium text-muted-foreground">{proyecto}</span>
+          <span className="text-muted-foreground">
+            sin calificaciones esta semana — no hay con qué medirlo
+          </span>
+        </div>
+      ))}
       {historia.length > 0 && (
         <>
           <Separator />
@@ -101,14 +118,59 @@ export function Calidad({ filas }: { filas: FilaCalidad[] }) {
 
 // ── Embudo y salud del motor (reemplaza Salud del Sistema) ─────────────────────
 
-const ETAPAS: { clave: keyof FilaEmbudo; nombre: string }[] = [
-  { clave: "colectados", nombre: "Colectados" },
-  { clave: "asignados", nombre: "Asignados a proyecto" },
-  { clave: "pretrim", nombre: "Pasaron el pre-trim" },
-  { clave: "filtrados", nombre: "Con heat-score" },
-  { clave: "gate_pass", nombre: "Pasaron el gate" },
-  { clave: "entregados", nombre: "Entregados al feed" },
+// ⚠️ Esto NO es un embudo de seis pasos, y tratarlo como tal era un bug visible: con una sola
+// base (`colectados`) la barra de `asignados` pedía 226% de ancho y se salía del riel.
+//
+// La razón es del dominio, no del CSS: `Asignar proyecto+voz` hace fan-out — un video que encaja
+// en tres proyectos genera TRES filas y se evalúa tres veces. De ahí en adelante, hasta el gate,
+// lo que se cuenta son evaluaciones `(video × proyecto)`, no videos. Recién `entregados` vuelve a
+// contar videos únicos, porque el dedup de `Armar candidato` deja una sola copia (ADR-018).
+//
+// Por eso son dos embudos con su propia base, y no seis barras comparando peras con manzanas.
+const EMBUDOS: {
+  titulo: string;
+  aclaracion?: string;
+  base: keyof FilaEmbudo;
+  etapas: { clave: keyof FilaEmbudo; nombre: string }[];
+}[] = [
+  {
+    titulo: "Videos únicos",
+    base: "colectados",
+    etapas: [
+      { clave: "colectados", nombre: "Colectados" },
+      { clave: "entregados", nombre: "Entregados al feed" },
+    ],
+  },
+  {
+    titulo: "Evaluaciones",
+    aclaracion: "un video que encaja en varios proyectos se evalúa una vez por cada uno",
+    base: "asignados",
+    etapas: [
+      { clave: "asignados", nombre: "Asignadas a proyecto" },
+      { clave: "pretrim", nombre: "Pasaron el pre-trim" },
+      { clave: "filtrados", nombre: "Con heat-score" },
+      { clave: "gate_pass", nombre: "Pasaron el gate" },
+    ],
+  },
 ];
+
+function Barra({ nombre, valor, base }: { nombre: string; valor: number; base: number }) {
+  // El clamp es cinturón además de tirantes: las dos bases de arriba ya hacen imposible pasarse,
+  // pero `metricas` es jsonb libre y una corrida rara no puede romper el layout.
+  const ancho = base > 0 ? Math.min((valor / base) * 100, 100) : 0;
+  return (
+    <div className="grid grid-cols-[11rem_1fr_3.5rem] items-center gap-2 text-sm">
+      <span className="text-muted-foreground">{nombre}</span>
+      <div className="h-2 overflow-hidden rounded-[4px] bg-muted">
+        <div
+          className="h-2 rounded-[4px] bg-primary"
+          style={{ width: `${Math.max(ancho, valor > 0 ? 1 : 0)}%` }}
+        />
+      </div>
+      <span className="text-right tabular-nums">{valor}</span>
+    </div>
+  );
+}
 
 export function Embudo({ filas }: { filas: FilaEmbudo[] }) {
   if (filas.length === 0) {
@@ -119,7 +181,6 @@ export function Embudo({ filas }: { filas: FilaEmbudo[] }) {
     );
   }
   const s = filas[0];
-  const base = s.colectados ?? 0;
 
   return (
     <div className="space-y-4">
@@ -150,25 +211,25 @@ export function Embudo({ filas }: { filas: FilaEmbudo[] }) {
           <p className="text-muted-foreground">de corrida en total</p>
         </div>
       </div>
-      {base > 0 && (
-        <div className="space-y-2">
-          {ETAPAS.map(({ clave, nombre }) => {
-            const valor = (s[clave] as number | null) ?? 0;
-            return (
-              <div key={clave} className="grid grid-cols-[11rem_1fr_3.5rem] items-center gap-2 text-sm">
-                <span className="text-muted-foreground">{nombre}</span>
-                <div className="h-2 rounded-[4px] bg-muted">
-                  <div
-                    className="h-2 rounded-[4px] bg-primary"
-                    style={{ width: `${Math.max((valor / base) * 100, valor > 0 ? 1 : 0)}%` }}
-                  />
-                </div>
-                <span className="text-right tabular-nums">{valor}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {EMBUDOS.map((embudo) => {
+        const base = (s[embudo.base] as number | null) ?? 0;
+        if (base <= 0) return null;
+        return (
+          <div key={embudo.titulo} className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {embudo.titulo}
+              {embudo.aclaracion && (
+                <span className="ml-2 normal-case tracking-normal opacity-80">
+                  ({embudo.aclaracion})
+                </span>
+              )}
+            </p>
+            {embudo.etapas.map(({ clave, nombre }) => (
+              <Barra key={clave} nombre={nombre} valor={(s[clave] as number | null) ?? 0} base={base} />
+            ))}
+          </div>
+        );
+      })}
       {filas.length > 1 && (
         <p className="text-sm text-muted-foreground">
           Semanas anteriores:{" "}
@@ -360,6 +421,7 @@ const ACCION: Record<string, string> = {
   "proyectos.crear": "creó un proyecto",
   "sugeridos.aprobar": "aprobó un sugerido",
   "sugeridos.descartar": "descartó un sugerido",
+  "sugeridos.buscar": "disparó el buscador de cuentas",
   "feed.calificar": "calificó un candidato",
   "descartes.veredicto": "auditó un descarte",
   "operar.correr": "disparó una corrida",

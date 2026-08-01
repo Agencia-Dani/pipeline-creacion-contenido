@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BotonBuscar } from "@/components/boton-buscar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { exigirZona } from "@/lib/auth";
@@ -25,15 +26,20 @@ export default async function SugeridosPage() {
         </Link>
         <h1 className="mt-1 text-2xl font-semibold">Sugeridos</h1>
         <p className="text-muted-foreground">
-          Cuentas nuevas que el buscador propone cada lunes. Aprobar una la suma al banco y empieza a
-          traer videos; descartarla es definitivo.
+          Cuentas nuevas que propone el buscador. Aprobar una la suma al banco y empieza a traer
+          videos; descartarla es definitivo.
         </p>
       </div>
+
+      {/* El botón va arriba y no al pie: se aprieta mirando la bandeja, que es cuando se siente
+          la falta. El mismo botón está en Operar, que es donde se disparan las máquinas. */}
+      <BotonBuscar pendientes={pendientes.length} />
 
       {pendientes.length === 0 ? (
         <Alert>
           <AlertDescription>
-            No hay propuestas pendientes. El buscador corre los lunes y deja acá lo que encuentra.
+            No hay propuestas pendientes. Apretá &laquo;Buscar cuentas nuevas&raquo; cuando quieras
+            más: el buscador ya no corre solo los lunes.
           </AlertDescription>
         </Alert>
       ) : (

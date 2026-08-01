@@ -13,11 +13,28 @@ export type Proyecto = {
   vozId: string | null;
 };
 
+/**
+ * Una línea de Operar: lo que el proyecto **pide**, con qué **cuenta** para conseguirlo, y lo que
+ * de verdad **entregó** la última vez.
+ *
+ * Los tres números son medidos, ninguno es un pronóstico. Es a propósito: `n` es un techo duro y
+ * la entrega es best-effort sobre el supply real (`Armar candidato`: «N es un TECHO exacto; la
+ * entrega es best-effort»), así que mostrar solo `pide 15` sería prometer algo que la máquina no
+ * puede cumplir, y eso es peor que decir «hasta». Poniendo la última entrega al lado, el equipo
+ * ve la realidad sin tener que confiar en una estimación — y `cuentas` es la palanca con la que
+ * se cambia esa realidad.
+ */
 export type ProyectoDelPlan = {
   id: string;
   nombre: string;
-  n: number;
-  nEsDefault: boolean;
+  /** Lo que este proyecto pide por corrida. Es el único número que gobierna la cantidad. */
+  pide: number;
+  /** Referentes activos que lo alimentan. Es lo que hay que subir cuando falta fuente. */
+  cuentas: number;
+  /** Lo que entregó la última corrida con datos. `null` = todavía no hay historia. */
+  ultimaEntrega: number | null;
+  /** Por qué quedó corto la última vez, si quedó. */
+  razonFaltante: RazonFaltante | null;
 };
 
 export type VistaOperar = {
@@ -26,14 +43,27 @@ export type VistaOperar = {
   noCorren: string[];
 };
 
+/**
+ * `defaultN` sigue existiendo solo para filas viejas con `n` en null: el motor las resuelve
+ * contra el global, así que la pantalla muestra el mismo número que el motor va a usar. Desde
+ * esta versión el form exige N, o sea que no se crean filas nuevas así.
+ *
+ * El join con el embudo va **por nombre de proyecto** y no por id: las claves de
+ * `metricas.por_proyecto` todavía son record ids de Airtable en las corridas ya registradas, y
+ * `nombre` viaja adentro del valor. Renombrar un proyecto degrada a «sin historia», nunca a un
+ * número de otro proyecto.
+ */
 export function armarVistaOperar(
   voces: Voz[],
   proyectos: Proyecto[],
   defaultN: number,
+  cuentasPorProyecto: Map<string, number> = new Map(),
+  embudo: EmbudoProyecto[] = [],
 ): VistaOperar {
   const noCorren: string[] = [];
   const porVoz = voces.map((voz) => ({ voz, proyectos: [] as ProyectoDelPlan[] }));
   const porVozId = new Map(porVoz.map((grupo) => [grupo.voz.id, grupo]));
+  const porNombre = new Map(embudo.map((f) => [f.nombre, f]));
 
   for (const proyecto of proyectos) {
     const grupo = proyecto.vozId ? porVozId.get(proyecto.vozId) : undefined;
@@ -41,12 +71,14 @@ export function armarVistaOperar(
       noCorren.push(proyecto.nombre);
       continue;
     }
-    const usaDefault = !proyecto.n; // vacío o 0 → default global
+    const ultima = porNombre.get(proyecto.nombre);
     grupo.proyectos.push({
       id: proyecto.id,
       nombre: proyecto.nombre,
-      n: usaDefault ? defaultN : (proyecto.n as number),
-      nEsDefault: usaDefault,
+      pide: proyecto.n && proyecto.n > 0 ? proyecto.n : defaultN,
+      cuentas: cuentasPorProyecto.get(proyecto.id) ?? 0,
+      ultimaEntrega: ultima ? ultima.entregados : null,
+      razonFaltante: ultima ? ultima.razonFaltante : null,
     });
   }
 

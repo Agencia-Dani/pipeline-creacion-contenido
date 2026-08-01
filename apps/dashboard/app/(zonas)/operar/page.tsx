@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BotonBuscar } from "@/components/boton-buscar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,11 +21,14 @@ import {
   hayCorridaViva,
   ultimoEmbudo,
   type Corrida,
+  type ProyectoDelPlan,
   type VistaOperar,
 } from "@/domain/corrida";
 import { leerConfigOperar } from "@/lib/config";
 import { exigirZona } from "@/lib/auth";
+import { cuentasPorProyecto } from "@/lib/referentes";
 import { ultimasCorridasMotor } from "@/lib/runs";
+import { leerPendientes } from "@/lib/sugeridos";
 import { AutoRefresh } from "./auto-refresh";
 import { BotonCorrer } from "./boton-correr";
 
@@ -40,23 +44,112 @@ const BADGE_POR_ESTADO: Record<
   parcial: "outline",
 };
 
+// Una línea por proyecto, con los TRES datos juntos: lo que pide, con qué cuenta, y lo que
+// entregó la última vez.
+//
+// Antes esto eran dos cards separadas —«Qué va a correr» decía «hasta 15 candidatos» y «Última
+// corrida» decía «entregó 1»— y había que cruzarlas de memoria. Peor: «hasta» le pedía al equipo
+// que adivinara. El número de la izquierda es un pedido y el de la derecha es un hecho; ponerlos
+// juntos es lo único que hace que el pedido se lea como lo que es.
+function FilaProyecto({ p }: { p: ProyectoDelPlan }) {
+  const quedaCorto = p.ultimaEntrega !== null && p.ultimaEntrega < p.pide;
+  return (
+    <li className="space-y-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+        <span className="font-medium">{p.nombre}</span>
+        <span className="text-muted-foreground">
+          pide <span className="font-medium text-foreground tabular-nums">{p.pide}</span> ·{" "}
+          {p.cuentas === 1 ? "1 cuenta" : `${p.cuentas} cuentas`} ·{" "}
+          {p.ultimaEntrega === null ? (
+            // No es lo mismo que "entregó 0": puede que la corrida ni lo haya mirado. Se dice lo
+            // que sabemos —que no hay dato— y no una interpretación que podría ser falsa.
+            "sin datos de la última corrida"
+          ) : (
+            <>
+              la última entregó{" "}
+              <span className={quedaCorto ? "" : "font-medium text-foreground"}>
+                {p.ultimaEntrega}
+              </span>
+            </>
+          )}
+        </span>
+      </div>
+      {p.cuentas === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          ⚠️ Sin cuentas que lo alimenten no va a traer nada.{" "}
+          <Link href="/curar/referentes" className="underline">
+            Asignale referentes
+          </Link>
+          .
+        </p>
+      ) : (
+        // Sin razón diagnosticada no hay palanca que recomendar: los números ya cuentan la
+        // historia y una sugerencia inventada sería peor que el silencio.
+        quedaCorto &&
+        p.razonFaltante !== null && (
+          <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+            <Badge variant="outline">{RAZON_FALTANTE_LEGIBLE[p.razonFaltante]}</Badge>
+            {/* La palanca sale de la razón que ya diagnosticó el motor, no de una corazonada:
+                `supply` se arregla con más cuentas, `gate` con criterios menos estrictos, y
+                `mixta` es las dos cosas. */}
+            <span>
+              Para acercarse a {p.pide}
+              {p.razonFaltante !== "gate" && (
+                <>
+                  {" "}
+                  sumá cuentas en{" "}
+                  <Link href="/curar/referentes" className="underline">
+                    Referentes
+                  </Link>
+                </>
+              )}
+              {p.razonFaltante === "mixta" && " y"}
+              {p.razonFaltante !== "supply" && (
+                <>
+                  {" "}
+                  aflojá los criterios en{" "}
+                  <Link href="/curar/voces" className="underline">
+                    Voces y proyectos
+                  </Link>
+                </>
+              )}
+              .
+            </span>
+          </p>
+        )
+      )}
+    </li>
+  );
+}
+
 export default async function OperarPage() {
   await exigirZona("operar");
 
-  // Cada mitad falla sola: si no se puede leer la config igual se ven las corridas, y al revés.
-  const [config, corridas] = await Promise.allSettled([
+  // Cada parte falla sola: si no se puede leer la config igual se ven las corridas, y al revés.
+  const [config, corridas, cuentas, propuestas] = await Promise.allSettled([
     leerConfigOperar(),
     ultimasCorridasMotor(),
+    cuentasPorProyecto(),
+    leerPendientes(),
   ]);
+
+  const runs = corridas.status === "fulfilled" ? corridas.value : null;
+  const embudo = runs ? ultimoEmbudo(runs) : null;
 
   const vista: VistaOperar | null =
     config.status === "fulfilled"
-      ? armarVistaOperar(config.value.voces, config.value.proyectos, config.value.defaultN)
+      ? armarVistaOperar(
+          config.value.voces,
+          config.value.proyectos,
+          config.value.defaultN,
+          cuentas.status === "fulfilled" ? cuentas.value : new Map(),
+          embudo?.filas ?? [],
+        )
       : null;
-  const runs = corridas.status === "fulfilled" ? corridas.value : null;
+
   const ahora = new Date();
   const corridaViva = runs ? hayCorridaViva(runs, ahora) : false;
-  const embudo = runs ? ultimoEmbudo(runs) : null;
+  const pendientes = propuestas.status === "fulfilled" ? propuestas.value.length : 0;
 
   return (
     <div className="space-y-6">
@@ -72,12 +165,15 @@ export default async function OperarPage() {
         <CardHeader>
           <CardTitle>Qué va a correr</CardTitle>
           <CardDescription>
-            Una corrida busca para todos los proyectos activos de voces activas, cada uno
-            hasta su N. Esto se edita en{" "}
+            Cada proyecto activo de voz activa pide su número de videos.{" "}
+            {embudo
+              ? `Al lado, lo que entregó de verdad la corrida de ${haceCuanto(embudo.corrida.inicio, ahora)}: el pedido es un techo, y lo que llega depende de cuántas cuentas lo alimenten.`
+              : "Cuando haya una corrida, al lado va a aparecer lo que entregó de verdad."}{" "}
+            El número se edita en{" "}
             <Link href="/curar/voces" className="underline">
               Voces y proyectos
             </Link>
-            ; acá se dispara y se mira.
+            .
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -100,19 +196,11 @@ export default async function OperarPage() {
             </p>
           ) : (
             vista.porVoz.map(({ voz, proyectos }) => (
-              <div key={voz.id} className="space-y-1">
+              <div key={voz.id} className="space-y-2">
                 <p className="text-sm font-medium">{voz.nombre}</p>
-                <ul className="space-y-1">
+                <ul className="space-y-2 border-l-2 pl-3">
                   {proyectos.map((p) => (
-                    <li
-                      key={p.id}
-                      className="flex items-center justify-between text-sm text-muted-foreground"
-                    >
-                      <span>{p.nombre}</span>
-                      <span>
-                        hasta {p.n} candidatos{p.nEsDefault && " (default global)"}
-                      </span>
-                    </li>
+                    <FilaProyecto key={p.id} p={p} />
                   ))}
                 </ul>
               </div>
@@ -129,46 +217,28 @@ export default async function OperarPage() {
         </CardContent>
       </Card>
 
-      {embudo && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Última corrida, por proyecto</CardTitle>
-            <CardDescription>
-              De {haceCuanto(embudo.corrida.inicio, ahora)}: cuánto entregó cada proyecto
-              de su meta, qué tan estricto fue su filtro, y por qué faltó (si faltó).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              {embudo.filas.map((f) => {
-                const corto = f.entregados < f.nObjetivo;
-                return (
-                  <li key={f.nombre} className="space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-                      <span className="font-medium">{f.nombre}</span>
-                      <span className={corto ? "text-muted-foreground" : ""}>
-                        entregó {f.entregados} de {f.nObjetivo}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span>
-                        filtro:{" "}
-                        {f.tasaGate == null
-                          ? "sin datos"
-                          : `pasó el ${Math.round(f.tasaGate * 100)}% de ${f.evaluados} evaluados`}
-                      </span>
-                      {f.sinGuion > 0 && <span>· {f.sinGuion} sin guion (descartados)</span>}
-                      {corto && f.razonFaltante && (
-                        <Badge variant="outline">{RAZON_FALTANTE_LEGIBLE[f.razonFaltante]}</Badge>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Buscar cuentas nuevas</CardTitle>
+          <CardDescription>
+            La otra máquina: en vez de traer videos, propone cuentas de referente nuevas a partir
+            de las que ya funcionan. Ya no corre sola los lunes — se aprieta acá.
+            {pendientes > 0 && (
+              <>
+                {" "}
+                Hay{" "}
+                <Link href="/curar/sugeridos" className="underline">
+                  {pendientes} propuesta{pendientes === 1 ? "" : "s"} esperando
+                </Link>
+                : conviene resolverlas antes de pedir más.
+              </>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BotonBuscar pendientes={pendientes} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

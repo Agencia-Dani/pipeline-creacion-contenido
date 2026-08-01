@@ -16,7 +16,8 @@ const GRUPOS = [
   {
     consume: "motor" as const,
     titulo: "Búsqueda de candidatos",
-    descripcion: "Gobiernan qué videos trae el motor y cómo los ordena.",
+    descripcion:
+      "Gobiernan qué videos acepta el motor y cómo los ordena. Cuántos trae cada proyecto NO se decide acá: eso es el número de cada proyecto en Voces y proyectos.",
   },
   {
     consume: "descubrimiento" as const,

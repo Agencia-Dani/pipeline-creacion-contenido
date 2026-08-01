@@ -17,10 +17,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //    existiendo para `proyecto_id is null`, que sí es posible (el motor lo omite si no lo tiene).
 //  · `thumbnail_url` es una columna de texto: se acabó el `urlDeMiniatura` sobre adjuntos.
 //
-// ⚠️ La contracara del thumbnail, y hay que medirla: Airtable **descargaba y re-hosteaba** la
-// imagen, y ahora guardamos la URL cruda del CDN de Instagram/TikTok, que viene firmada y con
-// expiry. La tarjeta tiene que tolerar que no cargue (placeholder), y la primera corrida post-D7
-// mide cuánto viven de verdad. Si no aguantan la semana, entra Supabase Storage.
+// ⚠️ La contracara del thumbnail, ya medida (2026-08-01) y ya resuelta en `app/api/miniatura`:
+// Airtable **descargaba y re-hosteaba** la imagen, y acá guardamos la URL cruda del CDN. Eso
+// rompió las miniaturas por DOS razones, y la primera no era la que esperábamos:
+//  1. El CDN de Instagram manda `cross-origin-resource-policy: same-origin`. El browser bloquea
+//     el `<img>` cross-origin **siempre**, con la URL fresca o vencida. Era el bug de verdad.
+//  2. La URL viene firmada con expiry de ~5 días, menos que la cadencia semanal.
+// La pantalla no consume esta columna directo: la pasa por `/api/miniatura`, que sirve desde
+// nuestro origen (resuelve 1) y copia a Supabase Storage en la primera vista (resuelve 2).
+// Los 145 candidatos migrados de Airtable tienen `thumbnail_url` en null a propósito: eran
+// adjuntos que murieron con el record, y no hay nada que proxear.
 
 const filaCandidato = z.object({
   id: z.string(),

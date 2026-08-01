@@ -40,6 +40,12 @@ export function Mazo({
   const [visibles, setVisibles] = useState<Set<string>>(
     () => new Set(candidatos.filter((c) => pasaFiltro(c, "sin-calificar")).map((c) => c.id)),
   );
+  // ⚠️ `plegados` es un estado SEPARADO de `visibles`, y tiene que quedarse separado. `visibles`
+  // es el congelado del filtro (la regla de arriba); plegar es solo dejar de dibujar un grupo.
+  // Si plegar tocara `visibles`, desplegar re-evaluaría el filtro y las tarjetas que acabás de
+  // calificar desaparecerían — justo el misclick irrecuperable que ese congelado evita.
+  // Arranca vacío: todo desplegado, que es el comportamiento de siempre. Plegar es la acción.
+  const [plegados, setPlegados] = useState<Set<string>>(new Set());
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<Set<string>>(new Set());
   const [errores, setErrores] = useState<Record<string, string>>({});
@@ -47,6 +53,14 @@ export function Mazo({
 
   const efectiva = (c: CandidatoFeed): Calificacion | null => puestas[c.id] ?? c.calificacion;
   const cuentas = contarPorFiltro(candidatos.map((c) => ({ calificacion: efectiva(c) })));
+
+  function alternarPlegado(proyecto: string) {
+    setPlegados((p) => {
+      const s = new Set(p);
+      if (!s.delete(proyecto)) s.add(proyecto);
+      return s;
+    });
+  }
 
   function cambiarFiltro(nuevo: Filtro) {
     setFiltro(nuevo);
@@ -114,27 +128,51 @@ export function Mazo({
             : "Nada en este filtro."}
         </p>
       ) : (
-        grupos.map((g) => (
-          <section key={g.proyecto} className="space-y-3">
-            <h2 className="flex items-baseline gap-2 border-b pb-1.5">
-              <span className="font-medium">{g.proyecto}</span>
-              <span className="text-sm text-muted-foreground">{g.candidatos.length}</span>
-            </h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {g.candidatos.map((c) => (
-                <Tarjeta
-                  key={c.id}
-                  candidato={c}
-                  puesta={efectiva(c)}
-                  enviando={enviando.has(c.id)}
-                  error={errores[c.id] ?? null}
-                  onCalificar={(cal) => calificar(c, cal)}
-                  onAbrir={() => setAbiertoId(c.id)}
-                />
-              ))}
-            </div>
-          </section>
-        ))
+        grupos.map((g) => {
+          const plegado = plegados.has(g.proyecto);
+          return (
+            <section key={g.proyecto} className="space-y-3">
+              {/* El título ES el control: los criterios son por proyecto, así que se trabaja de a
+                  un grupo por vez y los demás estorban. El contador se queda visible plegado —
+                  es justo lo que se quiere saber de un grupo cerrado. */}
+              <h2 className="border-b pb-1.5">
+                <button
+                  type="button"
+                  onClick={() => alternarPlegado(g.proyecto)}
+                  aria-expanded={!plegado}
+                  className="flex w-full items-baseline gap-2 text-left hover:text-primary"
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "text-xs text-muted-foreground transition-transform",
+                      plegado ? "-rotate-90" : "",
+                    )}
+                  >
+                    ▼
+                  </span>
+                  <span className="font-medium">{g.proyecto}</span>
+                  <span className="text-sm text-muted-foreground">{g.candidatos.length}</span>
+                </button>
+              </h2>
+              {!plegado && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {g.candidatos.map((c) => (
+                    <Tarjeta
+                      key={c.id}
+                      candidato={c}
+                      puesta={efectiva(c)}
+                      enviando={enviando.has(c.id)}
+                      error={errores[c.id] ?? null}
+                      onCalificar={(cal) => calificar(c, cal)}
+                      onAbrir={() => setAbiertoId(c.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })
       )}
 
       {/* El encadenamiento con los descartes. Va SIEMPRE al pie del mazo, no solo al terminar

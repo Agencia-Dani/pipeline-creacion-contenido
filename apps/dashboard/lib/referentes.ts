@@ -83,6 +83,27 @@ export async function leerBanco(): Promise<ReferenteDelBanco[]> {
 }
 
 /**
+ * Cuántas cuentas **prendidas** alimenta cada proyecto, por id.
+ *
+ * Lo consume Operar: es la palanca de la que depende que un proyecto llegue a su número. Un
+ * proyecto con 3 cuentas no puede entregar 15 videos nuevos por semana por más que los pida, y
+ * sin este dato la pantalla no tendría cómo decir qué hacer al respecto.
+ *
+ * Cuenta solo las activas a propósito: una cuenta apagada no le pide nada a Apify, así que
+ * contarla haría parecer que hay fuente donde no la hay.
+ */
+export async function cuentasPorProyecto(): Promise<Map<string, number>> {
+  const cuentas = new Map<string, number>();
+  for (const referente of await leerBanco()) {
+    if (!referente.activo) continue;
+    for (const proyectoId of referente.proyectoIds) {
+      cuentas.set(proyectoId, (cuentas.get(proyectoId) ?? 0) + 1);
+    }
+  }
+  return cuentas;
+}
+
+/**
  * Postgres → la forma del contrato (core/contracts/run-plan.md). Sin traducciones desde el paso 3
  * de D7: se leía Proyectos acá solo para mapear cada uuid a su record id de Airtable, y ahora el
  * contrato habla uuid de punta a punta.

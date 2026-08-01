@@ -49,7 +49,17 @@ export type DatosProyecto = {
   criterios_relevancia: string;
   vozId: string;
   activo: boolean;
-  n: number | null;
+  /**
+   * Cuántos videos pide este proyecto por corrida. **Obligatorio al escribir**, aunque la columna
+   * siga admitiendo null: el asimetría es deliberada (estricto al escribir, tolerante al leer),
+   * porque una fila vieja sin N no puede bloquear la pantalla.
+   *
+   * Antes, vacío significaba "usá el global `Candidatos por corrida`". Eso era un tercer número
+   * compitiendo con los otros dos que gobiernan cuántos videos entran, y el equipo no tenía cómo
+   * saber cuál mandaba. Desde esta versión hay UNO solo y es este: los tres globales pasaron a
+   * `visibilidad = 'dev'` y el equipo no los ve.
+   */
+  n: number;
 };
 
 /**
@@ -57,9 +67,9 @@ export type DatosProyecto = {
  * rechaza. La FK ya lo impediría, pero reventaría con un error de Postgres en vez de con una
  * frase que el equipo de redes pueda leer.
  *
- * `n` vacío o 0 significa "usá el default global" (ADR-024), y se guarda como null: un 0 en la
- * columna diría lo mismo con dos representaciones, que es la clase de ambigüedad que después
- * alguien "arregla" al revés.
+ * `n` es obligatorio y de 1 para arriba. Ya no existe el "vacío = usá el global": ese default
+ * silencioso era justo lo que hacía imposible responder "¿cuántos videos trae este proyecto?"
+ * sin abrir otra pantalla.
  */
 export function validarProyecto(
   entrada: {
@@ -87,10 +97,16 @@ export function validarProyecto(
     return { ok: false, error: "Elegí a qué voz pertenece el proyecto." };
   }
 
-  const nCrudo = entrada.n;
-  const n = nCrudo === "" || nCrudo === null || nCrudo === undefined ? null : Number(nCrudo);
-  if (n !== null && (!Number.isInteger(n) || n < 0)) {
-    return { ok: false, error: "Los videos por corrida van en número entero (o dejalo vacío para usar el global)." };
+  const nCrudo = typeof entrada.n === "string" ? entrada.n.trim() : entrada.n;
+  if (nCrudo === "" || nCrudo === null || nCrudo === undefined) {
+    return {
+      ok: false,
+      error: "Decí cuántos videos querés por corrida para este proyecto.",
+    };
+  }
+  const n = Number(nCrudo);
+  if (!Number.isInteger(n) || n < 1) {
+    return { ok: false, error: "Los videos por corrida van en número entero, de 1 para arriba." };
   }
 
   return {
@@ -101,7 +117,7 @@ export function validarProyecto(
       criterios_relevancia: criterios,
       vozId: entrada.vozId,
       activo: entrada.activo === true,
-      n: n === 0 ? null : n,
+      n,
     },
   };
 }

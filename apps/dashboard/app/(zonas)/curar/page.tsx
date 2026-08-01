@@ -60,8 +60,9 @@ export default async function CurarPage() {
           <CardHeader>
             <CardTitle>Voces y proyectos</CardTitle>
             <CardDescription>
-              Los clientes y sus temas: qué busca cada uno, con qué criterios y cuántos videos por
-              corrida. Apagar una voz apaga sus proyectos. Ya no se tocan en Airtable.
+              Los clientes y sus temas: qué busca cada uno, con qué criterios y cuántos videos
+              pide por corrida — ese número es el único que manda. Apagar una voz apaga sus
+              proyectos.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -96,8 +97,8 @@ export default async function CurarPage() {
           <CardHeader>
             <CardTitle>Ajustes</CardTitle>
             <CardDescription>
-              Las perillas del sistema: cuántos candidatos trae cada corrida, qué tan
-              exigente es el filtro, en qué plataformas busca. Ya no se tocan en Airtable.
+              Las perillas del sistema: qué tan exigente es el filtro y en qué plataformas
+              busca. Cuántos videos trae cada proyecto se decide en Voces y proyectos.
             </CardDescription>
           </CardHeader>
         </Card>

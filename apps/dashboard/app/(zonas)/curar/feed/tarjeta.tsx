@@ -96,16 +96,19 @@ export function Tarjeta({
             conjunto. Se recorta al centro, que es donde el reel pone el gancho. */}
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
           {candidato.thumbnail && !miniaturaRota ? (
-            // <img> a propósito, no next/image: la URL es del CDN de Instagram/TikTok, viene
-            // firmada y con expiry, así que optimizarla y cachearla la rompe (ver
-            // lib/candidatos.ts). Antes de D7 Airtable la re-hosteaba; ahora nadie lo hace.
+            // Va por /api/miniatura y NO directo al CDN: Instagram manda
+            // `cross-origin-resource-policy: same-origin`, así que el browser bloquea un <img>
+            // cross-origin aunque la URL responda 200. El proxy además la copia a Storage la
+            // primera vez, porque la URL firmada vence en ~5 días (ver app/api/miniatura/route.ts).
+            // <img> y no next/image: el optimizador tampoco puede leer una URL firmada de terceros.
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={candidato.thumbnail}
+              src={`/api/miniatura?u=${encodeURIComponent(candidato.thumbnail)}`}
               alt=""
               loading="lazy"
-              // Una URL vencida daba el ícono de imagen rota, que se lee como "la app falló".
-              // Cae al mismo lugar que no tener miniatura: la decisión igual la da el guion.
+              // Si ni el proxy la consigue (URL vencida antes del primer cacheo), el ícono de
+              // imagen rota se lee como "la app falló". Cae al mismo lugar que no tener miniatura:
+              // la decisión igual la da el guion.
               onError={() => setMiniaturaRota(true)}
               className="size-full object-cover transition-transform group-hover:scale-105"
             />

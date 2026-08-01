@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Copiar } from "@/components/ui/copiar";
+import { Modal } from "@/components/ui/modal";
 import type { Historico } from "@/lib/historicos";
 import { cargarMas } from "./actions";
 
@@ -92,41 +94,23 @@ export function Lista({
 }
 
 function Detalle({ historico, onCerrar }: { historico: Historico | null; onCerrar: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialogo = ref.current;
-    if (!dialogo) return;
-    if (historico && !dialogo.open) dialogo.showModal();
-    if (!historico && dialogo.open) dialogo.close();
-  }, [historico]);
-
   return (
-    <dialog
-      ref={ref}
-      onClose={onCerrar}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto max-h-[85vh] w-[min(46rem,92vw)] rounded-lg border bg-card p-0 text-card-foreground backdrop:bg-black/50"
+    <Modal
+      abierto={historico !== null}
+      onCerrar={onCerrar}
+      titulo={historico?.titulo ?? ""}
+      subtitulo={
+        historico && (
+          <>
+            {historico.proyecto ?? "(sin proyecto)"}
+            {historico.voz && ` · ${historico.voz}`}
+            {` · aprobado el ${fecha(historico.calificadoEn)}`}
+          </>
+        )
+      }
     >
       {historico && (
-        <div className="flex max-h-[85vh] flex-col">
-          <header className="flex items-start justify-between gap-4 border-b p-4">
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold leading-snug">{historico.titulo}</h2>
-              <p className="text-xs text-muted-foreground">
-                {historico.proyecto ?? "(sin proyecto)"}
-                {historico.voz && ` · ${historico.voz}`}
-                {` · aprobado el ${fecha(historico.calificadoEn)}`}
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => ref.current?.close()} aria-label="Cerrar">
-              ✕
-            </Button>
-          </header>
-
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <>
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {historico.calificacion && <Badge variant="secondary">{historico.calificacion}</Badge>}
               {historico.heat !== null && <Badge variant="outline">heat {historico.heat.toFixed(2)}</Badge>}
@@ -166,16 +150,18 @@ function Detalle({ historico, onCerrar }: { historico: Historico | null; onCerra
             )}
 
             <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">
-                Lo que se dice en el video (transcripción literal)
-              </p>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Lo que se dice en el video (transcripción literal)
+                </p>
+                <Copiar texto={historico.script} etiqueta="Copiar guion" />
+              </div>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">
                 {historico.script ?? "Sin transcripción."}
               </p>
             </div>
-          </div>
-        </div>
+        </>
       )}
-    </dialog>
+    </Modal>
   );
 }

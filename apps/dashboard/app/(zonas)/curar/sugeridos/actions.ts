@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { esPlataforma, validarReferente } from "@/domain/referentes";
 import { exigirZona } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
-import { hayBusquedaViva } from "@/lib/descubrimiento";
 import { buscarPorHandle, crearReferente, leerProyectos } from "@/lib/referentes";
 import { leerPendientes, marcarResuelto, notaDePromocion } from "@/lib/sugeridos";
 
@@ -88,40 +87,5 @@ export async function descartar(id: string): Promise<Resultado> {
   return { ok: true, mensaje: "Descartada. No se vuelve a proponer." };
 }
 
-// ── Disparar la búsqueda ─────────────────────────────────────────────────────
-//
-// Señal desnuda al webhook del descubrimiento, mismo patrón que el ▶ del motor (ADR-023): sin
-// payload, el workflow decide a quién buscar leyendo la config por la fachada. El header vive
-// solo acá (BFF, único portador de secretos) y en n8n.
-
-export async function buscarAhora(): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
-
-  const url = process.env.DESCUBRIMIENTO_WEBHOOK_URL;
-  const nombre = process.env.DESCUBRIMIENTO_WEBHOOK_HEADER_NOMBRE;
-  const valor = process.env.DESCUBRIMIENTO_WEBHOOK_HEADER_VALOR;
-  if (!url || !nombre || !valor) {
-    return { ok: false, mensaje: "Falta configurar el webhook del buscador (3 env vars del gestor). Avisale a un dev." };
-  }
-
-  // Preguntar antes de disparar: dos clicks son dos corridas de Apify pagas. Acá alcanza con esto
-  // y no con el guard single-flight del motor porque hay un solo camino de entrada (este botón).
-  if (await hayBusquedaViva()) {
-    return { ok: false, mensaje: "Ya hay una búsqueda corriendo. Esperá a que termine (tarda unos minutos)." };
-  }
-
-  try {
-    const res = await fetch(url, { method: "POST", headers: { [nombre]: valor } });
-    if (res.status === 403) {
-      // El gotcha documentado: header distinto al de la credencial de n8n = 403 en silencio.
-      return { ok: false, mensaje: "El buscador rechazó la señal (403): el header no coincide con el de n8n. Avisale a un dev." };
-    }
-    if (!res.ok) return { ok: false, mensaje: `El buscador respondió ${res.status}. Avisale a un dev.` };
-  } catch {
-    return { ok: false, mensaje: "No se pudo llegar al buscador. ¿n8n está caído? Avisale a un dev." };
-  }
-
-  await registrarEvento(usuario.id, "sugeridos.buscar", {});
-  revalidatePath("/curar/sugeridos");
-  return { ok: true, mensaje: "Buscando. En unos minutos aparecen las propuestas nuevas acá — recargá la página." };
-}
+// `buscarAhora` se mudó a `operar/actions.ts`, al lado de `correrAhora`: aprobar un sugerido es
+// curar, pero disparar una máquina es operar. El botón se importa desde `components/`.

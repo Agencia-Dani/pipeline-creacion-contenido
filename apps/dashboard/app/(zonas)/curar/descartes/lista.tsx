@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Copiar } from "@/components/ui/copiar";
+import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { VEREDICTOS, type DescarteFeed, type Veredicto } from "@/domain/feed";
 import { auditarDescarte } from "./actions";
@@ -77,9 +79,15 @@ export function Lista({ descartes }: { descartes: DescarteFeed[] }) {
               <button type="button" onClick={() => setAbiertoId(d.id)} className="flex gap-3 p-3 text-left">
                 <div className="size-16 shrink-0 overflow-hidden rounded bg-muted">
                   {d.thumbnail && (
-                    // <img> a propósito: la URL vence a las ~2 h (ver lib/candidatos.ts).
+                    // Por /api/miniatura, igual que el feed: el CDN de Instagram bloquea el
+                    // hotlink con `cross-origin-resource-policy` (ver app/api/miniatura/route.ts).
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={d.thumbnail} alt="" loading="lazy" className="size-full object-cover" />
+                    <img
+                      src={`/api/miniatura?u=${encodeURIComponent(d.thumbnail)}`}
+                      alt=""
+                      loading="lazy"
+                      className="size-full object-cover"
+                    />
                   )}
                 </div>
                 <div className="min-w-0 space-y-1">
@@ -131,67 +139,51 @@ export function Lista({ descartes }: { descartes: DescarteFeed[] }) {
 }
 
 function Detalle({ descarte, onCerrar }: { descarte: DescarteFeed | null; onCerrar: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialogo = ref.current;
-    if (!dialogo) return;
-    if (descarte && !dialogo.open) dialogo.showModal();
-    if (!descarte && dialogo.open) dialogo.close();
-  }, [descarte]);
-
   return (
-    <dialog
-      ref={ref}
-      onClose={onCerrar}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto max-h-[85vh] w-[min(46rem,92vw)] rounded-lg border bg-card p-0 text-card-foreground backdrop:bg-black/50"
+    <Modal
+      abierto={descarte !== null}
+      onCerrar={onCerrar}
+      titulo={descarte?.titulo ?? ""}
+      subtitulo={
+        descarte && (
+          <>
+            {descarte.proyecto || "(sin proyecto)"}
+            {descarte.referente && ` · ${descarte.referente}`}
+          </>
+        )
+      }
     >
       {descarte && (
-        <div className="flex max-h-[85vh] flex-col">
-          <header className="flex items-start justify-between gap-4 border-b p-4">
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold leading-snug">{descarte.titulo}</h2>
-              <p className="text-xs text-muted-foreground">
-                {descarte.proyecto || "(sin proyecto)"}
-                {descarte.referente && ` · ${descarte.referente}`}
-              </p>
+        <>
+          {descarte.urlReferente && (
+            <a
+              href={descarte.urlReferente}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm underline underline-offset-4"
+            >
+              ver el video ↗
+            </a>
+          )}
+          {descarte.relevanciaRazon && (
+            <div className="rounded-md bg-muted/50 p-3">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Por qué el filtro lo mató</p>
+              <p className="text-sm">{descarte.relevanciaRazon}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => ref.current?.close()} aria-label="Cerrar">
-              ✕
-            </Button>
-          </header>
-
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-            {descarte.urlReferente && (
-              <a
-                href={descarte.urlReferente}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm underline underline-offset-4"
-              >
-                ver el video ↗
-              </a>
-            )}
-            {descarte.relevanciaRazon && (
-              <div className="rounded-md bg-muted/50 p-3">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Por qué el filtro lo mató</p>
-                <p className="text-sm">{descarte.relevanciaRazon}</p>
-              </div>
-            )}
-            <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">
+          )}
+          <div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">
                 Lo que se dice en el video (transcripción literal)
               </p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {descarte.script ?? "Sin transcripción."}
-              </p>
+              <Copiar texto={descarte.script} etiqueta="Copiar guion" />
             </div>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {descarte.script ?? "Sin transcripción."}
+            </p>
           </div>
-        </div>
+        </>
       )}
-    </dialog>
+    </Modal>
   );
 }

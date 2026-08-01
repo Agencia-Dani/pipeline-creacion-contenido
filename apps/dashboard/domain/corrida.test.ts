@@ -18,7 +18,7 @@ const voces = [
 ];
 
 describe("armarVistaOperar", () => {
-  it("agrupa por voz y resuelve N contra el default (vacío y 0 usan el global)", () => {
+  it("agrupa por voz; una fila vieja sin N muestra el número que el motor va a usar", () => {
     const vista = armarVistaOperar(
       voces,
       [
@@ -31,13 +31,70 @@ describe("armarVistaOperar", () => {
     assert.equal(vista.porVoz.length, 2);
     const [cora, alma] = vista.porVoz;
     assert.deepEqual(
-      cora.proyectos.map((p) => [p.nombre, p.n, p.nEsDefault]),
+      cora.proyectos.map((p) => [p.nombre, p.pide]),
       [
-        ["Trading Psychology", 20, false],
-        ["Trading fast tips", 100, true],
+        ["Trading Psychology", 20],
+        ["Trading fast tips", 100],
       ],
     );
-    assert.deepEqual(alma.proyectos.map((p) => [p.n, p.nEsDefault]), [[100, true]]);
+    assert.deepEqual(alma.proyectos.map((p) => p.pide), [100]);
+  });
+
+  it("cruza el pedido con las cuentas que lo alimentan y con lo que entregó la última corrida", () => {
+    const vista = armarVistaOperar(
+      [{ id: "vozA", nombre: "Cora" }],
+      [
+        { id: "p1", nombre: "Comunicación de parejas", n: 15, vozId: "vozA" },
+        { id: "p2", nombre: "Sin historia", n: 40, vozId: "vozA" },
+      ],
+      100,
+      new Map([["p1", 3]]),
+      [
+        {
+          nombre: "Comunicación de parejas",
+          nObjetivo: 15,
+          evaluados: 1,
+          sinGuion: 0,
+          gatePass: 1,
+          tasaGate: 1,
+          entregados: 1,
+          razonFaltante: "supply",
+        },
+      ],
+    );
+    const [parejas, sinHistoria] = vista.porVoz[0].proyectos;
+    assert.deepEqual(
+      [parejas.pide, parejas.cuentas, parejas.ultimaEntrega, parejas.razonFaltante],
+      [15, 3, 1, "supply"],
+    );
+    // Sin fila en el embudo, la entrega es `null` (todavía no hay historia) y NO 0: un cero
+    // diría "corrió y no trajo nada", que es una afirmación distinta y podría ser falsa.
+    assert.deepEqual(
+      [sinHistoria.pide, sinHistoria.cuentas, sinHistoria.ultimaEntrega, sinHistoria.razonFaltante],
+      [40, 0, null, null],
+    );
+  });
+
+  it("el join con el embudo va por nombre: un proyecto renombrado queda sin historia, no con la ajena", () => {
+    const vista = armarVistaOperar(
+      [{ id: "vozA", nombre: "Cora" }],
+      [{ id: "p1", nombre: "Nombre nuevo", n: 15, vozId: "vozA" }],
+      100,
+      new Map(),
+      [
+        {
+          nombre: "Nombre viejo",
+          nObjetivo: 15,
+          evaluados: 80,
+          sinGuion: 0,
+          gatePass: 60,
+          tasaGate: 0.75,
+          entregados: 49,
+          razonFaltante: null,
+        },
+      ],
+    );
+    assert.equal(vista.porVoz[0].proyectos[0].ultimaEntrega, null);
   });
 
   it("un proyecto de voz apagada (o sin voz) NO corre y se reporta", () => {

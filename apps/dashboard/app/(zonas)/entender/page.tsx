@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { exigirZona } from "@/lib/auth";
+import { leerProyectos } from "@/lib/proyectos";
 import {
   leerAuditoria,
   leerCalidad,
@@ -23,14 +24,23 @@ export default async function EntenderPage() {
   const esDev = usuario.rol === "dev";
 
   // `allSettled` y no `all`: una vista que falle apaga su tarjeta, no la página entera.
-  const [calidad, embudo, auditoria, descubrimiento, costos, eventos] = await Promise.allSettled([
-    leerCalidad(),
-    leerEmbudo(),
-    leerAuditoria(),
-    leerDescubrimiento(),
-    leerCostos(),
-    esDev ? leerEventos() : Promise.resolve([]),
-  ]);
+  const [calidad, embudo, auditoria, descubrimiento, costos, eventos, proyectos] =
+    await Promise.allSettled([
+      leerCalidad(),
+      leerEmbudo(),
+      leerAuditoria(),
+      leerDescubrimiento(),
+      leerCostos(),
+      esDev ? leerEventos() : Promise.resolve([]),
+      leerProyectos(),
+    ]);
+
+  // Si no se pueden leer los proyectos, la card cae a mostrar solo los que tienen datos (el
+  // comportamiento viejo). Se degrada, no se apaga: la mitad medida sigue sirviendo.
+  const activos =
+    proyectos.status === "fulfilled"
+      ? proyectos.value.filter((p) => p.activo).map((p) => p.nombre)
+      : [];
 
   return (
     <div className="space-y-6">
@@ -52,7 +62,7 @@ export default async function EntenderPage() {
         </CardHeader>
         <CardContent>
           {calidad.status === "fulfilled" ? (
-            <Calidad filas={calidad.value} />
+            <Calidad filas={calidad.value} activos={activos} />
           ) : (
             <ErrorLectura que="la calidad por proyecto" />
           )}

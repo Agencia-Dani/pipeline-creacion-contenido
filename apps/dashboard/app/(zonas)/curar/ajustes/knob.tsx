@@ -58,12 +58,14 @@ export function Knob({
       <div className="flex shrink-0 items-center gap-2">
         {tipo === "toggle" ? (
           // 1/0 en la base, Sí/No en la pantalla: el equipo no tiene por qué saber que es un número.
+          // `h-8 w-32` es exactamente la caja del <Input> de al lado: con 18 knobs, dos tamaños
+          // distintos convierten la columna de valores en un escalón y se lee como un error.
           <select
             id={id}
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             disabled={enviando}
-            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+            className="h-8 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
           >
             <option value="1">Sí</option>
             <option value="0">No</option>

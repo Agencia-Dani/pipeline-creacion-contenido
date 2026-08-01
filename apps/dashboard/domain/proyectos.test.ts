@@ -18,7 +18,7 @@ const formProyecto = (extra: Record<string, unknown> = {}) => ({
   criterios_relevancia: "SÍ: historias con giro. NO: tutoriales.",
   vozId: "voz-1",
   activo: true,
-  n: "",
+  n: "15",
   ...extra,
 });
 
@@ -58,20 +58,25 @@ test("una voz que no existe se rechaza, no se filtra en silencio", () => {
   assert.equal(r.ok, false);
 });
 
-test("N vacío y N=0 son el mismo dato: null, o sea el default global (ADR-024)", () => {
-  for (const n of ["", "0", 0, null, undefined]) {
+// El N dejó de tener default silencioso. Antes, vacío o 0 significaban "usá el global
+// `Candidatos por corrida`", y ese tercer número escondido era justo lo que hacía imposible
+// responder "¿cuántos videos trae este proyecto?" mirando el proyecto.
+test("un proyecto sin N no se guarda: ya no hay default global al que caer", () => {
+  for (const n of ["", "   ", null, undefined]) {
     const r = validarProyecto(formProyecto({ n }), VOCES);
-    assert.equal(r.ok, true, `n=${JSON.stringify(n)}`);
-    assert.equal(r.ok && r.valor.n, null, `n=${JSON.stringify(n)}`);
+    assert.equal(r.ok, false, `n=${JSON.stringify(n)}`);
+    assert.match(r.ok === false ? r.error : "", /cuántos videos/i);
   }
 });
 
-test("N tiene que ser un entero no negativo", () => {
-  for (const n of ["-5", "3.5", "muchos"]) {
-    assert.equal(validarProyecto(formProyecto({ n }), VOCES).ok, false, `n=${n}`);
+test("N tiene que ser un entero de 1 para arriba (0 ya no significa «el global»)", () => {
+  for (const n of ["0", 0, "-5", "3.5", "muchos"]) {
+    assert.equal(validarProyecto(formProyecto({ n }), VOCES).ok, false, `n=${JSON.stringify(n)}`);
   }
   const r = validarProyecto(formProyecto({ n: "30" }), VOCES);
   assert.equal(r.ok && r.valor.n, 30);
+  // Y llega como número desde un <input>, que siempre manda string.
+  assert.equal(validarProyecto(formProyecto({ n: 40 }), VOCES).ok, true);
 });
 
 // ── La forma del contrato ────────────────────────────────────────────────────
