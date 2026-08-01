@@ -21,10 +21,17 @@
 
 ## 0. Lo que SÍ y lo que NO (léanlo primero, es el resumen de todo)
 
+> 🆕 **La pantalla cambió el 2026-08-01, y en todas las pantallas manda la misma regla:
+> la lista muestra un resumen, y para ver el detalle o editar algo se toca la fila y se abre.**
+> Para crear (una voz, un proyecto, una cuenta) hay un **botón arriba** de la página. Lo único que
+> se cambia sin abrir nada es el interruptor de prendido/apagado, que guarda solo al tocarlo.
+
 **Lo que SÍ hacen ustedes:**
-- ✅ Entrar a **Airtable** todos los días (o cada 2-3 días) y **calificar** los videos que llegaron.
-- ✅ Armar la corrida a su medida: elegir **Voz → Proyectos → N** (cuántos videos por tema) y **pedir
-  una corrida a demanda** cuando la necesiten (§3.1) — ya no dependen del lunes.
+- ✅ Entrar al **cockpit** todos los días (o cada 2-3 días) y **calificar** los videos que llegaron,
+  en `Curar → Feed`. En el feed pueden **plegar un proyecto entero** tocando su título, para
+  trabajar de a un tema por vez. Y al abrir un video hay un botón **«Copiar guion»**.
+- ✅ Armar la corrida a su medida: elegir **Voz → Proyectos → cuántos videos pide cada uno** y
+  **pedir una corrida a demanda** cuando la necesiten (§3.1) — ya no dependen del lunes.
 - ✅ Poner en cada candidato dos cosas: la **calificación** (🔥/👍/👎) y el **estado** (aprobado/descartado).
 - ✅ Calificar **también lo que descartan** (👎 + descartado): así la máquina aprende y mejora.
 - ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**), en
@@ -113,20 +120,33 @@ Lo que califican desaparece de pendientes y queda archivado.
 
 ### 3.1 Corridas a demanda (nuevo)
 
-Ya no hay que esperar al lunes. El flujo es como elegir en Netflix: dentro de una **Voz** prendida,
-prenden los **Proyectos** que quieren, le ponen a cada uno su **`N`** (cuántos videos quieren de ese
-tema, §5.2), y se dispara una corrida. En unos ~40-60 minutos los videos aparecen en el Feed.
+Ya no hay que esperar al lunes. Dentro de una **Voz** prendida, prenden los **Proyectos** que
+quieren, le ponen a cada uno **cuántos videos pide** (§5.2), y aprietan **▶ Correr ahora** en
+`Operar`. En unos ~40-60 minutos los videos aparecen en el Feed.
 
-Cómo se dispara **hoy**: se la piden al equipo técnico (es un click en la sala de máquinas; si en
-algún momento les enseñamos, es un solo botón — nada más de ahí se toca). Más adelante va a haber un
-botón propio en la herramienta nueva que estamos construyendo.
+En esa misma pantalla, arriba del botón, está **qué va a correr** — una línea por proyecto:
+
+> `Comunicación de parejas — pide 15 · 3 cuentas · la última corrida entregó 1`
+
+**Los tres números son reales, no promesas.** Vale la pena entender qué dice cada uno:
+- **pide 15** — lo que ustedes le pidieron a ese proyecto. Es un **techo**: nunca va a traer más.
+- **3 cuentas** — cuántos referentes lo alimentan. Es la palanca: de acá sale todo lo que puede
+  traer.
+- **la última corrida entregó 1** — lo que pasó de verdad la vez anterior.
+
+Si el tercero es más chico que el primero, la pantalla les dice **por qué** y **qué hacer** (casi
+siempre: sumar cuentas en `Curar → Referentes`). No es una falla: un proyecto con 3 cuentas no puede
+entregar 15 videos nuevos por semana aunque los pidan, porque el sistema **nunca repite un video que
+ya les mostró**. Más cuentas = más para elegir.
+
+Y en la misma página está **Buscar cuentas nuevas**, que es la otra máquina (§8.1).
 
 Dos reglas que evitan sorpresas:
 - **Una corrida a la vez.** Si piden una mientras otra está corriendo, la segunda no arranca (no es
-  un error: es a propósito, para no pagar doble). Esperen a que termine y pidan de nuevo.
-- **Antes de pedir, dejen la selección lista:** Voz prendida, Proyectos que quieren en `activo`, la
-  `N` puesta, y los Referentes de esos proyectos activos. La corrida procesa **todos** los proyectos
-  activos, cada uno hasta su N.
+  un error: es a propósito, para no pagar doble). El botón se deshabilita solo.
+- **Antes de apretar, dejen la selección lista:** Voz prendida, Proyectos que quieren en `activo`,
+  su número puesto, y los Referentes de esos proyectos activos. La corrida procesa **todos** los
+  proyectos activos.
 
 ---
 
@@ -254,20 +274,23 @@ con los de otro.
 | `criterios_relevancia` | **qué hace relevante a un video para este tema, y qué NO.** Es el campo más importante: la máquina lo lee para juzgar si un video sirve de verdad o es viral-vacío. Mientras más concreto, menos basura les llega (ejemplo abajo) |
 | `voz_default` | la Voz que crearon en 5.1 (se elige de una lista). **Una sola voz por proyecto** |
 | `activo` | ✅ marcado para que el proyecto entre en las búsquedas. Sin marcar = pausado. (Ojo: si la **Voz** está apagada, el proyecto no corre aunque esté activo — §5.1) |
-| `N` | **cuántos videos quieren de este tema por corrida** (ej: 20). Vacío = usa el global "Candidatos por corrida" (§5.5). Es POR proyecto: pueden pedir 20 de un tema y 10 de otro en la misma corrida |
+| **Videos por corrida** | **cuántos videos quieren de este tema** (ej: 20). **Obligatorio** — ya no se puede dejar vacío, porque ya no hay ningún global al que caer. Es POR proyecto: pueden pedir 20 de un tema y 10 de otro en la misma corrida, y es **el único número que gobierna la cantidad** |
 
-> **N es un máximo, no una promesa.** Si el filtro solo encuentra 12 videos que de verdad pegan con el
-> tema, llegan 12 — eso es el filtro trabajando, no un error. Si un proyecto entrega menos que su N
-> semana tras semana, la palanca es **darle más fuentes** (Referentes, §5.3), no subir la N.
+> **Es un máximo, no una promesa, y la pantalla se los dice.** Si el filtro solo encuentra 12 videos
+> que de verdad pegan con el tema, llegan 12 — eso es el filtro trabajando, no un error. Por eso
+> `Operar` muestra, al lado de lo que pidieron, **lo que entregó la última corrida de verdad**
+> (§3.1): así no tienen que adivinar. Si un proyecto entrega menos semana tras semana, la palanca es
+> casi siempre **darle más fuentes** (Referentes, §5.3), no subir el número.
 
 > **🔴 Regla de oro: un Proyecto activo necesita fuentes.** Un proyecto marcado `activo` pero **sin ningún
 > Referente** ligado **no trae absolutamente nada** — es un proyecto muerto que solo ocupa lugar. Antes de
 > activar un proyecto, asegúrense de que tenga **al menos una** cuenta en Referentes. (Pasó en la primera
 > corrida real: un proyecto quedó activo sin fuentes y no produjo nada.)
 
-> **Cambio de config:** `dias_recencia`, `top_n` y los checkboxes de canal **ya no viven en el Proyecto**.
-> Ahora los días de búsqueda, cuántos videos por corrida y los resultados por cuenta son **globales** para
-> todos los proyectos, en la **página Configuración Global** (§5.5).
+> **Dónde se toca (2026-08-01):** en `Curar → Voces y proyectos`, **tocan el nombre del proyecto y se
+> abre su ficha** con todo: nombre, voz, videos por corrida, descripción y criterios. Desde la lista
+> solo se prende y se apaga. Los días de búsqueda y los resultados por cuenta **ya no los ven**:
+> quedaron fijos, para que el único número que tengan que pensar sea el de cada proyecto (§5.5).
 
 > **Cómo escribir buenos `criterios_relevancia` (esto define la calidad de lo que llega).** Digan qué sirve
 > y qué no, concreto:
@@ -305,15 +328,23 @@ calidad** (cuentas que ustedes eligieron a mano).
 | Rastrear | destildá para dejar de traer sus videos, sin perder la cuenta |
 | Notas | por qué la agregaron (opcional) |
 
+> **Cómo se toca (2026-08-01).** La lista muestra una línea por cuenta con **a qué proyectos
+> alimenta** escrito al lado — ya no hay una grilla de casillas por fila. Para cambiar los proyectos
+> de una cuenta, **tocan la cuenta y se abre su ficha**. Para agregar una, el botón **«Agregar
+> cuenta»** está arriba de la página. Lo único que se cambia desde la lista es **Rastrear**, que
+> guarda solo al tocarlo.
+
 > **La máquina califica sus cuentas.** Al lado de cada una ven tres números que ella misma calcula:
 > qué proporción de sus videos **pasa el filtro**, qué proporción terminan **aprobando** ustedes, y
 > **sobre cuántos videos** salen esas cuentas (con pocos, no saquen conclusiones). Las que traen
 > bastante y pasan poco aparecen arriba de todo, en **A revisar**. **La máquina nunca desactiva una
 > cuenta sola** — solo la señala; podarla es decisión de ustedes.
 >
-> **Cuentas nuevas: `Curar → Sugeridos`.** Ahí caen las que propone el buscador cada lunes, con la
-> razón por la que las propone. **Aprobar una la suma al banco y empieza a traer videos en la
-> corrida siguiente** (§8.1); descartarla es definitivo.
+> **Cuentas nuevas: `Curar → Sugeridos`.** Ahí caen las que propone el buscador, con la razón por la
+> que las propone. **Aprobar una la suma al banco y empieza a traer videos en la corrida siguiente**
+> (§8.1); descartarla es definitivo. El buscador **ya no corre solo los lunes**: hay un botón
+> («Buscar cuentas nuevas», en `Operar` y en la misma página de Sugeridos) y conviene apretarlo
+> recién cuando resolvieron lo que ya está esperando.
 >
 > **🟠 Falta sembrar TikTok.** Hoy casi todos los Referentes cargados son de Instagram. Para que la máquina
 > traiga videos de TikTok hacen falta **dos cosas**: cargar cuentas de TikTok acá **y** que el toggle
@@ -362,14 +393,16 @@ cada columna que van a ver:
 La máquina ya viene con valores por defecto razonables. **No hace falta tocar nada para arrancar.** Es una
 lista de "perilla = valor" en español claro.
 
-Las perillas que sí van a querer tocar (las mismas para todos los proyectos):
+> 🔢 **Cuántos videos trae cada proyecto NO se decide acá (2026-08-01).** Antes había tres perillas
+> que movían lo mismo —*Candidatos por corrida*, *Días de recencia* y *Resultados por cuenta de
+> referente*— y ninguna decía cuál mandaba. **Las tres desaparecieron de su pantalla.** Ahora hay
+> **un solo número y está en el proyecto**: `Curar → Voces y proyectos → tocá el proyecto →
+> "Videos por corrida"`. Lo que pongan ahí es lo que el proyecto pide, y no cae contra ningún
+> default escondido. La ventana de búsqueda quedó fija y ancha (100 días): con el sistema
+> anti-repetidos nunca les va a traer dos veces el mismo video, así que achicarla solo servía para
+> traer menos.
 
-**Volumen y ventana:**
-- **Candidatos por corrida** — el valor **por defecto** de la `N` de cada proyecto: se usa para los
-  proyectos que no tienen `N` propia (§5.2). Ya no es un total de la corrida.
-- **Días de recencia** — qué tan atrás busca (ej: 7 para el día a día; más alto la primera vez o para un
-  backfill).
-- **Resultados por cuenta de referente** — cuántos videos baja por cada cuenta de Referentes (más = más costo).
+Las perillas que sí van a querer tocar (las mismas para todos los proyectos):
 
 **Traer videos — los dos ejes del motor semanal (1 = prendido / 0 = apagado; por defecto ambos prendidos):**
 - **Buscar por referentes en Instagram** — trae videos de las cuentas de IG en Referentes.
@@ -539,13 +572,20 @@ más/mejor → curen esa tabla.**
 
 ### 8.1 El buscador de cuentas nuevas (`Curar → Sugeridos`)
 
-Para que la lista de Referentes no se agote, hay un segundo robot que corre **los lunes a la mañana**
-y les propone cuentas nuevas. Cómo las encuentra: toma sus referentes que **mejor están funcionando**
-(los que más aprueban ustedes), busca cuentas **parecidas** en Instagram **y en TikTok**, filtra las
-que ya conocen y las que no pegan con los temas, y les deja **hasta 10 por semana** en el cockpit,
-en **Curar → Sugeridos**.
+Para que la lista de Referentes no se agote, hay un segundo robot que les propone cuentas nuevas.
+Cómo las encuentra: toma sus referentes que **mejor están funcionando** (los que más aprueban
+ustedes), busca cuentas **parecidas** en Instagram **y en TikTok**, filtra las que ya conocen y las
+que no pegan con los temas, y las deja en **Curar → Sugeridos**.
 
-Cada propuesta llega con todo para decidir sin salir de la pantalla:
+> **Ya no corre solo los lunes (2026-08-01): ahora lo aprietan ustedes.** El botón **«Buscar cuentas
+> nuevas»** está en `Operar` y también arriba de la bandeja de Sugeridos. El cambio es por dos
+> razones: producía más rápido de lo que se consume (llegó a haber 8 propuestas sin resolver), y
+> **buscar después de que ustedes terminaron de decidir usa una señal más fresca** — porque las
+> semillas salen de lo que aprobaron. Conviene apretarlo con la bandeja vacía, no con cosas
+> esperando. Cuesta créditos, así que pide confirmación.
+
+Cada propuesta llega con lo justo para decidir en la lista, y **si tocan la cuenta se abre la ficha**
+con la razón completa, la bio y los proyectos:
 
 | Qué ven | Qué es |
 |---|---|
@@ -554,11 +594,11 @@ Cada propuesta llega con todo para decidir sin salir de la pantalla:
 | La razón | **por qué** la propone, en español — léanla primero, decide la mayoría de los casos |
 | Bio y seguidores | contexto de la cuenta |
 | Quién la recomendó | cuáles de SUS referentes la "recomendaron" |
-| Los proyectos | vienen premarcados los que sugiere; **cámbienlos antes de aprobar** si va mejor en otro |
+| Los proyectos | dice **«entraría a: …»** con los que el buscador ya eligió. Si están bien, **aprueban de un click sin abrir nada**; si quieren cambiarlos, tocan la cuenta y se abre la ficha |
 
 **Su trabajo (una vez por semana, 5 minutos):** revisar las que están pendientes y decidir:
-- **Aprobar y empezar a rastrear** — la quieren. **No hay que hacer nada más:** queda en el banco de
-  Referentes, activa y con la razón en las notas, y empieza a traer videos en la corrida siguiente.
+- **Aprobar** — la quieren. **No hay que hacer nada más:** queda en el banco de Referentes, activa y
+  con la razón en las notas, y empieza a traer videos en la corrida siguiente.
 - **Descartar** — no va. **Ojo: es definitivo** — esa cuenta no se les vuelve a proponer nunca
   (si se arrepienten, siempre pueden agregarla a mano en `Curar → Referentes`).
 

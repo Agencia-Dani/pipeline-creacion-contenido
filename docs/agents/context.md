@@ -46,6 +46,19 @@ Un video ya transcrito y traducido al español, esperando que el equipo lo calif
 La unidad que el equipo cura es la dupla **(video, proyecto)**: un mismo video relevante para dos
 proyectos es dos candidatos, cada uno con su voz, su heat-score y su juicio de relevancia (ADR-013).
 
+**Videos por corrida** (el `N` del Proyecto):
+Cuántos candidatos **pide** un Proyecto cada vez que corre el motor. Es la **única** perilla de
+cantidad que ve el equipo, y es obligatoria (ADR-038; antes vacío significaba "usá el global", y
+había otras dos que movían lo mismo).
+
+⚠️ **Es un techo, no un contrato.** El motor nunca entrega más que `N` —el corte de `Armar
+candidato` es exacto— pero entregar menos es lo normal: la entrega es *best-effort sobre el supply
+real*, y el supply es `referentes activos × resultados por cuenta`, menos lo que mata el gate, menos
+lo que el dedup ya mostró. Por eso **la pantalla nunca dice «hasta N»**: dice lo que se pidió y, al
+lado, lo que la última corrida entregó de verdad. *Decir el número solo sería prometer algo que la
+máquina no garantiza.* Cuando queda corto, la palanca casi siempre es **más referentes**, no un `N`
+más alto.
+
 **Heat-score**:
 El número con que el motor ordena los candidatos de caliente a frío. Combina la relevancia/calidad
 del contenido (juicio semántico contra los criterios del Proyecto ⊕ la Voz) con su desempeño objetivo

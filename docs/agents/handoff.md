@@ -22,6 +22,56 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🟢 **REVISIÓN UI/UX DE LA PRIMERA VERSIÓN LIVE — EN PRODUCCIÓN 2026-08-01 (commit `dce25a3`).**
+> 10 observaciones de Mani sobre el cockpit recién deployado. Tres resultaron ser **bugs, no
+> preferencias**, y una obligó a decir algo incómodo sobre la máquina. Cero re-imports de n8n, cero
+> migraciones nuevas: todo en `apps/dashboard/` + un `UPDATE` de datos + un bucket de Storage.
+> Salieron 3 ADRs: [037](../adr/ADR-037-miniaturas-por-proxy-propio.md) ·
+> [038](../adr/ADR-038-una-sola-perilla-de-cantidad.md) ·
+> [039](../adr/ADR-039-la-lista-resume-el-record-se-abre.md).
+>
+> **Los tres hallazgos que no eran lo que parecían:**
+> 1. **Las miniaturas no fallaban por el expiry.** Los CDNs de Meta mandan
+>    `cross-origin-resource-policy: same-origin`: el browser **bloquea siempre** un `<img>` directo,
+>    con la URL fresca o vencida. `curl` daba 200 y por eso la hipótesis del handoff anterior apuntó
+>    al lado equivocado — CORP no lo aplica curl, lo aplica el browser. Arreglado con
+>    `/api/miniatura` (ADR-037). *El expiry también existía y se midió: **~5 días**, menos que la
+>    cadencia semanal — por eso el proxy además cachea en Storage.*
+> 2. **El botón del buscador no estaba escondido: no lo renderizaba nadie.** `BotonBuscar` quedó
+>    escrito y sin importar desde el commit `270d107` que lo creó. Ahora está en Operar (y en
+>    Sugeridos), y `buscarAhora` se mudó a `operar/actions.ts` al lado de `correrAhora` — la mezcla
+>    de "aprobar es curar" con "disparar es operar" fue lo que dejó el botón huérfano.
+> 3. **Las barras del embudo se salían porque no es un embudo.** `asignados` (1585) > `colectados`
+>    (700): del fan-out en adelante se cuentan filas `(video × proyecto)`, no videos. Ahora son
+>    **dos embudos con su propia base**, más clamp y `overflow-hidden`.
+>
+> **Y lo que hay que saber antes de tocar la cantidad de videos ([ADR-038](../adr/ADR-038-una-sola-perilla-de-cantidad.md)):**
+> los 3 knobs globales (`Días de recencia`, `Resultados por cuenta de referente`, `Candidatos por
+> corrida`) pasaron a `visibilidad = 'dev'` y el `N` del proyecto es obligatorio y único.
+> 🚨 **Se escondieron, NO se borraron, y no hay que "limpiarlos" después:** `Armar plan de corrida`
+> resuelve `pick('dias_recencia', …)` con `ajustes > Config`, y el `Config` del motor tiene
+> `dias_recencia = 7`. Borrar la fila sin re-importar **tira la recencia de 100 a 7 en silencio** —
+> la quinta de la familia. `visibilidad` es campo de UI, no del contrato: la fachada sigue sirviendo
+> los **18** ajustes (verificado contra prod).
+>
+> **Verificado en producción tras el deploy:** `/operar` sin la palabra «hasta», con
+> `pide N · X cuentas · la última entregó Y` por proyecto · `/api/miniatura` devuelve la imagen
+> (200, 1080×1920, redirigiendo a Storage), **307 sin sesión** y **400 al host fuera de la
+> allowlist** (el anti-SSRF) · fachada intacta en los dos ámbitos · `npm run validate` 1517 checks ·
+> 116 tests.
+>
+> ### 🟠 Lo que queda, y es de Mani
+> **1. `Resultados por cuenta de referente` sigue en 20; el handoff anterior pedía 40.** Ahora es
+> dev-only, así que la pantalla ya no se lo va a recordar. **Es la palanca más barata** para que los
+> proyectos se acerquen a su número: con 20, un proyecto de 3 referentes mira 60 videos crudos y
+> entrega ~10 contra un N de 15.
+> **2. Avisarle al equipo que la pantalla cambió.** [El onboarding](../onboarding-equipo-redes.md)
+> ya está reescrito (§0, §3.1, §5.2, §5.3, §5.5, §8.1). Lo que no puede faltar: *la lista resume y
+> el record se abre tocando la fila*, *crear es un botón arriba*, y *el número de videos ahora vive
+> en el proyecto y es el único que manda*.
+> **3. El pronóstico honesto va a mostrar que varios proyectos no llegan.** No es un bug de la
+> pantalla: es el estado real, que antes tapaba la palabra «hasta».
+
 > 🟢 **D7 ESTÁ EN PRODUCCIÓN — 2026-08-01. Airtable salió del sistema.** Mergeado a `main`,
 > deployado, **migración `013` aplicada**, dato migrado y **los 3 workflows re-importados y
 > publicados**. El hecho-cuando mecánico está cumplido: `grep -c api.airtable.com
@@ -502,6 +552,17 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-01 (cierre 78) — La primera revisión de UI/UX sobre el cockpit live: 10 observaciones, 3 bugs, 3 ADRs (Claude, pedido de Mani).**
+**Qué se hizo:** Mani usó la primera versión live y trajo 10 observaciones de layout/UX pensando en Majo y Jero. Se ejecutaron las 10 en un solo pase, sin tocar `Workflows/` ni `core/`: cero re-imports, cero migraciones. Commit `dce25a3`, deployado y verificado contra prod.
+**Lo que enseñó la sesión, y es el patrón: tres de las diez "preferencias" eran bugs, y ninguno se veía como bug.**
+· **«Todos los videos salen sin thumbnail»** → no era el expiry, que es lo que decía la hipótesis del cierre 77. Los CDNs de Meta mandan `cross-origin-resource-policy: same-origin` y **el browser bloquea el `<img>` cross-origin siempre**. La hipótesis se había verificado con `curl`, que da 200 porque **curl no aplica CORP**: la herramienta con la que medimos era ciega justo a la causa. *Corolario: para verificar algo que solo hace el browser, hay que medirlo en un browser.* (El expiry existía igual y se midió: **~5 días** contra una cadencia de 7, y por eso el proxy además cachea en Storage — ADR-037.)
+· **«No veo el botón del buscador»** → `BotonBuscar` estaba escrito y **no lo importaba nadie** desde el commit `270d107` que lo creó. Un `grep` de una línea lo dijo. La causa de fondo es de ubicación: el componente y su acción vivían en `curar/sugeridos/`, mezclando "aprobar es curar" con "disparar es operar", y nadie lo montó. Ahora `buscarAhora` está al lado de `correrAhora`.
+· **«Las barras negras se salen»** → se salían porque **no es un embudo**: `asignados` (1585) > `colectados` (700) porque del fan-out al gate se cuentan filas `(video × proyecto)`, no videos. Se partió en dos embudos con su propia base. *El CSS estaba gritando un error del modelo, no de estilo.*
+**Y la observación que obligó a discutir en vez de obedecer (ADR-038):** Mani pidió que Operar dijera «trae 15» en vez de «hasta 15», *"que sea un dato confiable"*. Pero `N` es un techo duro y la entrega es best-effort: las 3 corridas con `por_proyecto` dicen `razon_faltante: supply` en **todos** los proyectos. Cambiar la etiqueta habría convertido un dato honesto en una promesa incumplible. Se resolvió mostrando **tres números medidos** —`pide N · X cuentas · la última entregó Y`— con la razón y la palanca. *Se descartó un pronóstico calculado al mirar los datos: hay 3 corridas y son incomparables (49 · 4 · 1 para el mismo proyecto). Una mediana sobre eso es precisión falsa.*
+**La trampa que se esquivó:** para dejar un solo knob de cantidad, los 3 globales pasaron a `visibilidad = 'dev'` en vez de borrarse. Borrar la fila de `Días de recencia` **habría tirado la recencia de 100 a 7 en silencio**, porque `Armar plan de corrida` cae al `Config` del motor (que tiene 7). Habría sido la quinta de la familia "no falla, sale verde, deja un número peor".
+**Verificación:** 116 tests · typecheck · build · validador (1517 checks). Y contra **producción**: `/operar` sin la palabra «hasta» · `/api/miniatura` 200 con la imagen (1080×1920, redirigiendo a Storage), **307 sin sesión**, **400 al host fuera de la allowlist** · fachada intacta (3 voces · 15 referentes · **18 ajustes**, recencia 100 llegando al motor) · en el browser, las 2 miniaturas vivas renderizando y ninguna barra excediendo su riel.
+**Lo que queda:** subir `Resultados por cuenta de referente` a 40 (sigue en 20, y ahora es dev-only así que la pantalla no lo recuerda) y avisarle al equipo que la pantalla cambió — el onboarding ya está reescrito.
 
 **2026-08-01 (cierre 77) — La corrida que estrenó las escrituras, y el paso 3: D7 cierra (Claude, pedido de Mani).**
 **Qué se hizo:** Mani disparó la corrida que faltaba y con eso las escrituras de D7 dejaron de ser teoría; después salió el **paso 3 del expand/contract** a producción (commit `2260ec0`). D7 está cerrado del lado del código.

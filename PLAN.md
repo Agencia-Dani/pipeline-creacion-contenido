@@ -196,6 +196,11 @@ afuera (humano en el loop por diseño).
 | — | Airtable como cockpit del equipo de redes (revisa D4) | [ADR-008](./docs/adr/ADR-008-airtable-cockpit-equipo-redes.md) |
 | — | Scripts literales + aprendizaje en el scoring (revisa ADR-008) | [ADR-009](./docs/adr/ADR-009-scripts-literales-y-aprendizaje-en-scoring.md) |
 
+> **Esta tabla cubre solo las decisiones fundacionales (001–009).** De ADR-010 en adelante el índice
+> completo y al día vive en **[`docs/adr/README.md`](./docs/adr/README.md)**, que es su único dueño —
+> mantener dos listas de lo mismo garantiza que una de las dos mienta (y esta ya venía mintiendo por
+> omisión: van 39). Acá quedan las que fijaron la forma del sistema.
+
 ### 3.2 Abiertas (bloquean lo que se indica)
 
 - [ ] **Presupuesto mensual definitivo** — rango tentativo $10–30/mes; el fijo proyectado es

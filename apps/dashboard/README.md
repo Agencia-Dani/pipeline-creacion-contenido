@@ -13,20 +13,34 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
   [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed.
   De qué almacenamiento sale cada dominio lo decide `lib/config.ts` — la costura de los cortes de
-  D5. Con el corte 3/4 los **cuatro** dominios del contrato salen de Postgres; lo único que sigue
-  viniendo de Airtable son `criterios_aprendidos` y `advertencia_criterios`, que no son config del
-  equipo sino salida del archivado y se leen de donde su escritor los deja hasta D7
-  ([ADR-033](../../docs/adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md)).
+  D5. **Desde D7 los cuatro dominios del contrato salen de Postgres y Airtable no participa**;
+  `criterios_aprendidos`/`advertencia_criterios` también, porque D7 movió su escritor a PostgREST y
+  ADR-033 (un dueño por campo durante la coexistencia) se cumplió entera.
+  ⚠️ `visibilidad` de los ajustes es un campo **de la UI, no del contrato**: la fachada sigue
+  sirviendo los 18 knobs aunque el equipo solo vea algunos
+  ([ADR-038](../../docs/adr/ADR-038-una-sola-perilla-de-cantidad.md)).
 - `domain/` — reglas puras sin IO (C3): roles y zonas, la vista de corrida (qué corre, N
   resuelta, estado legible) y `enlace.ts` (de un pegote de texto a `external_id`). Se testea con
   `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
-  `airtable.ts` (lo que todavía vive en Airtable; muere en D8), `ajustes.ts`, `referentes.ts` y
-  `proyectos.ts` (los dominios ya cortados a Postgres), `sugeridos.ts` (la bandeja del descubrimiento),
+  `ajustes.ts`, `referentes.ts` y `proyectos.ts` (los dominios de config, todos en Postgres desde
+  D7 — `airtable.ts` murió con el corte), `sugeridos.ts` (la bandeja del descubrimiento),
   `runs.ts` (últimas corridas del motor), `transcripciones.ts` + `transcribir.ts` (el transcriptor:
   la cola y las llamadas a Supadata/Haiku), `eventos.ts` (auditoría, sumidero) y `auth.ts`
   (guardias `usuarioActual`/`exigirZona`).
-- `components/ui/` — shadcn, código propio editable (C9).
+- `components/ui/` — shadcn, código propio editable (C9). Lo propio del cockpit:
+  **`modal.tsx`** (el `<dialog>` nativo del estándar de
+  [ADR-039](../../docs/adr/ADR-039-la-lista-resume-el-record-se-abre.md) — uno por lista, no uno por
+  fila), **`copiar.tsx`** (copiar el guion al portapapeles) y **`select.tsx`** (el `<select>` nativo
+  con la caja del `<Input>`; existía copiado a mano en 4 pantallas con 2 alturas distintas).
+  `components/boton-buscar.tsx` está afuera de `ui/` porque no es una primitiva: lo renderizan dos
+  zonas (Operar y Curar → Sugeridos).
+- `app/api/miniatura/` — el proxy de miniaturas
+  ([ADR-037](../../docs/adr/ADR-037-miniaturas-por-proxy-propio.md)). **Sin esto el feed no muestra
+  ni una imagen:** el CDN de Instagram manda `cross-origin-resource-policy: same-origin` y el
+  browser bloquea el `<img>` cross-origin siempre. Sirve desde nuestro origen y copia a Storage en
+  la primera vista. Lo protege `proxy.ts` — si alguien agrega `/api/miniatura` a `esRutaPublica`,
+  pasa a ser un endpoint anónimo.
 - `scripts/` — solo queda **`npm run cortar:feed`**, el corte de D7: arrastra `Candidatos`,
   `Descartes del gate` y `Referentes propuestos` de Airtable a Postgres **por última vez**, e
   imprime el A/B que autoriza el flip (`-- --dry` verifica sin escribir). Es autocontenido a
@@ -64,7 +78,20 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    `npm run cortar:feed`. La **011 es obligatoria**: sin ella el BFF recibe
    `42501 permission denied for schema app` en TODO lo que lee de `app.*`. El login no lo delata
    porque va por la anon key.
-2. **Invitar a los usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
+2. **Bucket `miniaturas` en Supabase Storage** (público), para
+   [ADR-037](../../docs/adr/ADR-037-miniaturas-por-proxy-propio.md). Ya creado el 2026-08-01; queda
+   escrito para el próximo entorno. Sin él, `/api/miniatura` sigue sirviendo la imagen (baja del CDN
+   en cada pedido) pero no la cachea, así que se pierde cuando la URL firmada vence a los ~5 días:
+
+   ```bash
+   set -a && source .env && set +a
+   curl -X POST "$SUPABASE_URL/storage/v1/bucket" \
+     -H "apikey: $SUPABASE_SERVICE_ROLE" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE" \
+     -H "Content-Type: application/json" \
+     -d '{"id":"miniaturas","name":"miniaturas","public":true,"file_size_limit":5242880,"allowed_mime_types":["image/jpeg","image/png","image/webp"]}'
+   ```
+
+3. **Invitar a los usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.
    > ⚠️ **El email built-in de Supabase (free) tiene rate limit muy bajo** (unos pocos/hora) y no deja
@@ -79,10 +106,10 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    > Add Domain*, cargar SPF/DKIM en el DNS del dominio, y poner el Sender email en ese dominio
    > (`noreply@dominio`). Eso además saca al mail del spam (SPF/DKIM firmados). Con `onboarding@resend.dev`
    > solo se puede probar contra el mail de la cuenta.
-3. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
+4. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
    env vars de `.env.example` (del gestor). Producción en `main`, preview por rama (ADR-026).
    En Supabase, *Authentication → URL Configuration*: agregar la URL de Vercel a *Redirect URLs*.
-4. **Env vars** (del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` · `MOTOR_WEBHOOK_URL` +
+5. **Env vars** (del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` · `MOTOR_WEBHOOK_URL` +
    los 2 del header (el par exacto de la credencial `Webhook Motor Header` de n8n — si difiere en
    algo, el botón da 403) · los 2 `RUN_PLAN_HEADER_*` (el par que n8n manda a la fachada) · los 3
    `DESCUBRIMIENTO_WEBHOOK_*` (el botón «Buscar cuentas nuevas»). **Son tres pares de header

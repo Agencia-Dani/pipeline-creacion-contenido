@@ -122,6 +122,17 @@ de esta superficie — cuando haya duda en una decisión chica, se resuelve con 
 7. **Fail-closed en config, fail-open en entrega.** Sin config no se corre (ADR-028); un servicio
    externo caído no vacía la entrega (NFR2).
 8. **Cada fase entrega valor sola.** Nada de "esto sirve cuando termine la fase 5".
+9. **La lista resume, el record se abre** ([ADR-039](../adr/ADR-039-la-lista-resume-el-record-se-abre.md),
+   2026-08-01). Ninguna lista despliega formularios: muestra lo que uno viene a saber, y el detalle
+   se abre tocando la fila. Crear es un botón arriba. La única excepción es el interruptor de
+   prendido/apagado, que se edita desde la lista y guarda al toque. Es el §4 de esta lista llevado
+   hasta el final: nació de que Referentes dibujaba `filas × proyectos` casillas, o sea una pantalla
+   que **empeoraba con cada proyecto nuevo**.
+10. **Un número que el equipo ve, un dueño**
+    ([ADR-038](../adr/ADR-038-una-sola-perilla-de-cantidad.md), 2026-08-01). Es el §1 aplicado a la
+    superficie: si tres perillas mueven lo mismo, dos sobran aunque las tres funcionen. Y **la
+    pantalla no promete lo que la máquina no garantiza** — cuando un número es un techo y no un
+    contrato, se muestra al lado lo que pasó de verdad, no un «hasta» que obliga a adivinar.
 
 ---
 
@@ -331,7 +342,13 @@ conclusión opuesta a la verdad: el loop de auditoría de ADR-021 no está incom
 Si la app lo vuelve a dejar de solo-lectura, hereda el mismo agujero.
 **Hecho cuando:** una semana entera de calificación pasa por la app sin que nadie abra Airtable.
 
-### D7 — Corte de escritura *(re-import #2)* — **CÓDIGO HECHO (2026-08-01), falta ejecutarlo**
+### D7 — Corte de escritura *(re-import #2)* — ✅ **EN PRODUCCIÓN (2026-08-01)**
+> 🔁 **Y con el cockpit ya live salió la primera revisión de UI/UX** (commit `dce25a3`): 10
+> observaciones de uso real, de las que 3 eran bugs (miniaturas bloqueadas por CORP, el botón del
+> buscador sin renderizar, las barras del embudo comparando videos con evaluaciones). Dejó los
+> principios **§3.9 y §3.10** de arriba y los ADRs 037/038/039. Detalle en el
+> [handoff, cierre 78](./handoff.md).
+
 Los **3 workflows** dejan de tocar Airtable, y la app también: se borró `lib/airtable.ts` entero.
 El contrato de escritura se cerró con **[ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md)**
 — *n8n lee su config por la fachada, escribe sus resultados por PostgREST* — y no con "ADR-029" como
