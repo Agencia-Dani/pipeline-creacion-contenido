@@ -1,7 +1,7 @@
 # Pipeline de Creación de Contenido
 
 Central única de los workflows de n8n de creación de contenido de la agencia (Agencia-Dani).
-Hoy: el MVP de reels (motor de detección/transcripción + cockpit Airtable + histórico). El núcleo
+Hoy: el MVP de reels (motor de detección/transcripción + cockpit propio + histórico). El núcleo
 está hecho para que sumar un flujo o un cliente sea clonar y configurar, no construir de cero.
 
 ## Mapa de docs
@@ -29,9 +29,10 @@ en §Agent skills; acá solo se ubican.
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
-- [core/contracts/airtable-cockpit.md](core/contracts/airtable-cockpit.md) — modelo de datos del cockpit (las 6 tablas Airtable).
+- [core/contracts/airtable-cockpit.md](core/contracts/airtable-cockpit.md) — 🧊 **congelado en D7**: el modelo de datos de Airtable, como registro histórico. Lo vivo está en [core/schema/](core/schema/).
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
+  **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
 - [core/schema/](core/schema/) — migraciones SQL de Supabase (001–012; se aplican en el SQL Editor).
 
 **Operación / equipo de redes**
@@ -52,7 +53,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
   ubicuo). Leelo antes de nombrar variables/funciones/archivos y antes de discutir el dominio.
   Se afina con `/grill-with-docs`.
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
-  los dos workflows (orden de ejecución, qué tabla Airtable lee/escribe cada nodo, esquema Supabase y
+  los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
 - **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..031).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.

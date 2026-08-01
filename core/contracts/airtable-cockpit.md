@@ -1,5 +1,17 @@
 # Cockpit del equipo de redes — modelo de datos en Airtable (ADR-008 + ADR-009)
 
+> 🧊 **CONGELADO — 2026-08-01 (D7).** Este contrato describe una base que **ya no participa del
+> sistema**: los 3 workflows tienen cero llamadas a `api.airtable.com` y la app borró su cliente.
+> No se actualiza más. Queda como **registro histórico** y como guía del export final de D8.
+>
+> **Dónde está ahora lo que este doc describía:**
+> · el modelo de datos → [`core/schema/`](../schema/) (schema `app`)
+> · quién escribe qué → [`ingesta-registro.md §5`](./ingesta-registro.md) (ADR-035)
+> · qué lee el motor → [`run-plan.md`](./run-plan.md) (ADR-028)
+>
+> Su reemplazo formal (`cockpit-datos.md`) es trabajo de D8, junto con el export y el apagado.
+
+
 > La superficie no-code donde el equipo de redes (Majo, Jero) gestiona la búsqueda y **califica**
 > los scripts. Airtable plan **free**: 1.000 registros/base · 1.000 API calls/mes · 5 editores.
 > El motor (n8n) lee esta base cada corrida y le escribe los candidatos. Lo pesado (historial,
