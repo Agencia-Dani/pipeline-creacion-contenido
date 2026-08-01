@@ -22,100 +22,66 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> 🔴 **D7 ESTÁ ESCRITO Y VERDE EN EL REPO, PERO NO EJECUTADO — 2026-08-01.** Todo vive en la rama
-> **`d7-corte-escritura`**, sin mergear, a propósito: en este repo commitear es deployar, y D7
-> necesita que el deploy y el re-import pasen en la misma ventana. **No mergees sin leer el orden.**
+> 🟢 **D7 ESTÁ EN PRODUCCIÓN — 2026-08-01. Airtable salió del sistema.** Mergeado a `main`,
+> deployado, **migración `013` aplicada**, dato migrado y **los 3 workflows re-importados y
+> publicados**. El hecho-cuando mecánico está cumplido: `grep -c api.airtable.com
+> Workflows/*/workflow.json` da **0 0 0**, `lib/airtable.ts` no existe y `<<AIRTABLE_BASE_ID>>` ya
+> no es placeholder de nadie.
 >
-> **Lo verificado en local:** `typecheck` ✓ · 117 tests ✓ · `build` ✓ · `validate` (1517 checks) ✓ ·
-> `auditar-workflows` **sin hallazgos** · `test-nodos` en verde · y el hecho-cuando mecánico:
-> **`grep -c api.airtable.com Workflows/*/workflow.json` da 0 en los tres**, `lib/airtable.ts` no
-> existe y `<<AIRTABLE_BASE_ID>>` ya no es placeholder de nadie.
+> **Verificado contra prod:** la fachada sirve `fields.uuid` con el `id` viejo intacto (el paso de
+> expansión, vivo) · el webhook del descubrimiento responde **403 `Authorization data is wrong!`**
+> (activo, path y credencial OK) · en Postgres hay 145 candidatos, 20 descartes y 8 propuestas con
+> sus 16 pares.
 >
-> **Verificado CONTRA DATOS REALES (2026-08-01, sesión de cierre):**
-> · `npm run cortar:feed -- --dry` contra Airtable + Supabase vivos → **145 candidatos, 0 sin
->   `external_id`, 0 sin proyecto resoluble** (o sea la resolución record id → uuid funciona contra
->   la base real) · **20 descartes, 0 auditados** (confirma que el loop de ADR-021 estaba muerto) ·
->   **8 propuestas, 16 pares, las 8 con 2 proyectos** — el hallazgo 6 reproducido por el script.
-> · La **fachada corriendo en local contra Supabase real**: `?ambito=motor` → 3 voces · 4 proyectos ·
->   15 referentes · 18 ajustes, con `fields.uuid` en **todos** y el `id` viejo intacto.
-> · **`criterios_aprendidos`: Postgres y Airtable son idénticos** (los 862/1048 están en los dos
->   Trading, que están inactivos). El corte **no pierde nada** — la duda salió y se midió.
-> · La app levanta, `/login` renderiza, cero errores de consola y de servidor.
+> 🟠 **LO ÚNICO QUE FALTA, Y ES LO QUE NO SE PROBÓ NUNCA: una corrida.** Todas las **escrituras** de
+> n8n a Postgres (`POST Candidatos`, `POST Descartes`, `POST Propuestos`, el `PATCH` de criterios,
+> los `DELETE` del archivado) están escritas y auditadas pero **jamás se ejecutaron**. La lectura sí
+> se probó contra datos reales; la escritura se estrena en la primera corrida.
 >
-> **Lo que sigue SIN verificar:** la migración `013` no está aplicada, así que **ninguna consulta
-> que la necesite se ejecutó jamás** — ni las 2 vistas nuevas, ni los embeds de PostgREST
-> (`proyectos(nombre)`, la puente), ni un solo insert de n8n. Y n8n no se re-importó.
+> **Si algo va a fallar, el síntoma más probable es un `404` contra una tabla que existe**: es el
+> header de schema (`Content-Profile: app` para escribir, `Accept-Profile: app` para leer). Está en
+> [`ingesta-registro.md §5`](../../core/contracts/ingesta-registro.md).
 >
-> ### El orden, que importa más que el contenido
+> ### Los 3 pasos que quedan, en orden
 >
-> **1. Aplicar `core/schema/013_corte_escritura.sql`** en el SQL Editor. Agrega `external_id` con
->    `unique`, la tabla puente de propuestas, las 2 vistas nuevas, y dropea 2 columnas muertas.
+> **1. Disparar una corrida on-demand del motor** (botón ▶ en *Operar*). Es lo que estrena las
+> escrituras.
 >
-> **2. Cargar el dato vivo, en seco primero:**
-> ```
-> cd apps/dashboard && npm run cortar:feed -- --dry
-> ```
-> Mirá el A/B que imprime. **Lo que tiene que dar:** ~145 candidatos, los descartes con su cuenta de
-> auditados, y las propuestas con **2 proyectos cada una** (si dice "con más de 1 proyecto: 0",
-> algo está mal: se midió 8/8). Después sin `--dry`.
->
-> ➕ **El buscador de referentes perdió el cron y ahora es un botón** (enmienda de ADR-020, decidida
-> el 2026-08-01 y aprovechando que este re-import ya estaba pago). Al re-importar el descubrimiento
-> hay **dos cosas nuevas que preparar**:
-> 1. **En n8n:** el workflow trae un trigger `Buscar ahora (webhook)` con placeholder
->    `<<WEBHOOK_PATH_DESCUBRIMIENTO>>`, y pide una credencial *Header Auth* nueva llamada
->    **`Webhook Descubrimiento Header`**. Es un **tercer par** de header, distinto del webhook del
->    motor y del run-plan: no se reusan. **Activá el workflow** (si no, el webhook no existe).
-> 2. **En Vercel:** 3 env vars nuevas — `DESCUBRIMIENTO_WEBHOOK_URL` (la URL de *Producción* del
->    webhook) + `DESCUBRIMIENTO_WEBHOOK_HEADER_NOMBRE` + `..._VALOR`, con el par EXACTO de la
->    credencial. Si difieren en algo, el botón devuelve 403 y lo dice con esas palabras.
->
-> **Truco que ya ahorró horas y sirve igual acá:** un POST con header inválido al webhook distingue
-> gratis y sin disparar nada — **404** = workflow inactivo o path equivocado · **403
-> `Authorization data is wrong!`** = activo, path bien y credencial bien.
-
-> **3. Mergear la rama** (deploy) **y re-importar los 3 workflows en la misma ventana.** Orden:
->    **descubrimiento → archivado → motor** (barato → medio → caro).
->
-> ⚠️ **No corras el motor entre el merge y el re-import.** En esa ventana el motor viejo escribiría
-> en Airtable y la app ya estaría leyendo Postgres: los candidatos nuevos no aparecerían en el feed.
-> Si el cron del domingo cae en el medio, desactivalo antes.
->
-> ✅ **El pre-flight de credenciales YA NO HACE FALTA — verificado.** `main` tenía **10** nodos con
-> `nodeCredentialType` pero sin el bloque `credentials` (9 en el archivado, 1 en el motor): al
-> importar quedaban sin credencial y fallaban en ejecución. **Los 10 se fueron con D7**, borrados o
-> reescritos. Chequeo, por si alguien duda:
-> ```sh
-> python3 -c "
-> import json,glob
-> for f in glob.glob('Workflows/*/workflow.json'):
->     w=json.load(open(f))
->     print(f, [n['name'] for n in w['nodes'] if n.get('parameters',{}).get('nodeCredentialType') and not n.get('credentials')])"
-> ```
->
-> **4. El hecho-cuando, después de una corrida on-demand completa:**
+> **2. Verificar que no se perdió analítica** — esta clase de bug **sale verde en todo lo demás**,
+> hay que ir a buscarla:
 > ```sql
 > select id, calificacion, estado, fecha_calificacion from app.candidatos where estado <> 'nuevo' limit 5;
 > select * from app.v_metricas_calidad order by semana desc limit 5;
 > select * from app.v_auditoria_descartes order by semana desc limit 3;
+> select * from app.v_embudo_descubrimiento order by semana desc limit 3;
 > ```
-> **`fecha_calificacion` no puede ser null** y `v_metricas_calidad` **no puede dar cero filas** una
-> vez que el archivado corrió. Si alguna falla, es el hallazgo 4 sin arreglar y la métrica norte
-> quedó muda. Esta clase de bug **sale verde**: hay que ir a buscarla.
+> `fecha_calificacion` **no puede ser null** después de calificar algo, y `v_metricas_calidad` **no
+> puede dar cero filas** una vez que el archivado corrió. Si alguna falla, es el hallazgo 4 sin
+> arreglar y la precisión de entrega —la métrica norte— quedó muda.
 >
-> **5. Medir el thumbnail** (hallazgo 2): agarrá un `thumbnail_url` de la corrida nueva y pedilo con
-> `curl -I` al día siguiente. Si vence antes de la semana, entra Supabase Storage. Los candidatos
-> arrastrados por el paso 2 vienen **sin miniatura a propósito** (eran adjuntos de Airtable con
-> expiry de 2 h: copiar esa URL guardaba un link muerto).
+> **3. El paso 3 del expand/contract** (lo hace Claude, gateado por la corrida verde): `id` pasa a
+> ser el uuid, se borran `fields.uuid` y `airtable_id` del contrato, y **sale `AIRTABLE_PAT` de
+> Vercel**. Ahí D7 cierra del todo.
 >
-> **6. Recién ahí, el paso 3 del expand/contract:** `id` pasa a ser el uuid, se borran `fields.uuid`
-> y `airtable_id` del contrato, y **sale `AIRTABLE_PAT` de Vercel**. Está gateado por evidencia (una
-> corrida verde), no por calendario.
+> ### Dos cosas para medir en esa primera corrida
+> · **El thumbnail** (hallazgo 2): agarrá un `thumbnail_url` nuevo y pedilo con `curl -I` al día
+>   siguiente. Airtable re-hosteaba las imágenes y ahora se guarda la URL cruda del CDN, firmada y
+>   con expiry. Si vence antes de la semana, entra Supabase Storage. *(Los 145 arrastrados vienen
+>   **sin miniatura a propósito**: eran adjuntos de Airtable con expiry de 2 h.)*
+> · **`registro_dedup`** en `runs.metricas`, como siempre.
 >
-> ### Airtable, después de todo esto
-> El viaje de 9 páginas a congelar que venía acumulándose **deja de importar**: ninguna máquina
-> escribe ni lee ahí. Lo que queda es el trabajo no-código de **D8** (export final, base a
-> read-only, cancelar la suscripción) y **avisarle a Majo y a Jero que Airtable murió**.
+> ### Airtable
+> El viaje de 9 páginas a congelar **dejó de importar**: ninguna máquina escribe ni lee ahí. Queda
+> el trabajo no-código de **D8** (export final, base a read-only, cancelar la suscripción) y
+> **avisarle a Majo y Jero que Airtable murió** — que ahora califican solo en el cockpit, y que la
+> bandeja de Sugeridos **ya no se llena sola los lunes**: hay un botón, y conviene apretarlo recién
+> cuando resolvieron las 8 que están esperando.
+>
+> 🔎 **Un zombie conocido, inofensivo:** hay un run de `descubrimiento` en `en_curso` desde el
+> 27/07. El barredor de zombies solo corre cuando corre el workflow, y al sacarle el cron nadie lo
+> barrió. No bloquea el botón (la guarda `hayBusquedaViva` usa ventana de 60 min, y ese tiene 5
+> días), y `v_embudo_descubrimiento` no lo cuenta ni como ok ni como fallo. Se limpia solo la
+> próxima vez que alguien busque.
 
 
 > 📋 **El viaje a Airtable que se viene acumulando, junto, para hacerlo de una** (los 3 cortes de
@@ -408,9 +374,11 @@ ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-dem
 
 ## Para la próxima sesión — arrancá por acá
 
-> ⚠️ **Esta sección viene del 17/07 y quedó atrás** (los cierres 65–67 no la reescribieron). Para
-> saber qué sigue **hoy**, leé §Pendiente vivo y la última entrada del log. Lo de abajo sirve como
-> contexto del refactor, no como lista de tareas.
+> ⚠️ **Esta sección viene del 17/07 y quedó MUY atrás** (habla del refactor de Voces→Proyectos, que
+> terminó, y de Airtable, que murió en D7). Para saber qué sigue **hoy**, leé **§Pendiente vivo** y
+> la **última entrada del log (cierre 76)**. Lo de abajo sirve como arqueología del refactor, no
+> como lista de tareas — y varias de sus instrucciones (curar el cockpit de Airtable, congelar
+> páginas) ya no aplican a nada.
 
 > **Reescrito el 2026-07-17 (cierre 54). La sesión de auditoría completa del cierre 53 SE HIZO** — los 3
 > frentes ①②③ están ejecutados en el repo (spillover, presupuesto de transcripción, ADR-025, guía de
@@ -512,6 +480,20 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-01 (cierre 76) — D7: Airtable sale del sistema. El corte de escritura, de punta a punta (Claude, pedido de Mani).**
+**Qué se hizo:** el grilling completo de D7 y después su implementación entera — 9 commits en `d7-corte-escritura`, mergeados a `main`, con la migración `013` aplicada, el dato migrado y los 3 workflows re-importados por Mani. **Cero `api.airtable.com` en los 3 workflows y en toda la app**; `lib/airtable.ts`, `domain/sombra.ts` y los 4 scripts del modo sombra se borraron. El archivado bajó de 35 nodos a 20.
+**La decisión raíz es [ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md): PostgREST directo, no endpoint de la app.** La simetría con ADR-028 era falsa — n8n ya escribía `runs`/`outputs` directo desde el día 1, y meter la app en el camino de la **entrega** la vuelve dependencia justo donde el sistema es fail-open a propósito. La regla que queda, y cubre los 3 workflows y los que vengan: **n8n LEE su config por la fachada, ESCRIBE sus resultados por PostgREST.**
+**🚨 De los 6 hallazgos del grilling, 3 eran pérdidas SILENCIOSAS — de las que no fallan, salen verdes y dejan un número en cero.** (a) **`fecha_calificacion` no tenía autor**: en Airtable era un `lastModified` que se calculaba solo, y de él cuelga `outputs.calificado_en` → `v_metricas_calidad`, que filtra `calificado_en is not null` ⇒ la pantalla *Calidad* habría dado **cero filas** y la **precisión de entrega**, la métrica norte de ADR-021, habría desaparecido sin que nada fallara. (b) **`falsos_negativos` no sale de `runs.metricas`** sino de contar descartes auditados, así que ninguna vista lo cubría y D7 lo mataba **por segunda vez** — lo arregla [ADR-036](../adr/ADR-036-los-descartes-no-se-barren.md): los descartes dejan de barrerse y el contador pasa a ser vista viva. (c) **el embudo del descubrimiento** se quedaba sin reemplazo (`v_embudo_semana` filtra `workflow='motor'`).
+**🚨 Y uno medido, que era el peor: `Referentes propuestos` es N:M.** Se midió contra el dato vivo antes de escribir código: **las 8 propuestas tenían 2 proyectos cada una**, y el schema `009` les daba un `proyecto_id` simple ⇒ el corte tiraba **8 de 16 pares, el 100% de la atribución**. Es el bug del corte 2/4 en la misma forma exacta, pero completo. Enmienda de [ADR-032](../adr/ADR-032-referente-proyecto-es-n-a-n.md) + tabla puente. **Que cayera en el descubrimiento es exactamente por qué se eligió como piloto**: si quedaba para D8, aparecía después de re-importar el motor.
+**La regla de método que deja este corte, y completa la trilogía:** el 2/4 dejó *"medí el dato vivo contra el schema que lo va a recibir"*, el 3/4 dejó *"listá quién ESCRIBE cada campo"*, y D7 agrega **"listá qué campos NO los escribía nadie, porque Airtable los calculaba solo"**. Los `createdTime`, `lastModified` y las columnas-fórmula no tienen autor: al migrar se vuelven NULL en silencio y se llevan puesto lo que dependía de ellos.
+**Lo que el corte simplificó, y conviene no deshacer:** mueren `typecast` (o sea desaparece la clase "proyecto fantasma": un id mal formado ahora **viola una FK** en vez de crear datos malos en silencio), los batches de 10, y la traducción de ids. `external_id` entra al schema **con `unique`**, así que la 3ª línea del dedup de ADR-029 pasa de procedural a estructural — pero **`Leer feed vivo` NO se borró**: el constraint atrapa el duplicado *después* de pagar la transcripción, el nodo lo mata *antes* (es lo que bajó la corrida del 31/07 de 31 a 9,4 min).
+**Muere ADR-033.** Los criterios destilados y su escritor volvieron al mismo lugar (`Destilar criterios` PATCHea `app.proyectos`). Era una regla con fecha de vencimiento puesta en D7, y esta fue la fecha. Se verificó antes de cortar que Postgres y Airtable tenían **valores idénticos**: no se perdió nada.
+**Limpieza de peso muerto (auditoría del mismo día).** Los 18 knobs de `Ajustes` están **todos vivos** — ahí no había nada que tirar. Sí lo había en otro lado: **11 nodos muertos** (la cadena de Métricas, la de salud de referentes, y la de promoción del descubrimiento, que estaba muerta desde el corte 2/4), 3 nodos que quedaron **huérfanos** al morir sus únicos consumidores, y `app.eventos`, que 7 actions escribían y **nadie leía** — ahora tiene pantalla dev-only en *Entender*. Balde 2 (4 vistas sin consumidor + 6 columnas write-only) queda para una migración `014` aparte, a propósito: si D7 salía mal, no había que bisectar entre el corte y la limpieza.
+**➕ Enmienda a [ADR-020](../adr/ADR-020-motor-descubrimiento-referentes.md): el buscador perdió el cron y ahora es un botón** en *Curar → Sugeridos*. La razón es medida: había **8 propuestas pendientes y 0 resueltas**, o sea que la bandeja se llenaba más rápido de lo que el equipo la vacía, y cada corrida paga 3 actores de Apify + Haiku. Se hizo **en el mismo re-import** porque agregarlo después costaba un cuarto re-import. El guard contra doble click vive en la Server Action (`hayBusquedaViva`), no en el workflow: hay un solo camino de entrada y el peor caso es una corrida repetida.
+**Herramientas que se ganaron el sueldo:** `auditar-workflows.mjs` atrapó **dos veces** conexiones rotas por renombrar nodos (el rename deja los destinos apuntando al nombre viejo), y `test-nodos.mjs` atrapó el cambio de forma del feed vivo. Sin ellos, los dos se veían recién en producción.
+**⚠️ Lo que NO se probó:** ninguna **escritura** de n8n a Postgres se ejecutó todavía. La lectura sí (fachada, corte, vistas, todo contra datos reales). El paso 3 del expand/contract queda pendiente, gateado por una corrida verde.
+**Siguiente sesión:** verificar la corrida (§Pendiente vivo tiene las queries), después el paso 3 del expand/contract. Con eso cierra D7 y arranca **D7.5** (que la app escriba `outputs` al calificar, para matar el archivado) o **D8** (apagado de Airtable, todo no-código). Skills: `/diagnose` si la corrida falla, `/grill-with-docs` antes de D7.5 — enmienda ADR-014, que es `core/`.
 
 **2026-08-01 (cierre 75) — D6: el feed de calificación, y el dato que corrigió el diagnóstico a mitad de camino (Claude, pedido de Mani).**
 **Lo que se construyó:** las 3 pantallas del espacio de trabajo. **`/curar/feed`** (mazo de tarjetas compactas que se abren como el expand de Airtable, agrupadas por proyecto y por heat descendente adentro, con filtro sin-calificar/🔥/aprobados/todos), **`/curar/descartes`** (la auditoría del gate) y **`/curar/historicos`** (todo lo aprobado de todas las semanas, de a 25). Directo a `main`.
