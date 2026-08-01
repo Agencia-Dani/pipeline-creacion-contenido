@@ -100,7 +100,6 @@ export function validarReferente(
 
 export type ReferenteGuardado = {
   id: string;
-  airtable_id: string | null;
   handle: string;
   plataforma: string;
   activo: boolean;
@@ -115,22 +114,25 @@ export type ReferenteGuardado = {
  * viviera en la capa de IO, el A/B tendría que reimplementarla y compararía dos escrituras del
  * mismo autor en vez de comparar mundos.
  *
- * Las dos traducciones (por qué `id` es el record id de Airtable y por qué los proyectos viajan
- * en el idioma de Airtable mientras Proyectos no corte) están explicadas en `lib/referentes.ts`.
+ * Desde el paso 3 de D7 acá no queda ninguna traducción: `id` es el uuid y `fields.proyecto` son
+ * los uuid de los proyectos. Las dos tenían que caer **juntas** — el motor cruza
+ * `referentes[].fields.proyecto` contra `proyectos[].id`, así que mientras hablen el mismo idioma
+ * el cruce funciona, y si una sola hubiera flipeado, todo referente se habría quedado sin
+ * proyecto y el motor sin nada que buscar. `referentes[].id`, además, ya no lo consume nadie: su
+ * único lector era `Computar salud referentes`, que D7 borró.
  */
 export function aRegistrosDelPlan(
   banco: ReferenteGuardado[],
-  airtablePorProyecto: Map<string, string | null>,
   ambito: "motor" | "completo",
 ): { id: string; fields: Record<string, unknown> }[] {
   return banco
     .filter((r) => ambito === "completo" || r.activo)
     .map((r) => ({
-      id: r.airtable_id ?? r.id,
+      id: r.id,
       fields: {
         handle: r.handle,
         plataforma: r.plataforma,
-        proyecto: r.proyectoIds.map((id) => airtablePorProyecto.get(id) ?? id),
+        proyecto: r.proyectoIds,
         activo: r.activo,
         notas: r.notas,
       },

@@ -14,14 +14,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // `app.referentes_proyectos` (la relación N:M de ADR-032) con service_role: `app.*` tiene RLS
 // sin policies, el browser no llega solo.
 //
-// Las dos formas que salen de acá son distintas a propósito:
-//  · `leerBanco` habla en uuid — es para la pantalla, que edita.
-//  · `leerReferentesComoRegistros` habla en record ids de Airtable — es para la fachada, porque
-//    Proyectos TODAVÍA vive en Airtable (corte 4/4) y el motor cruza las dos listas por id.
+// Las dos formas que salían de acá —una en uuid para la pantalla, otra en record ids de Airtable
+// para la fachada— son una sola desde el paso 3 de D7: todo habla uuid.
 
 const filaReferente = z.object({
   id: z.string(),
-  airtable_id: z.string().nullable(),
   handle: z.string(),
   plataforma: z.string(),
   activo: z.boolean(),
@@ -35,14 +32,13 @@ const filaSalud = z.object({
   tasa_aprobacion: z.coerce.number().nullable(),
 });
 
-export type Proyecto = { id: string; airtableId: string | null; nombre: string; vozId: string; activo: boolean };
+export type Proyecto = { id: string; nombre: string; vozId: string; activo: boolean };
 export type ReferenteDelBanco = z.infer<typeof filaReferente> & { proyectoIds: string[]; salud: Salud };
 
 /** La proyección que la pantalla de referentes necesita: el picker de proyectos y su voz. */
 export async function leerProyectos(): Promise<Proyecto[]> {
   return (await leerProyectosDePostgres()).map((p) => ({
     id: p.id,
-    airtableId: p.airtable_id,
     nombre: p.nombre,
     vozId: p.voz_id,
     activo: p.activo,
@@ -70,7 +66,7 @@ async function leerPares(): Promise<Map<string, string[]>> {
 export async function leerBanco(): Promise<ReferenteDelBanco[]> {
   const supabase = createAdminClient();
   const [referentes, pares, salud] = await Promise.all([
-    supabase.schema("app").from("referentes").select("id, airtable_id, handle, plataforma, activo, notas").order("handle"),
+    supabase.schema("app").from("referentes").select("id, handle, plataforma, activo, notas").order("handle"),
     leerPares(),
     supabase.schema("app").from("v_salud_referentes").select("id, videos_evaluados, tasa_gate, tasa_aprobacion"),
   ]);
@@ -87,23 +83,12 @@ export async function leerBanco(): Promise<ReferenteDelBanco[]> {
 }
 
 /**
- * Postgres → la forma del contrato (core/contracts/run-plan.md).
- *
- * Dos traducciones que NO son cosméticas mientras dure la coexistencia:
- *  · **`id` = el record id de Airtable** cuando lo hay. A diferencia de `ajustes`, acá el `id`
- *    SÍ lo consume alguien: `Computar salud referentes` del archivado lo usa para PATCHear
- *    Airtable. Un referente nacido en la app no tiene, y viaja con su uuid — ese PATCH escribe
- *    sobre una tabla ya congelada y es fail-open, así que el peor caso es un batch descartado
- *    en un lugar que nadie lee. El nodo muere en D7.
- *  · **`fields.proyecto` = record ids de Airtable de los proyectos.** El motor cruza
- *    `referentes[].fields.proyecto` contra `proyectos[].id`, y ese id sigue siendo el de Airtable
- *    aunque Proyectos ya viva en Postgres (corte 3/4): el motor escribe `Candidatos.proyecto` como
- *    link de Airtable, y con `typecast` un uuid crearía un proyecto fantasma en vez de fallar.
- *    Las dos traducciones se caen juntas en **D7**, no antes (ADR-033).
+ * Postgres → la forma del contrato (core/contracts/run-plan.md). Sin traducciones desde el paso 3
+ * de D7: se leía Proyectos acá solo para mapear cada uuid a su record id de Airtable, y ahora el
+ * contrato habla uuid de punta a punta.
  */
 export async function leerReferentesComoRegistros(ambito: "motor" | "completo"): Promise<Registro[]> {
-  const [banco, proyectos] = await Promise.all([leerBanco(), leerProyectos()]);
-  return aRegistrosDelPlan(banco, new Map(proyectos.map((p) => [p.id, p.airtableId])), ambito);
+  return aRegistrosDelPlan(await leerBanco(), ambito);
 }
 
 // ── Escritura ────────────────────────────────────────────────────────────────

@@ -144,14 +144,8 @@ describe("esFlojo", () => {
 });
 
 describe("aRegistrosDelPlan", () => {
-  const airtablePorProyecto = new Map([
-    ["uuid-proy-a", "recPROYA"],
-    ["uuid-proy-b", "recPROYB"],
-  ]);
-
   const guardado = (extra: Partial<ReferenteGuardado> = {}): ReferenteGuardado => ({
     id: "uuid-ref",
-    airtable_id: "recREF",
     handle: "@simonsinek",
     plataforma: "instagram",
     activo: true,
@@ -160,41 +154,29 @@ describe("aRegistrosDelPlan", () => {
     ...extra,
   });
 
-  it("traduce los proyectos al idioma de Airtable (el motor cruza contra proyectos[].id)", () => {
-    const [r] = aRegistrosDelPlan([guardado({ proyectoIds: ["uuid-proy-a", "uuid-proy-b"] })], airtablePorProyecto, "motor");
-    assert.deepEqual(r.fields.proyecto, ["recPROYA", "recPROYB"]);
+  it("los proyectos viajan como uuid, el mismo idioma que proyectos[].id (D7 paso 3)", () => {
+    // Las dos puntas del cruce tenían que flipear JUNTAS: el motor busca
+    // `referentes[].fields.proyecto` dentro de `projects[...]`, indexado por `proyectos[].id`. Si
+    // solo una hubiera pasado a uuid, ningún referente habría encontrado su proyecto y la corrida
+    // habría salido `ok` sin buscar nada.
+    const [r] = aRegistrosDelPlan([guardado({ proyectoIds: ["uuid-proy-a", "uuid-proy-b"] })], "motor");
+    assert.deepEqual(r.fields.proyecto, ["uuid-proy-a", "uuid-proy-b"]);
   });
 
   it("los N proyectos viajan enteros: es la regresión que motivó ADR-032", () => {
-    const [r] = aRegistrosDelPlan(
-      [guardado({ proyectoIds: ["uuid-proy-a", "uuid-proy-b"] })],
-      airtablePorProyecto,
-      "completo",
-    );
+    const [r] = aRegistrosDelPlan([guardado({ proyectoIds: ["uuid-proy-a", "uuid-proy-b"] })], "completo");
     assert.equal((r.fields.proyecto as string[]).length, 2);
   });
 
-  it("el id es el record id de Airtable: el archivado PATCHea con eso", () => {
-    const [r] = aRegistrosDelPlan([guardado()], airtablePorProyecto, "motor");
-    assert.equal(r.id, "recREF");
-  });
-
-  it("un referente nacido en la app viaja con su uuid", () => {
-    const [r] = aRegistrosDelPlan([guardado({ airtable_id: null })], airtablePorProyecto, "motor");
+  it("el id es el uuid: su único consumidor (Computar salud referentes) murió en D7", () => {
+    const [r] = aRegistrosDelPlan([guardado()], "motor");
     assert.equal(r.id, "uuid-ref");
   });
 
   it("ambito=motor filtra los apagados; completo los trae (contrato §Los dos ámbitos)", () => {
-    const banco = [guardado(), guardado({ id: "otro", airtable_id: "recOTRO", activo: false })];
-    assert.equal(aRegistrosDelPlan(banco, airtablePorProyecto, "motor").length, 1);
-    assert.equal(aRegistrosDelPlan(banco, airtablePorProyecto, "completo").length, 2);
-  });
-
-  it("un proyecto sin airtable_id viaja con su uuid en vez de desaparecer", () => {
-    // Pasa recién en el corte 4/4, cuando Proyectos nazca en Postgres. Perder el link en
-    // silencio dejaría al referente alimentando a nadie.
-    const [r] = aRegistrosDelPlan([guardado({ proyectoIds: ["uuid-huerfano"] })], airtablePorProyecto, "motor");
-    assert.deepEqual(r.fields.proyecto, ["uuid-huerfano"]);
+    const banco = [guardado(), guardado({ id: "otro", activo: false })];
+    assert.equal(aRegistrosDelPlan(banco, "motor").length, 1);
+    assert.equal(aRegistrosDelPlan(banco, "completo").length, 2);
   });
 });
 

@@ -110,7 +110,6 @@ export function validarProyecto(
 
 export type VozGuardada = {
   id: string;
-  airtable_id: string | null;
   nombre: string;
   descripcion: string | null;
   criterios_relevancia: string | null;
@@ -119,7 +118,6 @@ export type VozGuardada = {
 
 export type ProyectoGuardado = {
   id: string;
-  airtable_id: string | null;
   nombre: string;
   descripcion: string | null;
   criterios_relevancia: string;
@@ -133,19 +131,18 @@ export type ProyectoGuardado = {
 /**
  * Postgres → los registros `{id, fields}` de `core/contracts/run-plan.md`.
  *
- * **El `id` sigue siendo el record id de Airtable, y NO se cae con este corte** (la doc decía que
- * sí; es falso y costaba caro descubrirlo en producción). Cuatro consumidores vivos lo usan como
- * record id: el motor escribe `Candidatos.proyecto`/`.voz` y `Descartes.proyecto` como LINKS de
- * Airtable, `Destilar criterios` PATCHea `Proyectos` por ese id, y esa misma destilación cruza
- * los candidatos calificados contra él. Y los links van con `typecast: true`, o sea un uuid no
- * daría error: Airtable **crearía un proyecto fantasma** con el uuid de nombre. Se cae en **D7**,
- * cuando el motor deja de escribir en Airtable.
+ * **`id` es el uuid de Postgres — paso 3 (y último) del expand/contract de D7.** Durante los
+ * pasos 1 y 2 fue el record id de Airtable, porque cuatro nodos vivos lo escribían como *link*
+ * con `typecast: true` y un uuid ahí no fallaba: creaba un proyecto **fantasma** con el uuid de
+ * nombre. D7 movió esos cuatro a PostgREST, el gate del paso 3 era una corrida completa verde, y
+ * la del 2026-08-01 lo cumplió: candidatos y descartes escritos con `proyecto_id`/`voz_id` como
+ * FK de verdad.
  *
- * 🔀 **`fields.uuid` es el paso 1 del expand/contract de D7.** Viaja al lado del `id` viejo para
- * que el corte no tenga un instante peligroso: los workflows re-importados escriben Postgres con
- * ESTE campo, y los que todavía no lo están siguen usando `id` sin enterarse. Sin él, el orden
- * deploy↔re-import importaría, y equivocarlo no falla: crea proyectos fantasma en silencio. Muere
- * en el paso 3, cuando `id` pase a ser el uuid (`core/contracts/run-plan.md`, version 2).
+ * 🔀 **`fields.uuid` sigue viajando, y ya no significa nada: es igual al `id`.** No se borra acá
+ * porque los cuatro consumidores en n8n resuelven el uuid con `uuidDe[x.id] = x.fields.uuid`, y
+ * con los dos ids iguales ese mapa queda **identidad** — o sea el flip no necesita re-import.
+ * Sacarlo sí lo necesitaría, así que muere en el próximo re-import que haga falta por otra cosa,
+ * junto con el `uuidDe` que quedó sin trabajo. Un campo redundante cuesta menos que una corrida.
  */
 export function aRegistrosDeVoces(
   voces: VozGuardada[],
@@ -154,7 +151,7 @@ export function aRegistrosDeVoces(
   return voces
     .filter((v) => ambito === "completo" || v.activo)
     .map((v) => ({
-      id: v.airtable_id ?? v.id,
+      id: v.id,
       fields: {
         uuid: v.id,
         nombre: v.nombre,
@@ -166,11 +163,11 @@ export function aRegistrosDeVoces(
 }
 
 /**
- * Igual que las voces, más una traducción: `voz_default` viaja como **array de un elemento** con
- * el record id de la voz, que es la forma que `Armar plan de corrida` lee (`voz_default[0]`) y
- * que `armarRunPlan` usa para cruzar contra `voces[].id`. El array de un elemento no es
- * cosmético: es el modelo nuevo hablando el idioma viejo, y sobrevive hasta D7 por lo mismo que
- * el `id`.
+ * Igual que las voces, más una forma heredada: `voz_default` viaja como **array de un elemento**
+ * con el id de la voz, que es como `Armar plan de corrida` lo lee (`voz_default[0]`) y como
+ * `armarRunPlan` lo cruza contra `voces[].id`. El contenido del array ya es el uuid (paso 3); el
+ * array de un elemento se queda porque cambiarlo sí obligaría a re-importar, y que la regla
+ * "1 proyecto = 1 voz" sea una FK not null no cambia la forma del contrato.
  *
  * `criterios_aprendidos` y `advertencia_criterios` **salen de Postgres desde D7**, como todo lo
  * demás. Durante la coexistencia venían de Airtable porque su único escritor —`Destilar criterios`
@@ -180,28 +177,24 @@ export function aRegistrosDeVoces(
  */
 export function aRegistrosDeProyectos(
   proyectos: ProyectoGuardado[],
-  airtablePorVoz: Map<string, string | null>,
   ambito: "motor" | "completo",
 ): { id: string; fields: Record<string, unknown> }[] {
   return proyectos
     .filter((p) => ambito === "completo" || p.activo)
-    .map((p) => {
-      const vozAirtable = airtablePorVoz.get(p.voz_id) ?? p.voz_id;
-      return {
-        id: p.airtable_id ?? p.id,
-        fields: {
-          uuid: p.id, // paso 1 del expand/contract de D7 — ver aRegistrosDeVoces
-          nombre: p.nombre,
-          descripcion: p.descripcion,
-          criterios_relevancia: p.criterios_relevancia,
-          criterios_aprendidos: p.criterios_aprendidos,
-          advertencia_criterios: p.advertencia_criterios,
-          voz_default: [vozAirtable],
-          activo: p.activo,
-          N: p.n,
-        },
-      };
-    });
+    .map((p) => ({
+      id: p.id,
+      fields: {
+        uuid: p.id, // redundante desde el paso 3 — ver aRegistrosDeVoces
+        nombre: p.nombre,
+        descripcion: p.descripcion,
+        criterios_relevancia: p.criterios_relevancia,
+        criterios_aprendidos: p.criterios_aprendidos,
+        advertencia_criterios: p.advertencia_criterios,
+        voz_default: [p.voz_id],
+        activo: p.activo,
+        N: p.n,
+      },
+    }));
 }
 
 // ── Lecturas que la pantalla necesita ────────────────────────────────────────

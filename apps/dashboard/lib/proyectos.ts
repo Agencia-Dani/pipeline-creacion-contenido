@@ -19,12 +19,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // cumplió entera y murió** — era la regla que sostenía la coexistencia, con fecha de vencimiento
 // puesta en D7.
 //
-// Lo único que queda del idioma viejo es el `airtable_id`, que la fachada sirve como `id` hasta
-// el paso 3 del corte (ver `domain/proyectos.ts::aRegistrosDeVoces`).
+// Y con el paso 3 del corte dejó de hablar el idioma viejo del todo: la fachada sirve el uuid
+// como `id` (ver `domain/proyectos.ts::aRegistrosDeVoces`), así que estas lecturas ya no traen
+// `airtable_id`. La columna sigue en la tabla —es la traza al export de Airtable y la usa
+// `scripts/cortar-feed.ts`, la evidencia del corte— y se cae con la limpieza de D8.
 
 const filaVoz = z.object({
   id: z.string(),
-  airtable_id: z.string().nullable(),
   nombre: z.string(),
   descripcion: z.string().nullable(),
   criterios_relevancia: z.string().nullable(),
@@ -33,7 +34,6 @@ const filaVoz = z.object({
 
 const filaProyecto = z.object({
   id: z.string(),
-  airtable_id: z.string().nullable(),
   nombre: z.string(),
   descripcion: z.string().nullable(),
   criterios_relevancia: z.string(),
@@ -44,9 +44,9 @@ const filaProyecto = z.object({
   n: z.coerce.number().nullable(),
 });
 
-const COLUMNAS_VOZ = "id, airtable_id, nombre, descripcion, criterios_relevancia, activo";
+const COLUMNAS_VOZ = "id, nombre, descripcion, criterios_relevancia, activo";
 const COLUMNAS_PROYECTO =
-  "id, airtable_id, nombre, descripcion, criterios_relevancia, criterios_aprendidos, advertencia_criterios, voz_id, activo, n";
+  "id, nombre, descripcion, criterios_relevancia, criterios_aprendidos, advertencia_criterios, voz_id, activo, n";
 
 export async function leerVoces(): Promise<VozGuardada[]> {
   const supabase = createAdminClient();
@@ -82,8 +82,7 @@ export async function leerVocesComoRegistros(ambito: "motor" | "completo"): Prom
 }
 
 export async function leerProyectosComoRegistros(ambito: "motor" | "completo"): Promise<Registro[]> {
-  const [proyectos, voces] = await Promise.all([leerProyectos(), leerVoces()]);
-  return aRegistrosDeProyectos(proyectos, new Map(voces.map((v) => [v.id, v.airtable_id])), ambito);
+  return aRegistrosDeProyectos(await leerProyectos(), ambito);
 }
 
 // ── Escritura ────────────────────────────────────────────────────────────────

@@ -33,9 +33,9 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 {
   "version": 1,
   "generado_en": "2026-07-20T08:00:00.000Z",
-  "voces":      [{ "id": "rec…", "fields": { "uuid": "…", "nombre": "…", "criterios_relevancia": "…", "activo": true } }],
-  "proyectos":  [{ "id": "rec…", "fields": { "uuid": "…", "nombre": "…", "criterios_relevancia": "…", "voz_default": ["rec…"], "N": 20, "…": "…" } }],
-  "referentes": [{ "id": "rec…", "fields": { "handle": "@…", "plataforma": "instagram", "proyecto": ["rec…"], "activo": true } }],
+  "voces":      [{ "id": "uuid…", "fields": { "uuid": "uuid…", "nombre": "…", "criterios_relevancia": "…", "activo": true } }],
+  "proyectos":  [{ "id": "uuid…", "fields": { "uuid": "uuid…", "nombre": "…", "criterios_relevancia": "…", "voz_default": ["uuid…"], "N": 20, "…": "…" } }],
+  "referentes": [{ "id": "uuid…", "fields": { "handle": "@…", "plataforma": "instagram", "proyecto": ["uuid…"], "activo": true } }],
   "ajustes":    [{ "id": "Candidatos por corrida", "fields": { "clave": "Candidatos por corrida", "valor": 100 } }]
 }
 ```
@@ -44,30 +44,28 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 > `fields.clave`, así que cuando `Ajustes` se cortó a Postgres (D5) el `id` pasó a ser la clave
 > misma sin que nada se enterara.
 >
-> **En `voces`, `proyectos` y `referentes` el `id` es el record id de Airtable, y lo va a ser
-> hasta D7** ([ADR-033](../../docs/adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md)). No es
-> una comodidad: cuatro nodos vivos lo consumen como record id — `Preparar batch Airtable` escribe
-> `Candidatos.proyecto`/`.voz` como *links*, `Preparar batch Descartes` escribe
-> `Descartes.proyecto`, `Computar salud referentes` PATCHea `Referentes`, y `Destilar criterios`
-> PATCHea `Proyectos`. ⚠️ **Esos POST van con `typecast: true`, así que un uuid no daría error:
-> Airtable crearía un registro fantasma con el uuid de nombre.** Por eso una fila nacida en la app
-> acuña su record id al crearse, y por eso la traducción se cae en **D7** —cuando el motor deje de
-> escribir en Airtable— y no antes. *(Versiones anteriores de este contrato decían "en el corte
-> 4/4". Era falso.)*
+> ✅ **En `voces`, `proyectos` y `referentes` el `id` es el uuid de Postgres desde el 2026-08-01
+> — paso 3 y último del expand/contract de D7.** Hasta ahí fue el record id de Airtable, y no por
+> comodidad: cuatro nodos vivos lo consumían como record id (`Preparar batch Airtable` escribía
+> `Candidatos.proyecto`/`.voz` como *links*, `Preparar batch Descartes` escribía
+> `Descartes.proyecto`, `Computar salud referentes` PATCHeaba `Referentes` y `Destilar criterios`
+> PATCHeaba `Proyectos`), y esos POST iban con `typecast: true` ⇒ un uuid **no fallaba**, Airtable
+> creaba un registro fantasma con el uuid de nombre. D7 movió los cuatro a PostgREST, donde un id
+> mal formado viola una FK, y el paso 3 esperó su gate: **una corrida completa verde**, cumplida
+> por la del 2026-08-01 (candidatos y descartes escritos con `proyecto_id`/`voz_id` como FK).
 >
-> 🔀 **`fields.uuid` en `voces` y `proyectos` — el campo de transición de D7 (paso 1 de 3).**
-> Es el id de Postgres, y viaja **al lado** del `id` viejo a propósito. D7 tiene que cambiar dos
-> lados que no se pueden deployar a la vez (la app en Vercel, los workflows en n8n a mano), y
-> equivocar el orden **no falla**: el motor viejo recibiendo un uuid escribe un link con
-> `typecast` y crea un proyecto fantasma en silencio. Con los dos ids sirviéndose juntos, el orden
-> deja de importar: el workflow re-importado usa `fields.uuid` para escribir `app.candidatos`, el
-> que todavía no lo está sigue usando `id`, y cada lado se verifica por separado.
-> **Muere en el paso 3**, cuando `id` pase a ser el uuid y este campo y `airtable_id` desaparezcan.
-> Ese paso está gateado por evidencia —una corrida completa verde— no por calendario.
+> 🔀 **`fields.uuid` sigue viajando en `voces` y `proyectos`, y ya es redundante: vale lo mismo
+> que el `id`.** Fue el campo de transición de los pasos 1 y 2 — servir los dos ids juntos hizo
+> que el orden entre el deploy de Vercel y el re-import a mano en n8n dejara de importar. No se
+> borra todavía porque los consumidores en n8n resuelven el uuid con `uuidDe[x.id] = x.fields.uuid`
+> y, con los dos ids iguales, ese mapa queda **identidad**: por eso el paso 3 **no necesitó un
+> tercer re-import**. Sacar el campo sí lo necesitaría, así que muere en el próximo re-import que
+> haga falta por otra cosa, junto con el `uuidDe` que quedó sin trabajo.
 >
-> **`referentes[].fields.proyecto` viaja en el mismo idioma que `proyectos[].id`.** El motor cruza
-> las dos listas por ese id; la traducción la hace la app (`domain/referentes.ts`). Es **un array**:
-> un referente alimenta N proyectos
+> **`referentes[].fields.proyecto` viaja en el mismo idioma que `proyectos[].id`** — hoy los dos
+> en uuid. Tenían que flipear **juntos**: el motor cruza las dos listas por ese id, así que mover
+> una sola no habría fallado, habría dejado a todos los referentes sin proyecto y a la corrida sin
+> nada que buscar. Es **un array**: un referente alimenta N proyectos
 > ([ADR-032](../../docs/adr/ADR-032-referente-proyecto-es-n-a-n.md)).
 >
 > **`proyectos[].fields.voz_default` es un array de UN elemento** con el id de la voz — la forma que
@@ -75,11 +73,13 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 > 1 voz" ahora sea una FK not null no cambia la forma del contrato.
 >
 > **De qué almacenamiento sale cada dominio hoy lo dice `apps/dashboard/lib/config.ts`**, y no se
-> repite acá para que no quede viejo. Con una excepción que sí vive acá porque es del contrato:
-> **`criterios_aprendidos` y `advertencia_criterios` NO salen de Postgres aunque `Proyectos` ya sea
-> de Postgres.** Los escribe `Destilar criterios` del archivado en Airtable cada domingo (ADR-022) y
-> se leen de ahí hasta D7 — un dueño por **campo**, no por tabla (ADR-033). Esa lectura es
-> **fail-open**: si Airtable no responde, el plan sale con los criterios manuales.
+> repite acá para que no quede viejo. Desde D7 **no hay excepciones**: todo sale de Postgres, en
+> una sola lectura. La que hubo —`criterios_aprendidos` y `advertencia_criterios` leídos de
+> Airtable aunque `Proyectos` ya viviera en Postgres— existía porque su único escritor,
+> `Destilar criterios` del archivado, seguía escribiendo allá: un dueño por **campo**, no por
+> tabla ([ADR-033](../../docs/adr/ADR-033-dueno-por-campo-durante-la-coexistencia.md)). D7 movió
+> ese escritor a PostgREST, así que el campo y su autor volvieron al mismo lugar y **ADR-033 se
+> cumplió entera y murió** — era una regla con fecha de vencimiento puesta en D7.
 
 - **Filtros (ADR-028 §2, y nada más):** solo voces `activo` · solo proyectos `activo` **de voz
   activa** (el gate que hoy hace `Armar plan` cruzando tablas) · solo referentes `activo` ·
