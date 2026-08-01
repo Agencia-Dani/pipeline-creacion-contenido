@@ -6,18 +6,30 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { exigirZona } from "@/lib/auth";
-import { leerCalidad, leerCostos, leerEmbudo } from "@/lib/entender";
-import { Calidad, Costos, Embudo, ErrorLectura } from "./secciones";
+import {
+  leerAuditoria,
+  leerCalidad,
+  leerCostos,
+  leerDescubrimiento,
+  leerEmbudo,
+  leerEventos,
+} from "@/lib/entender";
+import { Actividad, Auditoria, Calidad, Costos, Descubrimiento, Embudo, ErrorLectura } from "./secciones";
 
 export const dynamic = "force-dynamic";
 
 export default async function EntenderPage() {
-  await exigirZona("entender");
+  const usuario = await exigirZona("entender");
+  const esDev = usuario.rol === "dev";
 
-  const [calidad, embudo, costos] = await Promise.allSettled([
+  // `allSettled` y no `all`: una vista que falle apaga su tarjeta, no la página entera.
+  const [calidad, embudo, auditoria, descubrimiento, costos, eventos] = await Promise.allSettled([
     leerCalidad(),
     leerEmbudo(),
+    leerAuditoria(),
+    leerDescubrimiento(),
     leerCostos(),
+    esDev ? leerEventos() : Promise.resolve([]),
   ]);
 
   return (
@@ -66,6 +78,40 @@ export default async function EntenderPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Cuánto bueno estamos tirando</CardTitle>
+          <CardDescription>
+            De los rechazos que el motor dejó para revisar, cuántos el equipo marcó como
+            &laquo;era bueno&raquo;. Es lo único que mide si el filtro se pasa de exigente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {auditoria.status === "fulfilled" ? (
+            <Auditoria filas={auditoria.value} />
+          ) : (
+            <ErrorLectura que="la auditoría de descartes" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Buscador de cuentas</CardTitle>
+          <CardDescription>
+            Cuántas cuentas nuevas encontró el descubrimiento y cuántas terminaron alimentando
+            proyectos. Si nunca se aprueba nada, las semillas no están sirviendo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {descubrimiento.status === "fulfilled" ? (
+            <Descubrimiento filas={descubrimiento.value} />
+          ) : (
+            <ErrorLectura que="el embudo del buscador" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Costos de la semana</CardTitle>
           <CardDescription>
             Consumo real por servicio × su tarifa (viven en la tabla de tarifas de la
@@ -80,6 +126,25 @@ export default async function EntenderPage() {
           )}
         </CardContent>
       </Card>
+
+      {esDev && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Actividad</CardTitle>
+            <CardDescription>
+              Quién cambió qué, y cuándo. Solo para dev: al equipo no le sirve, pero cuando algo
+              cambió solo esto es lo que responde por qué.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {eventos.status === "fulfilled" ? (
+              <Actividad filas={eventos.value} />
+            ) : (
+              <ErrorLectura que="la actividad" />
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

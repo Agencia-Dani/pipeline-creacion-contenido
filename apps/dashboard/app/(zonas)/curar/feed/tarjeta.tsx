@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { CALIFICACIONES, type Calificacion, type CandidatoFeed } from "@/domain/feed";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +76,7 @@ export function Tarjeta({
   onAbrir: () => void;
 }) {
   const calificado = puesta !== null;
+  const [miniaturaRota, setMiniaturaRota] = useState(false);
 
   return (
     <div
@@ -93,19 +95,28 @@ export function Tarjeta({
             que una sola fila de tarjetas llene la pantalla y el mazo deje de leerse como un
             conjunto. Se recorta al centro, que es donde el reel pone el gancho. */}
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-          {candidato.thumbnail ? (
-            // <img> a propósito, no next/image: la URL es un attachment de Airtable que vence a
-            // las ~2 h, así que optimizarla y cachearla la rompe (ver lib/candidatos.ts).
+          {candidato.thumbnail && !miniaturaRota ? (
+            // <img> a propósito, no next/image: la URL es del CDN de Instagram/TikTok, viene
+            // firmada y con expiry, así que optimizarla y cachearla la rompe (ver
+            // lib/candidatos.ts). Antes de D7 Airtable la re-hosteaba; ahora nadie lo hace.
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={candidato.thumbnail}
               alt=""
               loading="lazy"
+              // Una URL vencida daba el ícono de imagen rota, que se lee como "la app falló".
+              // Cae al mismo lugar que no tener miniatura: la decisión igual la da el guion.
+              onError={() => setMiniaturaRota(true)}
               className="size-full object-cover transition-transform group-hover:scale-105"
             />
           ) : (
-            <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-              sin miniatura
+            <div className="flex size-full flex-col items-center justify-center gap-1 px-2 text-center">
+              <span className="text-lg font-semibold text-muted-foreground/70">
+                {(candidato.referente ?? candidato.titulo).replace(/^@/, "").charAt(0).toUpperCase() || "?"}
+              </span>
+              <span className="text-[10px] leading-tight text-muted-foreground">
+                {candidato.thumbnail ? "miniatura vencida" : "sin miniatura"}
+              </span>
             </div>
           )}
           {puesta && (

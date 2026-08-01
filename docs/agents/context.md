@@ -42,7 +42,7 @@ descubrimiento ciego; el eje se removió por completo y su reemplazo es el motor
 referentes (ADR-020).
 
 **Candidato**:
-Un video ya transcrito y traducido al español, esperando que el equipo lo califique en Airtable.
+Un video ya transcrito y traducido al español, esperando que el equipo lo califique en el cockpit.
 La unidad que el equipo cura es la dupla **(video, proyecto)**: un mismo video relevante para dos
 proyectos es dos candidatos, cada uno con su voz, su heat-score y su juicio de relevancia (ADR-013).
 
@@ -60,7 +60,7 @@ de adorno. Garantizarla es trabajo de la máquina.
 Qué tanto aporta el contenido del video en sí, frente a lo viral-vacío (gancho sin sustancia).
 
 **Criterios de relevancia**:
-Las reglas, editables por el equipo en Airtable, contra las que el motor juzga si un video sirve
+Las reglas, editables por el equipo en el cockpit, contra las que el motor juzga si un video sirve
 para un **Proyecto**. Alimentan la evaluación semántica. Un buen criterio dice qué sirve, qué NO
 sirve, y trae ejemplos reales; si no permite rechazar nada, es una descripción, no un criterio. La
 Voz no aporta criterio sino **contexto de persona** (revisión de ADR-010, 2026-07-14).
@@ -73,14 +73,17 @@ reemplazan; el equipo los ve y puede editarlos o borrarlos (ADR-022). La misma d
 visible al equipo pero que el gate no lee.
 
 **Salud por referente**:
-Tres números que el archivado escribe por cuenta cada semana — `tasa_gate` (qué fracción de sus videos
-pasó el gate), `tasa_aprobacion` (qué fracción terminó aprobando el equipo) y `videos_evaluados` — con
-mínimo de muestra. Señalan qué fuente **podar**; la poda siempre la ejecuta el equipo (ADR-022).
+Tres números por cuenta, **derivados de lo que ya pasó** (nadie los escribe a mano ni los guarda):
+`tasa_gate` (qué fracción de sus videos pasó el gate), `tasa_aprobacion` (qué fracción terminó
+aprobando el equipo) y `videos_evaluados` — con mínimo de muestra. Señalan qué fuente **podar**; la
+poda siempre la ejecuta el equipo (ADR-022).
 
 **Descarte del gate**:
 Un video que el juicio de relevancia rechazó después de transcribirlo. **No es un Candidato** (nunca
 esperó calificación). Los de score intermedio se exponen al equipo para auditoría; uno que el equipo
-marca "era bueno" es un **falso negativo** y alimenta la revisión de criterios (ADR-021).
+marca "era bueno" es un **falso negativo** y alimenta la revisión de criterios (ADR-021). A
+diferencia de un Candidato, **un descarte no caduca**: queda esperando su auditoría el tiempo que
+haga falta, porque nadie más guarda lo que se tiró (ADR-036).
 
 **Precisión de entrega**:
 La métrica norte de calidad: de lo que el equipo calificó en la semana, qué fracción aprobó. Mide si

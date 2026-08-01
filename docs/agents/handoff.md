@@ -22,6 +22,87 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🔴 **D7 ESTÁ ESCRITO Y VERDE EN EL REPO, PERO NO EJECUTADO — 2026-08-01.** Todo vive en la rama
+> **`d7-corte-escritura`**, sin mergear, a propósito: en este repo commitear es deployar, y D7
+> necesita que el deploy y el re-import pasen en la misma ventana. **No mergees sin leer el orden.**
+>
+> **Lo verificado en local:** `typecheck` ✓ · 117 tests ✓ · `build` ✓ · `validate` (1517 checks) ✓ ·
+> `auditar-workflows` **sin hallazgos** · `test-nodos` en verde · y el hecho-cuando mecánico:
+> **`grep -c api.airtable.com Workflows/*/workflow.json` da 0 en los tres**, `lib/airtable.ts` no
+> existe y `<<AIRTABLE_BASE_ID>>` ya no es placeholder de nadie.
+>
+> **Verificado CONTRA DATOS REALES (2026-08-01, sesión de cierre):**
+> · `npm run cortar:feed -- --dry` contra Airtable + Supabase vivos → **145 candidatos, 0 sin
+>   `external_id`, 0 sin proyecto resoluble** (o sea la resolución record id → uuid funciona contra
+>   la base real) · **20 descartes, 0 auditados** (confirma que el loop de ADR-021 estaba muerto) ·
+>   **8 propuestas, 16 pares, las 8 con 2 proyectos** — el hallazgo 6 reproducido por el script.
+> · La **fachada corriendo en local contra Supabase real**: `?ambito=motor` → 3 voces · 4 proyectos ·
+>   15 referentes · 18 ajustes, con `fields.uuid` en **todos** y el `id` viejo intacto.
+> · **`criterios_aprendidos`: Postgres y Airtable son idénticos** (los 862/1048 están en los dos
+>   Trading, que están inactivos). El corte **no pierde nada** — la duda salió y se midió.
+> · La app levanta, `/login` renderiza, cero errores de consola y de servidor.
+>
+> **Lo que sigue SIN verificar:** la migración `013` no está aplicada, así que **ninguna consulta
+> que la necesite se ejecutó jamás** — ni las 2 vistas nuevas, ni los embeds de PostgREST
+> (`proyectos(nombre)`, la puente), ni un solo insert de n8n. Y n8n no se re-importó.
+>
+> ### El orden, que importa más que el contenido
+>
+> **1. Aplicar `core/schema/013_corte_escritura.sql`** en el SQL Editor. Agrega `external_id` con
+>    `unique`, la tabla puente de propuestas, las 2 vistas nuevas, y dropea 2 columnas muertas.
+>
+> **2. Cargar el dato vivo, en seco primero:**
+> ```
+> cd apps/dashboard && npm run cortar:feed -- --dry
+> ```
+> Mirá el A/B que imprime. **Lo que tiene que dar:** ~145 candidatos, los descartes con su cuenta de
+> auditados, y las propuestas con **2 proyectos cada una** (si dice "con más de 1 proyecto: 0",
+> algo está mal: se midió 8/8). Después sin `--dry`.
+>
+> **3. Mergear la rama** (deploy) **y re-importar los 3 workflows en la misma ventana.** Orden:
+>    **descubrimiento → archivado → motor** (barato → medio → caro).
+>
+> ⚠️ **No corras el motor entre el merge y el re-import.** En esa ventana el motor viejo escribiría
+> en Airtable y la app ya estaría leyendo Postgres: los candidatos nuevos no aparecerían en el feed.
+> Si el cron del domingo cae en el medio, desactivalo antes.
+>
+> ✅ **El pre-flight de credenciales YA NO HACE FALTA — verificado.** `main` tenía **10** nodos con
+> `nodeCredentialType` pero sin el bloque `credentials` (9 en el archivado, 1 en el motor): al
+> importar quedaban sin credencial y fallaban en ejecución. **Los 10 se fueron con D7**, borrados o
+> reescritos. Chequeo, por si alguien duda:
+> ```sh
+> python3 -c "
+> import json,glob
+> for f in glob.glob('Workflows/*/workflow.json'):
+>     w=json.load(open(f))
+>     print(f, [n['name'] for n in w['nodes'] if n.get('parameters',{}).get('nodeCredentialType') and not n.get('credentials')])"
+> ```
+>
+> **4. El hecho-cuando, después de una corrida on-demand completa:**
+> ```sql
+> select id, calificacion, estado, fecha_calificacion from app.candidatos where estado <> 'nuevo' limit 5;
+> select * from app.v_metricas_calidad order by semana desc limit 5;
+> select * from app.v_auditoria_descartes order by semana desc limit 3;
+> ```
+> **`fecha_calificacion` no puede ser null** y `v_metricas_calidad` **no puede dar cero filas** una
+> vez que el archivado corrió. Si alguna falla, es el hallazgo 4 sin arreglar y la métrica norte
+> quedó muda. Esta clase de bug **sale verde**: hay que ir a buscarla.
+>
+> **5. Medir el thumbnail** (hallazgo 2): agarrá un `thumbnail_url` de la corrida nueva y pedilo con
+> `curl -I` al día siguiente. Si vence antes de la semana, entra Supabase Storage. Los candidatos
+> arrastrados por el paso 2 vienen **sin miniatura a propósito** (eran adjuntos de Airtable con
+> expiry de 2 h: copiar esa URL guardaba un link muerto).
+>
+> **6. Recién ahí, el paso 3 del expand/contract:** `id` pasa a ser el uuid, se borran `fields.uuid`
+> y `airtable_id` del contrato, y **sale `AIRTABLE_PAT` de Vercel**. Está gateado por evidencia (una
+> corrida verde), no por calendario.
+>
+> ### Airtable, después de todo esto
+> El viaje de 9 páginas a congelar que venía acumulándose **deja de importar**: ninguna máquina
+> escribe ni lee ahí. Lo que queda es el trabajo no-código de **D8** (export final, base a
+> read-only, cancelar la suscripción) y **avisarle a Majo y a Jero que Airtable murió**.
+
+
 > 📋 **El viaje a Airtable que se viene acumulando, junto, para hacerlo de una** (los 3 cortes de
 > D5 y D6 dejaron su parte y ninguna se hizo todavía). **9 páginas a congelar** —solo-lectura o
 > renombrar `[ARCHIVO] …`— y **ninguna tabla a bloquear**:

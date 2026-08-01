@@ -1,88 +1,108 @@
-import { camposDeCalificacion, esCalificacion, type Calificacion, type CandidatoFeed, type Estado } from "@/domain/feed";
-import { leerTabla, parchearRegistro, urlDeMiniatura } from "@/lib/airtable";
-import { leerProyectos } from "@/lib/referentes";
+import { z } from "zod";
+import {
+  camposDeCalificacion,
+  esCalificacion,
+  type Calificacion,
+  type CandidatoFeed,
+  type Estado,
+} from "@/domain/feed";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-// El feed de calificación (D6). Los candidatos siguen viviendo **en Airtable**, y eso es a
-// propósito: los escribe el motor y los lee el archivado en 7 nodos (archivar a `outputs`,
-// contar métricas de la semana, destilar criterios, barrer los viejos). D6 cambia la
-// SUPERFICIE, no el dueño — el corte de estas tablas es D7, con su re-import.
+// El feed de calificación. Desde D7 los candidatos viven **en Postgres**: los escribe el motor por
+// PostgREST (ADR-035) y los lee el archivado por el mismo canal. Airtable ya no participa.
 //
-// Por eso `Candidatos` y `Descartes del gate` SIGUEN en el catálogo de sombra
-// (`scripts/comun.ts`), al revés de lo que manda el procedimiento del corte 1/4: ahí la regla
-// era "la tabla cortada sale del catálogo", y acá no hay corte, así que Postgres sigue siendo
-// un espejo de solo lectura y el `sombra:diff` tiene que seguir dando cero.
+// Lo que el corte simplificó, y vale anotarlo porque era ruido puro:
+//  · El proyecto se resuelve por **FK**, no cruzando record ids a mano. Un candidato no puede
+//    apuntar a un proyecto inexistente: la base no lo deja. El grupo `(sin proyecto)` sigue
+//    existiendo para `proyecto_id is null`, que sí es posible (el motor lo omite si no lo tiene).
+//  · `thumbnail_url` es una columna de texto: se acabó el `urlDeMiniatura` sobre adjuntos.
 //
-// ⚠️ Las URLs de `thumbnail` son attachments de Airtable y **vencen a las ~2 h**. Nunca se
-// cachean: `leerTabla` va con `cache: "no-store"` y la página es `force-dynamic`. Si alguna vez
-// se cachea la página o las URLs pasan por el optimizador de imágenes de Next, las tarjetas
-// quedan rotas y el bug parece intermitente.
+// ⚠️ La contracara del thumbnail, y hay que medirla: Airtable **descargaba y re-hosteaba** la
+// imagen, y ahora guardamos la URL cruda del CDN de Instagram/TikTok, que viene firmada y con
+// expiry. La tarjeta tiene que tolerar que no cargue (placeholder), y la primera corrida post-D7
+// mide cuánto viven de verdad. Si no aguantan la semana, entra Supabase Storage.
 
-export const TABLA = "Candidatos";
+const filaCandidato = z.object({
+  id: z.string(),
+  titulo: z.string(),
+  script: z.string().nullable(),
+  thumbnail_url: z.string().nullable(),
+  referente: z.string().nullable(),
+  url_referente: z.string().nullable(),
+  heat_score: z.coerce.number().nullable(),
+  relevancia_score: z.coerce.number().nullable(),
+  relevancia_razon: z.string().nullable(),
+  idioma: z.string().nullable(),
+  views: z.coerce.number().nullable(),
+  likes: z.coerce.number().nullable(),
+  seguidores: z.coerce.number().nullable(),
+  viral_por_tamano: z.boolean(),
+  calificacion: z.string().nullable(),
+  estado: z.string(),
+  notas_equipo: z.string().nullable(),
+  proyectos: z.object({ nombre: z.string() }).nullable(),
+});
 
-const texto = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
-const numero = (v: unknown): number | null => (typeof v === "number" ? v : null);
+const COLUMNAS =
+  "id, titulo, script, thumbnail_url, referente, url_referente, heat_score, relevancia_score, " +
+  "relevancia_razon, idioma, views, likes, seguidores, viral_por_tamano, calificacion, estado, " +
+  "notas_equipo, proyectos(nombre)";
 
-function primerLink(v: unknown): string | null {
-  return Array.isArray(v) && typeof v[0] === "string" ? v[0] : null;
-}
-
-/**
- * Todo lo que hay en el feed, con el proyecto ya resuelto a nombre.
- *
- * El cruce va por record id de Airtable porque el motor escribe `Candidatos.proyecto` como
- * *link* (ADR-033 §3: eso muere recién en D7). Un candidato cuyo proyecto no exista de este
- * lado no se esconde — cae en el grupo `(sin proyecto)`, que es visible y raro a propósito:
- * esconderlo sería perder trabajo sin avisar.
- */
+/** Todo lo que hay en el feed, con el proyecto ya resuelto a nombre por la FK. */
 export async function leerFeed(): Promise<CandidatoFeed[]> {
-  const [registros, proyectos] = await Promise.all([leerTabla(TABLA, ""), leerProyectos()]);
-  const nombrePorAirtableId = new Map(
-    proyectos.filter((p) => p.airtableId).map((p) => [p.airtableId!, p.nombre]),
-  );
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.schema("app").from("candidatos").select(COLUMNAS);
+  if (error) throw new Error(`Supabase respondió con error leyendo el feed: ${error.message}`);
 
-  return registros.map((r) => {
-    const f = r.fields;
-    const calificacion = esCalificacion(f.calificacion) ? f.calificacion : null;
-    const estadoCrudo = texto(f.estado);
-    const proyectoId = primerLink(f.proyecto);
-
-    return {
-      id: r.id,
-      titulo: texto(f.titulo) ?? "(sin título)",
-      script: texto(f.script),
-      thumbnail: urlDeMiniatura(f.thumbnail),
-      proyecto: (proyectoId && nombrePorAirtableId.get(proyectoId)) ?? "",
-      referente: texto(f.referente),
-      urlReferente: texto(f.url_referente),
-      heat: numero(f.heat_score),
-      relevanciaScore: numero(f.relevancia_score),
-      relevanciaRazon: texto(f.relevancia_razon),
-      idioma: texto(f.idioma),
-      views: numero(f.views),
-      likes: numero(f.likes),
-      seguidores: numero(f.seguidores),
-      viralPorTamano: f.viral_por_tamano === true,
-      calificacion,
-      estado: (estadoCrudo as Estado | null) ?? "nuevo",
-      notas: texto(f.notas_equipo),
-    } satisfies CandidatoFeed;
-  });
+  return z.array(filaCandidato).parse(data).map((r) => ({
+    id: r.id,
+    titulo: r.titulo,
+    script: r.script,
+    thumbnail: r.thumbnail_url,
+    proyecto: r.proyectos?.nombre ?? "",
+    referente: r.referente,
+    urlReferente: r.url_referente,
+    heat: r.heat_score,
+    relevanciaScore: r.relevancia_score,
+    relevanciaRazon: r.relevancia_razon,
+    idioma: r.idioma,
+    views: r.views,
+    likes: r.likes,
+    seguidores: r.seguidores,
+    viralPorTamano: r.viral_por_tamano,
+    calificacion: esCalificacion(r.calificacion) ? r.calificacion : null,
+    estado: (r.estado as Estado) ?? "nuevo",
+    notas: r.notas_equipo,
+  } satisfies CandidatoFeed));
 }
 
 /**
- * Calificar: los DOS campos, siempre juntos (ADR-034). Escribir solo `calificacion` dejaría al
- * candidato en `nuevo`, o sea invisible para el archivado y purgado a los 20 días sin pasar por
- * el histórico — el agujero del 14% medido sobre `outputs`.
+ * Calificar: los TRES campos, siempre juntos (ADR-034 + el hallazgo de D7 sobre
+ * `fecha_calificacion`, que en Airtable se calculaba sola y en Postgres no tiene autor).
+ * Escribir solo `calificacion` dejaría al candidato en `nuevo` — invisible para el archivado y
+ * purgado a los 20 días sin pasar por el histórico.
  */
 export async function calificar(id: string, calificacion: Calificacion): Promise<void> {
-  await parchearRegistro(TABLA, id, camposDeCalificacion(calificacion));
+  await actualizar(id, camposDeCalificacion(calificacion));
 }
 
 /**
- * Las notas son la válvula de escape de ADR-034: la combinación "buen video pero no lo quiero"
- * dejó de ser expresable con el emoji, así que vive acá. No se pierden — desde D.3(b) el
- * archivado las lleva a `outputs.metadata`.
+ * Las notas son la válvula de escape de ADR-034: "buen video pero no lo quiero" dejó de ser
+ * expresable con el emoji. No se pierden — el archivado las lleva a `outputs.metadata`.
  */
 export async function guardarNotas(id: string, notas: string): Promise<void> {
-  await parchearRegistro(TABLA, id, { notas_equipo: notas });
+  await actualizar(id, { notas_equipo: notas });
+}
+
+/** Fail-loud si el candidato ya no existe: el barrido del domingo pudo habérselo llevado. */
+async function actualizar(id: string, campos: Record<string, unknown>): Promise<void> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .schema("app")
+    .from("candidatos")
+    .update(campos)
+    .eq("id", id)
+    .select("id");
+  if (error) throw new Error(`Supabase respondió con error guardando el candidato: ${error.message}`);
+  if (!data || data.length === 0) throw new Error("Ese candidato ya no está en el feed.");
 }

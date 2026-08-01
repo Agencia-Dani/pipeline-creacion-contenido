@@ -37,12 +37,32 @@ describe("estadoDe — la derivación de ADR-034", () => {
     }
   });
 
-  it("camposDeCalificacion manda SIEMPRE los dos campos juntos", () => {
+  it("camposDeCalificacion manda SIEMPRE los tres campos juntos", () => {
     // Si alguna vez se escribiera solo `calificacion`, el archivado no levantaría el candidato
     // (filtra `NOT estado='nuevo'`) y el barrido de 20 días lo purgaría sin archivar: es
     // exactamente el agujero del 14% que ADR-034 vino a cerrar.
-    assert.deepEqual(camposDeCalificacion("🔥"), { calificacion: "🔥", estado: "aprobado" });
-    assert.deepEqual(camposDeCalificacion("👎"), { calificacion: "👎", estado: "descartado" });
+    const ahora = new Date("2026-08-01T15:04:05.000Z");
+    assert.deepEqual(camposDeCalificacion("🔥", ahora), {
+      calificacion: "🔥",
+      estado: "aprobado",
+      fecha_calificacion: "2026-08-01T15:04:05.000Z",
+    });
+    assert.deepEqual(camposDeCalificacion("👎", ahora), {
+      calificacion: "👎",
+      estado: "descartado",
+      fecha_calificacion: "2026-08-01T15:04:05.000Z",
+    });
+  });
+
+  it("camposDeCalificacion NUNCA deja fecha_calificacion sin llenar", () => {
+    // Este test existe por un hallazgo de D7, no por paranoia. En Airtable la fecha era un campo
+    // `lastModified` que se calculaba solo: ningún código la escribía. Al pasar a Postgres la
+    // columna se queda sin autor, y de ella cuelga `outputs.calificado_en` → `v_metricas_calidad`,
+    // que filtra `calificado_en is not null`. En NULL, la vista devuelve cero filas y la
+    // precisión de entrega —la métrica norte de ADR-021— desaparece sin que nada falle.
+    const campos = camposDeCalificacion("👍");
+    assert.ok(campos.fecha_calificacion, "sin fecha, la analítica de calidad queda muda");
+    assert.ok(!Number.isNaN(Date.parse(campos.fecha_calificacion)));
   });
 
   it("esCalificacion rechaza lo que no es un emoji del vocabulario", () => {

@@ -32,8 +32,9 @@ export default async function DescartesPage() {
 
       <Alert>
         <AlertDescription>
-          Esta lista se borra sola cada domingo. Lo que no se marca antes no se recupera: no queda
-          para la semana que viene.
+          Esta lista ya no se borra los domingos: lo que no marques hoy sigue acá la semana que
+          viene. Marcar «era bueno» es lo único que le dice al sistema cuánto contenido útil está
+          tirando el filtro.
         </AlertDescription>
       </Alert>
 

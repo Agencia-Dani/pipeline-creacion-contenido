@@ -37,7 +37,7 @@ export default async function CurarPage() {
             <CardTitle>Descartes</CardTitle>
             <CardDescription>
               Los que el filtro mató por poco. Marcar cuáles eran buenos es lo que corrige los
-              criterios — y la lista se borra cada domingo.
+              criterios. Lo que no marques sigue esperando: la lista ya no se borra.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -331,12 +331,58 @@ conclusión opuesta a la verdad: el loop de auditoría de ADR-021 no está incom
 Si la app lo vuelve a dejar de solo-lectura, hereda el mismo agujero.
 **Hecho cuando:** una semana entera de calificación pasa por la app sin que nadie abra Airtable.
 
-### D7 — Corte de escritura *(re-import #2)*
-El motor deja de escribir Candidatos y Descartes en Airtable, y el archivado deja de escribir
-Métricas y salud de referentes. Contrato de escritura a definir (**ADR-029**, se escribe al diseñar
-esta fase: endpoint de la app vs. insert directo). El archivado adelgaza: barre, destila criterios y
-poco más.
+### D7 — Corte de escritura *(re-import #2)* — **CÓDIGO HECHO (2026-08-01), falta ejecutarlo**
+Los **3 workflows** dejan de tocar Airtable, y la app también: se borró `lib/airtable.ts` entero.
+El contrato de escritura se cerró con **[ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md)**
+— *n8n lee su config por la fachada, escribe sus resultados por PostgREST* — y no con "ADR-029" como
+decía este plan (ese número ya se había usado para dedup blindado). El archivado adelgaza de 35
+nodos a 20.
 **Hecho cuando:** una corrida completa (motor → archivado) no toca Airtable en ningún nodo.
+
+> **El alcance real fue más grande que este párrafo, y a propósito.** Decía "motor + archivado",
+> pero dejar el descubrimiento afuera creaba un **tercer re-import** que el plan dice que no existe
+> (§6: solo D4 y D7). Entró, y fue el **piloto**: 1 nodo cambió de destino y 4 se borraron.
+>
+> **Los 6 hallazgos del grilling, porque 3 eran pérdidas silenciosas** — de las que no fallan, salen
+> verdes y dejan un número en cero:
+> 1. **`app.candidatos` no tenía `external_id`.** El motor lo escribía en Airtable como 3ª línea del
+>    dedup (ADR-029) y el schema `009` no le dio columna: el import de sombra lo venía tirando hace
+>    semanas. Ahora va **con `unique`**, así que la defensa pasó de procedural a estructural — es la
+>    alternativa que ADR-029 dejó diferida. `Leer feed vivo` **no se borró**: el constraint atrapa el
+>    duplicado *después* de pagar la transcripción, el nodo lo mata *antes*.
+> 2. **Airtable re-hosteaba las miniaturas y nadie lo había notado.** Ahora se guarda la URL cruda
+>    del CDN, firmada y con expiry. La tarjeta cae a un placeholder cuando vence, y **la primera
+>    corrida post-D7 mide cuánto viven** (nadie lo sabe: nunca se guardó la original). Si no aguantan
+>    la semana, entra Supabase Storage.
+> 3. 🔴 **D7 mataba `falsos_negativos` por segunda vez.** `v_embudo_semana` no lo tiene y no puede:
+>    ese número sale de contar descartes auditados, no de `runs.metricas`. Lo arregla
+>    [ADR-036](../adr/ADR-036-los-descartes-no-se-barren.md): los descartes **dejan de barrerse** y
+>    el contador pasa a ser una vista viva. Efecto lateral bueno: un descarte sin auditar dejó de ser
+>    *"una auditoría perdida para siempre"*.
+> 4. 🔴 **`fecha_calificacion` no tenía autor.** En Airtable era un `lastModified` que se calculaba
+>    solo; en Postgres quedaba NULL, y de ella cuelga `outputs.calificado_en` → `v_metricas_calidad`,
+>    que filtra `calificado_en is not null`. La pantalla *Calidad* habría dado **cero filas** y la
+>    **precisión de entrega** —la métrica norte de ADR-021— habría desaparecido sin que nada fallara.
+> 5. 🟠 **El embudo del descubrimiento se quedaba sin reemplazo** (`v_embudo_semana` filtra
+>    `workflow = 'motor'`). Los costos sí estaban cubiertos; el embudo no.
+> 6. 🔴 **`Referentes propuestos` es N:M**, medido contra el dato vivo: las 8 propuestas tenían
+>    **2 proyectos cada una**, y el schema les daba un `proyecto_id` simple ⇒ el corte tiraba 8 de 16
+>    pares. Es el bug del corte 2/4 otra vez, completo. Enmienda de ADR-032 + tabla puente.
+>    **Que cayera en el piloto es exactamente por qué el piloto va primero.**
+>
+> **La regla de método que deja este corte**, y que completa la trilogía: el 2/4 dejó *"medí el dato
+> vivo contra el schema que lo va a recibir"*, el 3/4 dejó *"listá quién ESCRIBE cada campo"*, y D7
+> agrega **"listá qué campos NO los escribía nadie, porque Airtable los calculaba solo"**. Los
+> `createdTime`, `lastModified` y las columnas-fórmula no tienen autor: al migrar se vuelven NULL en
+> silencio y se llevan puesto lo que dependía de ellos.
+
+### D7.5 — matar el archivado *(sin re-import, después de la corrida verde)*
+Con todo en Postgres el archivado dejó de ser un movedor de datos: archivar y barrer son una
+sentencia SQL cada uno. Lo que queda es la llamada a Haiku de `Destilar criterios` y el Sheet.
+El paso siguiente es que **la app escriba `outputs` en el mismo acto de calificar** — enmienda
+ADR-014, pide `run_id` en `app.candidatos`, y por eso D7 *no* lo agregó especulativamente.
+No entró en D7 por "una corrida, una variable": cambiar quién escribe el histórico al mismo tiempo
+que se re-importan 3 workflows significa no saber cuál de los dos lo rompió.
 
 ### D8 — Apagado y sostenibilidad
 Export final de Airtable al repo · base a read-only · `setup-airtable.mjs` deprecado ·
@@ -368,10 +414,16 @@ Airtable intacto** — eso es lo que hace que valga la pena empezar.
 
 ## 8. Decisiones abiertas (del arquitecto, no se asumen acá)
 
-- [ ] **Contrato de escritura del motor (D7)** — endpoint de la app vs. insert directo a Postgres
-      desde n8n. Se cierra con **ADR-029** al diseñar D7.
-- [ ] **Qué queda del archivado** cuando las Métricas son vistas: ¿sigue computando algo, o se
-      reduce a barrer Candidatos y destilar criterios (ADR-022)?
+- [x] **Contrato de escritura del motor (D7).** RESUELTO en
+      **[ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md)**: PostgREST directo, no
+      endpoint de la app. La simetría con ADR-028 era falsa — n8n ya escribía `runs`/`outputs`
+      directo desde el día 1, y meter la app en el camino de la **entrega** la vuelve una dependencia
+      justo donde el sistema es fail-open a propósito. *(Este plan decía "se cierra con ADR-029";
+      ese número terminó usándose para dedup blindado.)*
+- [x] **Qué queda del archivado.** RESUELTO: se reduce a archivar a `outputs`, escribir el Sheet,
+      destilar criterios (ADR-022) y barrer candidatos. De 35 nodos a 20. Las Métricas y la salud de
+      referentes se borraron (ya eran vistas desde D2 y el corte 2/4). **El siguiente paso —matarlo
+      del todo— es D7.5**, y no entró en D7 por "una corrida, una variable".
 - [x] **Estado de corrida: polling vs. Supabase Realtime.** RESUELTO en D1 (cierre 59): polling cada
       5 s **solo** mientras hay una corrida `en_curso` (`operar/auto-refresh.tsx`). Realtime queda
       como optimización futura si molesta.

@@ -101,11 +101,10 @@ const proyecto = (extra: Partial<ProyectoGuardado> = {}): ProyectoGuardado => ({
 });
 
 const AIRTABLE_POR_VOZ = new Map([["uuid-voz-1", "recVOZ1" as string | null]]);
-const SIN_DESTILAR = new Map<string, { criterios_aprendidos: string | null; advertencia_criterios: string | null }>();
 
 test("el id que viaja es el record id de Airtable: el motor lo usa como link al escribir", () => {
   assert.equal(aRegistrosDeVoces([voz()], "motor")[0].id, "recVOZ1");
-  assert.equal(aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, SIN_DESTILAR, "motor")[0].id, "recPROY1");
+  assert.equal(aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, "motor")[0].id, "recPROY1");
 });
 
 test("una fila nacida en la app viaja con su uuid (no tiene otro id que dar)", () => {
@@ -114,7 +113,7 @@ test("una fila nacida en la app viaja con su uuid (no tiene otro id que dar)", (
 });
 
 test("voz_default viaja como array de un elemento con el record id de la voz", () => {
-  const [r] = aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, SIN_DESTILAR, "motor");
+  const [r] = aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, "motor");
   assert.deepEqual(r.fields.voz_default, ["recVOZ1"]);
 });
 
@@ -124,40 +123,46 @@ test("?ambito=motor filtra lo apagado; ?ambito=completo lo trae todo", () => {
   assert.equal(aRegistrosDeVoces(voces, "completo").length, 2);
 
   const proyectos = [proyecto(), proyecto({ id: "uuid-proy-2", airtable_id: "recPROY2", activo: false })];
-  assert.equal(aRegistrosDeProyectos(proyectos, AIRTABLE_POR_VOZ, SIN_DESTILAR, "motor").length, 1);
-  assert.equal(aRegistrosDeProyectos(proyectos, AIRTABLE_POR_VOZ, SIN_DESTILAR, "completo").length, 2);
+  assert.equal(aRegistrosDeProyectos(proyectos, AIRTABLE_POR_VOZ, "motor").length, 1);
+  assert.equal(aRegistrosDeProyectos(proyectos, AIRTABLE_POR_VOZ, "completo").length, 2);
 });
 
-test("los criterios destilados entran desde donde los escribe el archivado, no desde Postgres", () => {
-  // La columna de Postgres tiene un valor viejo (el del último import de sombra) y Airtable el
-  // que el archivado escribió el domingo. Gana Airtable: es su dueño hasta D7 (ADR-033).
-  const destilados = new Map([
-    ["recPROY1", { criterios_aprendidos: "lo aprendido el domingo", advertencia_criterios: "falta lista negativa" }],
-  ]);
+test("los criterios destilados salen de la fila, como todo lo demás (murió ADR-033)", () => {
+  // Durante la coexistencia estos dos campos venían de Airtable, porque su único escritor
+  // —`Destilar criterios` del archivado— vivía ahí. D7 movió ese escritor a PostgREST, así que
+  // el campo y su autor volvieron al mismo lugar y la regla "un dueño por CAMPO" se cumplió sola.
   const [r] = aRegistrosDeProyectos(
-    [proyecto({ criterios_aprendidos: "valor viejo de la sombra" })],
+    [proyecto({ criterios_aprendidos: "lo aprendido el domingo", advertencia_criterios: "falta lista negativa" })],
     AIRTABLE_POR_VOZ,
-    destilados,
     "motor",
   );
   assert.equal(r.fields.criterios_aprendidos, "lo aprendido el domingo");
   assert.equal(r.fields.advertencia_criterios, "falta lista negativa");
 });
 
-test("sin destilado (o proyecto nuevo sin fila en Airtable) los campos viajan null, no undefined", () => {
-  const [r] = aRegistrosDeProyectos(
-    [proyecto({ airtable_id: null, criterios_aprendidos: "valor viejo" })],
-    AIRTABLE_POR_VOZ,
-    SIN_DESTILAR,
-    "motor",
-  );
+test("sin destilar todavía, los campos viajan null y no undefined", () => {
+  // `undefined` desaparece al serializar a JSON y el motor recibiría un objeto sin la clave.
+  const [r] = aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, "motor");
   assert.equal(r.fields.criterios_aprendidos, null);
+  assert.equal(r.fields.advertencia_criterios, null);
+});
+
+test("el uuid viaja al lado del record id: es lo que hace seguro el orden del corte (D7 paso 1)", () => {
+  // Sin este campo, el orden deploy↔re-import importaría — y equivocarlo no falla: el motor viejo
+  // recibiendo un uuid escribe un link con `typecast` y Airtable inventa un proyecto fantasma.
+  const [v] = aRegistrosDeVoces([voz()], "motor");
+  assert.equal(v.id, "recVOZ1");
+  assert.equal(v.fields.uuid, "uuid-voz-1");
+
+  const [p] = aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, "motor");
+  assert.equal(p.id, "recPROY1");
+  assert.equal(p.fields.uuid, "uuid-proy-1");
 });
 
 test("N viaja tal cual: la resolución contra el global la hace armarRunPlan", () => {
-  const conN = aRegistrosDeProyectos([proyecto({ n: 30 })], AIRTABLE_POR_VOZ, SIN_DESTILAR, "motor");
+  const conN = aRegistrosDeProyectos([proyecto({ n: 30 })], AIRTABLE_POR_VOZ, "motor");
   assert.equal(conN[0].fields.N, 30);
-  const sinN = aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, SIN_DESTILAR, "motor");
+  const sinN = aRegistrosDeProyectos([proyecto()], AIRTABLE_POR_VOZ, "motor");
   assert.equal(sinN[0].fields.N, null);
 });
 

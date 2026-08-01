@@ -8,16 +8,19 @@ import {
   type ProyectoGuardado,
   type VozGuardada,
 } from "@/domain/proyectos";
-import { crearRegistro, leerCriteriosDestilados } from "@/lib/airtable";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// IO de voces y proyectos (D5, corte 3/4). Lee y escribe `app.voces` + `app.proyectos` con
-// service_role: `app.*` tiene RLS sin policies, el browser no llega solo.
+// IO de voces y proyectos. Lee y escribe `app.voces` + `app.proyectos` con service_role: `app.*`
+// tiene RLS sin policies, el browser no llega solo.
 //
-// Igual que en Referentes, salen dos formas distintas a propósito:
-//  · `leerVoces` / `leerProyectos` hablan en uuid — son para la pantalla, que edita.
-//  · `leer*ComoRegistros` hablan en record ids de Airtable — son para la fachada, porque el
-//    motor todavía escribe Candidatos y Descartes como links de Airtable (ADR-033 §3).
+// Con D7 este archivo dejó de hablar dos idiomas. Ya no acuña record ids en Airtable al crear
+// (el motor escribe FKs uuid, no links con `typecast`) y ya no va a buscar los criterios
+// destilados afuera: los escribe el archivado por PostgREST, en la misma fila. **ADR-033 se
+// cumplió entera y murió** — era la regla que sostenía la coexistencia, con fecha de vencimiento
+// puesta en D7.
+//
+// Lo único que queda del idioma viejo es el `airtable_id`, que la fachada sirve como `id` hasta
+// el paso 3 del corte (ver `domain/proyectos.ts::aRegistrosDeVoces`).
 
 const filaVoz = z.object({
   id: z.string(),
@@ -61,26 +64,16 @@ export async function leerProyectos(): Promise<ProyectoGuardado[]> {
 
 /**
  * Lo que la pantalla muestra: las voces con sus proyectos y, en cada proyecto, lo que la máquina
- * aprendió y la advertencia que escribió. Esos dos vienen de Airtable mientras el archivado siga
- * siendo su escritor (ADR-033) — la pantalla no tiene por qué saberlo, así que se mezclan acá.
+ * aprendió y la advertencia que escribió. Desde D7 sale todo de la misma fila — antes había que
+ * ir a buscar esos dos campos a Airtable y pisarlos acá (ADR-033).
  */
 export async function leerVocesConProyectos(): Promise<
   (VozGuardada & { proyectos: ProyectoGuardado[] })[]
 > {
-  const [voces, proyectos, destilados] = await Promise.all([
-    leerVoces(),
-    leerProyectos(),
-    leerCriteriosDestilados(),
-  ]);
+  const [voces, proyectos] = await Promise.all([leerVoces(), leerProyectos()]);
   return voces.map((v) => ({
     ...v,
-    proyectos: proyectos
-      .filter((p) => p.voz_id === v.id)
-      .map((p) => ({
-        ...p,
-        criterios_aprendidos: destilados.get(p.airtable_id ?? "")?.criterios_aprendidos ?? null,
-        advertencia_criterios: destilados.get(p.airtable_id ?? "")?.advertencia_criterios ?? null,
-      })),
+    proyectos: proyectos.filter((p) => p.voz_id === v.id),
   }));
 }
 
@@ -89,12 +82,8 @@ export async function leerVocesComoRegistros(ambito: "motor" | "completo"): Prom
 }
 
 export async function leerProyectosComoRegistros(ambito: "motor" | "completo"): Promise<Registro[]> {
-  const [proyectos, voces, destilados] = await Promise.all([
-    leerProyectos(),
-    leerVoces(),
-    leerCriteriosDestilados(),
-  ]);
-  return aRegistrosDeProyectos(proyectos, new Map(voces.map((v) => [v.id, v.airtable_id])), destilados, ambito);
+  const [proyectos, voces] = await Promise.all([leerProyectos(), leerVoces()]);
+  return aRegistrosDeProyectos(proyectos, new Map(voces.map((v) => [v.id, v.airtable_id])), ambito);
 }
 
 // ── Escritura ────────────────────────────────────────────────────────────────
@@ -138,22 +127,20 @@ export async function actualizarProyecto(id: string, datos: DatosProyecto): Prom
 }
 
 /**
- * El alta acuña primero el record id en Airtable y recién después escribe en Postgres.
+ * El alta escribe en Postgres y nada más.
  *
- * Por qué ese orden y no al revés: si Airtable falla, no queda nada creado (y el equipo reintenta);
- * si fallara Postgres después, queda una fila huérfana en una tabla que ya nadie mira. El error
- * caro es el opuesto — un proyecto vivo en la app SIN record id hace que el motor escriba sus
- * candidatos con `typecast` y un uuid, y Airtable no falla: **inventa un proyecto fantasma**
- * (ADR-033 §3). La llamada a Airtable se borra en D7, no la fila de Postgres.
+ * Hasta D7 acá había un paso previo: acuñar un record id en Airtable, porque el motor escribía
+ * `Candidatos.proyecto` como *link* con `typecast: true` y una fila sin record id no producía un
+ * error sino un **proyecto fantasma** (ADR-033 §4). Con el motor escribiendo FKs uuid ese riesgo
+ * desapareció: un id que no existe ahora viola la foreign key, que es exactamente lo que uno
+ * quiere que pase.
  */
 export async function crearVoz(datos: DatosVoz): Promise<string> {
-  const airtableId = await crearRegistro("Voces", { nombre: datos.nombre });
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .schema("app")
     .from("voces")
     .insert({
-      airtable_id: airtableId,
       nombre: datos.nombre,
       descripcion: datos.descripcion,
       criterios_relevancia: datos.criterios_relevancia,
@@ -165,19 +152,12 @@ export async function crearVoz(datos: DatosVoz): Promise<string> {
   return data.id;
 }
 
-export async function crearProyecto(datos: DatosProyecto, airtableVozId: string | null): Promise<string> {
-  // El link a la voz viaja solo si la voz tiene record id. Una voz nacida en la app y un
-  // proyecto nacido en la app comparten el problema y la solución: los dos acuñan el suyo.
-  const airtableId = await crearRegistro("Proyectos", {
-    nombre: datos.nombre,
-    ...(airtableVozId ? { voz_default: [airtableVozId] } : {}),
-  });
+export async function crearProyecto(datos: DatosProyecto): Promise<string> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .schema("app")
     .from("proyectos")
     .insert({
-      airtable_id: airtableId,
       nombre: datos.nombre,
       descripcion: datos.descripcion,
       criterios_relevancia: datos.criterios_relevancia,

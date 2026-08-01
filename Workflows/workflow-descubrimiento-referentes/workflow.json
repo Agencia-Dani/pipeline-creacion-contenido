@@ -40,12 +40,6 @@
         "assignments": {
           "assignments": [
             {
-              "id": "c1",
-              "name": "airtable_base_id",
-              "value": "<<AIRTABLE_BASE_ID>>",
-              "type": "string"
-            },
-            {
               "id": "c2",
               "name": "supabase_url",
               "value": "<<SUPABASE_URL>>",
@@ -203,37 +197,28 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes%20propuestos' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/referentes_propuestos?select=handle,plataforma' }}",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "options": {
-          "timeout": 20000,
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "qs",
-                    "name": "offset",
-                    "value": "={{ $response.body.offset }}"
-                  }
-                ]
-              },
-              "paginationMode": "updateAParameterInEachRequest",
-              "nextURL": "",
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.offset }}",
-              "limitPagesFetched": false
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept-Profile",
+              "value": "app"
             }
-          }
+          ]
+        },
+        "options": {
+          "timeout": 20000
         }
       },
       "name": "Leer Propuestos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
+        "supabaseApi": {
+          "name": "Supabase Registro"
         }
       },
       "onError": "continueRegularOutput",
@@ -241,123 +226,6 @@
       "position": [
         1920,
         380
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Preparar promoción — cierra el loop: filas de 'Referentes propuestos' con estado=aprobado se\n// convierten en Referentes (activo) y se marcan promovido. Máx 10 por corrida (batch Airtable).\nconst recs = $('Leer Propuestos').all().flatMap(it => (it.json && it.json.records) || []);\nconst aprobados = recs.filter(r => String(((r.fields || {}).estado) || '') === 'aprobado').slice(0, 10);\nconst hoy = new Date().toISOString().slice(0, 10);\nconst crear = aprobados.map(r => { const f = r.fields || {}; return { fields: {\n  handle: String(f.handle || '').trim(),\n  plataforma: f.plataforma || 'instagram',\n  proyecto: Array.isArray(f.proyecto) ? f.proyecto : [],\n  activo: true,\n  notas: 'Promovido por descubrimiento ' + hoy + (f.afinidad != null ? ' (afinidad ' + f.afinidad + ')' : '') + (f.razon ? ': ' + String(f.razon).slice(0, 300) : '')\n} }; });\nconst marcar = aprobados.map(r => ({ id: r.id, fields: { estado: 'promovido' } }));\nif (crear.length) console.log('[Descubrimiento] promoviendo ' + crear.length + ' referente(s): ' + crear.map(c => c.fields.handle).join(', '));\nreturn [{ json: { hay: crear.length > 0, crear, marcar } }];"
-      },
-      "name": "Preparar promoción",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "preparar-promocion",
-      "position": [
-        2130,
-        380
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c1",
-              "leftValue": "={{ ($json.crear || []).length }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "name": "IF — hay aprobados",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "id": "if-hay-aprobados",
-      "position": [
-        2340,
-        380
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { records: $json.crear, typecast: true } }}",
-        "options": {
-          "timeout": 20000
-        }
-      },
-      "name": "POST Referentes (promoción)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
-        }
-      },
-      "id": "post-referentes-promocion",
-      "position": [
-        2550,
-        380
-      ]
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes%20propuestos' }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { records: $('Preparar promoción').first().json.marcar, typecast: true } }}",
-        "options": {
-          "timeout": 20000
-        }
-      },
-      "name": "PATCH Propuestos promovidos",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
-        }
-      },
-      "id": "patch-propuestos-promovidos",
-      "position": [
-        240,
-        720
       ]
     },
     {
@@ -387,7 +255,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Armar plan de descubrimiento (ADR-020) — semillas rankeadas por señal + set de dedup + knobs.\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst _nrm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();\nconst cfg0 = $('Config').first().json;\n// Knobs del equipo (Ajustes) sobre defaults de Config; caps de costo solo en Config (patrón ADR-011/016).\nconst AJUSTE_MAP = { 'propuestas por corrida': 'propuestas_max', 'afinidad minima de propuesta': 'afinidad_minima', 'descubrir en instagram': 'descubrir_ig', 'descubrir en tiktok': 'descubrir_tt' };\nconst plan = $('Leer plan (fachada)').first().json;\nconst ajustes = {};\n(plan.ajustes || []).forEach(a => { const f = a.fields || {}; const k = AJUSTE_MAP[_nrm(f.clave)]; if (k && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[k] = Number(f.valor); });\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst propuestas_max = Math.max(1, Number(pick('propuestas_max', 10)));\nconst afinidad_minima = Number(pick('afinidad_minima', 0.6));\nconst cap_semillas = Math.max(1, Number(cfg0.cap_semillas || 8));\nconst cap_detalle = Math.max(1, Number(cfg0.cap_perfiles_detalle || 20));\n// Toggles de eje del descubrimiento (equipo, Ajustes > Config; default ON). Off = ese eje no genera semillas.\nconst DESCUBRIR_IG = Number(pick('descubrir_ig', 1)) > 0;\nconst DESCUBRIR_TT = Number(pick('descubrir_tt', 1)) > 0;\n\n// Proyectos activos con criterios Proyecto ⊕ Voz (mismo modelo que el gate del motor, ADR-010).\nconst voces = {};\n(plan.voces || []).forEach(v => { const f = v.fields || {}; voces[v.id] = (f.criterios_relevancia || '').toString().trim(); });\nconst projects = {};\n(plan.proyectos || []).forEach(p => { const f = p.fields || {};\n  if (!f.activo) return; // ambito=completo no filtra: la regla vive acá, explicita\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = { id: p.id, nombre: f.nombre || '', criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: (vozId && voces[vozId]) || '' };\n});\n\n// Dedup: cualquier handle ya conocido no se re-propone (Referentes activo o no + Propuestos en cualquier estado).\n// Dedup por (plataforma, handle): TikTok e Instagram son namespaces distintos, no se cruzan.\nconst conocidos_ig = new Set(); const conocidos_tt = new Set();\nconst referentes = plan.referentes || [];\nconst _dedup = (r) => { const f = r.fields || {}; const h = String(f.handle || '').trim().replace(/^@+/, '').toLowerCase(); if (!h) return; (String(f.plataforma || '').toLowerCase().indexOf('tik') >= 0 ? conocidos_tt : conocidos_ig).add(h); };\nreferentes.forEach(_dedup);\nrecs('Leer Propuestos').forEach(_dedup);\nconst conocidos = new Set([...conocidos_ig, ...conocidos_tt]);\n\n// Semillas: referentes IG activos de proyectos activos, rankeados por tasa de selección (fail-open sin señal).\nconst senal = {};\n$('Leer señal selección').all().forEach(it => { const s = it.json || {}; if (s.referente) senal[String(s.referente).toLowerCase()] = { tasa: Number(s.tasa_seleccion || 0), cal: Number(s.calificados || 0) }; });\nconst semMap = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('insta') < 0) return; // v1 solo IG (ADR-020)\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMap[k] = semMap[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMap[k].proyectos.add(id));\n});\nconst semillas = (DESCUBRIR_IG ? Object.entries(semMap) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj = {};\nsemillas.forEach(s => { seed_to_proj[s.handle.toLowerCase()] = s.proyectos; });\nconsole.log('[Descubrimiento] semillas IG (' + semillas.length + '): ' + semillas.map(s => s.handle + '(' + s.tasa.toFixed(2) + ')').join(', '));\n\n// Semillas TikTok (ADR-020 extendido): referentes TT activos, rankeados por señal. El lookalike actor\n// (dataovercoffee) mezcla todas las semillas y devuelve un ranking global con score; la atribución a\n// proyecto la resuelve el vetting Haiku contra los criterios de cada proyecto con semillas TT.\nconst semMapTT = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('tik') < 0) return;\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMapTT[k] = semMapTT[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMapTT[k].proyectos.add(id));\n});\nconst semillasTT = (DESCUBRIR_TT ? Object.entries(semMapTT) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj_tt = {}; const ttProjIds = new Set();\nsemillasTT.forEach(s => { seed_to_proj_tt[s.handle.toLowerCase()] = s.proyectos; s.proyectos.forEach(p => ttProjIds.add(p)); });\nconst cap_detalle_tt = Math.max(1, Number(cfg0.cap_lookalikes_tt || 15));\nconsole.log('[Descubrimiento] semillas TT (' + semillasTT.length + '): ' + semillasTT.map(s => s.handle).join(', '));\n\nreturn [{ json: { semillas: semillas.map(s => s.handle), seed_to_proj, conocidos: [...conocidos], conocidos_ig: [...conocidos_ig], conocidos_tt: [...conocidos_tt], projects, propuestas_max, afinidad_minima, cap_detalle, tt_semillas: semillasTT.map(s => s.handle), seed_to_proj_tt, tt_project_ids: [...ttProjIds], cap_detalle_tt } }];"
+        "jsCode": "// Armar plan de descubrimiento (ADR-020) — semillas rankeadas por señal + set de dedup + knobs.\nconst recs = (n) => $(n).all().flatMap((it) => (it.json && it.json.records) || []);\nconst _nrm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();\nconst cfg0 = $('Config').first().json;\n// Knobs del equipo (Ajustes) sobre defaults de Config; caps de costo solo en Config (patrón ADR-011/016).\nconst AJUSTE_MAP = { 'propuestas por corrida': 'propuestas_max', 'afinidad minima de propuesta': 'afinidad_minima', 'descubrir en instagram': 'descubrir_ig', 'descubrir en tiktok': 'descubrir_tt' };\nconst plan = $('Leer plan (fachada)').first().json;\nconst ajustes = {};\n(plan.ajustes || []).forEach(a => { const f = a.fields || {}; const k = AJUSTE_MAP[_nrm(f.clave)]; if (k && f.valor !== undefined && f.valor !== null && f.valor !== '') ajustes[k] = Number(f.valor); });\nconst pick = (k, d) => (ajustes[k] != null ? ajustes[k] : (cfg0[k] != null ? Number(cfg0[k]) : d));\nconst propuestas_max = Math.max(1, Number(pick('propuestas_max', 10)));\nconst afinidad_minima = Number(pick('afinidad_minima', 0.6));\nconst cap_semillas = Math.max(1, Number(cfg0.cap_semillas || 8));\nconst cap_detalle = Math.max(1, Number(cfg0.cap_perfiles_detalle || 20));\n// Toggles de eje del descubrimiento (equipo, Ajustes > Config; default ON). Off = ese eje no genera semillas.\nconst DESCUBRIR_IG = Number(pick('descubrir_ig', 1)) > 0;\nconst DESCUBRIR_TT = Number(pick('descubrir_tt', 1)) > 0;\n\n// Proyectos activos con criterios Proyecto ⊕ Voz (mismo modelo que el gate del motor, ADR-010).\nconst voces = {};\n(plan.voces || []).forEach(v => { const f = v.fields || {}; voces[v.id] = (f.criterios_relevancia || '').toString().trim(); });\nconst projects = {};\n(plan.proyectos || []).forEach(p => { const f = p.fields || {};\n  if (!f.activo) return; // ambito=completo no filtra: la regla vive acá, explicita\n  const vozId = Array.isArray(f.voz_default) && f.voz_default[0] ? f.voz_default[0] : null;\n  projects[p.id] = { id: p.id, nombre: f.nombre || '', criterios: (f.criterios_relevancia || '').toString().trim(), voz_criterios: (vozId && voces[vozId]) || '' };\n});\n\n// Dedup: cualquier handle ya conocido no se re-propone (Referentes activo o no + Propuestos en cualquier estado).\n// Dedup por (plataforma, handle): TikTok e Instagram son namespaces distintos, no se cruzan.\nconst conocidos_ig = new Set(); const conocidos_tt = new Set();\nconst referentes = plan.referentes || [];\nconst _dedup = (r) => { const f = r.fields || {}; const h = String(f.handle || '').trim().replace(/^@+/, '').toLowerCase(); if (!h) return; (String(f.plataforma || '').toLowerCase().indexOf('tik') >= 0 ? conocidos_tt : conocidos_ig).add(h); };\nreferentes.forEach(_dedup);\n// D7: `Leer Propuestos` ahora es PostgREST, que devuelve filas PLANAS (no {records:[{fields}]}).\nconst _filas = (n) => { try { const a = $(n).all().map(i => i.json); return (a.length === 1 && Array.isArray(a[0])) ? a[0] : a; } catch (e) { return []; } };\n_filas('Leer Propuestos').forEach(f => _dedup({ fields: f }));\nconst conocidos = new Set([...conocidos_ig, ...conocidos_tt]);\n\n// Semillas: referentes IG activos de proyectos activos, rankeados por tasa de selección (fail-open sin señal).\nconst senal = {};\n$('Leer señal selección').all().forEach(it => { const s = it.json || {}; if (s.referente) senal[String(s.referente).toLowerCase()] = { tasa: Number(s.tasa_seleccion || 0), cal: Number(s.calificados || 0) }; });\nconst semMap = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('insta') < 0) return; // v1 solo IG (ADR-020)\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMap[k] = semMap[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMap[k].proyectos.add(id));\n});\nconst semillas = (DESCUBRIR_IG ? Object.entries(semMap) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj = {};\nsemillas.forEach(s => { seed_to_proj[s.handle.toLowerCase()] = s.proyectos; });\nconsole.log('[Descubrimiento] semillas IG (' + semillas.length + '): ' + semillas.map(s => s.handle + '(' + s.tasa.toFixed(2) + ')').join(', '));\n\n// Semillas TikTok (ADR-020 extendido): referentes TT activos, rankeados por señal. El lookalike actor\n// (dataovercoffee) mezcla todas las semillas y devuelve un ranking global con score; la atribución a\n// proyecto la resuelve el vetting Haiku contra los criterios de cada proyecto con semillas TT.\nconst semMapTT = {};\nreferentes.forEach(r => { const f = r.fields || {};\n  if (!f.activo) return;\n  if (String(f.plataforma || '').toLowerCase().indexOf('tik') < 0) return;\n  const h = String(f.handle || '').trim().replace(/^@+/, ''); if (!h) return;\n  const proys = (Array.isArray(f.proyecto) ? f.proyecto : []).filter(id => projects[id]); if (!proys.length) return;\n  const k = h.toLowerCase();\n  (semMapTT[k] = semMapTT[k] || { handle: h, proyectos: new Set() });\n  proys.forEach(id => semMapTT[k].proyectos.add(id));\n});\nconst semillasTT = (DESCUBRIR_TT ? Object.entries(semMapTT) : [])\n  .map(([k, v]) => ({ handle: v.handle, proyectos: [...v.proyectos], tasa: (senal[k] || {}).tasa || 0, cal: (senal[k] || {}).cal || 0 }))\n  .sort((a, b) => (b.tasa - a.tasa) || (b.cal - a.cal))\n  .slice(0, cap_semillas);\nconst seed_to_proj_tt = {}; const ttProjIds = new Set();\nsemillasTT.forEach(s => { seed_to_proj_tt[s.handle.toLowerCase()] = s.proyectos; s.proyectos.forEach(p => ttProjIds.add(p)); });\nconst cap_detalle_tt = Math.max(1, Number(cfg0.cap_lookalikes_tt || 15));\nconsole.log('[Descubrimiento] semillas TT (' + semillasTT.length + '): ' + semillasTT.map(s => s.handle).join(', '));\n\nreturn [{ json: { semillas: semillas.map(s => s.handle), seed_to_proj, conocidos: [...conocidos], conocidos_ig: [...conocidos_ig], conocidos_tt: [...conocidos_tt], projects, propuestas_max, afinidad_minima, cap_detalle, tt_semillas: semillasTT.map(s => s.handle), seed_to_proj_tt, tt_project_ids: [...ttProjIds], cap_detalle_tt } }];"
       },
       "name": "Armar plan de descubrimiento",
       "type": "n8n-nodes-base.code",
@@ -530,7 +398,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Armar propuestas — junta IG + TikTok (leídos por nombre, cada fila trae su plataforma y proyecto),\n// umbral de afinidad + cap por corrida (Ajustes) → batches de 10 para Airtable.\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst MAX = Math.max(1, Number(plan.propuestas_max || 10));\nconst grab = (n) => { try { return $(n).all().map(i => i.json); } catch (e) { return []; } };\nconst items = [...grab('Vetting relevancia (Haiku)'), ...grab('Vetting TikTok (Haiku)')].filter(d => d && d.username && !d._vacio);\nconst elegidos = items.filter(d => Number(d.afin || 0) >= MIN)\n  .sort((a, b) => (b.afin - a.afin) || ((b.freq || 0) - (a.freq || 0))).slice(0, MAX);\nif (!elegidos.length) { console.log('[Descubrimiento] 0 propuestas sobre el umbral ' + MIN); return [{ json: { hay_propuestas: false, propuestos: 0 } }]; }\nconst records = elegidos.map(d => ({ fields: {\n  handle: '@' + d.username, plataforma: d.plataforma || 'instagram', proyecto: d.proyectos || [],\n  afinidad: Math.round(Number(d.afin) * 100) / 100, razon: String(d.razon || '').slice(0, 500),\n  seguidores: Number(d.seguidores || 0), bio: String(d.bio || '').slice(0, 500), url: d.url,\n  semillas: d.semillas || '', estado: 'propuesto'\n} }));\nconsole.log('[Descubrimiento] proponiendo ' + records.length + ': ' + elegidos.map(d => d.username + '(' + (d.plataforma || 'ig') + ' ' + d.afin + ')').join(', '));\nconst out = [];\nfor (let i = 0; i < records.length; i += 10) out.push({ json: { hay_propuestas: true, records: records.slice(i, i + 10), propuestos: records.length } });\nreturn out;"
+        "jsCode": "// Armar propuestas — junta IG + TikTok (leídos por nombre, cada fila trae su plataforma y proyecto),\n// umbral de afinidad + cap por corrida (Ajustes) → filas planas para PostgREST (ADR-035).\n//\n// D7 cambió dos cosas acá:\n//  1. Se escribe en Postgres, así que no hay `fields`, ni `typecast`, ni batches de 10: PostgREST\n//     acepta el array entero de una.\n//  2. **Los proyectos viajan aparte, como PARES.** `app.referentes_propuestos` no tiene columna\n//     `proyecto_id`: la relación es N:M (enmienda de ADR-032 — medido antes del corte, las 8\n//     propuestas vivas tenían 2 proyectos cada una, así que una FK simple tiraba la mitad).\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst MAX = Math.max(1, Number(plan.propuestas_max || 10));\nconst grab = (n) => { try { return $(n).all().map(i => i.json); } catch (e) { return []; } };\nconst items = [...grab('Vetting relevancia (Haiku)'), ...grab('Vetting TikTok (Haiku)')].filter(d => d && d.username && !d._vacio);\nconst elegidos = items.filter(d => Number(d.afin || 0) >= MIN)\n  .sort((a, b) => (b.afin - a.afin) || ((b.freq || 0) - (a.freq || 0))).slice(0, MAX);\nif (!elegidos.length) { console.log('[Descubrimiento] 0 propuestas sobre el umbral ' + MIN); return [{ json: { hay_propuestas: false, propuestos: 0 } }]; }\n\n// record id de Airtable → uuid de Postgres. Sale de `fields.uuid`, el campo de transición que la\n// fachada sirve al lado del `id` viejo (paso 1 del corte). Un proyecto sin uuid no se puede\n// enlazar: se saltea ese par en vez de romper la corrida entera.\nconst uuidDe = {};\n(($('Leer plan (fachada)').first().json || {}).proyectos || []).forEach(p => {\n  const u = (p.fields || {}).uuid; if (u) uuidDe[p.id] = u;\n});\n\nconst filas = elegidos.map(d => ({\n  handle: '@' + d.username, plataforma: d.plataforma || 'instagram',\n  afinidad: Math.round(Number(d.afin) * 100) / 100, razon: String(d.razon || '').slice(0, 500),\n  seguidores: Number(d.seguidores || 0), bio: String(d.bio || '').slice(0, 500), url: d.url,\n  semillas: d.semillas || '', estado: 'propuesto'\n}));\n// Los pares se llevan por handle porque el uuid de la propuesta todavía no existe: lo acuña el\n// insert. `Preparar puente propuestas` los cruza contra lo que PostgREST devuelve.\nconst pares = elegidos.map((d, i) => ({\n  handle: filas[i].handle.toLowerCase(),\n  proyecto_ids: (d.proyectos || []).map(id => uuidDe[id]).filter(Boolean)\n}));\nconst _sinUuid = elegidos.reduce((a, d) => a + (d.proyectos || []).filter(id => !uuidDe[id]).length, 0);\nif (_sinUuid) console.log('[Descubrimiento] ⚠️ ' + _sinUuid + ' vínculo(s) a proyectos sin uuid en la fachada: se saltean');\nconsole.log('[Descubrimiento] proponiendo ' + filas.length + ' con ' + pares.reduce((a, p) => a + p.proyecto_ids.length, 0) + ' pares: ' + elegidos.map(d => d.username + '(' + (d.plataforma || 'ig') + ' ' + d.afin + ')').join(', '));\nreturn [{ json: { hay_propuestas: true, filas, pares, propuestos: filas.length } }];"
       },
       "name": "Armar propuestas",
       "type": "n8n-nodes-base.code",
@@ -576,38 +444,104 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.airtable.com/v0/' + $('Config').first().json.airtable_base_id + '/Referentes%20propuestos' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/referentes_propuestos' }}",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "Content-Profile",
+              "value": "app"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { records: $json.records, typecast: true } }}",
+        "jsonBody": "={{ JSON.stringify($json.filas) }}",
         "options": {
           "timeout": 20000
         }
       },
-      "name": "POST Airtable Propuestos",
+      "name": "POST Propuestos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "credentials": {
-        "airtableTokenApi": {
-          "name": "Airtable PAT"
+        "supabaseApi": {
+          "name": "Supabase Registro"
         }
       },
-      "id": "post-airtable-propuestos",
+      "id": "post-propuestos-pg",
       "position": [
         2340,
         720
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar puente propuestas (D7) — cruza lo que PostgREST acaba de crear contra los pares que\n// armó `Armar propuestas`, para llenar `app.referentes_propuestos_proyectos`.\n//\n// Por qué hace falta este paso y no se pudo escribir todo de una: el uuid de la propuesta lo\n// acuña el insert, así que los vínculos no se pueden armar antes de tenerlo. Se cruza por\n// **handle** y no por posición: PostgREST conserva el orden, pero depender de eso vuelve el\n// vínculo frágil ante cualquier cambio futuro, y acá un cruce mal hecho no falla — enlaza una\n// propuesta al proyecto equivocado.\nconst _filas = (n) => { try { const a = $(n).all().map(i => i.json); return (a.length === 1 && Array.isArray(a[0])) ? a[0] : a; } catch (e) { return []; } };\nconst creadas = _filas('POST Propuestos').filter(r => r && r.id && r.handle);\nconst idDe = {};\ncreadas.forEach(r => { idDe[String(r.handle).toLowerCase()] = r.id; });\n\nconst pares = [];\nfor (const p of ($('Armar propuestas').first().json.pares || [])) {\n  const propuestoId = idDe[p.handle];\n  if (!propuestoId) continue;\n  for (const proyectoId of (p.proyecto_ids || [])) pares.push({ propuesto_id: propuestoId, proyecto_id: proyectoId });\n}\nconsole.log('[Descubrimiento] puente: ' + pares.length + ' pares para ' + creadas.length + ' propuestas');\n// Sin pares no hay nada que postear, y PostgREST con [] devuelve 400: se corta acá.\nif (!pares.length) return [];\nreturn [{ json: { pares } }];"
+      },
+      "id": "preparar-puente-propuestas",
+      "name": "Preparar puente propuestas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/referentes_propuestos_proyectos' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Profile",
+              "value": "app"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.pares) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "post-puente-propuestas",
+      "name": "POST Puente propuestas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2780,
+        720
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase Registro"
+        }
+      }
     },
     {
       "parameters": {
@@ -737,57 +671,6 @@
       "main": [
         [
           {
-            "node": "Preparar promoción",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF — hay aprobados": {
-      "main": [
-        [
-          {
-            "node": "POST Referentes (promoción)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Leer señal selección",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preparar promoción": {
-      "main": [
-        [
-          {
-            "node": "IF — hay aprobados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "POST Referentes (promoción)": {
-      "main": [
-        [
-          {
-            "node": "PATCH Propuestos promovidos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "PATCH Propuestos promovidos": {
-      "main": [
-        [
-          {
             "node": "Leer señal selección",
             "type": "main",
             "index": 0
@@ -865,7 +748,7 @@
       "main": [
         [
           {
-            "node": "POST Airtable Propuestos",
+            "node": "POST Propuestos",
             "type": "main",
             "index": 0
           }
@@ -884,17 +767,6 @@
         [
           {
             "node": "IF — hay propuestas",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "POST Airtable Propuestos": {
-      "main": [
-        [
-          {
-            "node": "Cerrar run en el registro",
             "type": "main",
             "index": 0
           }
@@ -946,6 +818,39 @@
         [
           {
             "node": "Leer Propuestos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Propuestos": {
+      "main": [
+        [
+          {
+            "node": "Preparar puente propuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar puente propuestas": {
+      "main": [
+        [
+          {
+            "node": "POST Puente propuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Puente propuestas": {
+      "main": [
+        [
+          {
+            "node": "Cerrar run en el registro",
             "type": "main",
             "index": 0
           }

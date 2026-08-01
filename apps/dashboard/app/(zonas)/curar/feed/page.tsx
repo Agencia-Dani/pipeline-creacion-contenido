@@ -5,11 +5,11 @@ import { leerFeed } from "@/lib/candidatos";
 import { leerDescartes } from "@/lib/descartes";
 import { Mazo } from "./mazo";
 
-// El feed de calificación (D6). Los candidatos siguen viviendo en Airtable hasta D7 — acá
+// El feed de calificación (D6). Desde D7 los candidatos viven en Postgres — acá
 // cambia la superficie, no el dueño (ver lib/candidatos.ts).
 //
 // `force-dynamic` no es una precaución genérica: las URLs de miniatura son attachments de
-// Airtable que vencen a las ~2 h, así que una página cacheada serviría tarjetas rotas.
+// Instagram/TikTok, firmadas y con expiry, así que una página cacheada serviría tarjetas rotas.
 
 export const dynamic = "force-dynamic";
 

@@ -33,8 +33,8 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 {
   "version": 1,
   "generado_en": "2026-07-20T08:00:00.000Z",
-  "voces":      [{ "id": "rec…", "fields": { "nombre": "…", "criterios_relevancia": "…", "activo": true } }],
-  "proyectos":  [{ "id": "rec…", "fields": { "nombre": "…", "criterios_relevancia": "…", "voz_default": ["rec…"], "N": 20, "…": "…" } }],
+  "voces":      [{ "id": "rec…", "fields": { "uuid": "…", "nombre": "…", "criterios_relevancia": "…", "activo": true } }],
+  "proyectos":  [{ "id": "rec…", "fields": { "uuid": "…", "nombre": "…", "criterios_relevancia": "…", "voz_default": ["rec…"], "N": 20, "…": "…" } }],
   "referentes": [{ "id": "rec…", "fields": { "handle": "@…", "plataforma": "instagram", "proyecto": ["rec…"], "activo": true } }],
   "ajustes":    [{ "id": "Candidatos por corrida", "fields": { "clave": "Candidatos por corrida", "valor": 100 } }]
 }
@@ -54,6 +54,16 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 > acuña su record id al crearse, y por eso la traducción se cae en **D7** —cuando el motor deje de
 > escribir en Airtable— y no antes. *(Versiones anteriores de este contrato decían "en el corte
 > 4/4". Era falso.)*
+>
+> 🔀 **`fields.uuid` en `voces` y `proyectos` — el campo de transición de D7 (paso 1 de 3).**
+> Es el id de Postgres, y viaja **al lado** del `id` viejo a propósito. D7 tiene que cambiar dos
+> lados que no se pueden deployar a la vez (la app en Vercel, los workflows en n8n a mano), y
+> equivocar el orden **no falla**: el motor viejo recibiendo un uuid escribe un link con
+> `typecast` y crea un proyecto fantasma en silencio. Con los dos ids sirviéndose juntos, el orden
+> deja de importar: el workflow re-importado usa `fields.uuid` para escribir `app.candidatos`, el
+> que todavía no lo está sigue usando `id`, y cada lado se verifica por separado.
+> **Muere en el paso 3**, cuando `id` pase a ser el uuid y este campo y `airtable_id` desaparezcan.
+> Ese paso está gateado por evidencia —una corrida completa verde— no por calendario.
 >
 > **`referentes[].fields.proyecto` viaja en el mismo idioma que `proyectos[].id`.** El motor cruza
 > las dos listas por ese id; la traducción la hace la app (`domain/referentes.ts`). Es **un array**:

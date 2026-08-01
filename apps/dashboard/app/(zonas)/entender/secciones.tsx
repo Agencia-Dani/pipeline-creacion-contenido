@@ -1,10 +1,17 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { diagnosticoCriterio } from "@/domain/entender";
-import type { FilaCalidad, FilaCosto, FilaEmbudo } from "@/lib/entender";
+import type {
+  FilaAuditoria,
+  FilaCalidad,
+  FilaCosto,
+  FilaDescubrimiento,
+  FilaEmbudo,
+  FilaEvento,
+} from "@/lib/entender";
 
-// Las 3 secciones de la zona Entender, separadas de la página para poder
-// renderizarlas solas (fixtures, previews). Presentación pura: cero IO.
+// Las secciones de la zona Entender, separadas de la página para poder renderizarlas solas
+// (fixtures, previews). Presentación pura: cero IO.
 
 const usd = (n: number) => `$${n.toFixed(2)}`;
 const pct = (n: number | null) => (n == null ? "—" : `${Math.round(n * 100)}%`);
@@ -236,3 +243,149 @@ export function Costos({ filas }: { filas: FilaCosto[] }) {
   );
 }
 
+
+// ── Auditoría de descartes: el recall del gate (ADR-021 + ADR-036) ────────────
+//
+// Este bloque es la razón por la que `app.descartes` dejó de barrerse. Es la única medida de
+// cuánto contenido bueno mata el filtro, y hasta D7 llegaba por una proyección semanal que se
+// escribía en Airtable. `auditados` va al lado de `falsos_negativos` a propósito: sin él, un 0
+// se lee como "el gate está perfecto" cuando en realidad puede significar "nadie miró".
+
+export function Auditoria({ filas }: { filas: FilaAuditoria[] }) {
+  if (filas.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Todavía no hay descartes expuestos. El motor deja los rechazos más cerca de pasar en cada
+        corrida.
+      </p>
+    );
+  }
+  const s = filas[0];
+  const sinAuditar = s.expuestos - s.auditados;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-medium">{semanaDel(s.semana)}</p>
+      <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+        <div>
+          <p className="text-2xl font-semibold">{s.falsos_negativos}</p>
+          <p className="text-muted-foreground">falsos negativos (&laquo;era bueno&raquo;)</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold">
+            {s.auditados}/{s.expuestos}
+          </p>
+          <p className="text-muted-foreground">auditados</p>
+        </div>
+      </div>
+      {s.auditados === 0 ? (
+        <Alert>
+          <AlertTitle>Sin auditar, este número no dice nada</AlertTitle>
+          <AlertDescription>
+            Cero falsos negativos con cero auditorías no significa que el filtro ande bien:
+            significa que nadie miró. Se marcan en Curar → Descartes.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        sinAuditar > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Quedan {sinAuditar} sin marcar. Ya no caducan: siguen ahí la semana que viene.
+          </p>
+        )
+      )}
+      {filas.length > 1 && (
+        <p className="text-sm text-muted-foreground">
+          Semanas anteriores:{" "}
+          {filas
+            .slice(1)
+            .map((f) => `${f.semana}: ${f.falsos_negativos} de ${f.auditados} auditados`)
+            .join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Embudo del descubrimiento (reemplaza la fila DESCUBRIMIENTO de Métricas Global) ──
+
+export function Descubrimiento({ filas }: { filas: FilaDescubrimiento[] }) {
+  if (filas.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Todavía no hay corridas del buscador de cuentas registradas.
+      </p>
+    );
+  }
+  const s = filas[0];
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-medium">{semanaDel(s.semana)}</p>
+      <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+        <div>
+          <p className="text-2xl font-semibold">{num(s.semillas)}</p>
+          <p className="text-muted-foreground">semillas usadas</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold">{num(s.sugeridos_unicos)}</p>
+          <p className="text-muted-foreground">cuentas encontradas</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold">{num(s.propuestos)}</p>
+          <p className="text-muted-foreground">propuestas al equipo</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold">{num(s.promovidos)}</p>
+          <p className="text-muted-foreground">aprobadas al banco</p>
+        </div>
+      </div>
+      {s.runs_fallo > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {s.runs_ok} corridas ok · {s.runs_fallo} con fallo.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Actividad: quién tocó qué (app.eventos, dev-only) ────────────────────────
+
+const ACCION: Record<string, string> = {
+  "ajustes.editar": "cambió una perilla",
+  "referentes.editar": "editó un referente",
+  "referentes.crear": "sumó un referente",
+  "voces.editar": "editó una voz",
+  "voces.crear": "creó una voz",
+  "proyectos.editar": "editó un proyecto",
+  "proyectos.crear": "creó un proyecto",
+  "sugeridos.aprobar": "aprobó un sugerido",
+  "sugeridos.descartar": "descartó un sugerido",
+  "feed.calificar": "calificó un candidato",
+  "descartes.veredicto": "auditó un descarte",
+  "operar.correr": "disparó una corrida",
+};
+
+export function Actividad({ filas }: { filas: FilaEvento[] }) {
+  if (filas.length === 0) {
+    return <p className="text-sm text-muted-foreground">Todavía no hay actividad registrada.</p>;
+  }
+
+  return (
+    <ul className="divide-y text-sm">
+      {filas.map((e, i) => (
+        <li key={i} className="flex flex-wrap items-baseline gap-x-2 py-1.5">
+          <span className="tabular-nums text-muted-foreground">
+            {new Date(e.creado_en).toLocaleString("es", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <span className="font-medium">{e.usuarios?.nombre ?? "alguien"}</span>
+          <span>{ACCION[e.tipo] ?? e.tipo}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}

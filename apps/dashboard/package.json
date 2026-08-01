@@ -8,10 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"domain/**/*.test.ts\"",
-    "sombra:import": "node --env-file=.env.local scripts/importar-airtable.ts",
-    "sombra:diff": "node --env-file=.env.local scripts/diff-airtable.ts",
-    "cortar:referentes": "node --env-file=.env.local scripts/cortar-referentes.ts",
-    "cortar:voces-proyectos": "node --env-file=.env.local scripts/cortar-voces-proyectos.ts"
+    "cortar:feed": "node --env-file=.env.local scripts/cortar-feed.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
