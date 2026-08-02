@@ -835,6 +835,9 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 
 > ### 📋 EL CHECKLIST DEL RE-IMPORT (es de Mani, y va en este orden)
 > 1. ✅ **`016` aplicada** por Mani el 2026-08-02, y verificada contra la base (el detalle, en §Pendiente vivo). El `@casper_smc` duplicado ya estaba limpio. **Con esto, el deploy de la rama dejó de estar bloqueado.**
+>
+> > 🧪 **Y con la `016` puesta, el contrato v2 se probó CONTRA LA BASE REAL antes de gastar el re-import** (dev server local + las credenciales del `.env`, todo lecturas): `?instancia` ausente ⇒ **400 `instancia_ausente`** · inexistente ⇒ **403 `instancia_desconocida`** · sin header ⇒ **403 `header_ausente_o_distinto`** · instancia real ⇒ **200 con `version: 2`**, 3 voces · 5 proyectos (los 6 menos el de voz apagada, o sea el gate vivo) · 16 referentes · 18 ajustes, y **`fields.uuid` ausente en las cuatro listas**. El endpoint nuevo: sin `?workflow` ⇒ 400 · `short-form-content` ⇒ la instancia · un pipeline que no existe ⇒ **200 con lista vacía**, que es lo que evita que el dispatcher entre a su rama de fallo por un caso normal.
+> > **Lo que esto NO prueba:** nada del lado de n8n. Los `jsCode` y las URLs nuevas recién se ejercitan en la corrida del paso 5.
 > 2. **Re-importar los 3 workflows + importar el dispatcher.** Placeholders, por workflow — `<<INSTANCE_ID>>` **ya no está en ninguno**:
 >    · **motor (5):** `<<DASHBOARD_URL>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_MOTOR>>` `<ANTHROPIC_API_KEY>`×3 `<SUPADATA_API_KEY>`
 >    · **archivado (7):** los 2 de siempre + `<<WEBHOOK_PATH_ARCHIVADO>>` **(nuevo)** + `<<GOOGLE_SHEET_ID>>` `<<NOMBRE_PESTANA_SHEET>>` `<<CREDENCIAL_GOOGLE_SHEETS>>` `<ANTHROPIC_API_KEY>`
