@@ -38,12 +38,63 @@
 > · **El `018` de ADR-051** mueve el acceso de `usuarios.client_id` a `usuarios_clientes`. **Si no
 >   backfillea las 5 filas de arriba, los 5 pierden el cockpit el día del deploy** — Jero incluido.
 >
-> 🟠 **Y la decisión de nombres, que tiene ventana corta: si el producto es de Retia, `piloto` debería
-> llamarse `retia`.** Desde la Fase 3, `clients.id` y `instances.slug` **van en la URL**
-> (`/piloto/short-form-content/curar/feed` hoy; `/retia/reels/curar/feed` si se renombra). Renombrar
-> el `slug` es un `update` de una fila; renombrar `clients.id` es FK desde 5 tablas. **Las dos cosas
-> son baratas AHORA y caras después del merge**, porque después ya hay links repartidos y romperlos
-> dos veces seguidas es lo que hace que la gente deje de confiar en el cockpit.
+> 🟠 **DECIDIDO (Mani, 2026-08-02): `piloto` → `retia` y el slug → `reels`, ANTES del merge.**
+> Desde la Fase 3 los dos van en la URL: `/piloto/short-form-content/curar/feed` hoy,
+> `/retia/reels/curar/feed` después. Se hace antes del merge porque después ya hay links repartidos,
+> y romperlos dos veces seguidas es lo que hace que la gente deje de confiar en el cockpit.
+>
+> > 🚨 **No es un `update clients set id = 'retia'`: eso falla.** Las **6 FKs** que apuntan a
+> > `clients.id` están declaradas `references clients (id)` **a secas, sin `on update cascade`**
+> > (la `001` y la `016`). Hay que crear, repuntar y borrar. Y la trampa que no se ve: **la `016`
+> > dejó DEFAULTS puente apuntando a `'piloto'`** en las 4 tablas de grano empresa, y viven hasta
+> > la `017` — si no se mueven, el primer insert que no mande `client_id` explícito viola la FK.
+> >
+> > ```sql
+> > begin;
+> >
+> > -- 1. Nace el cliente nuevo con los datos del viejo.
+> > insert into clients (id, nombre, estado, creado_en, parent_id)
+> > select 'retia', 'Retia', estado, creado_en, parent_id   -- 👉 confirmá el nombre visible
+> > from clients where id = 'piloto';
+> >
+> > -- 2. Repuntar TODO lo que le apunta. Los conteos son los de prod al 2026-08-02:
+> > update instances      set client_id = 'retia' where client_id = 'piloto';  -- 1
+> > update clients        set parent_id = 'retia' where parent_id = 'piloto';  -- 0 (no hay árbol aún)
+> > update app.usuarios   set client_id = 'retia' where client_id = 'piloto';  -- 5  ← Jero acá
+> > update app.voces      set client_id = 'retia' where client_id = 'piloto';  -- 3
+> > update app.proyectos  set client_id = 'retia' where client_id = 'piloto';  -- 6
+> > update app.referentes set client_id = 'retia' where client_id = 'piloto';  -- 16
+> >
+> > -- 3. Los defaults puente de la 016. SIN ESTO se rompe el primer insert.
+> > alter table app.usuarios   alter column client_id set default 'retia';
+> > alter table app.voces      alter column client_id set default 'retia';
+> > alter table app.proyectos  alter column client_id set default 'retia';
+> > alter table app.referentes alter column client_id set default 'retia';
+> >
+> > -- 4. Recién ahora.
+> > delete from clients where id = 'piloto';
+> >
+> > -- 5. El otro segmento de la URL. `slug`/`nombre` no los referencia nadie.
+> > update instances set slug = 'reels', nombre = 'Reels'
+> >  where workflow_id = 'short-form-content';
+> >
+> > commit;
+> > ```
+> >
+> > **Verificar después** (las tres tienen que dar lo esperado, no "parecer bien"):
+> > `select id, nombre from clients;` → una fila, `retia` ·
+> > `select client_id, slug from instances;` → `retia` / `reels` ·
+> > `select count(*) from app.usuarios where client_id <> 'retia';` → **0**.
+> >
+> > **Lo que NO cambia, y conviene saberlo:** el **`instances.id` es el mismo uuid**, así que
+> > `N8N_INSTANCE_ID`, los workflows re-importados y el dispatcher **no se tocan**. Y el código no
+> > tiene el slug hardcodeado en ningún lado (verificado: solo aparece en un comentario).
+> >
+> > 🔸 **Dos cosas que quedan desalineadas a propósito:** `instances.config_ref` sigue diciendo
+> > `clients/piloto/…` y el directorio `clients/piloto/` **no se renombró**. Ese yaml es config de
+> > prueba de la era piloto (una voz falsa de "IA y productividad", cuentas de muestra) y su único
+> > consumidor es `deploy.mjs`, que está **deprecado**. Renombrarlo etiquetaría datos falsos como si
+> > fueran de Retia; limpiarlo o borrarlo es otra tarea.
 >
 > 📌 **Alta de usuarios: sigue manual y Mani quiere cambiarlo.** ADR-051 lo dejó como deuda
 > consciente con disparador *"el primer usuario que no sea de la agencia"*. **Vale confirmar si ese
