@@ -20,8 +20,10 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   sirviendo los 18 knobs aunque el equipo solo vea algunos
   ([ADR-038](../../docs/adr/ADR-038-una-sola-perilla-de-cantidad.md)).
 - `domain/` — reglas puras sin IO (C3): roles y zonas, la vista de corrida (qué corre, N
-  resuelta, estado legible) y `enlace.ts` (de un pegote de texto a `external_id`). Se testea con
-  `node:test`.
+  resuelta, estado legible), `enlace.ts` (de un pegote de texto a `external_id`) y `borrado.ts`
+  (**qué se puede borrar**: un registro sale solo si nunca produjo nada —
+  [ADR-045](../../docs/adr/ADR-045-se-borra-solo-lo-que-nunca-produjo-nada.md) — y esta función
+  arma *la frase*; la FK sigue siendo *la garantía*). Se testea con `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
   `ajustes.ts`, `referentes.ts` y `proyectos.ts` (los dominios de config, todos en Postgres desde
   D7 — `airtable.ts` murió con el corte), `sugeridos.ts` (la bandeja del descubrimiento),
@@ -33,8 +35,11 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   [ADR-039](../../docs/adr/ADR-039-la-lista-resume-el-record-se-abre.md) — uno por lista, no uno por
   fila), **`copiar.tsx`** (copiar el guion al portapapeles) y **`select.tsx`** (el `<select>` nativo
   con la caja del `<Input>`; existía copiado a mano en 4 pantallas con 2 alturas distintas).
-  `components/boton-buscar.tsx` está afuera de `ui/` porque no es una primitiva: lo renderizan dos
-  zonas (Operar y Curar → Sugeridos).
+  `components/boton-buscar.tsx` y **`components/borrar.tsx`** están afuera de `ui/` porque no son
+  primitivas: el primero lo renderizan dos zonas (Operar y Curar → Sugeridos); el segundo es el
+  control de borrado de las tres pantallas de config (voz, proyecto, cuenta), que **confirma en el
+  lugar** —el botón se reemplaza por la pregunta— y devuelve el resultado al pie del formulario en
+  vez de mostrarlo él, para no tener dos frases del servidor compitiendo en la misma barra.
 - `app/api/miniatura/` — el proxy de miniaturas
   ([ADR-037](../../docs/adr/ADR-037-miniaturas-por-proxy-propio.md)). **Sin esto el feed no muestra
   ni una imagen:** el CDN de Instagram manda `cross-origin-resource-policy: same-origin` y el

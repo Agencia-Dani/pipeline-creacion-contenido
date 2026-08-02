@@ -22,6 +22,84 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🟡 **SACAR EL TECHO DE GASTO: CÓDIGO LISTO, FALTA EL RE-IMPORT (2026-08-02).** Mani pidió sacar
+> `cap_top_n` (los planes pagos de Apify/Supadata/Claude no llegan ni a la mitad del cupo y se
+> resetean solos) y que el motor sea lo más preciso posible trayendo el `N` de cada proyecto. La
+> revisión encontró que **el cap no era lo que frenaba, y sacarlo hoy habría roto la corrida**.
+> Salieron 2 ADRs: [044](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md) ·
+> [045](../adr/ADR-045-se-borra-solo-lo-que-nunca-produjo-nada.md).
+>
+> ### 🚨 El hallazgo que importa: `Traducir` era el techo real, y el único nodo caro SIN red
+> Corría **serial con `sleep(1000)` y sin presupuesto**. Los referentes son casi todos ingleses: la
+> corrida del 31/07 16:28 hizo **170 traducciones sobre 191 transcritos (89%)** y duró 31 min.
+> `Transcribir` tiene presupuesto (840 s) justamente porque el watchdog del task runner
+> (`N8N_RUNNERS_TASK_TIMEOUT`, 900 s en el pod) **mata el nodo entero** y la corrida muere sin
+> entregar nada — pasó 3 veces el 07-10. `Traducir` no tenía ninguno: al doble de volumen se lleva la
+> corrida puesta, después de pagar Apify y Supadata. **Era el modo de falla más caro del motor.**
+>
+> ### 🩸 Y la asimetría que hay que memorizar: el cap POSTERGA, el presupuesto QUEMA
+> El orden en serie es `Heat-score v1 → Preparar procesados → POST processed_items → Transcribir`
+> (ADR-029, enmienda del 31/07), o sea **el video se marca como procesado ANTES de transcribirse**.
+> El que se queda sin presupuesto vuelve con transcript vacío → el gate lo descarta `sin_guion`
+> (ADR-030) → y ya está en la memoria de dedup: **no se reintenta nunca**. El corte de `cap_top_n`,
+> en cambio, pasa *adentro* de `Heat-score v1`, antes de ese POST: lo capado vuelve la corrida
+> siguiente. Sacar el cap sin mover el presupuesto habría cambiado un aplazamiento por una pérdida
+> permanente. *(Y con `CONCURRENCIA = 8` a ~27 s/video, 840 s daban ~250 videos: exactamente
+> `cap_top_n = 250`. Los dos techos estaban calibrados al mismo punto, así que bajar uno no destrababa
+> nada.)*
+>
+> ### 🟠 Lo que queda, y es de Mani (EN ESTE ORDEN)
+> **1. Re-importar y publicar el motor** (`workflow-short-form-content`). Sin esto, poner el cap en 0
+> mata la corrida en `Traducir`. **Los 6 placeholders, no 2:** `<<DASHBOARD_URL>>` · `<<INSTANCE_ID>>` ·
+> `<<SUPABASE_URL>>` · `<<WEBHOOK_PATH_MOTOR>>` · `<ANTHROPIC_API_KEY>` · `<SUPADATA_API_KEY>`.
+> **2. Recién ahí: `Videos a transcribir por corrida` → 0** en `/curar/ajustes` (dev-only). No
+> necesita re-import: `pick` resuelve ajustes > Config y el nodo hace `if (CAP > 0)`.
+> **3. Correr y mirar los logs de n8n:** que aparezca `[Traducir] Loop completo en …ms` y que **no**
+> aparezca `[Traducir] PRESUPUESTO agotado`. Si aparece con volumen normal, el techo pasó a ser
+> Anthropic y hay que subir `concurrencia_traducir` desde `Config` (sin re-import).
+> **4. Opcional, la palanca más barata que sigue sin usar:** `Resultados por cuenta de referente`
+> está en **40** y el cap de `Config` es **50**. Subirlo a 50 son 160 crudos más por corrida, gratis.
+>
+> ### ⚠️ Lo que esto NO arregla, y hay que decirlo
+> **Ningún proyecto se va a acercar a su `N` por esto.** El cuello es el **supply**, no los cortes:
+> todos los proyectos, en todas las corridas medidas, dicen `razon_faltante: supply`. Los 4 proyectos
+> de comunicación comparten **7 cuentas** y piden 60 videos entre todos, y `Armar candidato` le da
+> cada video a **un solo** proyecto. La corrida más gorda que hubo (31/07 16:28, 280 crudos, 191
+> transcritos, sin que el cap mordiera) entregó **139 de 400**. Y el dedup contra `processed_items` es
+> brutal: 2 h después de esa corrida, 491 pretrim quedaron en **35** filtrados. La recencia en 100 días
+> va a drenar un backlog viejo en las próximas 1-2 corridas, y eso es real, pero es de una sola vez.
+> **La palanca de verdad es sumar referentes.**
+>
+> 🔎 **Otro hallazgo que quedó anotado y no se tocó: `cap_top_n` corta GLOBAL, no por proyecto.**
+> Medido en tu propia corrida de verificación `191ddc8b` (02/08, cap en 10): `Trading fast tips` se
+> llevó los 10 lugares y los cuatro proyectos de comunicación quedaron en `evaluados: 0`. Mientras
+> esté en un valor que muerda, mata proyectos enteros en vez de recortar parejo. Con el techo en 0 el
+> problema no se plantea; repartirlo por proyecto sería un ADR propio.
+>
+> ### ✅ Lo que ya está hecho y verificado (código, sin tocar prod)
+> · **`Traducir` con pool + presupuesto** y el `catch` mudo que ahora cuenta y loguea (una tanda
+>   entera podía fallar y la corrida salía verde con los scripts en inglés).
+> · **`Transcribir` de 8 a 24 en vuelo** (~0.9 req/s contra los 10 req/s del plan pago: 11× de aire).
+>   840 s pasan a cubrir **~745 videos**.
+> · **3 knobs nuevos en `Config`** (`concurrencia_transcribir`, `concurrencia_traducir`,
+>   `presupuesto_traducir_s`): se editan a mano en n8n **sin re-importar**, que es el punto — el
+>   handoff ya documenta lo que cuesta un re-import.
+> · **Borrar records en el cockpit (ADR-045):** voces, proyectos y referentes. Verificado en vivo
+>   contra la base: el rechazo («*Comunicación en empresas tiene 24 videos en el feed…*») y el borrado
+>   feliz, con un proyecto y un referente de prueba que se crearon y se borraron. **De los 6 proyectos
+>   vivos hoy solo *Trading Psychology* se puede borrar** (0 candidatos, 0 descartes); los otros cinco
+>   tienen entre 10 y 60 filas colgando. **Sin migración y sin re-import.**
+> · 🧹 **El `@casper_smc` duplicado que este handoff arrastra desde el 01/08 ya se puede limpiar solo,
+>   sin SQL a mano.** Sigue vigente el cuidado: mirar qué proyectos tiene cada una de las dos filas
+>   antes de borrar, porque si difieren, borrar la equivocada le saca fuentes a un proyecto.
+>
+> **Verde antes de commitear:** `npm run validate` 1616 checks · **138 tests** del dashboard (7 nuevos
+> de `domain/borrado.ts`) · `typecheck` · `build` · `auditar-workflows.mjs` sin hallazgos ·
+> `test-nodos.mjs` todo en verde con una sección nueva para `Traducir` (pool, presupuesto, dedup del
+> fan-out, el español que no gasta llamada, y el fail-open ahora audible). ⚠️ El test del presupuesto
+> de `Transcribir` tuvo que **fijar la concurrencia en 2**: con el pool en 24, los 30 videos del caso
+> arrancan en dos vueltas y ningún budget razonable llega a morder.
+
 > 🟡 **SEGUNDA RONDA DE REVISIÓN UI/UX — CÓDIGO LISTO, FALTAN 2 PASOS MANUALES DE MANI (2026-08-01).**
 > 7 observaciones de Mani sobre el cockpit live. Como en la primera ronda, **tres eran defectos y no
 > preferencias**, y una era una pantalla que decía algo falso. Salieron 4 ADRs:
@@ -75,7 +153,9 @@
 > 🧹 Quedaron 2 runs en `fallo` del 02/08 (`a375351b`, `dbdd85a0`): son los intentos muertos, no hay
 > nada que investigar ahí.
 
-> ### 🟠 Lo que queda, y es de Mani
+> ### ✅ Lo que quedaba de Mani — LOS 3 HECHOS (verificado 2026-08-02: la `014` está aplicada, el
+> motor re-importado, y la corrida `191ddc8b` transcribió 10 videos distintos con el techo en 10).
+> *Se dejan escritos porque el porqué de cada uno sigue valiendo para el próximo re-import.*
 > **1. Aplicar [`core/schema/014`](../../core/schema/014_criterios_voz_y_perillas.sql) en el SQL
 > Editor — ANTES del commit.** El código endurece el zod de `filaVoz` a `z.string()`: si el deploy
 > llega primero y alguna voz tuviera `criterios_relevancia` null, se cae `/curar/voces` **y la
@@ -183,10 +263,11 @@
 > 116 tests.
 >
 > ### 🟠 Lo que queda, y es de Mani
-> **1. `Resultados por cuenta de referente` sigue en 20; el handoff anterior pedía 40.** Ahora es
-> dev-only, así que la pantalla ya no se lo va a recordar. **Es la palanca más barata** para que los
-> proyectos se acerquen a su número: con 20, un proyecto de 3 referentes mira 60 videos crudos y
-> entrega ~10 contra un N de 15.
+> **1. ✅ `Resultados por cuenta de referente` está en 40 desde el 01/08.** (Se pedía subirlo de 20.
+> Queda margen: el cap de `Config` es **50**, o sea 160 crudos más por corrida sin re-importar nada.)
+> Es dev-only, así que la pantalla no lo recuerda. **Es la palanca más barata** para que los
+> proyectos se acerquen a su número: con 20, un proyecto de 3 referentes miraba 60 videos crudos y
+> entregaba ~10 contra un N de 15.
 > **2. Avisarle al equipo que la pantalla cambió.** [El onboarding](../onboarding-equipo-redes.md)
 > ya está reescrito (§0, §3.1, §5.2, §5.3, §5.5, §8.1). Lo que no puede faltar: *la lista resume y
 > el record se abre tocando la fila*, *crear es un botón arriba*, y *el número de videos ahora vive
@@ -640,12 +721,16 @@ producción**. El orden de acá en adelante:
 3. ~~D6 — el feed de calificación~~ ✅ **hecho el 01/08 y en prod** (fila D6 de la tabla de arriba).
    Queda su hecho-cuando, que es el único que no se puede apurar: **una semana entera de
    calificación pasando por la app**.
-4. **D7 — corte de escritura** (re-import #2). Es el que mata las 3 llamadas que le quedan a
-   Airtable en la app y la traducción de ids del contrato (ADR-033 §3). **D6 le dejó dos cosas
-   preparadas:** `/curar/historicos` ya lee `outputs`, o sea no cambia en D7; y las 2 tablas que
-   D7 corta ya tienen su superficie propia, así que el corte es mover el almacenamiento, no
-   construir pantallas.
-5. **D8 — apagado.**
+4. ~~D7 — corte de escritura~~ ✅ **HECHO Y EN PROD el 01/08** (cierres 76 y 77): Airtable salió del
+   sistema, `grep -c api.airtable.com Workflows/*/workflow.json` da `0 0 0`, y el paso 3 del
+   expand/contract cerró (el `id` del contrato es el uuid). Mató las 3 llamadas que le quedaban a
+   Airtable en la app y la traducción de ids (ADR-033, que murió cumplida).
+5. **D8 — apagado de Airtable** (todo no-código) **+ la migración de limpieza**: balde 2 (4 vistas
+   sin consumidor + 6 columnas write-only) y las columnas `airtable_id`. También muere ahí
+   `fields.uuid` y el `uuidDe` que quedó sin trabajo — **necesita re-import**, así que conviene
+   juntarlo con otro re-import y no gastar uno solo en eso.
+6. **D7.5 (alternativa a D8, sin orden fijo):** que la app escriba `outputs` al calificar, para
+   matar el archivado. Es enmienda de ADR-014 y toca `core/`: va con `/grill-with-docs`.
 
 **Las 2 decisiones abiertas se CERRARON el 2026-07-16 (cierre 49, consultadas a Mani):**
 el **descubrimiento NO respeta `Voces.activo` a propósito** (despensa para voces pausadas —
@@ -659,8 +744,19 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **Contexto que ahorra media hora de re-derivar:**
 - **El arranque del motor cambió (C.3):** `Config → Barrer runs zombie → Leer corridas vivas → Guard
   single-flight → Abrir run`. El guard aplica a los 3 triggers; vivo/zombie lo decide
-  `ventana_corrida_min` (Config, 120). No "arregles" el orden del barrido: que corra antes del guard
-  es lo que evita que un zombie trabe el motor.
+  `ventana_corrida_min` (Config, **60** desde el 31/07). No "arregles" el orden del barrido: que corra
+  antes del guard es lo que evita que un zombie trabe el motor. Y la ventana tiene que quedar **por
+  encima** de la corrida más larga posible: si queda debajo, el barredor mata una corrida en vuelo y
+  el guard deja arrancar otra en paralelo.
+- 🚨 **Antes de aflojar cualquier techo del motor, preguntá si POSTERGA o si QUEMA** (ADR-044). El
+  corte de `cap_top_n` pasa dentro de `Heat-score v1`, **antes** de `POST processed_items`: lo capado
+  vuelve la corrida siguiente. Los presupuestos de tiempo de `Transcribir` corren **después** de ese
+  POST: lo que se quedan afuera ya está en la memoria de dedup y se pierde para siempre. Desde la
+  pantalla de Ajustes los dos se ven igual.
+- **No leas el costo de un nodo por su nombre.** `Traducir (Claude Haiku)` decía "Haiku" y se leía
+  como barato; era el nodo más lento del motor y el único sin presupuesto, porque lo caro no era la
+  llamada sino el `sleep(1000)` × 170 videos. El costo de un Code node es *llamadas × latencia ×
+  serialidad*, y eso solo se ve leyendo el loop.
 - El mapa de la superficie ya está completo: **[mapa-campos.md](./mapa-campos.md)** (§4 campos, §5 páginas).
   **No re-derives nada de ahí** — y leé §1 antes de grepear: el grep de campos **no sirve** en este repo.
 - Hay **tests** del motor ahora: `test-nodos.mjs`. Si tocás `Armar plan` o `Armar candidato`, corrélos.
@@ -674,6 +770,18 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-02 (cierre 80) — Sacar el techo de gasto: el cap no era el problema, y sacarlo así habría roto la corrida. Más: borrar records en el cockpit (Claude, pedido de Mani).**
+**Qué se hizo:** Mani trajo tres cosas — recencia ya en 100, "no debería haber cap para regular costos, quiero el motor lo más preciso posible trayendo el `N` por proyecto, revisá qué lo está afectando", y "dejame borrar voces, proyectos y referentes". La revisión del punto 2 dio vuelta el pedido: **el cap no era lo que frenaba, y sacarlo tal como estaba el motor habría matado la corrida y quemado videos para siempre.** Salieron 2 ADRs ([044](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md), [045](../adr/ADR-045-se-borra-solo-lo-que-nunca-produjo-nada.md)) y todo el código está listo; el re-import es de Mani (§Pendiente vivo).
+**🚨 El hallazgo: `Traducir (Claude Haiku)` era el techo real y el único nodo caro SIN red.** Serial, con `sleep(1000)`, sin presupuesto. Los referentes son casi todos ingleses: **170 traducciones sobre 191 transcritos** el 31/07 (89%). `Transcribir` tenía presupuesto justamente porque el watchdog del task runner mata el **nodo entero** a los 900 s y la corrida muere sin entregar nada — pasó 3 veces el 07-10. A `Traducir` no se lo habían puesto nunca. *El sesgo que lo escondió: el nodo tenía "Haiku" en el nombre y se leía como barato. Lo caro no era la llamada, era el `sleep` × 170.*
+**🩸 Y la asimetría que hay que memorizar, porque decide qué se puede aflojar: el cap POSTERGA, el presupuesto QUEMA.** `POST processed_items` corre **antes** de `Transcribir` (ADR-029, enmienda del 31/07), así que el video que se queda sin presupuesto ya está en la memoria de dedup: vuelve sin transcript, el gate lo tira como `sin_guion` (ADR-030) y **no se reintenta nunca**. El corte de `cap_top_n` pasa *adentro* de `Heat-score v1`, antes de ese POST, y vuelve la corrida siguiente. Un techo seguro y uno destructivo, con el mismo aspecto desde la pantalla de Ajustes.
+**La coincidencia que confirmó el diagnóstico:** con `CONCURRENCIA = 8` a ~27 s/video, 840 s dan ~250 videos — **exactamente `cap_top_n = 250`**. Los dos techos estaban calibrados al mismo punto, así que bajar uno no destrababa nada. Y el aire sin usar era enorme: Supadata pago da 10 req/s y 8 en vuelo iniciaban 0.3.
+**⚠️ Lo que la revisión tuvo que decir y no era lo que el pedido esperaba: esto NO acerca ningún proyecto a su `N`.** El cuello es el **supply**: todos los proyectos, en todas las corridas, dicen `razon_faltante: supply`. Los 4 proyectos de comunicación comparten **7 cuentas** y piden 60 videos entre todos, y cada video va a **un solo** proyecto. La corrida más gorda que hubo entregó **139 de 400**. El dedup se come el 93% dos horas después de una corrida (491 pretrim → 35). Lo que estos cambios compran es que sacar el techo **no rompa nada**; la palanca de verdad sigue siendo sumar referentes, igual que dice ADR-043.
+**El otro hallazgo, anotado y no tocado:** `cap_top_n` **corta global, no por proyecto**. Medido en la propia corrida de verificación de Mani (`191ddc8b`, cap en 10): *Trading fast tips* se llevó los 10 y los cuatro de comunicación quedaron en `evaluados: 0`. Cuando muerde no recorta parejo, mata proyectos enteros. Con el techo en 0 no se plantea; repartirlo sería un ADR propio.
+**Borrar records (ADR-045):** la pregunta no era de UI sino de FK, y había dos mundos. **Los referentes salen limpios** (la puente cascadea y su historia se guarda por *handle en texto*, no por FK: `candidatos.referente`, `descartes.referente`, `v_senal_seleccion` desde `outputs`). **Las voces y los proyectos no**: `candidatos.proyecto_id`, `candidatos.voz_id`, `descartes.proyecto_id` y `proyectos.voz_id` son FK sin `on delete`. Se descartó el `cascade` (borraría 143 candidatos sin leer con el mismo click que borra un proyecto vacío) y el `set null` (cambia un error claro de Postgres por filas que se ven bien y no significan nada — la familia exacta que este repo viene cazando). Queda **la regla: se borra solo lo que nunca produjo nada**, y el rechazo dice **cuánta** historia hay y ofrece apagar. Hoy eso deja borrable solo *Trading Psychology*, y es correcto. Bonus: el `@casper_smc` duplicado ya se limpia sin SQL.
+**Verificación en vivo, contra la base real:** el rechazo (*«Comunicación en empresas tiene 24 videos en el feed…»*, modal abierta, URL sin cambiar) y el camino feliz, con un proyecto y un referente **de prueba creados y borrados** para no tocar el dato de Mani — la fila desaparece, la modal cierra, la lista refresca y `app.eventos` queda con el registro completo. 138 tests · typecheck · build · validador (1616 checks) · `auditar-workflows.mjs` sin hallazgos · `test-nodos.mjs` verde con sección nueva de `Traducir`.
+**El detalle de test que vale guardar:** el caso del presupuesto de `Transcribir` empezó a fallar al subir el pool a 24 — los 30 videos arrancaban en dos vueltas y ningún budget razonable llegaba a morder. Se arregló **fijando la concurrencia en 2 en ese test**, no aflojando el assert: el test prueba el presupuesto, no el throughput, y mezclarlos era lo que lo volvía frágil.
+**Siguiente sesión:** el re-import y la corrida sin techo (§Pendiente vivo, en orden). Después de eso, las dos cosas que siguen abiertas son subir `Resultados por cuenta` de 40 a 50 (el cap de `Config`) y, si se quiere ir más lejos, escalar lo que se le pide a Apify **por proyecto** — la solución de fondo que ADR-038 ya dejó identificada y que es la única que vuelve a `N` vinculante en vez de solo informada.
 
 **2026-08-01 (cierre 78) — La primera revisión de UI/UX sobre el cockpit live: 10 observaciones, 3 bugs, 3 ADRs (Claude, pedido de Mani).**
 **Qué se hizo:** Mani usó la primera versión live y trajo 10 observaciones de layout/UX pensando en Majo y Jero. Se ejecutaron las 10 en un solo pase, sin tocar `Workflows/` ni `core/`: cero re-imports, cero migraciones. Commit `dce25a3`, deployado y verificado contra prod.

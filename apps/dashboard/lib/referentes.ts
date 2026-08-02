@@ -189,3 +189,23 @@ export async function buscarPorHandle(handle: string, plataforma: string): Promi
   const banco = await leerBanco();
   return banco.find((r) => normalizarHandle(r.handle) === handle && r.plataforma === plataforma) ?? null;
 }
+
+/**
+ * Sacar una cuenta del banco de verdad, no apagarla.
+ *
+ * A diferencia de voces y proyectos, acá no hay nada que preguntar antes (ver `domain/borrado.ts`):
+ * `referentes_proyectos` cascadea —es la asignación, no historia— y la historia de la cuenta se
+ * guarda por HANDLE en texto (`candidatos.referente`, `descartes.referente`, y de ahí sale
+ * `v_senal_seleccion`), no por FK. O sea que borrar la fila saca la cuenta de las próximas corridas
+ * y del banco, y deja intacto todo lo que trajo. Si mañana se vuelve a agregar el mismo handle, la
+ * salud y la señal de selección vuelven solas.
+ *
+ * Apagar sigue siendo lo correcto para "no la busques más pero quiero seguir viéndola"; borrar es
+ * para la fila que no debería existir: la repetida, la que se cargó con un typo.
+ */
+export async function borrarReferente(id: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.schema("app").from("referentes").delete().eq("id", id).select("id");
+  if (error) throw new Error(`Supabase respondió con error borrando el referente: ${error.message}`);
+  if (!data || data.length === 0) throw new Error("Ese referente ya no existe.");
+}

@@ -6,6 +6,7 @@ import { exigirZona } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import {
   actualizarReferente,
+  borrarReferente,
   buscarPorHandle,
   crearReferente,
   leerBanco,
@@ -92,4 +93,46 @@ export async function crear(form: FormReferente): Promise<Resultado> {
 
   revalidatePath("/curar/referentes");
   return { ok: true, mensaje: "Agregada. Entra en la próxima corrida." };
+}
+
+/**
+ * Sacar la cuenta del banco. Sin comprobaciones previas a propósito: nada le cuelga por FK y su
+ * historia se guarda por handle en texto, así que borrarla no se lleva nada (el porqué largo está
+ * en `lib/referentes.ts::borrarReferente` y en `domain/borrado.ts`).
+ *
+ * El evento va antes del DELETE y con los proyectos adentro: es lo único que queda de a quién
+ * alimentaba, y la fila puente se va con la cuenta.
+ */
+export async function borrar(id: string): Promise<Resultado> {
+  const usuario = await exigirZona("curar");
+
+  let referente;
+  try {
+    referente = (await leerBanco()).find((r) => r.id === id);
+  } catch (e) {
+    console.error("[referentes] no se pudo leer el banco:", e);
+    return { ok: false, mensaje: "No se pudo leer el banco. Probá de nuevo." };
+  }
+  if (!referente) return { ok: false, mensaje: "Ese referente ya no existe. Recargá la página." };
+
+  await registrarEvento(usuario.id, "referentes.borrar", {
+    id,
+    handle: referente.handle,
+    plataforma: referente.plataforma,
+    proyectoIds: referente.proyectoIds,
+  });
+
+  try {
+    await borrarReferente(id);
+  } catch (e) {
+    console.error(`[referentes] falló borrar ${id}:`, e);
+    return { ok: false, mensaje: e instanceof Error ? e.message : "No se pudo borrar. Probá de nuevo." };
+  }
+
+  // Los proyectos que se quedan sin cuentas dejan de traer videos, y eso se ve en Voces (el techo
+  // de crudos del campo N pasa a 0) y en Operar.
+  revalidatePath("/curar/referentes");
+  revalidatePath("/curar/voces");
+  revalidatePath("/operar");
+  return { ok: true, mensaje: `${referente.handle} salió del banco. Lo que ya trajo queda en el feed y en el histórico.` };
 }

@@ -315,7 +315,7 @@ seccion('Invariantes que no se tocan');
 // `this` mockeado; el mock cuenta llamadas y concurrencia en vuelo)
 // ════════════════════════════════════════════════════════════════════════════
 const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
-const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, falla, secuencia } = {}) => {
+const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia } = {}) => {
   const llamadas = [];
   let enVuelo = 0, maxEnVuelo = 0;
   const thisMock = { helpers: { httpRequest: async (opts) => {
@@ -328,7 +328,7 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, 
     return respuesta || { content: 'transcript de prueba', lang: 'en' };
   } } };
   const $ = (n) => {
-    if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto } }) };
+    if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto, concurrencia_transcribir: concurrencia } }) };
     if (n === 'Heat-score v1') return { all: () => items.map((j) => ({ json: j })) };
     throw new Error('nodo no mockeado: ' + n);
   };
@@ -343,14 +343,21 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, respuesta, 
 };
 const tvid = (id, extra = {}) => Object.assign({ external_id: id, video_url: 'https://v/' + id, idioma_guess: 'es' }, extra);
 
-seccion('Transcribir — pool de 8 (cierre 55, plan pago Supadata 10 req/s)');
+seccion('Transcribir — pool paralelo (plan pago Supadata 10 req/s)');
 await (async () => {
   {
-    const items = []; for (let i = 0; i < 20; i++) items.push(tvid('t' + i));
-    const { out, llamadas, maxEnVuelo } = await runTranscribir(items, { delayMs: 15 });
-    check('con 20 videos hay hasta 8 llamadas EN VUELO a la vez (antes: 1)', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
-    check('cada video distinto se llama UNA vez (dedup intacto con el pool)', llamadas.length === 20, llamadas.length + ' llamadas');
+    const items = []; for (let i = 0; i < 40; i++) items.push(tvid('t' + i));
+    const { out, llamadas, maxEnVuelo } = await runTranscribir(items, { delayMs: 15, concurrencia: 24 });
+    check('la concurrencia sale de Config: con 24 hay hasta 24 EN VUELO a la vez (antes: 1)', maxEnVuelo() === 24, 'max en vuelo = ' + maxEnVuelo());
+    check('cada video distinto se llama UNA vez (dedup intacto con el pool)', llamadas.length === 40, llamadas.length + ' llamadas');
     check('todos salen con transcript', out.every((o) => o.transcripcion === 'transcript de prueba'), JSON.stringify(out.filter((o) => !o.transcripcion).length + ' sin transcript'));
+  }
+  {
+    // Config viejo (sin la clave) ⇒ cae al default del código, no a 1: un re-import a medias no
+    // puede devolver el nodo al throughput serial en silencio.
+    const items = []; for (let i = 0; i < 30; i++) items.push(tvid('d' + i));
+    const { maxEnVuelo } = await runTranscribir(items, { delayMs: 15 });
+    check('sin la clave en Config cae al default 24, no a 1', maxEnVuelo() === 24, 'max en vuelo = ' + maxEnVuelo());
   }
   {
     // fan-out: 3 copias de 2 videos → 2 llamadas, el transcript se reparte a las copias
@@ -367,8 +374,10 @@ await (async () => {
   {
     // presupuesto agotado: budget ínfimo + llamadas lentas ⇒ no se ARRANCAN videos nuevos; el resto
     // pasa sin transcript y lo dice en el log (la degradación del 07-17, ahora visible y probada)
+    // La concurrencia va fija y baja acá: lo que se prueba es el presupuesto, y con el pool en 24 los
+    // 30 videos arrancan en dos vueltas y ningún budget razonable llega a morder.
     const items = []; for (let i = 0; i < 30; i++) items.push(tvid('p' + i));
-    const { out, logs, llamadas } = await runTranscribir(items, { presupuesto: 0.04, delayMs: 25 });
+    const { out, logs, llamadas } = await runTranscribir(items, { presupuesto: 0.04, delayMs: 25, concurrencia: 2 });
     check('el presupuesto corta: no se llaman los 30', llamadas.length < 30, llamadas.length + ' llamadas');
     check('los cortados salen igual, sin transcript (fail-open)', out.length === 30, out.length + ' items');
     check('y avisa cuántos quedaron sin transcript', logs.some((l) => /PRESUPUESTO agotado .*sin transcript/.test(l)), JSON.stringify(logs.slice(-2)));
@@ -385,6 +394,84 @@ await (async () => {
   {
     const { out, llamadas } = await runTranscribir([tvid('r2')], { secuencia: [{ content: '', lang: '' }, { content: '', lang: '' }] });
     check('dos vacías: fail-open (transcripcion vacía) tras agotar el retry', out[0].transcripcion === '' && llamadas.length === 2, `tx='${out[0].transcripcion}' llamadas=${llamadas.length}`);
+  }
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// Traducir (Claude Haiku) — pool + presupuesto (espejo de Transcribir)
+// ════════════════════════════════════════════════════════════════════════════
+// Era el ÚNICO nodo caro serial y sin presupuesto: 1 llamada + sleep(1000) por video no-español, y
+// los referentes son casi todos ingleses (170 traducciones sobre 191 transcritos el 31/07). Sin
+// presupuesto, el watchdog del task runner mata el nodo y la corrida no entrega nada — el modo de
+// falla más caro que tiene el motor. Lo que se prueba acá es la diferencia con Transcribir: este
+// presupuesto DEGRADA (el video sale en su idioma original y el gate lo juzga igual), no quema.
+const runTraducir = async (items, { presupuesto = 0, concurrencia, delayMs = 5, respuesta, falla } = {}) => {
+  const llamadas = [];
+  let enVuelo = 0, maxEnVuelo = 0;
+  const thisMock = { helpers: { httpRequest: async (opts) => {
+    llamadas.push(opts.body && opts.body.messages[0].content);
+    enVuelo++; maxEnVuelo = Math.max(maxEnVuelo, enVuelo);
+    await new Promise((r) => setTimeout(r, delayMs));
+    enVuelo--;
+    if (falla) throw new Error('anthropic caída (mock)');
+    return respuesta || { content: [{ text: 'traducido' }] };
+  } } };
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: { presupuesto_traducir_s: presupuesto, concurrencia_traducir: concurrencia } }) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const $input = { all: () => items.map((j) => ({ json: j })) };
+  const logs = [];
+  const out = await new AsyncFn('$', '$input', 'console', jsCode('Traducir (Claude Haiku)'))
+    .call(thisMock, $, $input, { log: (m) => logs.push(m) });
+  return { out: out.map((i) => i.json), logs, llamadas, maxEnVuelo: () => maxEnVuelo };
+};
+const xvid = (id, idioma = 'en', extra = {}) => Object.assign({ external_id: id, transcripcion: 'text of ' + id, idioma_detectado: idioma }, extra);
+
+seccion('Traducir — pool + presupuesto (el nodo que mataba la corrida)');
+await (async () => {
+  {
+    const items = []; for (let i = 0; i < 20; i++) items.push(xvid('x' + i));
+    const { out, llamadas, maxEnVuelo } = await runTraducir(items, { delayMs: 15 });
+    check('hay hasta 8 llamadas EN VUELO a la vez (antes: 1, serial con sleep de 1s)', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
+    check('cada video distinto se traduce UNA vez (dedup del cierre 31 intacto)', llamadas.length === 20, llamadas.length + ' llamadas');
+    check('todos salen con el script traducido', out.every((o) => o.script === 'traducido'), JSON.stringify(out.filter((o) => o.script !== 'traducido').length + ' sin traducir'));
+  }
+  {
+    const items = []; for (let i = 0; i < 30; i++) items.push(xvid('c' + i));
+    const { maxEnVuelo } = await runTraducir(items, { delayMs: 15, concurrencia: 16 });
+    check('la concurrencia sale de Config (16 ⇒ 16 en vuelo)', maxEnVuelo() === 16, 'max en vuelo = ' + maxEnVuelo());
+  }
+  {
+    // El español no se traduce: sigue siendo lo que ahorra la mitad de las llamadas.
+    const { llamadas, out } = await runTraducir([xvid('e1', 'es'), xvid('e2', 'en')]);
+    check('el español no gasta una llamada', llamadas.length === 1, llamadas.length + ' llamadas');
+    check('y su script queda como el transcript original', out[0].script === 'text of e1', out[0].script);
+  }
+  {
+    // fan-out: 3 copias de 2 videos → 2 llamadas
+    const { llamadas, out } = await runTraducir([xvid('a'), xvid('a'), xvid('b')]);
+    check('el fan-out no paga doble: 3 items / 2 únicos = 2 llamadas', llamadas.length === 2, llamadas.length + ' llamadas');
+    check('las copias del fan-out comparten la traducción', out.length === 3 && out.every((o) => o.script === 'traducido'), out.length + ' items');
+  }
+  {
+    const { out, logs } = await runTraducir([xvid('f1')], { falla: true });
+    check('Haiku caído ⇒ fail-open: el script queda en el idioma original', out[0].script === 'text of f1', out[0].script);
+    check('y deja de ser silencioso: lo dice en el log', logs.some((l) => /ERROR id=f1/.test(l)), JSON.stringify(logs));
+  }
+  {
+    // presupuesto agotado: budget ínfimo + llamadas lentas ⇒ no se ARRANCAN traducciones nuevas.
+    // La diferencia con Transcribir: acá el video SIGUE VIVO, solo que sin traducir.
+    const items = []; for (let i = 0; i < 40; i++) items.push(xvid('p' + i));
+    const { out, logs, llamadas } = await runTraducir(items, { presupuesto: 0.04, delayMs: 25, concurrencia: 2 });
+    check('el presupuesto corta: no se llaman los 40', llamadas.length < 40, llamadas.length + ' llamadas');
+    check('los cortados NO se pierden: salen con el transcript original', out.length === 40 && out.every((o) => o.script), out.length + ' items');
+    check('y avisa cuántos quedaron sin traducir', logs.some((l) => /PRESUPUESTO agotado .*idioma original/.test(l)), JSON.stringify(logs.slice(-3)));
+  }
+  {
+    const { out, logs } = await runTraducir([xvid('v1')], { respuesta: { content: [{ text: '   ' }] } });
+    check('respuesta vacía ⇒ fail-open al transcript original', out[0].script === 'text of v1', out[0].script);
+    check('y se cuenta como fallida', logs.some((l) => /1 traducciones fallaron/.test(l)), JSON.stringify(logs));
   }
 })();
 

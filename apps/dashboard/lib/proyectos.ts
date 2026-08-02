@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Dependencia } from "@/domain/borrado";
 import type { Registro } from "@/domain/run-plan";
 import {
   aRegistrosDeProyectos,
@@ -168,4 +169,80 @@ export async function crearProyecto(datos: DatosProyecto): Promise<string> {
     .single();
   if (error) throw new Error(`Supabase respondió con error creando el proyecto: ${error.message}`);
   return data.id;
+}
+
+// ── Borrado ──────────────────────────────────────────────────────────────────
+// La regla vive en `domain/borrado.ts`: se borra solo lo que nunca produjo nada. Acá va el conteo
+// que la alimenta y el DELETE.
+
+/** Cuántas filas de una tabla de `app` apuntan a este id. `head: true` no trae los datos. */
+async function contar(tabla: string, columna: string, id: string): Promise<number> {
+  const supabase = createAdminClient();
+  const { count, error } = await supabase
+    .schema("app")
+    .from(tabla)
+    .select("id", { count: "exact", head: true })
+    .eq(columna, id);
+  if (error) throw new Error(`Supabase respondió con error contando ${tabla}: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Lo que retiene a un proyecto, en el orden en que la frase lo va a nombrar.
+ *
+ * No están los pares `referentes_proyectos` ni `referentes_propuestos_proyectos`: cascadean, y con
+ * razón — son la asignación (a qué proyecto alimenta esta cuenta), no historia. Si el proyecto deja
+ * de existir, esa asignación no significa nada.
+ */
+export async function dependenciasDeProyecto(id: string): Promise<Dependencia[]> {
+  const [candidatos, descartes] = await Promise.all([
+    contar("candidatos", "proyecto_id", id),
+    contar("descartes", "proyecto_id", id),
+  ]);
+  return [
+    { cuantos: candidatos, singular: "video en el feed", plural: "videos en el feed" },
+    { cuantos: descartes, singular: "descarte", plural: "descartes" },
+  ];
+}
+
+/**
+ * Lo que retiene a una voz. Los proyectos van primero porque son la razón habitual: `voz_id` es
+ * `not null`, así que una voz con proyectos no se puede borrar ni aunque estén vacíos — habría que
+ * borrarlos a ellos primero, y eso es una decisión de a uno, no un efecto secundario.
+ */
+export async function dependenciasDeVoz(id: string): Promise<Dependencia[]> {
+  const [proyectos, candidatos] = await Promise.all([
+    contar("proyectos", "voz_id", id),
+    contar("candidatos", "voz_id", id),
+  ]);
+  return [
+    { cuantos: proyectos, singular: "proyecto", plural: "proyectos" },
+    { cuantos: candidatos, singular: "video en el feed", plural: "videos en el feed" },
+  ];
+}
+
+/**
+ * El conteo previo arma la frase; ESTO es la garantía. Entre contar y borrar puede entrar una
+ * corrida y escribir candidatos, y ahí la FK rechaza el DELETE con un `23503`. Traducirlo es la
+ * diferencia entre "no se pudo borrar, ya hay videos nuevos" y un error de Postgres en pantalla.
+ */
+function traducirFk(error: { code?: string; message: string }, que: string): Error {
+  if (error.code === "23503") {
+    return new Error(`No se pudo borrar ${que}: mientras tanto le quedó historia colgando. Recargá la página.`);
+  }
+  return new Error(`Supabase respondió con error borrando ${que}: ${error.message}`);
+}
+
+export async function borrarProyecto(id: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.schema("app").from("proyectos").delete().eq("id", id).select("id");
+  if (error) throw traducirFk(error, "el proyecto");
+  if (!data || data.length === 0) throw new Error("Ese proyecto ya no existe.");
+}
+
+export async function borrarVoz(id: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.schema("app").from("voces").delete().eq("id", id).select("id");
+  if (error) throw traducirFk(error, "la voz");
+  if (!data || data.length === 0) throw new Error("Esa voz ya no existe.");
 }

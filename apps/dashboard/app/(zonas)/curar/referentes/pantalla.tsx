@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { BotonBorrar } from "@/components/borrar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
   esFlojo,
   type Salud,
 } from "@/domain/referentes";
-import { crear, guardar, type FormReferente, type Resultado } from "./actions";
+import { borrar, crear, guardar, type FormReferente, type Resultado } from "./actions";
 
 // El banco de cuentas con el estándar del cockpit: la fila muestra un resumen y el record se
 // abre. Lo que cambió respecto de la primera versión live y por qué:
@@ -402,10 +403,28 @@ function Formulario({
         />
       </div>
 
-      <div className="sticky bottom-0 -mx-4 -mb-4 flex items-center justify-between gap-4 border-t bg-card px-4 py-3">
-        <p className={`text-xs ${resultado?.ok === false ? "text-destructive" : "text-muted-foreground"}`}>
-          {resultado?.mensaje ?? (cambiado ? "Hay cambios sin guardar." : "")}
-        </p>
+      {/* Borrar solo existe editando, nunca en el alta, y va lejos de Guardar: es la única acción
+          de esta pantalla que no se deshace. Apagar («Rastrear») sigue siendo lo correcto para
+          «no la busques más»; borrar es para la fila que no debería existir — la repetida, la del
+          typo. Lo que la cuenta ya trajo no se toca: la historia se guarda por handle, no por FK. */}
+      <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t bg-card px-4 py-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+          {referente && (
+            <BotonBorrar
+              etiqueta="Borrar la cuenta"
+              advertencia="Sale del banco; lo que ya trajo se queda. No se puede deshacer."
+              deshabilitado={enviando}
+              onBorrar={() => borrar(referente.id)}
+              onResultado={(r) => {
+                setResultado(r);
+                if (r.ok) onListo();
+              }}
+            />
+          )}
+          <p className={`text-xs ${resultado?.ok === false ? "text-destructive" : "text-muted-foreground"}`}>
+            {resultado?.mensaje ?? (cambiado ? "Hay cambios sin guardar." : "")}
+          </p>
+        </div>
         <Button onClick={enviar} disabled={!cambiado || enviando}>
           {enviando ? "Guardando…" : referente ? "Guardar" : "Agregar"}
         </Button>

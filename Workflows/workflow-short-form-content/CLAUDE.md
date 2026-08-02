@@ -47,6 +47,18 @@ ADR-009); el "link" es la URL del video original.
   regla de arriba: `Abrir run en el registro` (porque `Cerrar run` lo referencia por nombre) y
   `Preparar procesados → POST processed_items`, que se metió entre `Heat-score v1` y `Transcribir`
   para que la memoria del dedup se grabe **antes** de entregar (ADR-029, enmienda 2026-07-31).
+- 🚨 **Los dos nodos caros tienen pool + presupuesto, y fallan distinto (ADR-044).** El watchdog del
+  task runner (`N8N_RUNNERS_TASK_TIMEOUT`, 900 s en el pod) mata el **nodo entero** y la corrida no
+  entrega nada, así que ni `Transcribir` ni `Traducir` pueden correr sin límite de tiempo. La
+  asimetría que hay que tener en la cabeza antes de tocar cualquiera de los dos:
+  **el presupuesto de `Transcribir` QUEMA** (`POST processed_items` corre antes, así que el video que
+  queda afuera ya está en la memoria de dedup, vuelve sin transcript, el gate lo descarta `sin_guion`
+  y no se reintenta nunca) y **el de `Traducir` DEGRADA** (sale en su idioma original y el gate lo
+  juzga igual). Por eso el corte de `cap_top_n` es seguro —pasa dentro de `Heat-score v1`, antes de
+  ese POST, o sea posterga— y el presupuesto no. **La palanca de throughput es la concurrencia**, no
+  el presupuesto: este no puede pasar de ~880 s. Las 4 perillas viven en `Config`
+  (`concurrencia_transcribir` 24 · `presupuesto_transcribir_s` 840 · `concurrencia_traducir` 8 ·
+  `presupuesto_traducir_s` 840) para tunearlas desde n8n **sin re-importar**.
 - **Gates fail-open, con dos excepciones:** si Haiku falla, el item pasa (invariante #1: no conviertas
   un fallo externo en dependencia de ejecución). Fail-open aplica a los gates de *juicio* y a las
   *escrituras* de registro. **Excepción 1 (ADR-029):** la *lectura* de `processed_items`
@@ -86,9 +98,10 @@ node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log(
 ## Validar
 
 `cd core/scripts && npm run validate` (contrato del manifest + escaneo de secretos) y
-`node test-nodos.mjs` (ejercita `Armar plan`, `Armar candidato`, `Transcribir`, `Heat-score`, `Gate` y
-`Preparar procesados` fuera de n8n con `$` y `this.helpers` mockeados — corrélo SIEMPRE antes de
-re-importar si tocaste esos nodos). Si tocaste **conexiones, posiciones o cualquier `$('X')`**, corré
+`node test-nodos.mjs` (ejercita `Armar plan`, `Armar candidato`, `Transcribir`, `Traducir`,
+`Heat-score`, `Gate` y `Preparar procesados` fuera de n8n con `$` y `this.helpers` mockeados — el
+mock cuenta llamadas **y concurrencia en vuelo**, así que un pool que se serializa sin querer se ve
+acá; corrélo SIEMPRE antes de re-importar si tocaste esos nodos). Si tocaste **conexiones, posiciones o cualquier `$('X')`**, corré
 además `node ../auditar-workflows.mjs`: chequea conexiones rotas, inalcanzables, refs a no-ancestros,
 que los `jsCode` compilen **como AsyncFunction** (un `new Function()` pelado da falsos positivos por
 los `await` de nivel superior) y te lista los placeholders del re-import. La conducta final igual se

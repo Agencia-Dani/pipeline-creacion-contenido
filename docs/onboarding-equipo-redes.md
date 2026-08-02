@@ -26,6 +26,10 @@
 > Para crear (una voz, un proyecto, una cuenta) hay un **botón arriba** de la página. Lo único que
 > se cambia sin abrir nada es el interruptor de prendido/apagado, que guarda solo al tocarlo.
 
+> 🆕 **Desde el 2026-08-02 se puede BORRAR** una voz, un proyecto o una cuenta de referente. El botón
+> está **adentro del record** (se toca la fila, se abre, y está abajo a la izquierda), y pregunta
+> antes. **Apagar y borrar no son lo mismo, y casi siempre lo que quieren es apagar** — ver §5.6.
+
 **Lo que SÍ hacen ustedes:**
 - ✅ Entrar al **cockpit** todos los días (o cada 2-3 días) y **calificar** los videos que llegaron,
   en `Curar → Feed`. En el feed pueden **plegar un proyecto entero** tocando su título, para
@@ -34,9 +38,9 @@
   **pedir una corrida a demanda** cuando la necesiten (§3.1) — ya no dependen del lunes.
 - ✅ Poner en cada candidato dos cosas: la **calificación** (🔥/👍/👎) y el **estado** (aprobado/descartado).
 - ✅ Calificar **también lo que descartan** (👎 + descartado): así la máquina aprende y mejora.
-- ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**), en
-  el cockpit, `Curar → Referentes`. Esa lista es de dónde sale **todo** el contenido: cuentas
-  buenas = candidatos buenos.
+- ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**, y
+  **sacar** las que no sirven), en el cockpit, `Curar → Referentes`. Esa lista es de dónde sale
+  **todo** el contenido: cuentas buenas = candidatos buenos.
 - ✅ Revisar **una vez por semana** `Curar → Sugeridos`: la máquina les sugiere cuentas nuevas;
   ustedes aprueban o descartan, y las aprobadas entran al banco solas (§8.1).
 - ✅ Escribir buenos `criterios_relevancia` en cada Proyecto (es lo que decide la calidad de lo que llega).
@@ -427,6 +431,30 @@ Las perillas que sí van a querer tocar (las mismas para todos los proyectos):
 El resto de las perillas (pesos de orden, bonus de idioma, mínimos) son **avanzadas**: no aparecen en su
 cockpit. Si necesitan mover una, avísennos. Igual, todas tienen un tope de seguridad para que nadie
 dispare el gasto sin querer.
+
+### 5.6 Apagar vs. borrar (nuevo, 2026-08-02)
+
+Son dos cosas distintas y **casi siempre la que quieren es apagar**.
+
+| | Qué hace | Cuándo |
+|---|---|---|
+| **Apagar** (el interruptor de la lista) | La fila se queda ahí, gris, y deja de correr. Se puede volver a prender cuando sea. | *"Este cliente se pausa unos meses"*, *"esta cuenta no me está sirviendo pero no quiero perderla de vista"*. **Esto es lo normal.** |
+| **Borrar** (adentro del record, abajo a la izquierda) | La fila **desaparece**. No se deshace. | *"Esto lo creé mal"*: el proyecto duplicado, la cuenta con el nombre mal escrito, la voz de un cliente que nunca arrancó. |
+
+**Borrar una cuenta de referente** se puede siempre. **Lo que esa cuenta ya trajo no se toca**: los
+videos que están en el feed y el histórico se quedan como están. Solo deja de buscarse. Y si mañana
+la vuelven a agregar con el mismo `@`, recupera sus porcentajes (*pasa* / *aprueban*) sola.
+
+**Borrar una voz o un proyecto** solo se puede si **todavía no produjo nada**. Si el proyecto ya tiene
+videos en el feed, la pantalla no los borra: les dice cuántos hay y les propone apagarlo. Es a
+propósito — esos videos son el trabajo de la máquina y sus decisiones de ustedes, y no queremos que un
+click se los lleve. Si de verdad necesitan borrar un proyecto que ya tiene feed, **avísennos**.
+
+Una voz tampoco se borra mientras tenga proyectos colgando: primero se resuelven los proyectos.
+
+> ⚠️ **Borrar un proyecto puede dejar cuentas sin trabajo.** Si una cuenta solo alimentaba a ese
+> proyecto, queda prendida y sin destino. Después de borrar, pasen por *Referentes*: el aviso de
+> arriba de la página les dice cuántas quedaron así.
 
 ---
 

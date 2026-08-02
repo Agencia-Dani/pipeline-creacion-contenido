@@ -71,7 +71,25 @@ deliberadamente no se calcula.
 Cuántos videos distintos se transcriben como máximo en **toda** la corrida, todos los Proyectos
 juntos, ordenados por Heat-score. Muerde justo antes de transcribir y filtrar, que son los pasos que
 se pagan: es el presupuesto de la corrida. `0` = sin techo. No confundir con el `N` del Proyecto,
-que reparte; este limita el total (ADR-042).
+que reparte; este limita el total, y **corta global**: cuando muerde no recorta parejo, deja
+proyectos enteros en cero (ADR-042, medido en ADR-044).
+
+**Presupuesto de nodo** (`presupuesto_transcribir_s`, `presupuesto_traducir_s`):
+Cuánto tiempo puede gastar un Code node caro antes de dejar de arrancar trabajo nuevo. Existe porque
+el watchdog del task runner de n8n mata el **nodo entero** a los 900 s y con él la corrida, sin
+entregar nada. No es lo mismo que el Techo de gasto: aquel elige **qué** se procesa, este corta
+**cuándo se deja de procesar**. Y los dos que hay no cuestan lo mismo (ADR-044): el de `Transcribir`
+**quema** (el video ya está en la memoria de dedup, así que se pierde para siempre), el de `Traducir`
+**degrada** (el video sale en su idioma original y se juzga igual). La palanca para procesar más no
+es subir el presupuesto —tiene el watchdog encima— sino la **concurrencia** del pool.
+
+**Apagar vs. borrar**:
+Dos actos distintos sobre un registro de config. **Apagar** (`activo = false`) lo saca de las
+corridas y lo deja en la lista: es reversible y es lo normal. **Borrar** lo saca de la base, y solo
+se permite si el registro **nunca produjo nada** (ADR-045) — un Referente sale siempre, porque su
+historia se guarda por handle en texto y no por FK; una Voz o un Proyecto, solo si no tienen
+Candidatos ni Descartes colgando. La frase que rechaza el borrado dice **cuánta** historia hay y
+ofrece apagar.
 
 **Heat-score**:
 El número con que el motor ordena los candidatos de caliente a frío. Combina la relevancia/calidad

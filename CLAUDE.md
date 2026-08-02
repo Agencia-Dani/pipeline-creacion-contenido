@@ -25,7 +25,7 @@ en §Agent skills; acá solo se ubican.
   que reemplaza a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–043, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–045, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -33,7 +33,8 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–012; se aplican en el SQL Editor).
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–015; se aplican a mano en el SQL Editor,
+  en orden). Al 2026-08-02 las 15 están aplicadas en prod.
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
@@ -55,7 +56,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..039).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..045).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del
@@ -81,9 +82,11 @@ módulos), `/handoff` (compactar una sesión).
   posición en el canvas, no el array de conexiones), `jsCode` que compile como AsyncFunction, e
   inventario de placeholders del re-import. **Corrélo si tocaste conexiones o posiciones.** Solo lee.
 - **Test de los code nodes del motor:** `node Workflows/workflow-short-form-content/test-nodos.mjs` —
-  ejercita `Armar plan de corrida` y `Armar candidato` fuera de n8n con un `$` mockeado (N por proyecto,
-  gate por `Voces.activo`, orden dedup→corte, piso, y las regresiones que ya nos mordieron). **Corrélo
-  antes de re-importar** si tocaste esos nodos. Sin dependencias: es node pelado.
+  ejercita `Armar plan de corrida`, `Armar candidato`, `Heat-score v1`, `Preparar procesados` y los dos
+  nodos caros (`Transcribir`, `Traducir`) fuera de n8n, con `$` y `this.helpers` mockeados: N por
+  proyecto, gate por `Voces.activo`, orden dedup→corte, piso, **concurrencia real en vuelo del pool y
+  el corte del presupuesto** (ADR-044), y las regresiones que ya nos mordieron. **Corrélo antes de
+  re-importar** si tocaste esos nodos. Sin dependencias: es node pelado.
 - **Typecheck / lint:** no hay — los scripts son ESM `.mjs` plano, sin TS ni linter.
 - **Run:** el motor **corre en n8n**, no localmente: se importa el `workflow.json` (una instancia,
   editada a mano en el nodo `Config`) y se dispara con *Execute Workflow* (manual) o el cron semanal.

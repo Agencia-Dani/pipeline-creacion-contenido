@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { BotonBorrar } from "@/components/borrar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { pideMasQueElTecho, techoDeCrudos } from "@/domain/corrida";
 import {
+  borrarProyecto,
+  borrarVoz,
   crearProyectoNuevo,
   crearVozNueva,
   guardarProyecto,
@@ -67,25 +70,37 @@ export const formDeProyecto = (p: ProyectoFila): FormProyecto => ({
   n: p.n === null ? "" : String(p.n),
 });
 
-/** El pie del formulario: guarda solo si algo cambió, y no se va con el scroll. */
+/**
+ * El pie del formulario: guarda solo si algo cambió, y no se va con el scroll.
+ *
+ * `borrar` va a la izquierda del todo, lejos de Guardar y con el peso visual más bajo de la barra:
+ * es la acción rara (una vez por trimestre) y la única que no se puede deshacer. Su resultado entra
+ * por el mismo `resultado` que el de guardar, así que el motivo de un borrado rechazado se lee
+ * donde el equipo ya está mirando.
+ */
 function Pie({
   cambiado,
   enviando,
   resultado,
   onGuardar,
   etiqueta = "Guardar",
+  borrar,
 }: {
   cambiado: boolean;
   enviando: boolean;
   resultado: Resultado | null;
   onGuardar: () => void;
   etiqueta?: string;
+  borrar?: React.ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 -mx-4 -mb-4 flex items-center justify-between gap-4 border-t bg-card px-4 py-3">
-      <p className={`text-xs ${resultado?.ok === false ? "text-destructive" : "text-muted-foreground"}`}>
-        {resultado?.mensaje ?? (cambiado ? "Hay cambios sin guardar." : "")}
-      </p>
+    <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t bg-card px-4 py-3">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        {borrar}
+        <p className={`text-xs ${resultado?.ok === false ? "text-destructive" : "text-muted-foreground"}`}>
+          {resultado?.mensaje ?? (cambiado ? "Hay cambios sin guardar." : "")}
+        </p>
+      </div>
       <Button onClick={onGuardar} disabled={!cambiado || enviando}>
         {enviando ? "Guardando…" : etiqueta}
       </Button>
@@ -238,7 +253,24 @@ export function FormularioVoz({ voz, onListo }: { voz: VozFila; onListo: () => v
           rows={6}
         />
       </div>
-      <Pie cambiado={cambiado} enviando={enviando} resultado={resultado} onGuardar={enviar} />
+      <Pie
+        cambiado={cambiado}
+        enviando={enviando}
+        resultado={resultado}
+        onGuardar={enviar}
+        borrar={
+          <BotonBorrar
+            etiqueta="Borrar la voz"
+            advertencia="No se puede deshacer."
+            deshabilitado={enviando}
+            onBorrar={() => borrarVoz(voz.id)}
+            onResultado={(r) => {
+              setResultado(r);
+              if (r.ok) onListo();
+            }}
+          />
+        }
+      />
     </>
   );
 }
@@ -362,7 +394,24 @@ export function FormularioProyecto({
           </p>
         </div>
       )}
-      <Pie cambiado={cambiado} enviando={enviando} resultado={resultado} onGuardar={enviar} />
+      <Pie
+        cambiado={cambiado}
+        enviando={enviando}
+        resultado={resultado}
+        onGuardar={enviar}
+        borrar={
+          <BotonBorrar
+            etiqueta="Borrar el proyecto"
+            advertencia="No se puede deshacer."
+            deshabilitado={enviando}
+            onBorrar={() => borrarProyecto(proyecto.id)}
+            onResultado={(r) => {
+              setResultado(r);
+              if (r.ok) onListo();
+            }}
+          />
+        }
+      />
     </>
   );
 }
