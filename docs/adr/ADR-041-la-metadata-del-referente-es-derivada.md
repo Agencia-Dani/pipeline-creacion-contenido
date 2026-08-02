@@ -44,3 +44,22 @@
     viaja por candidato. Si algún día hacen falta, entran por la misma puerta y sin migración de datos.
   - `create or replace view` en vez de `drop + create`: la columna nueva va **al final**, que es lo que
     Postgres permite reemplazar sin dropear. Nada que lea la vista se entera.
+
+---
+
+## Nota de implementación — el bug que apareció al verificar (migración `015`)
+
+Al contar las filas de la vista para comprobar la columna nueva, salieron **18 para 17 referentes**.
+No lo causó `seguidores`: `v_senal_seleccion` (migración `003`) agrupa por **`(referente, idioma)`** y
+el `left join` de `v_salud_referentes` lo trataba como uno-a-uno desde la `009`. Cualquier cuenta que
+publicara en dos idiomas se duplicaba, y «aprueban» mostraba la tasa de **un idioma elegido al azar
+por el join**, no la de la cuenta.
+
+Se arregló en [`015`](../../core/schema/015_salud_referentes_una_fila.sql) colapsando la señal por
+referente antes del join. **No es una decisión nueva** —es la tasa que la pantalla siempre dijo que
+mostraba— así que no lleva ADR propio.
+
+Lo que sí deja como regla para esta vista: **todo join nuevo tiene que garantizar una fila por
+referente.** Las dos CTEs de `seguidores` ya nacieron con `distinct on` por eso mismo; el fan-out
+viejo se había colado justo por no aplicar ese cuidado.
+

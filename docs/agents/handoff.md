@@ -30,6 +30,25 @@
 > [042](../adr/ADR-042-el-techo-de-gasto-se-toca-desde-el-cockpit.md) ·
 > [043](../adr/ADR-043-el-techo-se-muestra-la-entrega-no-se-promete.md).
 >
+> ### 🚨 Y apareció un bug PREEXISTENTE al verificar (migración `015`, sin aplicar)
+> Contar las filas de `v_salud_referentes` para comprobar la columna `seguidores` dio **18 para 17
+> referentes**. No lo causó ADR-041: **`v_senal_seleccion` agrupa por `(referente, idioma)`** y el
+> `left join` de la `009` lo trataba como uno-a-uno. Cualquier cuenta que publique en dos idiomas se
+> duplica. `@tori.trades` es una hoy:
+> `otro → 0 de 1 (0.00)` · `en → 1 de 8 (0.13)`.
+> O sea que la cuenta salía **dos veces** en `/curar/referentes` y «aprueban» mostraba **la tasa de un
+> idioma elegido al azar por el join**, no la de la cuenta (la real es 1 de 9 ≈ 11%). Misma familia
+> que todo lo demás: no falla, no avisa, y deja un número que se ve razonable y está mal. *`esFlojo`
+> usa `tasa_gate`, no esta, así que* A revisar *nunca estuvo contaminado.*
+> ⚠️ **Falta correr [`core/schema/015`](../../core/schema/015_salud_referentes_una_fila.sql)**, que
+> colapsa la señal por referente antes del join. **Regla que deja para esa vista: todo join nuevo
+> tiene que garantizar UNA fila por referente** — las CTEs de `seguidores` ya nacieron con
+> `distinct on` justamente por eso.
+>
+> 🧹 **Dato sucio aparte, sin resolver: `@casper_smc` está DOS VECES en `app.referentes`**, dos ids
+> distintos y la misma plataforma. No es la vista, son dos filas reales. Antes de borrar una hay que
+> mirar qué proyectos tiene cada una: si difieren, borrar la equivocada le saca fuentes a un proyecto.
+>
 > ### 🔴 Lo que falta, EN ESTE ORDEN, y es de Mani
 > **1. Aplicar [`core/schema/014`](../../core/schema/014_criterios_voz_y_perillas.sql) en el SQL
 > Editor — ANTES del commit.** El código endurece el zod de `filaVoz` a `z.string()`: si el deploy
