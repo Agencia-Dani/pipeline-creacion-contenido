@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cerrarSesion } from "@/app/(zonas)/actions";
+import { cerrarSesion } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 
 // Sesión válida pero sin fila en app.usuarios: entró al edificio pero nadie le dio escritorio.

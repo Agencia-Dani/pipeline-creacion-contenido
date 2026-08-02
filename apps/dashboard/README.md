@@ -8,9 +8,9 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
 
 ## Mapa del código
 
-- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 4 zonas en `(zonas)/`:
-  `operar` · `curar` · `transcribir` · `entender` (plan-cockpit §2.1 + ADR-031), y
-  `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
+- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 4 zonas en
+  **`[cliente]/[pipeline]/(zonas)/`**: `operar` · `curar` · `transcribir` · `entender`
+  (plan-cockpit §2.1 + ADR-031), y `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
   [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed.
   De qué almacenamiento sale cada dominio lo decide `lib/config.ts` — la costura de los cortes de
   D5. **Desde D7 los cuatro dominios del contrato salen de Postgres y Airtable no participa**;
@@ -62,6 +62,28 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   3/4 se borraron en D7 — con Postgres de dueño, un import posterior pisaría en silencio lo que el
   equipo calificó. Están en git si hiciera falta mirarlos.
 - `proxy.ts` — refresh de sesión + redirect a login (en Next 16 middleware se llama proxy).
+  **No cambió con el multi-tenant y no tiene que cambiar:** sigue siendo el chequeo optimista de
+  sesión, y la autoridad sigue en cada página.
+
+### Las URLs llevan el tenant adelante
+
+`/30x/reels/curar/feed`, `/estadox/linkedin/operar`. **En la URL y no en una cookie** a propósito
+(plan-multi-tenant §6): los links se pueden compartir entre compañeros, el caché de Next keyea
+correcto por tenant, y el tenant no se puede perder al navegar — una cookie de tenant es un bug de
+caché esperando.
+
+Las reglas que sostienen eso, y que conviene respetar al agregar una pantalla:
+- **Ningún `href` ni `revalidatePath` se escribe a mano.** Se arman con `domain/rutas.ts`
+  (`rutaDe` / `rutaZona` / `comoRuta`), que es puro y está testeado. Con el prefijo variable, cada
+  string escrito a mano es una chance de mandar a alguien —o de revalidar— el cockpit equivocado.
+- **Los segmentos crudos de la URL solo sirven para RESOLVER.** Todo lo que se renderiza se arma con
+  el cockpit ya validado que devuelve `exigirTenant`. Si no, la pantalla puede mostrar los datos de
+  un cockpit y los links de otro.
+- **Los componentes cliente leen el cockpit de la URL** con `usarCockpit()` (colocado en
+  `(zonas)/`), en vez de recibirlo por props tres niveles abajo solo para armar un `href`.
+- **Fuera del tenant:** `/`, `/login`, `/auth/*`, `/sin-rol` y `/api/*`. La raíz no es una pantalla:
+  resuelve el cockpit del usuario y su zona inicial, y es la salida de emergencia a la que caen
+  todos los `redirect("/")` de las guardias.
 
 La autoridad de permisos está en el servidor: cada página exige su zona con `exigirZona`, y los
 datos los protege RLS. El nav solo *esconde*.

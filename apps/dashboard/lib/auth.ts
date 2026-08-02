@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { TenantContext } from "@/domain/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { esRol, puedeVerZona, type Rol, type Zona } from "@/domain/roles";
-import { resolverContexto } from "@/lib/tenant";
+import { resolverContexto, type Instancia } from "@/lib/tenant";
 
 export type Usuario = {
   id: string;
@@ -66,11 +66,12 @@ export async function exigirTenant(
   zona: Zona,
   cliente?: string,
   pipeline?: string,
-): Promise<{ usuario: Usuario; ctx: TenantContext }> {
+): Promise<{ usuario: Usuario; ctx: TenantContext; cockpit: Instancia }> {
   const usuario = await exigirZona(zona);
-  const ctx = await resolverContexto(usuario, cliente, pipeline);
-  // Un cockpit ajeno en la URL sale por el mismo lado que una zona ajena: redirect, sin decir si
-  // existe. Es exactamente lo que ya hace `exigirZona` con el rol.
-  if (!ctx) redirect("/");
-  return { usuario, ctx };
+  const sesion = await resolverContexto(usuario, cliente, pipeline);
+  // Un cockpit ajeno en la URL sale por el mismo lado que una zona ajena: redirect a la raíz, que
+  // reboteará al cockpit que sí le corresponde. Sin decir si existe — es lo que ya hace
+  // `exigirZona` con el rol.
+  if (!sesion) redirect("/");
+  return { usuario, ...sesion };
 }

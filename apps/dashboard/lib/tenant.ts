@@ -60,11 +60,14 @@ export async function leerInstancias(): Promise<Instancia[]> {
   }));
 }
 
+/** El cockpit abierto: con qué scopear (`ctx`) y cuál es (`cockpit`, que además arma la URL). */
+export type Sesion = { ctx: TenantContext; cockpit: Instancia };
+
 /**
  * El contexto de un usuario para el cockpit que está mirando.
  *
- * `cliente` y `pipeline` son los segmentos de la URL de la Fase 3. Mientras no existan, se cae al
- * único cockpit visible — que hoy es literalmente uno.
+ * `cliente` y `pipeline` son los dos segmentos de la URL (`/30x/reels/...`). Si no vienen —la raíz,
+ * o una acción que no los conoce— se cae al cockpit por defecto del usuario.
  *
  * Devuelve `null` si el usuario no puede ver eso: no distingue "no existe" de "no es tuyo", **a
  * propósito**. Decirle a alguien que el cliente `estadox` existe pero no es suyo ya es filtrar algo.
@@ -74,7 +77,7 @@ export async function resolverContexto(
   usuario: { clientId: string },
   cliente?: string,
   pipeline?: string,
-): Promise<TenantContext | null> {
+): Promise<Sesion | null> {
   const [clientes, instancias] = await Promise.all([leerArbolClientes(), leerInstancias()]);
   const visibles = visiblesDesde(usuario.clientId, clientes);
   const suyas = instancias.filter((i) => visibles.includes(i.clientId));
@@ -88,7 +91,8 @@ export async function resolverContexto(
         (suyas.find((i) => i.clientId === usuario.clientId) ?? suyas[0]);
 
   if (!elegida) return null;
-  return armarContexto(usuario.clientId, elegida, clientes);
+  const ctx = armarContexto(usuario.clientId, elegida, clientes);
+  return ctx ? { ctx, cockpit: elegida } : null;
 }
 
 /** Las instancias que este usuario puede abrir: lo que alimenta el selector de la Fase 3. */
