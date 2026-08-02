@@ -16,10 +16,15 @@ status: draft                     # validado end-to-end (V3/C1-C3 ✅, cierre 19
 owner: dev3
 
 triggers:
-  - type: cron
-    schedule: "0 9 * * *"         # diario 9:00 AM
-    timezone: America/Bogota
-  - type: manual                  # "Execute Workflow" en n8n
+  # El cron (domingo 18:00) se MUDÓ al dispatcher en la Fase 4, por el mismo motivo que el del
+  # motor: sin payload no hay instancia, y sin instancia este workflow leería los candidatos
+  # calificados de TODAS las empresas y los archivaría dentro de una sola corrida.
+  # (El manifest decía "diario 9:00" y el JSON decía domingo 18:00 desde hacía tiempo — el que
+  # valía era el JSON, y ahora los dos dicen lo mismo: lo dispara el dispatcher.)
+  - type: webhook                 # ADR-050: POST con { instancia } del dispatcher.
+                                  # Path = <<WEBHOOK_PATH_ARCHIVADO>>, Header Auth.
+  - type: manual                  # "Execute Workflow" en n8n — hay que pegarle el uuid de la
+                                  # instancia en la expresión de Config.instance_id (anotado ahí).
 
 inputs:
   client_config: "clients/{cliente}/archivado.yaml"   # MVP: 1 instancia editada en el nodo Config
@@ -46,8 +51,8 @@ outputs:
     registered: yes               # registro central = Supabase outputs (alimenta v_historico/v_selecciones/v_senal)
 
 runbook:
-  setup: "Importar workflow.json en n8n → completar nodo Config (base_id, supabase_url, instance_id, google_sheet_id, pestaña 'Historico') → mapear credenciales (Airtable PAT, Supabase Registro, Google Sheets OAuth2). Requiere 004_historico_script_texto.sql aplicado."
-  start: "Activar el cron diario en n8n (validar timezone)."
+  setup: "Importar workflow.json en n8n → completar nodo Config (supabase_url, dashboard_url, google_sheet_id, pestaña 'Historico'); instance_id YA NO se completa, sale del payload → reemplazar <<WEBHOOK_PATH_ARCHIVADO>> por un path aleatorio (la URL de Producción resultante va al Config del dispatcher y al gestor, JAMÁS a git) → mapear credenciales (Supabase Registro, Google Sheets OAuth2, y la httpHeaderAuth del webhook) → ACTIVAR (el webhook de Producción solo escucha activo). Requiere 004_historico_script_texto.sql y la 016 aplicadas."
+  start: "Lo dispara el dispatcher (workflow-dispatcher), domingo 18:00. Acá solo hay que dejar el workflow ACTIVO para que el webhook escuche."
   stop: "Desactivar el workflow en n8n."
   test: "Calificar 1 Candidato en Airtable → Execute Workflow → verificar fila en el Sheet con su script, candidato borrado de Airtable, y v_selecciones_por_dia responde."
   docs:

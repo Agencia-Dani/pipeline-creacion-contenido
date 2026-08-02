@@ -172,11 +172,11 @@ export type ProyectoGuardado = {
  * la del 2026-08-01 lo cumplió: candidatos y descartes escritos con `proyecto_id`/`voz_id` como
  * FK de verdad.
  *
- * 🔀 **`fields.uuid` sigue viajando, y ya no significa nada: es igual al `id`.** No se borra acá
- * porque los cuatro consumidores en n8n resuelven el uuid con `uuidDe[x.id] = x.fields.uuid`, y
- * con los dos ids iguales ese mapa queda **identidad** — o sea el flip no necesita re-import.
- * Sacarlo sí lo necesitaría, así que muere en el próximo re-import que haga falta por otra cosa,
- * junto con el `uuidDe` que quedó sin trabajo. Un campo redundante cuesta menos que una corrida.
+ * ☠️ **`fields.uuid` murió acá, en la Fase 4 (ADR-048 §5).** Viajaba redundante desde el paso 3 del
+ * expand/contract —valía lo mismo que el `id`— y quedó anotado que *"muere en el próximo re-import
+ * que haga falta por otra cosa"*. Ese re-import es este: el contrato ya sube a `version: 2` por la
+ * instancia, así que sacarlo no cuesta una corrida extra. Con él se van los mapas `uuidDe` de los
+ * tres workflows, que hacían `uuidDe[x.id] = x.fields.uuid` sobre dos ids iguales — o sea nada.
  */
 export function aRegistrosDeVoces(
   voces: VozGuardada[],
@@ -187,7 +187,6 @@ export function aRegistrosDeVoces(
     .map((v) => ({
       id: v.id,
       fields: {
-        uuid: v.id,
         nombre: v.nombre,
         descripcion: v.descripcion,
         criterios_relevancia: v.criterios_relevancia,
@@ -218,7 +217,6 @@ export function aRegistrosDeProyectos(
     .map((p) => ({
       id: p.id,
       fields: {
-        uuid: p.id, // redundante desde el paso 3 — ver aRegistrosDeVoces
         nombre: p.nombre,
         descripcion: p.descripcion,
         criterios_relevancia: p.criterios_relevancia,

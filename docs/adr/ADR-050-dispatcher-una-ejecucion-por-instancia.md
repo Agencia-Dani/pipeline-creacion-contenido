@@ -103,3 +103,46 @@
   `GET /api/engine/instancias` de [ADR-048](./ADR-048-run-plan-v2-motor-por-instancia.md) ·
   `app/(zonas)/operar/actions.ts` (single-flight por instancia) · `PLAN §2.2` — **C9 deja de ser
   "se construye en F5" y pasa a construido**.
+
+---
+
+## Enmienda del 2026-08-02 (implementación) — los crons SÍ se mudan, y el archivado necesitó un webhook
+
+Dos cosas se descubrieron al construirlo, y las dos corrigen una línea de este ADR. Se escriben acá
+porque cambian lo que hay que operar, no solo cómo está hecho.
+
+### 1. «Cada workflow conserva su trigger natural» no se sostiene para los crons
+
+La tabla de arriba, contestándole a ADR-006, dice: *"Cada workflow conserva su trigger natural. El
+dispatcher agrega uno, no reemplaza ninguno."* **Es falso para los crons, y el propio diagrama de la
+decisión ya lo decía** (`[cron] → GET instancias → POST webhook`): el cron es del dispatcher.
+
+El motivo es de ADR-048 y no admite término medio. Con `<<INSTANCE_ID>>` derogado, **un cron no
+tiene payload y por lo tanto no tiene instancia**. Un cron que queda vivo después de la Fase 4 no
+corre "como antes": corre y **aborta** — y aborta *después* de `Abrir run`, así que deja una fila en
+`en_curso` para siempre, sin `fin` ni métricas. Es exactamente el fallo mudo que el handoff mide
+(*"parecía una corrida lenta"*), una vez por semana, para siempre.
+
+Así que **el cron del motor (lunes 8am) y el del archivado (domingo 6pm) se fueron del repo** y
+viven en el dispatcher, con su horario intacto. Lo que sí se conserva de la afirmación original, y
+es lo que le contesta a ADR-006, es que **ninguna corrida depende del dispatcher para existir**: el
+botón ▶ del cockpit y el Execute manual siguen ahí.
+
+> 🚨 **Consecuencia operativa que hay que chequear en el re-import:** el repo ya no tiene esos
+> crons, pero **la instancia de n8n conserva lo que se importó**. Si queda una copia vieja activa,
+> el piloto corre dos veces por semana y una de las dos muere a mitad. Apagar antes de activar.
+
+### 2. El archivado no tenía webhook, y sin uno no puede correr por instancia
+
+Este ADR asumió que el dispatcher solo despachaba el motor. El archivado era **cron + manual**, sin
+webhook, o sea sin ninguna puerta por la que recibir una instancia. Y la necesita: su
+`candidatos?estado=neq.nuevo` sin filtro **archiva los candidatos calificados de todas las empresas
+dentro de una sola corrida**, los escribe en el `outputs` de un tenant ajeno y después los borra.
+
+Se le agregó `Disparo por instancia (webhook)` (`<<WEBHOOK_PATH_ARCHIVADO>>`, Header Auth), igual
+que el del motor. **Costo aceptado: un placeholder más en el checklist del re-import**, y que el
+dispatcher pase a tener dos crons en vez de uno.
+
+> Se descartó la alternativa —dejarle el cron y que recorra las instancias adentro— por la misma
+> razón que la decisión original: un tenant que rompe el archivado no puede llevarse puesta la
+> semana de los otros.

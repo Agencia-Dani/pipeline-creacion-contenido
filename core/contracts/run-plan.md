@@ -7,7 +7,7 @@ schema de la config para siempre — Airtable hoy, Postgres en D5, **sin re-impo
 
 ## La llamada
 
-- **`GET <URL del dashboard>/api/engine/run-plan`** con **header compartido** (nombre y valor en el
+- **`GET <URL del dashboard>/api/engine/run-plan?instancia=<uuid>`** con **header compartido** (nombre y valor en el
   gestor de contraseñas, env `RUN_PLAN_HEADER_*` en Vercel y credencial `httpHeaderAuth` en n8n —
   mismo patrón que el webhook de ADR-023). Sin header o con header distinto: **403**.
 - **El 403 dice cuál de los dos casos es**, en `motivo`: `header_ausente_o_distinto` (lo que manda
@@ -18,12 +18,23 @@ schema de la config para siempre — Airtable hoy, Postgres en D5, **sin re-impo
   crudos, y si el largo difiere ni se llega a `timingSafeEqual`); en el header que viaja, en cambio,
   la capa HTTP lo recorta sola. O sea: cuando hay 403, el sospechoso es el valor **guardado**, no el
   enviado.
-- **Fail-closed (ADR-028 §4):** cualquier respuesta ≠200 (403, 503, timeout) debe **abortar la
+- **`?instancia=<uuid>` es OBLIGATORIO desde v2 ([ADR-048](../../docs/adr/ADR-048-run-plan-v2-motor-por-instancia.md)):**
+  dice **de quién** es la config que se pide. Ausente ⇒ **400**; inexistente o ajena al llamante ⇒
+  **403**. En los dos casos la corrida no arranca.
+  > ⚠️ **No hay default, y es la decisión, no un olvido.** Caer a "la única instancia activa"
+  > funciona hasta el día que hay dos, y ese día falla **mudo**: el dispatcher se olvida del payload
+  > y la corrida entrega los candidatos de una empresa dentro de la otra, en verde. Un 400 al
+  > arrancar cuesta una corrida; el default silencioso cuesta descubrirlo en los datos.
+- **De dónde sale el uuid:** del payload del webhook (`{ "instancia": "<uuid>" }`), que le mandan el
+  dispatcher ([ADR-050](../../docs/adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md)) y el
+  botón ▶ del cockpit. **Ya no es una constante del archivo** — ver
+  [ingesta-registro.md](./ingesta-registro.md).
+- **Fail-closed (ADR-028 §4):** cualquier respuesta ≠200 (400, 403, 503, timeout) debe **abortar la
   corrida** — el HTTP Request de n8n se deja SIN continue-on-fail a propósito. Una corrida sin
   config entrega ruido; no entregar es mejor. El registro (`runs`/`outputs`) sigue siendo
   fail-open: esto solo gobierna el arranque.
 
-## Qué devuelve (v1)
+## Qué devuelve (v2)
 
 Los **mismos registros, con los mismos filtros server-side** que los 4 nodos Airtable que
 reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`), en la forma
@@ -31,10 +42,10 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "generado_en": "2026-07-20T08:00:00.000Z",
-  "voces":      [{ "id": "uuid…", "fields": { "uuid": "uuid…", "nombre": "…", "criterios_relevancia": "…", "activo": true } }],
-  "proyectos":  [{ "id": "uuid…", "fields": { "uuid": "uuid…", "nombre": "…", "criterios_relevancia": "…", "voz_default": ["uuid…"], "N": 20, "…": "…" } }],
+  "voces":      [{ "id": "uuid…", "fields": { "nombre": "…", "criterios_relevancia": "…", "activo": true } }],
+  "proyectos":  [{ "id": "uuid…", "fields": { "nombre": "…", "criterios_relevancia": "…", "voz_default": ["uuid…"], "N": 20, "…": "…" } }],
   "referentes": [{ "id": "uuid…", "fields": { "handle": "@…", "plataforma": "instagram", "proyecto": ["uuid…"], "activo": true } }],
   "ajustes":    [{ "id": "Candidatos por corrida", "fields": { "clave": "Candidatos por corrida", "valor": 100 } }]
 }
@@ -54,13 +65,12 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 > mal formado viola una FK, y el paso 3 esperó su gate: **una corrida completa verde**, cumplida
 > por la del 2026-08-01 (candidatos y descartes escritos con `proyecto_id`/`voz_id` como FK).
 >
-> 🔀 **`fields.uuid` sigue viajando en `voces` y `proyectos`, y ya es redundante: vale lo mismo
-> que el `id`.** Fue el campo de transición de los pasos 1 y 2 — servir los dos ids juntos hizo
-> que el orden entre el deploy de Vercel y el re-import a mano en n8n dejara de importar. No se
-> borra todavía porque los consumidores en n8n resuelven el uuid con `uuidDe[x.id] = x.fields.uuid`
-> y, con los dos ids iguales, ese mapa queda **identidad**: por eso el paso 3 **no necesitó un
-> tercer re-import**. Sacar el campo sí lo necesitaría, así que muere en el próximo re-import que
-> haga falta por otra cosa, junto con el `uuidDe` que quedó sin trabajo.
+> ☠️ **`fields.uuid` murió en v2.** Fue el campo de transición de los pasos 1 y 2 del expand/contract
+> —servir los dos ids juntos hizo que el orden entre el deploy de Vercel y el re-import a mano en
+> n8n dejara de importar— y desde el paso 3 valía lo mismo que el `id`. Se quedó vivo solo porque
+> sacarlo costaba un re-import propio y el mapa `uuidDe[x.id] = x.fields.uuid` de los workflows
+> quedaba identidad, o sea inofensivo. **v2 ya paga ese re-import por la instancia**, así que el
+> campo y los tres `uuidDe` se fueron juntos (ADR-048 §5).
 >
 > **`referentes[].fields.proyecto` viaja en el mismo idioma que `proyectos[].id`** — hoy los dos
 > en uuid. Tenían que flipear **juntos**: el motor cruza las dos listas por ese id, así que mover
@@ -91,9 +101,33 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 
 ## Versionado
 
-`version` gobierna la compatibilidad (ADR-028 §5): mientras sea `1`, la app puede cambiar de dónde
+`version` gobierna la compatibilidad (ADR-028 §5): mientras no cambie, la app puede cambiar de dónde
 salen los datos (Airtable → Postgres, dominio por dominio) sin tocar n8n. Un cambio de **forma**
 sube la versión y **ahí sí** hay re-import coordinado.
+
+**Historia, corta:** `1` sirvió todo D5–D7, incluido el flip de ids de
+[ADR-035](../../docs/adr/ADR-035-contrato-de-escritura-por-postgrest.md) — que anunció un bump y
+**nunca lo necesitó**, porque terminó siendo pass-through. `2` es el primero de verdad
+(ADR-048): dos cambios de forma juntos, `?instancia` obligatorio y la muerte de `fields.uuid`.
+
+## Quiénes corren — `GET /api/engine/instancias?workflow=<slug>`
+
+El hermano chico de este contrato, y su único consumidor es el **dispatcher** (ADR-050). Misma
+credencial, mismo fail-closed, solo lectura:
+
+```json
+{ "workflow": "short-form-content",
+  "instancias": [{ "id": "uuid…", "cliente": "30x", "slug": "reels", "nombre": "Reels 30X" }] }
+```
+
+- **`workflow` es obligatorio** (falta ⇒ 400): sin él la respuesta serían todas las instancias de
+  todos los pipelines, y el dispatcher del motor terminaría mandándole el webhook del motor a una
+  instancia de otro pipeline.
+- **Lista vacía es 200, no 404.** Un pipeline sin instancias activas es un estado legítimo, y el
+  dispatcher tiene que poder no disparar nada sin entrar a su rama de fallo.
+- Vive en la app y no es una query de n8n a PostgREST por la misma razón que todo lo demás acá: si
+  mañana "instancia activa" deja de ser `estado = 'active'`, cambia la app y ningún workflow se
+  entera.
 
 ## Los dos ámbitos (decisión de Mani, 2026-07-20)
 

@@ -84,7 +84,7 @@ se entera. **El registro central es un sumidero adicional, nunca una dependencia
 | C6 | **Observabilidad y alertas** | Saber que corrió, cuánto costó, y enterarse de una falla antes que el cliente (heartbeat: "el cron del lunes no corrió") | registro central + workflow de alertas |
 | C7 | **Plantillas y scaffolding** | Que agregar workflow/cliente N+1 sea clonar-y-configurar, con validación automatizada del contrato | `core/templates/` + script validador |
 | C8 | **Documentación viva** | Invariantes (§2.5), ADRs con su porqué, checklists ejecutables | este PLAN + `docs/adr/` + `ROADMAP.md` |
-| C9 | **Entrada bajo demanda (dispatcher)** | Formulario simple (no técnico) que dispara corridas con filtros — cliente, plataforma, hashtags, tema, mínimos de views/likes/seguidores — y las rutea al workflow correspondiente | workflow interno de n8n (se construye en F5) |
+| C9 | **Dispatcher** | ✅ **Construido** (Fase 4 del refactor multi-tenant, [ADR-050](docs/adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md)): pregunta a la fachada qué instancias están activas y dispara el webhook del destino **una vez por cada una**. Es lo que convierte un workflow parametrizado en N corridas aisladas. *No* terminó siendo el formulario con filtros que este renglón imaginaba — esa entrada bajo demanda ya existe y es el botón ▶ del cockpit | [`Workflows/workflow-dispatcher/`](Workflows/workflow-dispatcher/) |
 
 ### 2.2 Modelo de datos del registro (v0 — SQL real: `core/schema/001_registro_inicial.sql`)
 

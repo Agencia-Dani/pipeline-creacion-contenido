@@ -22,6 +22,19 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🔴 **REFACTOR MULTI-TENANT — FASES 0 a 4 EN LA RAMA, NADA EN PROD (2026-08-02).** Todo el código
+> vive en `refactor/multi-tenant-fase-0-adrs` ([PR #3](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/3)),
+> y de los pasos manuales el `@casper_smc` duplicado **ya está limpio**. Falta, en este orden:
+> **la `016` en el SQL Editor → el re-import de los 4 workflows → apagar los crons viejos → la
+> corrida de verificación → la `017`.** El checklist completo, con los placeholders por workflow
+> (ya no son 6 iguales para todos) y las trampas de cada paso, está en el **cierre 86** del log.
+>
+> ⚠️ **El orden entre la `016` y el deploy es un requisito, no una recomendación:** el BFF ya pide
+> `client_id`/`instance_id` y nombra los uniques nuevos en los `onConflict`. Contra una base sin la
+> `016` eso es columna inexistente y `42P10`. **Mergear el PR deploya**, así que la migración va
+> antes del merge. *(De paso: el preview de Vercel de esa rama está roto por lo mismo — no lo leas
+> como una regresión del código.)*
+
 > 🟡 **SACAR EL TECHO DE GASTO: CÓDIGO LISTO, FALTA EL RE-IMPORT (2026-08-02).** Mani pidió sacar
 > `cap_top_n` (los planes pagos de Apify/Supadata/Claude no llegan ni a la mitad del cupo y se
 > resetean solos) y que el motor sea lo más preciso posible trayendo el `N` de cada proyecto. La
@@ -801,6 +814,36 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-02 (cierre 86) — Fase 4 del refactor multi-tenant: `run-plan` v2, el motor por instancia y el dispatcher (Claude, pedido de Mani).**
+**Qué se hizo:** la fase que **obliga al re-import**, entera y en el repo. El contrato sube a **`version: 2`** con `?instancia=<uuid>` **obligatorio**, `<<INSTANCE_ID>>` deja de existir como placeholder, nace `GET /api/engine/instancias`, y nace [`Workflows/workflow-dispatcher/`](../../Workflows/workflow-dispatcher/). `typecheck` 0 · **158 tests** · `build` · `validate` **1786 checks / 5 workflows** · `auditar-workflows.mjs` sin hallazgos · `test-nodos.mjs` verde con dos secciones nuevas. **Nada aplicado en prod: el re-import es de Mani.**
+**🚨 La tensión que el plan no tenía resuelta, y que cambió el diseño: los crons se quedaban sin instancia.** El motor tenía 3 triggers y el archivado 2, y **ni el cron ni el manual tienen payload**. Un cron que sobrevive a esta fase no corre como antes: corre y **aborta**, después de `Abrir run`, dejando una fila en `en_curso` para siempre — el mismo fallo mudo que ya costó una sesión (*"parecía una corrida lenta"*), una vez por semana. Así que **los dos crons se mudaron al dispatcher con su horario intacto** (lunes 8am · domingo 6pm), y eso corrige una línea de ADR-050 que decía lo contrario (*"cada workflow conserva su trigger natural"*) mientras su propio diagrama ya decía esto. Está escrito como [enmienda en el ADR](../adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md#enmienda-del-2026-08-02-implementación--los-crons-sí-se-mudan-y-el-archivado-necesitó-un-webhook), no en silencio.
+**🔎 Y el hueco que apareció al mirar los triggers: el archivado no tenía webhook.** Era cron + manual, o sea **ninguna puerta por la que recibir una instancia** — y la necesita, porque su `candidatos?estado=neq.nuevo` sin filtro archiva los calificados de **todas** las empresas dentro de una corrida, los escribe en el `outputs` del tenant equivocado y después **los borra**. Le entró `Disparo por instancia (webhook)`. Costo: un placeholder más (`<<WEBHOOK_PATH_ARCHIVADO>>`) y un segundo cron en el dispatcher.
+**El `Ejecutar manual` se conservó, y sin reintroducir un default silencioso.** `Config.instance_id` es una expresión que lee el body del webhook y cae a `''`; para una corrida manual se pega el uuid en ese `''` (anotado en el nodo). **En git va vacío siempre**, y vacío ⇒ `run-plan` 400 ⇒ no arranca. Es lo contrario del default que ADR-048 descartó: aquel caía al piloto (y escribía en la empresa equivocada, en verde), este aborta.
+**Lo que se relevó y NO eran 7 URLs, eran 13.** El checklist del cierre 82 se quedó corto: faltaban los **cuatro `runs` del single-flight y del barredor** en los tres workflows (sin `&instance_id=eq.` la corrida de una empresa le bloquea el arranque a otra, y el barredor le marca `fallo` los zombies ajenos) y el **DELETE de `Barrer candidatos sin calificar`**, que sin filtro le borra el feed sin calificar a las otras empresas. Todas están puestas; la lista completa, abajo.
+**☠️ `fields.uuid` murió, y con él los tres `uuidDe`.** Quedaba anotado que *"muere en el próximo re-import que haga falta por otra cosa"* — este es ese. El mapa era identidad desde el paso 3 de D7, así que `uuidDe[d.proyecto_id] || null` y `d.proyecto_id || null` son lo mismo: verificado siguiendo el id hasta `Armar plan de corrida`, donde `projects` se keyea por el `p.id` del plan. **Se le agregó test:** `Preparar candidatos` y `Preparar descartes` no estaban cubiertos por `test-nodos.mjs` y son los que escriben el cockpit — sus dos modos de falla (fila sin `instance_id` ⇒ tenant equivocado; `proyecto_id` perdido ⇒ todo al grupo *(sin proyecto)*) entregan **en verde**, mal.
+**Un detalle del contrato que no se parcheó:** el manifest v1 exige ≥1 `outputs` con `registered: pending|yes`, y **el dispatcher no produce nada** (ADR-050 §4: no registra, no escribe). Quedó declarado como `senal_de_corrida / pending`, que es lo más honesto que admite el contrato hoy, con el comentario puesto en el yaml. Es un hueco chico de `workflow-manifest.md`, no una decisión de diseño — si molesta, es una enmienda de una línea.
+
+> ### 📋 EL CHECKLIST DEL RE-IMPORT (es de Mani, y va en este orden)
+> **Precondición: la `016` tiene que estar aplicada.** Verificado el 2026-08-02: **no lo está** (`clients.parent_id` no existe). El `@casper_smc` duplicado **ya está limpio** (1 fila) y las 3 guardas de la `016` pasan (1 cliente `piloto`, 1 instancia).
+>
+> 1. **`016` en el SQL Editor.** Antes que el deploy de Vercel de esta rama, no después.
+> 2. **Re-importar los 3 workflows + importar el dispatcher.** Placeholders, por workflow — `<<INSTANCE_ID>>` **ya no está en ninguno**:
+>    · **motor (5):** `<<DASHBOARD_URL>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_MOTOR>>` `<ANTHROPIC_API_KEY>`×3 `<SUPADATA_API_KEY>`
+>    · **archivado (7):** los 2 de siempre + `<<WEBHOOK_PATH_ARCHIVADO>>` **(nuevo)** + `<<GOOGLE_SHEET_ID>>` `<<NOMBRE_PESTANA_SHEET>>` `<<CREDENCIAL_GOOGLE_SHEETS>>` `<ANTHROPIC_API_KEY>`
+>    · **descubrimiento (4):** `<<DASHBOARD_URL>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_DESCUBRIMIENTO>>` `<ANTHROPIC_API_KEY>`×2
+>    · **dispatcher (3):** `<<DASHBOARD_URL>>` `<<WEBHOOK_URL_MOTOR>>` `<<WEBHOOK_URL_ARCHIVADO>>` — **URLs completas**, no paths
+>    ⚠️ **`<ANTHROPIC_API_KEY>` y `<SUPADATA_API_KEY>` muerden a mitad de corrida**, no al principio.
+> 3. **Apagar los crons viejos en n8n** (motor lunes 8am, archivado domingo 6pm). El repo ya no los tiene, pero n8n conserva lo importado: si quedan vivos, el piloto corre dos veces y una muere a mitad.
+> 4. **Activar el dispatcher** recién después del paso 3.
+> 5. **Corrida de verificación** con el techo en 10 (la más barata). Reflejo de siempre: **`runs` no distingue "colgada" de "muerta", Apify sí** — cero llamadas ⇒ murió antes de scrapear, y el sospechoso #1 sigue siendo un placeholder sin rellenar.
+> 6. **Recién ahí la `017`**, que tiene gate de confirmación humana adentro. Y el techo vuelve a 250.
+>
+> **Con una sola instancia esto no prueba nada por sí solo** (el resultado es idéntico al de antes). Lo que lo prueba es el paso 7 de [plan §11.3](./plan-multi-tenant.md): con dos instancias, N videos distintos por instancia y ninguno cruzado, mirado con un `select`.
+
+**Qué sigue, y el cierre 85 le cambió el orden a esto mientras se escribía.** El plan §12 ponía la Capa 2 (RLS) en el anteúltimo lugar; **ADR-051 activó su disparador**, así que la secuencia de código pasa a ser: **`018_membresias.sql` + el refactor de las guardias → Capa 2 (RLS) → #7 paginación del feed → #9 Fase 5 (LinkedIn)**. Lo que la Fase 4 le deja a la 5 ya está: `?workflow=<slug>` en el dispatcher y `instances` como (pipeline × empresa) es todo lo que un pipeline nuevo necesita del núcleo.
+**🔁 Y lo que el cierre 85 le va a tocar a ESTA fase, para que no sorprenda:** ADR-051 saca `rol` de `usuarioActual()` y unifica las guardias en `exigirTenant`. De lo que se escribió acá, lo único que queda en su camino son los dos botones de Operar (`exigirTenant("operar")`); **la fachada no se toca** — `run-plan` e `instancias` se autentican por header compartido y no tienen usuario, así que las membresías les son ajenas por diseño.
+**🔧 Dos drifts pre-existentes que encontré y NO toqué** (no los creó esta fase, y arreglarlos a la pasada mezcla cambios): el manifest del descubrimiento declara `type: cron` lunes 9am pero su `workflow.json` **no tiene cron** desde la enmienda de ADR-020 (es el botón *Buscar ahora*); y el `dev-doc §3.2` lo lista igual. El manifest del archivado decía "diario 9:00" contra el `0 18 * * 0` del JSON — **ese sí quedó corregido**, porque el trigger es justo lo que esta fase cambió.
 
 **2026-08-02 (cierre 85) — El modelo de acceso: membresías en vez de herencia. ADR-051 + ADR-052, sin una línea de código (Claude, diseño con Alejandro).**
 **Qué pasó:** Alejandro trajo una idea —*"el cockpit tiene una especie de auth: los asociados con 30X solo ven 30X, y los únicos que ven todo son los devs"*— y al aterrizarla salieron **cuatro hechos que ADR-046 no tenía** y que le cambian el modelo de acceso. Salieron 2 ADRs; **nada construido todavía**, a propósito: `core/` solo cambia con ADR.

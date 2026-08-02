@@ -13,10 +13,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // (`clients`, `instances`) sin scopear, y tiene que serlo: scopear la tabla con la que se resuelve
 // el scope sería circular. Por eso esas tres tablas no están en el mapa de `scoped.ts`.
 //
-// ⚠️ **Lo que cambia en la Fase 3 es UNA función, no el modelo.** Hoy `resolverContexto` cae al
-// único cockpit del usuario porque las rutas todavía no tienen `[cliente]/[pipeline]`. Cuando la
-// Fase 3 los agregue, el `layout.tsx` va a llamar a esta misma función con los dos segmentos y el
-// resto del código no se entera. La forma del contexto ya es la definitiva.
+// Desde la Fase 3 las rutas traen `[cliente]/[pipeline]` y `resolverContexto` los recibe; sin
+// segmentos (la raíz, o una acción que no los conoce) sigue cayendo al cockpit por defecto del
+// usuario. La forma del contexto no cambió en ninguna de las dos fases, que era la apuesta.
 
 const filaCliente = z.object({ id: z.string(), parent_id: z.string().nullable() });
 const filaInstancia = z.object({
@@ -103,7 +102,7 @@ export async function cockpitsDe(ctx: TenantContext): Promise<Instancia[]> {
 /** Lo que puede salir mal al resolver el tenant de la fachada. Cada caso tiene su status. */
 export type ResultadoFachada =
   | { ok: true; ctx: TenantContext }
-  | { ok: false; motivo: "instancia_desconocida" | "instancia_ambigua" };
+  | { ok: false; motivo: "instancia_ausente" | "instancia_desconocida" };
 
 /**
  * El contexto de la fachada de ADR-028. **No hay usuario acá**: el motor se autentica con el header
@@ -113,22 +112,30 @@ export type ResultadoFachada =
  * instancia y su config es la de esa empresa. Que el humano de Retia vea a sus clientes no
  * significa que el motor de Retia deba traerse los referentes de ellos.
  *
- * 🔜 **Fase 4 (ADR-048):** `instancia` pasa a ser un parámetro OBLIGATORIO y el contrato sube a
- * `version: 2`. Hoy es opcional y, si no viene, cae a la única instancia activa — con dos, esto
- * responde `instancia_ambigua` en vez de adivinar, que es el fail-closed de ADR-028 §4 aplicado a
- * lo que sabemos hoy: *"una corrida sin config entrega ruido; no entregar es mejor"*, y una corrida
- * con la config de OTRA empresa es peor que ruido.
+ * **La instancia es OBLIGATORIA desde ADR-048 (`version: 2`).** No hay caída a "la única activa":
+ * ese default se sostenía solo mientras existiera exactamente una, y su modo de falla el día que
+ * hubiera dos era mudo — el dispatcher se olvida del payload y la corrida escribe en el tenant
+ * equivocado, en verde. Es el fail-closed de ADR-028 §4 llevado hasta el final: *"una corrida sin
+ * config entrega ruido; no entregar es mejor"*, y una corrida con la config de OTRA empresa es
+ * peor que ruido.
  */
 export async function contextoDeFachada(instanciaPedida?: string): Promise<ResultadoFachada> {
+  if (!instanciaPedida) return { ok: false, motivo: "instancia_ausente" };
+
   const instancias = await leerInstancias();
+  const elegida = instancias.find((i) => i.id === instanciaPedida);
+  if (!elegida) return { ok: false, motivo: "instancia_desconocida" };
+  return { ok: true, ctx: { clientId: elegida.clientId, visibles: [elegida.clientId], instanceId: elegida.id } };
+}
 
-  if (instanciaPedida) {
-    const elegida = instancias.find((i) => i.id === instanciaPedida);
-    if (!elegida) return { ok: false, motivo: "instancia_desconocida" };
-    return { ok: true, ctx: { clientId: elegida.clientId, visibles: [elegida.clientId], instanceId: elegida.id } };
-  }
-
-  if (instancias.length !== 1) return { ok: false, motivo: "instancia_ambigua" };
-  const unica = instancias[0];
-  return { ok: true, ctx: { clientId: unica.clientId, visibles: [unica.clientId], instanceId: unica.id } };
+/**
+ * Las instancias activas de un pipeline: lo que consume el dispatcher de ADR-050 por
+ * `GET /api/engine/instancias?workflow=<slug>`.
+ *
+ * Sin `TenantContext` a propósito, y es la misma razón por la que este archivo entero vive fuera de
+ * `scoped.ts`: el dispatcher pregunta **quiénes corren**, o sea justo lo que todavía no puede
+ * scopear. Su autoridad es el header compartido, igual que la de `run-plan`.
+ */
+export async function instanciasDePipeline(workflowId: string): Promise<Instancia[]> {
+  return (await leerInstancias()).filter((i) => i.workflowId === workflowId);
 }

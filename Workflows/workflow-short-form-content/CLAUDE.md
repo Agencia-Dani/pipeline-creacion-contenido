@@ -7,8 +7,9 @@ el contrato en [workflow.yaml](./workflow.yaml), el uso en [README.md](./README.
 
 ## Qué es
 
-Un único workflow de **n8n** (`workflow.json`, 35 nodos, 3 entradas: cron semanal + Execute manual +
-webhook on-demand con guard single-flight — ADR-023)
+Un único workflow de **n8n** (`workflow.json`, 34 nodos, 2 entradas: Execute manual + webhook
+on-demand con guard single-flight **por instancia** — ADR-023 + ADR-050; el cron semanal se mudó al
+[dispatcher](../workflow-dispatcher/) en la Fase 4)
 que es el **motor de reels** del MVP. Lee la config del equipo por la **fachada del cockpit**
 (`/api/engine/run-plan`, D4/ADR-028 — ya no toca Airtable para config) → descubre reels IG + TikTok (Apify, solo por referentes — ADR-019) → prescore métrico (`Heat-score v1`) →
 transcribe (Supadata) → **traduce literal al español con Claude Haiku solo si no está en español** →
@@ -68,7 +69,8 @@ ADR-009); el "link" es la URL del video original.
   ya no cubre el *insumo* transcript (revierte la decisión #6). Si Supadata se cae entera, la corrida
   entrega 0 y lo avisa.
 - **La config NO se lee de Airtable (D4, ADR-028).** `Leer plan (fachada)` hace **un** GET a
-  `{dashboard_url}/api/engine/run-plan?ambito=motor` y devuelve voces/proyectos/referentes/ajustes en
+  `{dashboard_url}/api/engine/run-plan?ambito=motor&instancia={instance_id}` (contrato **v2**,
+  ADR-048: sin instancia responde 400 y la corrida no arranca) y devuelve voces/proyectos/referentes/ajustes en
   la misma forma `{id, fields}`. Es **fail-closed a propósito: no le pongas `onError`** — sin config
   el run tiene que abortar. Si necesitás un dato de config nuevo, se agrega **en la app** (y en el
   [contrato](../../core/contracts/run-plan.md)), no con un nodo Airtable nuevo acá.
@@ -87,8 +89,9 @@ ADR-009); el "link" es la URL del video original.
 ## Convención de placeholders
 
 Lo que se completa al importar: API keys `<ANTHROPIC_API_KEY>` / `<SUPADATA_API_KEY>` (en los Code
-nodes), e IDs `<<SUPABASE_URL>>` / `<<INSTANCE_ID>>` / `<<DASHBOARD_URL>>` / `<<WEBHOOK_PATH_MOTOR>>`
-(en el nodo `Config`). **`<<AIRTABLE_BASE_ID>>` murió en D7.**
+nodes), e IDs `<<SUPABASE_URL>>` / `<<DASHBOARD_URL>>` / `<<WEBHOOK_PATH_MOTOR>>` (en el nodo
+`Config`). **`<<AIRTABLE_BASE_ID>>` murió en D7 y `<<INSTANCE_ID>>` en la Fase 4** — la instancia
+ya no es una constante del archivo, viaja en el payload del webhook (ADR-048). Son **5**, no 6.
 Listarlos:
 
 ```sh
@@ -99,7 +102,8 @@ node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log(
 
 `cd core/scripts && npm run validate` (contrato del manifest + escaneo de secretos) y
 `node test-nodos.mjs` (ejercita `Armar plan`, `Armar candidato`, `Transcribir`, `Traducir`,
-`Heat-score`, `Gate` y `Preparar procesados` fuera de n8n con `$` y `this.helpers` mockeados — el
+`Heat-score`, `Gate`, `Preparar procesados` y los dos `Preparar` que escriben el cockpit
+—`candidatos` y `descartes`, donde vive la instancia de cada fila— fuera de n8n con `$` y `this.helpers` mockeados — el
 mock cuenta llamadas **y concurrencia en vuelo**, así que un pool que se serializa sin querer se ve
 acá; corrélo SIEMPRE antes de re-importar si tocaste esos nodos). Si tocaste **conexiones, posiciones o cualquier `$('X')`**, corré
 además `node ../auditar-workflows.mjs`: chequea conexiones rotas, inalcanzables, refs a no-ancestros,

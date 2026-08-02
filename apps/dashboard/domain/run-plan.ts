@@ -9,7 +9,16 @@
 // en n8n sea un nodo, no una refactorización. Mientras `version` no cambie, la app
 // puede mover el almacenamiento (Airtable → Postgres, D5) sin tocar n8n.
 
-export const RUN_PLAN_VERSION = 1;
+/**
+ * `2` desde ADR-048: el motor pasa a pedir la config **de una instancia** (`?instancia=<uuid>`) y
+ * `fields.uuid` deja de viajar. Los dos son cambios de FORMA, así que suben la versión y cuestan el
+ * re-import coordinado que la regla de versionado de ADR-028 §5 siempre anunció.
+ *
+ * ⚠️ El bump que ADR-035 declaró (por el flip de ids de D7) **nunca se ejecutó**, y con razón: el
+ * flip terminó siendo pass-through. Este es el primero de verdad — la nota de numeración está en
+ * ADR-048.
+ */
+export const RUN_PLAN_VERSION = 2;
 
 export type Registro = { id: string; fields: Record<string, unknown> };
 

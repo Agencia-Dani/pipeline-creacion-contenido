@@ -1,0 +1,73 @@
+# Manifest — cumple core/contracts/workflow-manifest.md (v1)
+#
+# El disparador de ADR-050: una definición de workflow, N ejecuciones. Pregunta a la fachada qué
+# instancias están activas y dispara el webhook del destino una vez por cada una, con
+# { instancia } en el body. NO procesa nada, no toca Apify/Supadata/Anthropic y no escribe una
+# sola fila. Diseño y porqués en docs/adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md.
+contract_version: 1
+
+id: dispatcher
+name: "Dispatcher — una ejecución por instancia"
+description: >
+  Reemplaza los crons que vivían adentro del motor y del archivado, que después de ADR-048 se
+  quedaron sin instancia de la que colgar. Cada corrida: GET /api/engine/instancias?workflow=…,
+  y por cada instancia activa un POST al webhook del destino. Continue-on-fail por iteración: un
+  tenant caído no corta a los otros (invariante #1). Si el dispatcher se cae no hay pérdida de
+  datos — el botón ▶ del cockpit sigue disparando y se vuelve a disparar la semana siguiente.
+engine: n8n
+status: draft                     # construido en la Fase 4; se importa junto con el re-import
+owner: mani
+
+triggers:
+  - type: cron
+    schedule: "0 8 * * 1"         # lunes 8:00 — el cron que era del motor
+    timezone: America/Bogota
+  - type: cron
+    schedule: "0 18 * * 0"        # domingo 18:00 — el cron que era del archivado
+    timezone: America/Bogota
+  - type: manual                  # "Execute Workflow" en n8n — cae en la rama del motor
+
+inputs:
+  # No hay config por cliente, y es la característica: la lista de quiénes corren vive en
+  # `instances` y se lee por la fachada. Un yaml por cliente sería una segunda verdad sobre lo
+  # mismo, que es justo la alternativa que ADR-050 descartó (un cron por instancia a mano).
+  client_config: "n/a — global por diseño (ADR-050); las instancias salen de GET /api/engine/instancias"
+  filters:
+    - key: pipeline
+      type: string
+      scope: client
+      default: short-form-content
+      desc: "Slug de `workflows` a despachar (nodo Config). Motor, archivado y descubrimiento comparten instancia: se distinguen por params.workflow en runs, no por instancia."
+  credentials:
+    - run_plan_header             # credencial n8n 'Run Plan Header' (httpHeaderAuth) — la MISMA que usa run-plan
+    - motor_webhook_header        # credencial n8n 'Webhook Motor Header' (httpHeaderAuth) — la del webhook del destino
+
+stages:                           # el dispatcher no recorre el embudo: solo abre la puerta
+  colectar: "GET /api/engine/instancias?workflow=<pipeline> — las instancias activas del pipeline (contrato run-plan.md). Sin continue-on-fail: si no se sabe quiénes corren, no se dispara nada."
+  normalizar: "Desarmar instancias: una fila por instancia. Es lo que convierte un cron en N ejecuciones en vez de un loop adentro del motor (el loop chocaría con los 900 s del watchdog)."
+  filtrar_scorear: n/a
+  enriquecer: n/a
+  generar: n/a
+  calidad: n/a
+  entregar: "POST al webhook del destino con { instancia }, uno por instancia, con continue-on-fail por iteración."
+  notificar: n/a
+
+outputs:
+  # ⚠️ El dispatcher no produce nada que caiga en ningún lado: dispara y se olvida (ADR-050 §4).
+  # El contrato v1 exige al menos un output y solo admite `registered: pending|yes`, así que esto
+  # es lo más honesto que se puede declarar hoy. Anotado como hueco del contrato, no como diseño.
+  - type: senal_de_corrida        # la señal de arranque que recibe el workflow destino
+    destination_native: n8n       # el webhook del motor o del archivado
+    registered: pending           # no registra NADA por diseño; el registro lo escribe cada destino en `runs`
+
+runbook:
+  setup: "Importar workflow.json en n8n → completar el nodo Config con <<DASHBOARD_URL>>, <<WEBHOOK_URL_MOTOR>> y <<WEBHOOK_URL_ARCHIVADO>> (las URLs completas de los dos webhooks de producción) → mapear las dos credenciales httpHeaderAuth: 'Run Plan Header' en «Leer instancias (fachada)» y la del webhook destino en «Disparar por instancia». ⚠️ Requiere que el motor y el archivado ya estén re-importados con la Fase 4: sin { instancia } en el body, el destino aborta."
+  start: "Activar el workflow en n8n. ⚠️ Verificar ANTES que el motor y el archivado tengan sus crons apagados, o el piloto corre dos veces."
+  stop: "Desactivar el workflow en n8n. Las corridas siguen disponibles por el botón ▶ del cockpit y por Execute manual."
+  test: "Execute Workflow manual → en el log tiene que aparecer '[Dispatcher] N instancia(s) de short-form-content → motor: …' y después 'disparadas N/N'. Verificar en Supabase: una fila nueva en `runs` POR INSTANCIA, cada una con su instance_id y trigger_type='on_demand'. Con una sola instancia el resultado es idéntico al de antes — la prueba que importa es con dos (plan §11.3)."
+  docs:
+    - README.md
+    - ../../docs/adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md
+    - ../../core/contracts/run-plan.md
+
+cost_per_run: "$0. No llama a ningún servicio pago: una lectura a la fachada y N POST a webhooks de n8n. El costo real lo pagan las corridas que dispara, y es el mismo que pagarían disparadas a mano."

@@ -2,26 +2,6 @@
   "name": "Archivado de curación — Candidatos calificados → Supabase + Sheet (carril C)",
   "nodes": [
     {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 18 * * 0"
-            }
-          ]
-        }
-      },
-      "id": "cron-semanal-domingo",
-      "name": "Cron — semanal (domingo 6pm)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        200
-      ]
-    },
-    {
       "id": "ejecutar-manual",
       "name": "Ejecutar manual",
       "type": "n8n-nodes-base.manualTrigger",
@@ -50,7 +30,7 @@
             {
               "id": "a3",
               "name": "instance_id",
-              "value": "<<INSTANCE_ID>>",
+              "value": "={{ $('Disparo por instancia (webhook)').isExecuted ? (($('Disparo por instancia (webhook)').first().json.body || {}).instancia || '') : '' }}",
               "type": "string"
             },
             {
@@ -94,7 +74,9 @@
       "position": [
         240,
         300
-      ]
+      ],
+      "notes": "instance_id sale del payload del webhook ({ instancia }), no de un placeholder (ADR-048).\nPara «Ejecutar manual»: reemplazá el '' final de la expresión por el uuid de la instancia.\nEn git va VACÍO a propósito — vacío hace que run-plan responda 400 y la corrida no arranque.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -117,7 +99,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { instance_id: $('Config').first().json.instance_id, trigger_type: 'cron', estado: 'en_curso', params: { workflow: 'archivado' } } }}",
+        "jsonBody": "={{ { instance_id: $('Config').first().json.instance_id, trigger_type: $('Disparo por instancia (webhook)').isExecuted ? 'on_demand' : 'manual', estado: 'en_curso', params: { workflow: 'archivado' } } }}",
         "options": {
           "timeout": 20000
         }
@@ -140,7 +122,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.archivado&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.archivado&instance_id=eq.' + $('Config').first().json.instance_id + '&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -181,7 +163,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/candidatos?estado=neq.nuevo&select=*&limit=5000' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/candidatos?estado=neq.nuevo&instance_id=eq.' + $('Config').first().json.instance_id + '&select=*&limit=5000' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -272,7 +254,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs?on_conflict=external_id' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/outputs?on_conflict=instance_id,external_id' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -480,7 +462,7 @@
       "onError": "continueRegularOutput",
       "parameters": {
         "method": "DELETE",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/candidatos?estado=eq.nuevo&creado_en=lt.' + encodeURIComponent($now.minus({ days: 20 }).toISO()) }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/candidatos?estado=eq.nuevo&instance_id=eq.' + $('Config').first().json.instance_id + '&creado_en=lt.' + encodeURIComponent($now.minus({ days: 20 }).toISO()) }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -567,7 +549,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=completo' }}",
+        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=completo&instancia=' + $('Config').first().json.instance_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpHeaderAuth",
         "options": {
@@ -592,20 +574,34 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "notes": "La config del cockpit (ADR-028), ambito=completo: SIN filtros de activo, el total tal cual, porque este workflow aplica su propia logica encima. FAIL-CLOSED: sin onError, !=200 tras 3 intentos aborta el run. execute-once: lookup de corrida, no de item (cierre 67)."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<<WEBHOOK_PATH_ARCHIVADO>>",
+        "responseMode": "onReceived",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "id": "arch-webhook-instancia",
+      "name": "Disparo por instancia (webhook)",
+      "webhookId": "arch-webhook-instancia",
+      "notes": "Lo dispara el dispatcher (ADR-050), una vez por instancia, con { instancia } en el body.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Webhook Motor Header"
+        }
+      }
     }
   ],
   "connections": {
-    "Cron — semanal (domingo 6pm)": {
-      "main": [
-        [
-          {
-            "node": "Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Ejecutar manual": {
       "main": [
         [
@@ -804,6 +800,17 @@
         [
           {
             "node": "Leer Candidatos calificados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disparo por instancia (webhook)": {
+      "main": [
+        [
+          {
+            "node": "Config",
             "type": "main",
             "index": 0
           }

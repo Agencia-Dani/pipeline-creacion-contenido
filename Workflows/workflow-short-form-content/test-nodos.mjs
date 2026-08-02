@@ -634,5 +634,55 @@ await (async () => {
   }
 })();
 
+// ════════════════════════════════════════════════════════════════════════════
+// Preparar candidatos / Preparar descartes — de quién es cada fila (Fase 4, ADR-048)
+// ════════════════════════════════════════════════════════════════════════════
+// Estos dos nodos escriben las tablas del cockpit, y la Fase 4 les tocó lo mismo a los dos: la
+// instancia entra en cada fila y el mapa `uuidDe` se fue con `fields.uuid`. Los dos cambios fallan
+// callados si salen mal — una fila sin `instance_id` cae en el tenant del default puente (o sea la
+// empresa equivocada) y un `proyecto_id` perdido manda todo al grupo `(sin proyecto)` del feed.
+// Ninguno tira error: entregan, en verde, mal.
+const IID = 'inst-42';
+const runPrepCandidatos = (videos) => {
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: { instance_id: IID } }) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const $input = { all: () => videos.map((j) => ({ json: j })) };
+  const out = new Function('$', '$input', 'console', jsCode('Preparar candidatos'))($, $input, { log: () => {} });
+  return out.length ? out[0].json.filas : [];
+};
+const cvid = (id, extra = {}) => Object.assign({ external_id: id, titulo: 't' + id, script: 'g', proyecto_id: 'P1', voz_id: 'V1' }, extra);
+
+seccion('Preparar candidatos — la instancia viaja en cada fila (ADR-048)');
+{
+  const filas = runPrepCandidatos([cvid('a'), cvid('b')]);
+  check('cada candidato lleva su instance_id', filas.length === 2 && filas.every((f) => f.instance_id === IID), JSON.stringify(filas.map((f) => f.instance_id)));
+  check('proyecto_id y voz_id sobreviven a la muerte de uuidDe (eran identidad)', filas[0].proyecto_id === 'P1' && filas[0].voz_id === 'V1', JSON.stringify([filas[0].proyecto_id, filas[0].voz_id]));
+}
+{
+  // El caso que antes resolvía `uuidDe[...] || null`: un video sin proyecto asignado sigue viajando
+  // sin él, no con un string vacío que la FK rechace.
+  const filas = runPrepCandidatos([cvid('c', { proyecto_id: '', voz_id: undefined })]);
+  check('sin proyecto resoluble la fila va con null, no con "" (la FK lo rechazaría)', filas[0].proyecto_id === null && filas[0].voz_id === null, JSON.stringify([filas[0].proyecto_id, filas[0].voz_id]));
+}
+
+seccion('Preparar descartes — misma regla, misma instancia');
+{
+  const items = [
+    { external_id: 'd1', _descarte: true, descarte_razon: 'no_relevante', proyecto_id: 'P1', username: 'ref', script: 'g' },
+    { external_id: 'd2', _descarte: true, descarte_razon: 'sin_guion', proyecto_id: 'P1', username: 'ref' },
+  ];
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: { instance_id: IID } }) };
+    if (n === 'Gate de relevancia') return { all: () => items.map((j) => ({ json: j })) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const out = new Function('$', 'console', jsCode('Preparar descartes'))($, { log: () => {} });
+  const filas = out.length ? out[0].json.filas : [];
+  check('el descarte auditable lleva su instance_id', filas.length === 1 && filas[0].instance_id === IID, JSON.stringify(filas));
+  check('sin_guion sigue sin subir (ADR-030 intacto)', filas.length === 1, 'subieron ' + filas.length);
+}
+
 console.log(fail ? `\n${fail} test(s) en rojo` : '\nTodo en verde');
 process.exit(fail ? 1 : 0);

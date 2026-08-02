@@ -9,14 +9,19 @@ import { registrarEvento } from "@/lib/eventos";
 // Las DOS señales que disparan una máquina viven acá, juntas y guardadas por la misma zona.
 // Antes `buscarAhora` estaba en `curar/sugeridos/actions.ts`, al lado de aprobar y descartar —
 // pero aprobar es curar y disparar es operar, y esa mezcla es la que dejó el botón sin renderizar
-// durante todo el commit que lo creó. Son gemelas: POST desnudo a un webhook de n8n, el workflow
-// decide qué hacer leyendo su config por la fachada (ADR-023 + ADR-028).
+// durante todo el commit que lo creó. Son gemelas: POST a un webhook de n8n, el workflow decide
+// qué hacer leyendo su config por la fachada (ADR-023 + ADR-028).
+//
+// ⚠️ **Desde ADR-048 la señal ya no es desnuda: lleva `{ instancia }`.** Es el único dato que el
+// workflow no puede deducir —hay una definición para N empresas— y sin él la fachada responde 400
+// y la corrida no arranca. Todo lo demás lo sigue resolviendo el motor leyendo la config: el
+// payload dice DE QUIÉN es la corrida, no qué hacer.
 
 export type ResultadoDisparo = { ok: boolean; mensaje: string };
 
-// ▶ Correr ahora: señal desnuda al webhook del motor (ADR-023). Sin payload:
-// el motor decide qué corre leyendo la config. El header vive solo acá (BFF,
-// único portador de secretos) y en n8n — jamás en el browser ni en git.
+// ▶ Correr ahora: señal al webhook del motor (ADR-023) con la instancia del cockpit abierto.
+// El header vive solo acá (BFF, único portador de secretos) y en n8n — jamás en el browser ni en
+// git. La instancia no es secreta: es un uuid del registro, y viaja en el body como el dispatcher.
 export async function correrAhora(): Promise<ResultadoDisparo> {
   const { usuario, ctx, cockpit } = await exigirTenant("operar");
 
@@ -32,7 +37,11 @@ export async function correrAhora(): Promise<ResultadoDisparo> {
   }
 
   try {
-    const res = await fetch(url, { method: "POST", headers: { [nombre]: valor } });
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { [nombre]: valor, "content-type": "application/json" },
+      body: JSON.stringify({ instancia: ctx.instanceId }),
+    });
     if (res.status === 403) {
       // El gotcha documentado: header distinto al de la credencial de n8n = 403 en silencio.
       return {
@@ -62,7 +71,7 @@ export async function correrAhora(): Promise<ResultadoDisparo> {
 // ── Buscar cuentas nuevas ────────────────────────────────────────────────────
 //
 // El buscador de referentes perdió el cron de los lunes (enmienda de ADR-020) y pasó a ser este
-// botón. Misma forma que el ▶ del motor: señal desnuda, sin payload, el header solo acá y en n8n.
+// botón. Misma forma que el ▶ del motor: la instancia en el body, el header solo acá y en n8n.
 
 export async function buscarAhora(): Promise<ResultadoDisparo> {
   const { usuario, ctx, cockpit } = await exigirTenant("operar");
@@ -81,7 +90,11 @@ export async function buscarAhora(): Promise<ResultadoDisparo> {
   }
 
   try {
-    const res = await fetch(url, { method: "POST", headers: { [nombre]: valor } });
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { [nombre]: valor, "content-type": "application/json" },
+      body: JSON.stringify({ instancia: ctx.instanceId }),
+    });
     if (res.status === 403) {
       // El gotcha documentado: header distinto al de la credencial de n8n = 403 en silencio.
       return { ok: false, mensaje: "El buscador rechazó la señal (403): el header no coincide con el de n8n. Avisale a un dev." };

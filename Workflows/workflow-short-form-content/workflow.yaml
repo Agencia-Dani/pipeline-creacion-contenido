@@ -22,14 +22,18 @@ status: draft                     # corrió manual (V1); cron sin activar (D1–
 owner: mani
 
 triggers:
-  - type: cron
-    schedule: "0 8 * * 1"         # lunes 8:00 AM (semanal — acota el gasto de Apify free)
-    timezone: America/Bogota      # validar interpretación al activar (D1 del ROADMAP)
-  - type: manual                  # "Execute Workflow" en n8n para corridas de prueba
-  - type: webhook                 # ADR-023: botón Airtable → automation → POST de Producción (señal
-                                  # desnuda, sin payload; el motor lee Airtable). Guard single-flight
-                                  # en TODOS los triggers: si hay corrida viva (<ventana_corrida_min),
-                                  # no arranca otra. Path = placeholder <<WEBHOOK_PATH_MOTOR>>.
+  # El cron semanal (lunes 8am) se MUDÓ al dispatcher en la Fase 4 (ADR-048 + ADR-050): con la
+  # instancia viajando en el payload, un cron acá no tiene de dónde sacarla y solo podría producir
+  # corridas que abortan — dejando la fila de `runs` en `en_curso` para siempre, que es el fallo
+  # mudo que ya costó una sesión. El horario no cambió, cambió quién lo dispara.
+  - type: manual                  # "Execute Workflow" en n8n para corridas de prueba. Sin payload:
+                                  # hay que pegarle el uuid de la instancia al final de la expresión
+                                  # de Config.instance_id (está anotado en el nodo). Vacío = 400.
+  - type: webhook                 # ADR-023 + ADR-048: POST con { instancia } en el body, del
+                                  # dispatcher o del botón ▶ del cockpit. Guard single-flight en
+                                  # TODOS los triggers y ahora POR INSTANCIA: si hay corrida viva de
+                                  # ESA instancia (<ventana_corrida_min), no arranca otra — la de
+                                  # otra empresa ya no la bloquea. Path = <<WEBHOOK_PATH_MOTOR>>.
                                   # Header Auth (enmienda auth de ADR-023): credencial 'Webhook Motor
                                   # Header'. El path dejó de ser el secreto; sin el header, 403.
   # (El Form Trigger del template viejo se eliminó: Airtable es la única superficie de config.)
@@ -86,8 +90,8 @@ outputs:
     registered: yes               # reporta al registro central (Supabase outputs; contenido_o_link = texto del script — ADR-009 nota 2026-06-14)
 
 runbook:
-  setup: "Importar workflow.json en n8n → editar nodo Config (base_id, supabase_url, instance_id) → reemplazar <<WEBHOOK_PATH_MOTOR>> en el nodo webhook por un path aleatorio (la URL de Producción resultante va a la automation de Airtable y al gestor, JAMÁS a git) → crear la credencial httpHeaderAuth 'Webhook Motor Header' (nombre+valor de header aleatorios; el mismo par va en el fetch de la automation) → pegar API keys/credenciales (B4) → importar error-workflow-registro.json como Error Workflow → ACTIVAR (el webhook de Producción solo escucha activo)."
-  start: "Activar el cron en n8n (validar timezone). Para probar: Execute Workflow manual."
+  setup: "Importar workflow.json en n8n → editar nodo Config (supabase_url, dashboard_url; instance_id YA NO se completa, sale del payload del webhook — ADR-048) → reemplazar <<WEBHOOK_PATH_MOTOR>> en el nodo webhook por un path aleatorio (la URL de Producción resultante va a la automation de Airtable y al gestor, JAMÁS a git) → crear la credencial httpHeaderAuth 'Webhook Motor Header' (nombre+valor de header aleatorios; el mismo par va en el fetch de la automation) → pegar API keys/credenciales (B4) → importar error-workflow-registro.json como Error Workflow → ACTIVAR (el webhook de Producción solo escucha activo)."
+  start: "Lo dispara el dispatcher (lunes 8am) y el botón ▶ del cockpit; acá solo hay que dejarlo ACTIVO para que el webhook escuche. Para probar: Execute Workflow manual, con el uuid de la instancia pegado en la expresión de Config.instance_id."
   stop: "Desactivar el workflow en n8n."
   test: "Corrida manual de backfill (dias_recencia alto en el proyecto provisional) → candidatos en Airtable con script en español + idioma; processed_items poblada; runs/outputs en Supabase (V1–V6)."
   docs:

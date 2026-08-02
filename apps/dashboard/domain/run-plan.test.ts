@@ -35,6 +35,15 @@ describe("armarRunPlan (ADR-028)", () => {
     assert.equal(plan.generado_en, "2026-07-20T08:00:00.000Z");
   });
 
+  // El número literal, no la constante: comparar `plan.version` contra `RUN_PLAN_VERSION` es
+  // tautológico y pasa igual si alguien mueve la constante sin querer. Y moverla no es un detalle —
+  // `version` gobierna la compatibilidad con n8n (ADR-028 §5), así que cambiarla obliga a un
+  // re-import coordinado de los 3 workflows. Este assert existe para que eso sea un acto
+  // deliberado (romper un test) y no un efecto colateral.
+  it("el contrato está en v2 y subirlo cuesta un re-import (ADR-048)", () => {
+    assert.equal(RUN_PLAN_VERSION, 2);
+  });
+
   // ADR-042: `Candidatos por corrida` se borró. Era el default global de N, competía con el número
   // del proyecto, y desde ADR-038 no aplicaba a ninguno. Este test fija que la red que quedó en su
   // lugar es una CONSTANTE: ningún ajuste la mueve, ni siquiera uno que se llame igual que el viejo.

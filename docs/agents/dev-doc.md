@@ -127,9 +127,10 @@
 
 | Workflow | Trigger | Cadencia | Nodos | Qué hace |
 |---|---|---|---|---|
-| **Motor** (`short-form-content`) | Cron + Execute manual + **webhook on-demand (ADR-023)** | **Semanal**, lunes 8am + a demanda (webhook) | 35 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **`app.candidatos`** + los descartes borderline (**`app.descartes`**, ADR-021) por PostgREST (ADR-035) + registra la corrida en Supabase. §2. |
+| **Dispatcher** (`dispatcher`, ADR-050) | Cron ×2 + Execute manual | **Lunes 8am** (motor) y **domingo 6pm** (archivado) | 8 | Los crons que vivían adentro del motor y del archivado. `GET /api/engine/instancias` → un POST al webhook del destino **por instancia activa**, con `{ instancia }` en el body y continue-on-fail por iteración. No procesa, no registra, no gasta. Nodo por nodo en su [README](../../Workflows/workflow-dispatcher/README.md). |
+| **Motor** (`short-form-content`) | Execute manual + **webhook (ADR-023 + ADR-048)** | **A demanda**; el semanal lo dispara el dispatcher | 34 | Descubre reels (IG+TikTok, Apify, solo por referentes — ADR-019) → prescore métrico → transcribe/traduce → gate de relevancia (Haiku) → escribe **`app.candidatos`** + los descartes borderline (**`app.descartes`**, ADR-021) por PostgREST (ADR-035) + registra la corrida en Supabase. §2. |
 | **Descubrimiento** (`descubrimiento-referentes`, ADR-020) | Cron + Execute manual | **Semanal**, lunes 9am (1h después del motor) | 22 | Busca cuentas nuevas parecidas a las que funcionan (IG: sugeridos, 2 pasadas Apify; TikTok: lookalike, rama paralela — ADR-020 §8) → dedup → vetting Haiku **FAIL-CLOSED** → escribe **`app.referentes_propuestos`** + su tabla puente N:M. La promoción la hace la app, no este workflow (D7 borró esa cadena de 4 nodos). §3. |
-| **Archivado** (`archivado`) | Cron + Execute manual | **Semanal**, domingo 6pm (`0 18 * * 0`) | 20 | Toma los candidatos **calificados** de `app.candidatos` → los archiva en `outputs` (con relevancia — ADR-021) + append al **Sheet Histórico** → los borra → **destila criterios aprendidos** y los PATCHea en `app.proyectos` (ADR-022). Las Métricas y la salud de referentes **murieron en D7**: son vistas SQL. §4. |
+| **Archivado** (`archivado`) | **Webhook** + Execute manual | **Semanal**, domingo 6pm — lo dispara el dispatcher | 20 | Toma los candidatos **calificados** de `app.candidatos` → los archiva en `outputs` (con relevancia — ADR-021) + append al **Sheet Histórico** → los borra → **destila criterios aprendidos** y los PATCHea en `app.proyectos` (ADR-022). Las Métricas y la salud de referentes **murieron en D7**: son vistas SQL. §4. |
 
 Los tres comparten el patrón de registro `runs` en Supabase (abre `en_curso` con `params.workflow`
 propio, cierra `ok` con métricas; el barredor marca `fallo` los zombies de su propio workflow).
@@ -137,12 +138,17 @@ Archivado y descubrimiento: `Config → Abrir run → Barrer runs zombie → …
 ADR-023) reordena el arranque a `Config → Barrer runs zombie → Leer corridas vivas → Guard
 single-flight → Abrir run → …`: el barrido pasa **antes** de abrir el run (así ya no excluye su
 propio id) y solo barre `en_curso` más viejos que `ventana_corrida_min` (60); el guard bloquea la
-corrida si hay otra **viva** (más joven que la ventana) — aplica a los 3 triggers, no solo al
+corrida si hay otra **viva** (más joven que la ventana) — aplica a todos los triggers, no solo al
 webhook. Todos los nodos de Supabase son **continue-on-fail** (invariante: si el registro falla, el
 trabajo útil igual se entrega; el guard con Supabase caído **deja pasar** — fail-open). Cadencia
 semanal encadenada a propósito: **domingo 6pm** archiva la curación de la semana → **lunes 8am** el
-motor trae la tanda nueva → **lunes 9am** el descubrimiento propone cuentas con la señal fresca del
-archivado.
+motor trae la tanda nueva. Los dos horarios los guarda ahora el **dispatcher**, no cada workflow.
+
+> ⚠️ **Desde la Fase 4 (ADR-048), todo lo de arriba es POR INSTANCIA.** El barredor, el guard
+> single-flight y cada lectura/escritura llevan `instance_id=eq.<uuid>`, y el uuid sale del payload
+> del webhook — no de un placeholder. Sin instancia el workflow no arranca: `Abrir run` viola la FK
+> y `run-plan` responde 400, los dos **antes** de tocar Apify. El single-flight dejó de ser global:
+> la corrida de una empresa ya no le bloquea el arranque a otra.
 
 ---
 
@@ -301,10 +307,10 @@ Notas de orden que muerden si las ignorás:
 
 | # | Nodo | Tipo | Qué hace · lee → emite |
 |---|---|---|---|
-| 1 | Cron — semanal (lunes 8am) | scheduleTrigger | Dispara la corrida los lunes 8am (`weeks`, día 1, hora 8). |
-| 2 | Ejecutar manual | manualTrigger | Execute Workflow a mano (las V-runs). |
-| 2b | Disparo on-demand (webhook) | webhook | **ADR-023 (C.3):** POST de Producción, path = `<<WEBHOOK_PATH_MOTOR>>` (se reemplaza al importar; la URL va a la automation de Airtable y al gestor, jamás a git). **Señal desnuda:** sin payload; el motor lee Airtable (toggles + N). Responde 200 inmediato (`onReceived`) — el veredicto del guard se ve en la ejecución de n8n y en `runs`, no en la respuesta. |
-| 3 | Config | set | Define los **IDs** (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`), los **defaults de knobs** que el equipo puede pisar desde Ajustes (`resultados_referente` 20, `top_n` 100, `dias_recencia` 7, toggles `buscar_referente_ig`/`buscar_referente_tiktok` 1) , los **caps dev-only** que NADIE pisa desde Ajustes (`cap_resultados_referente` 50; ⚠️ **`cap_top_n` YA NO ES UNO DE ELLOS** — ADR-042 lo subió a Ajustes como *Videos a transcribir por corrida* y `Armar plan de corrida` lo resuelve con `pick('cap_top_n', 250)`, o sea `ajustes > Config`; el `Config` conserva **250** como fallback — subido de 30 el 2026-07-13 ahora que Apify/Supadata son pagos; es el techo de videos transcritos/corrida, `piso_referente` 5, `cap_descartes` 10 — ADR-021 (top-K por score, enmienda 2026-07-13), y **el bloque de throughput de ADR-044**: `presupuesto_transcribir_s` 840 · `concurrencia_transcribir` **24** · `presupuesto_traducir_s` **840** · `concurrencia_traducir` **8** — los cuatro se editan a mano en n8n **sin re-importar**, que es justamente por qué viven acá y no en el código; los presupuestos quedan debajo del watchdog de 900 s del pod y la palanca de throughput es la concurrencia; `ventana_corrida_min` **60** — C.3/ADR-023, frontera vivo/zombie del single-flight; bajado de 120 el 2026-07-31 porque un abort fail-closed deja la fila `en_curso` y bloqueaba 2 h, y subido de 45 a 60 el mismo día: 45 se había elegido sobre un máximo medido de **23,2 min** (10 corridas) y la corrida del 31/07 duró **31** — la ventana tiene que quedar POR ENCIMA de la corrida más larga posible, porque si queda debajo el barredor mata una corrida en vuelo y el guard deja arrancar otra en paralelo; **`banda_descarte_min`/`max` podados 2026-07-16, C.5**) y los **defaults de scoring** (`peso_views` .4, `peso_likes` .4, `peso_eng` .2, `peso_relevancia` .7, `boost_idioma` .3, `umbral_viral` 700000). Los Ajustes de Airtable caen **encima** de los defaults, nunca de los caps. |
+| 1 | ~~Cron — semanal (lunes 8am)~~ | — | **Se fue en la Fase 4.** Con la instancia viajando en el payload (ADR-048), un cron acá no tiene de dónde sacarla: solo podría producir corridas que abortan dejando la fila de `runs` en `en_curso` para siempre. El horario se mudó intacto al [dispatcher](../../Workflows/workflow-dispatcher/). |
+| 2 | Ejecutar manual | manualTrigger | Execute Workflow a mano (las V-runs). **Sin payload:** hay que pegarle el uuid de la instancia al `''` final de la expresión de `Config.instance_id` (está anotado en el nodo). Vacío ⇒ 400 y no arranca. |
+| 2b | Disparo on-demand (webhook) | webhook | **ADR-023 (C.3) + ADR-048:** POST de Producción, path = `<<WEBHOOK_PATH_MOTOR>>` (se reemplaza al importar; la URL va al Config del dispatcher y al gestor, jamás a git). **El body lleva `{ instancia }`** — es el único dato que el workflow no puede deducir. Lo mandan el dispatcher y el botón ▶ del cockpit. Responde 200 inmediato (`onReceived`) — el veredicto del guard se ve en la ejecución de n8n y en `runs`, no en la respuesta. |
+| 3 | Config | set | Define los **IDs** (`supabase_url`, `dashboard_url` — placeholders `<<…>>`) y resuelve **`instance_id` desde el body del webhook** (ADR-048: ya no es un placeholder; ver el nodo 2b), los **defaults de knobs** que el equipo puede pisar desde Ajustes (`resultados_referente` 20, `top_n` 100, `dias_recencia` 7, toggles `buscar_referente_ig`/`buscar_referente_tiktok` 1) , los **caps dev-only** que NADIE pisa desde Ajustes (`cap_resultados_referente` 50; ⚠️ **`cap_top_n` YA NO ES UNO DE ELLOS** — ADR-042 lo subió a Ajustes como *Videos a transcribir por corrida* y `Armar plan de corrida` lo resuelve con `pick('cap_top_n', 250)`, o sea `ajustes > Config`; el `Config` conserva **250** como fallback — subido de 30 el 2026-07-13 ahora que Apify/Supadata son pagos; es el techo de videos transcritos/corrida, `piso_referente` 5, `cap_descartes` 10 — ADR-021 (top-K por score, enmienda 2026-07-13), y **el bloque de throughput de ADR-044**: `presupuesto_transcribir_s` 840 · `concurrencia_transcribir` **24** · `presupuesto_traducir_s` **840** · `concurrencia_traducir` **8** — los cuatro se editan a mano en n8n **sin re-importar**, que es justamente por qué viven acá y no en el código; los presupuestos quedan debajo del watchdog de 900 s del pod y la palanca de throughput es la concurrencia; `ventana_corrida_min` **60** — C.3/ADR-023, frontera vivo/zombie del single-flight; bajado de 120 el 2026-07-31 porque un abort fail-closed deja la fila `en_curso` y bloqueaba 2 h, y subido de 45 a 60 el mismo día: 45 se había elegido sobre un máximo medido de **23,2 min** (10 corridas) y la corrida del 31/07 duró **31** — la ventana tiene que quedar POR ENCIMA de la corrida más larga posible, porque si queda debajo el barredor mata una corrida en vuelo y el guard deja arrancar otra en paralelo; **`banda_descarte_min`/`max` podados 2026-07-16, C.5**) y los **defaults de scoring** (`peso_views` .4, `peso_likes` .4, `peso_eng` .2, `peso_relevancia` .7, `boost_idioma` .3, `umbral_viral` 700000). Los Ajustes de Airtable caen **encima** de los defaults, nunca de los caps. |
 | 4 | Barrer runs zombie | http PATCH | **Auto-sanador del motor (ADR-017; reordenado en C.3), entre `Config` y el guard.** `PATCH runs` → marca `fallo` los runs de motor `en_curso` **más viejos que `ventana_corrida_min`** (scoped `params->>workflow=eq.motor`; corre antes de `Abrir run`, así ya no necesita excluir su propio id). Barrer ANTES del guard es lo que garantiza que un zombie nunca bloquee el single-flight. continue-on-fail. |
 | 4b | Leer corridas vivas | http GET | **Guard single-flight, mitad lectura (C.3, ADR-023).** `GET runs` con `estado=en_curso` + `inicio>=now−ventana_corrida_min`, `limit=1` → si devuelve fila, hay corrida viva. `alwaysOutputData` + continue-on-fail (Supabase caído = item sin `id` = pasa, fail-open). |
 | 4c | Guard single-flight | if | Evalúa `Boolean($json.id)`: **false** (no hay corrida viva) → `Abrir run` y la corrida sigue; **true** → `Bloqueada: ya hay corrida viva` (NoOp) y la ejecución muere ahí — **sin abrir run**, así un click bloqueado no ensucia `runs_fallo` ni las métricas de salud. Aplica a los 3 triggers (decisión Mani 2026-07-16). |
@@ -423,7 +429,7 @@ Notas de diseño que muerden si las ignorás:
 |---|---|---|---|
 | 1 | Cron — semanal (lunes 9am) | scheduleTrigger | Lunes 9am (1h después del motor: señal fresca del archivado del domingo). |
 | 2 | Ejecutar manual | manualTrigger | Execute a mano. |
-| 3 | Config | set | IDs (`airtable_base_id`, `supabase_url`, `instance_id` — placeholders `<<…>>`) + defaults/caps: `cap_semillas` 8, `cap_perfiles_detalle` 20, `cap_lookalikes_tt` 15 (dev-only), `propuestas_max` 10, `afinidad_minima` 0.6, toggles `descubrir_ig`/`descubrir_tt` 1 (pisables desde Ajustes). |
+| 3 | Config | set | IDs (`supabase_url`, `dashboard_url` — placeholders `<<…>>`) + `instance_id` **desde el body del webhook** (ADR-048) + defaults/caps: `cap_semillas` 8, `cap_perfiles_detalle` 20, `cap_lookalikes_tt` 15 (dev-only), `propuestas_max` 10, `afinidad_minima` 0.6, toggles `descubrir_ig`/`descubrir_tt` 1 (pisables desde Ajustes). |
 | 4 | Abrir run en el registro | http POST | `POST runs` con `params:{workflow:'descubrimiento'}`, `return=representation`. continue-on-fail. |
 | 5 | Barrer runs zombie | http PATCH | Marca `fallo` los runs de descubrimiento previos colgados `en_curso` (scoped `params->>workflow=eq.descubrimiento` + `id=neq.<run actual>`). continue-on-fail. |
 | 6 | Leer plan (fachada) | http GET | **D4 (ADR-028): reemplaza a `Leer Proyectos`/`Voces`/`Referentes` y a `Leer Ajustes` (nodo 14).** `?ambito=**completo**` — sin filtros de `activo`, el total tal cual, porque este workflow aplica su propia lógica encima (el descubrimiento **ignora `Voces.activo` a propósito**, cierre 49, y el dedup necesita los referentes inactivos). ⚠️ **El `{activo}` de Proyectos, que antes hacía el `filterByFormula`, ahora es una línea explícita en `Armar plan de descubrimiento`** — sin ella se propondría para proyectos apagados. Fail-closed (sin `onError`), retry ×3, `executeOnce`. |
@@ -542,9 +548,9 @@ Referentes salud** escribe la salud por referente.
 
 | # | Nodo | Tipo | Qué hace |
 |---|---|---|---|
-| 1 | Cron — semanal (domingo 6pm) | scheduleTrigger | `0 18 * * 0` (domingo 18:00, un día antes del motor). |
+| 1 | Disparo por instancia (webhook) | webhook | **Nuevo en la Fase 4.** Reemplaza al cron `0 18 * * 0`, que se mudó al [dispatcher](../../Workflows/workflow-dispatcher/) con su horario intacto. Path = `<<WEBHOOK_PATH_ARCHIVADO>>`, Header Auth, body `{ instancia }`. Sin webhook no había forma de archivar por empresa: `candidatos?estado=neq.nuevo` sin filtro mezcla los calificados de todas dentro de una sola corrida. |
 | 2 | Ejecutar manual | manualTrigger | Execute a mano. |
-| 3 | Config | set | `airtable_base_id`, `supabase_url`, `instance_id`, `sheet_id`, `sheet_tab` (placeholders `<<…>>`) + `min_muestra_referente` 10, `min_muestra_destilar` 4 (ADR-022) + `ventana_corrida_min` 60 (matiz D.2: frontera vivo/zombie al contar `runs_ok/fallo` — mismo nombre y semántica que en el motor). |
+| 3 | Config | set | `supabase_url`, `dashboard_url`, `sheet_id`, `sheet_tab` (placeholders `<<…>>`) + `instance_id` **desde el body del webhook** (ADR-048) + `min_muestra_referente` 10, `min_muestra_destilar` 4 (ADR-022) + `ventana_corrida_min` 60 (matiz D.2: frontera vivo/zombie al contar `runs_ok/fallo` — mismo nombre y semántica que en el motor). |
 | 4 | Abrir run en el registro | http POST | `POST runs` con `params:{workflow:'archivado'}`, `return=representation`. continue-on-fail. |
 | 5 | Barrer runs zombie | http PATCH | **Auto-sanador (B5, cierre 19).** `PATCH runs` → marca `fallo` los runs de archivado anteriores colgados `en_curso` (scoped `params->>workflow=eq.archivado` + `id=neq.<run actual>`). Repara la integridad de `runs` cuando una corrida previa falló antes de *Cerrar run*. continue-on-fail. |
 | 6 | Leer plan (fachada) | http GET | **D4 (ADR-028): reemplaza a `Leer Proyectos`, `Leer Voces` y `Leer Referentes (archivado)` (nodo 23).** `?ambito=**completo**` — el archivado necesita TODAS las voces y proyectos para resolver nombres al archivar, y la salud se le escribe también a referentes pausados. Sus 3 lecturas no tenían filtro, así que `completo` calza exacto (verificado campo por campo contra Airtable). Fail-closed (sin `onError`), retry ×3, `executeOnce`. Lo consumen 4 code nodes: `Armar filas archivado`, `Computar métricas semana`, `Destilar criterios` y `Computar salud referentes`. |
@@ -723,11 +729,17 @@ De dónde sale y a dónde llega cada campo que importa:
 - **API keys** (en los Code nodes, como strings): motor → `<ANTHROPIC_API_KEY>` (×3: Pre-trim,
   Traducir, Gate) + `<SUPADATA_API_KEY>` (×1: Transcribir); descubrimiento → `<ANTHROPIC_API_KEY>`
   (**×2: Vetting relevancia (Haiku) IG + Vetting TikTok (Haiku)**).
-- **IDs** (en el nodo `Config`, como `<<…>>`): `<<AIRTABLE_BASE_ID>>`, `<<SUPABASE_URL>>`,
-  `<<INSTANCE_ID>>` (los tres workflows); el archivado suma `<<GOOGLE_SHEET_ID>>`,
-  `<<NOMBRE_PESTANA_SHEET>>`; el motor suma `<<WEBHOOK_PATH_MOTOR>>` (en el nodo webhook, no en
-  Config: path aleatorio del disparo on-demand, ADR-023 — la URL de Producción resultante es
-  cuasi-secreto: dispara corridas pagas, va al gestor y a la automation de Airtable, jamás a git).
+- **IDs** (en el nodo `Config`, como `<<…>>`): `<<SUPABASE_URL>>` y `<<DASHBOARD_URL>>` (los tres
+  workflows); el archivado suma `<<GOOGLE_SHEET_ID>>`, `<<NOMBRE_PESTANA_SHEET>>`; el dispatcher
+  lleva `<<DASHBOARD_URL>>`, `<<WEBHOOK_URL_MOTOR>>` y `<<WEBHOOK_URL_ARCHIVADO>>` (URLs completas,
+  no paths).
+  ☠️ **`<<AIRTABLE_BASE_ID>>` murió en D7 y `<<INSTANCE_ID>>` en la Fase 4** — la instancia dejó de
+  ser una constante del archivo y viaja en el payload del webhook (ADR-048). Es el placeholder que
+  más veces se olvidó, y ya no se puede olvidar: no existe.
+- **Paths de webhook** (en el nodo webhook, no en Config — paths aleatorios; la URL de Producción
+  resultante es cuasi-secreto porque dispara corridas pagas: va al gestor y al Config del
+  dispatcher, jamás a git): `<<WEBHOOK_PATH_MOTOR>>` (ADR-023),
+  `<<WEBHOOK_PATH_DESCUBRIMIENTO>>` y `<<WEBHOOK_PATH_ARCHIVADO>>` (nuevo en la Fase 4).
 - **Credenciales nativas de n8n:** `airtableTokenApi` ("Airtable PAT"), `supabaseApi` ("Supabase
   Registro"), `apifyApi` (2 nodos Apify del motor + 3 del descubrimiento — la misma cred sirve para el actor TikTok dataovercoffee), Google Sheets **OAuth2**
   (solo el archivado).

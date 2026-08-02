@@ -53,7 +53,7 @@
             {
               "id": "c3",
               "name": "instance_id",
-              "value": "<<INSTANCE_ID>>",
+              "value": "={{ $('Buscar ahora (webhook)').isExecuted ? (($('Buscar ahora (webhook)').first().json.body || {}).instancia || '') : '' }}",
               "type": "string"
             },
             {
@@ -109,7 +109,9 @@
       "position": [
         660,
         380
-      ]
+      ],
+      "notes": "instance_id sale del payload del webhook ({ instancia }), no de un placeholder (ADR-048).\nPara «Ejecutar manual»: reemplazá el '' final de la expresión por el uuid de la instancia.\nEn git va VACÍO a propósito — vacío hace que run-plan responda 400 y la corrida no arranque.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -155,7 +157,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.descubrimiento&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.descubrimiento&instance_id=eq.' + $('Config').first().json.instance_id + '&estado=eq.en_curso&id=neq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -196,7 +198,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/referentes_propuestos?select=handle,plataforma' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/referentes_propuestos?select=handle,plataforma&instance_id=eq.' + $('Config').first().json.instance_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -230,7 +232,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,tasa_seleccion,calificados' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,tasa_seleccion,calificados&instance_id=eq.' + $('Config').first().json.instance_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "options": {
@@ -397,7 +399,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Armar propuestas — junta IG + TikTok (leídos por nombre, cada fila trae su plataforma y proyecto),\n// umbral de afinidad + cap por corrida (Ajustes) → filas planas para PostgREST (ADR-035).\n//\n// D7 cambió dos cosas acá:\n//  1. Se escribe en Postgres, así que no hay `fields`, ni `typecast`, ni batches de 10: PostgREST\n//     acepta el array entero de una.\n//  2. **Los proyectos viajan aparte, como PARES.** `app.referentes_propuestos` no tiene columna\n//     `proyecto_id`: la relación es N:M (enmienda de ADR-032 — medido antes del corte, las 8\n//     propuestas vivas tenían 2 proyectos cada una, así que una FK simple tiraba la mitad).\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst MAX = Math.max(1, Number(plan.propuestas_max || 10));\nconst grab = (n) => { try { return $(n).all().map(i => i.json); } catch (e) { return []; } };\nconst items = [...grab('Vetting relevancia (Haiku)'), ...grab('Vetting TikTok (Haiku)')].filter(d => d && d.username && !d._vacio);\nconst elegidos = items.filter(d => Number(d.afin || 0) >= MIN)\n  .sort((a, b) => (b.afin - a.afin) || ((b.freq || 0) - (a.freq || 0))).slice(0, MAX);\nif (!elegidos.length) { console.log('[Descubrimiento] 0 propuestas sobre el umbral ' + MIN); return [{ json: { hay_propuestas: false, propuestos: 0 } }]; }\n\n// record id de Airtable → uuid de Postgres. Sale de `fields.uuid`, el campo de transición que la\n// fachada sirve al lado del `id` viejo (paso 1 del corte). Un proyecto sin uuid no se puede\n// enlazar: se saltea ese par en vez de romper la corrida entera.\nconst uuidDe = {};\n(($('Leer plan (fachada)').first().json || {}).proyectos || []).forEach(p => {\n  const u = (p.fields || {}).uuid; if (u) uuidDe[p.id] = u;\n});\n\nconst filas = elegidos.map(d => ({\n  handle: '@' + d.username, plataforma: d.plataforma || 'instagram',\n  afinidad: Math.round(Number(d.afin) * 100) / 100, razon: String(d.razon || '').slice(0, 500),\n  seguidores: Number(d.seguidores || 0), bio: String(d.bio || '').slice(0, 500), url: d.url,\n  semillas: d.semillas || '', estado: 'propuesto'\n}));\n// Los pares se llevan por handle porque el uuid de la propuesta todavía no existe: lo acuña el\n// insert. `Preparar puente propuestas` los cruza contra lo que PostgREST devuelve.\nconst pares = elegidos.map((d, i) => ({\n  handle: filas[i].handle.toLowerCase(),\n  proyecto_ids: (d.proyectos || []).map(id => uuidDe[id]).filter(Boolean)\n}));\nconst _sinUuid = elegidos.reduce((a, d) => a + (d.proyectos || []).filter(id => !uuidDe[id]).length, 0);\nif (_sinUuid) console.log('[Descubrimiento] ⚠️ ' + _sinUuid + ' vínculo(s) a proyectos sin uuid en la fachada: se saltean');\nconsole.log('[Descubrimiento] proponiendo ' + filas.length + ' con ' + pares.reduce((a, p) => a + p.proyecto_ids.length, 0) + ' pares: ' + elegidos.map(d => d.username + '(' + (d.plataforma || 'ig') + ' ' + d.afin + ')').join(', '));\nreturn [{ json: { hay_propuestas: true, filas, pares, propuestos: filas.length } }];"
+        "jsCode": "// Armar propuestas — junta IG + TikTok (leídos por nombre, cada fila trae su plataforma y proyecto),\n// umbral de afinidad + cap por corrida (Ajustes) → filas planas para PostgREST (ADR-035).\n//\n// D7 cambió dos cosas acá:\n//  1. Se escribe en Postgres, así que no hay `fields`, ni `typecast`, ni batches de 10: PostgREST\n//     acepta el array entero de una.\n//  2. **Los proyectos viajan aparte, como PARES.** `app.referentes_propuestos` no tiene columna\n//     `proyecto_id`: la relación es N:M (enmienda de ADR-032 — medido antes del corte, las 8\n//     propuestas vivas tenían 2 proyectos cada una, así que una FK simple tiraba la mitad).\nconst plan = $('Armar plan de descubrimiento').first().json;\nconst MIN = Number(plan.afinidad_minima || 0.6);\nconst MAX = Math.max(1, Number(plan.propuestas_max || 10));\nconst grab = (n) => { try { return $(n).all().map(i => i.json); } catch (e) { return []; } };\nconst items = [...grab('Vetting relevancia (Haiku)'), ...grab('Vetting TikTok (Haiku)')].filter(d => d && d.username && !d._vacio);\nconst elegidos = items.filter(d => Number(d.afin || 0) >= MIN)\n  .sort((a, b) => (b.afin - a.afin) || ((b.freq || 0) - (a.freq || 0))).slice(0, MAX);\nif (!elegidos.length) { console.log('[Descubrimiento] 0 propuestas sobre el umbral ' + MIN); return [{ json: { hay_propuestas: false, propuestos: 0 } }]; }\n\n// Los ids del plan YA son los uuid de Postgres: el mapa `uuidDe` murió con el contrato v2\n// (ADR-048 §5), donde `fields.uuid` dejó de viajar. Los proyectos conocidos son los del plan, y\n// un id que no esté ahí se saltea en vez de romper la corrida entera.\nconst conocidos = new Set((($('Leer plan (fachada)').first().json || {}).proyectos || []).map(p => p.id));\n\nconst filas = elegidos.map(d => ({\n  handle: '@' + d.username, plataforma: d.plataforma || 'instagram',\n  afinidad: Math.round(Number(d.afin) * 100) / 100, razon: String(d.razon || '').slice(0, 500),\n  seguidores: Number(d.seguidores || 0), bio: String(d.bio || '').slice(0, 500), url: d.url,\n  semillas: d.semillas || '', estado: 'propuesto',\n  instance_id: $('Config').first().json.instance_id\n}));\n// Los pares se llevan por handle porque el uuid de la propuesta todavía no existe: lo acuña el\n// insert. `Preparar puente propuestas` los cruza contra lo que PostgREST devuelve.\nconst pares = elegidos.map((d, i) => ({\n  handle: filas[i].handle.toLowerCase(),\n  proyecto_ids: (d.proyectos || []).filter(id => conocidos.has(id))\n}));\nconst _sinUuid = elegidos.reduce((a, d) => a + (d.proyectos || []).filter(id => !conocidos.has(id)).length, 0);\nif (_sinUuid) console.log('[Descubrimiento] ⚠️ ' + _sinUuid + ' vínculo(s) a proyectos que no están en el plan: se saltean');\nconsole.log('[Descubrimiento] proponiendo ' + filas.length + ' con ' + pares.reduce((a, p) => a + p.proyecto_ids.length, 0) + ' pares: ' + elegidos.map(d => d.username + '(' + (d.plataforma || 'ig') + ' ' + d.afin + ')').join(', '));\nreturn [{ json: { hay_propuestas: true, filas, pares, propuestos: filas.length } }];"
       },
       "name": "Armar propuestas",
       "type": "n8n-nodes-base.code",
@@ -582,7 +584,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=completo' }}",
+        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=completo&instancia=' + $('Config').first().json.instance_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpHeaderAuth",
         "options": {
