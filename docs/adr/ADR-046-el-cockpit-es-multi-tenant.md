@@ -36,11 +36,17 @@
      | Grano | Tablas | Por qué |
      |---|---|---|
      | **`client_id`** | `usuarios`, `voces`, `proyectos`, `referentes` | Son de la **empresa** y **cruzan pipelines**. La voz de un referente es la misma para reels y para LinkedIn: scoparla por pipeline la duplicaría y habría dos que mantener sincronizadas a mano |
-     | **`instance_id`** | `ajustes`, `candidatos`, `descartes`, `referentes_propuestos`, `eventos` | Son de **un pipeline concreto**. Los knobs de reels no son los de LinkedIn. `runs`/`outputs`/`processed_items` ya lo tienen desde ADR-003 |
+     | **`instance_id`** | `ajustes`, `candidatos`, `descartes`, `referentes_propuestos`, `eventos`, `transcripciones` | Son de **un pipeline concreto**. Los knobs de reels no son los de LinkedIn. `runs`/`outputs`/`processed_items` ya lo tienen desde ADR-003 |
      | **ninguno** | `referentes_proyectos`, `referentes_propuestos_proyectos` | Join tables: heredan por FK con `on delete cascade` |
 
      **`instances` ya es `workflow × cliente`.** No se inventa una entidad nueva: se usa la que
      ADR-003 creó y que hasta hoy estaba infrautilizada.
+
+     > `app.transcripciones` (la zona Transcribir, [ADR-031](./ADR-031-transcriptor-a-pedido.md))
+     > **no estaba en el inventario del plan** y aparece acá porque la regla la cubre sin
+     > ambigüedad: es de un pipeline concreto. Traía además un **sexto** unique global
+     > —`(plataforma, external_id)`— de la misma familia que los cinco del punto 4. Lo que faltó
+     > fue el inventario, no el criterio.
 
   3. **`clients` se vuelve un árbol** con `parent_id text references clients (id)`. Hoy `30x`,
      `estadox`, `retia` sin padre — un nivel. Mañana un cliente de Retia es **una fila, no una
