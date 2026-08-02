@@ -40,8 +40,8 @@
 > idioma elegido al azar por el join**, no la de la cuenta (la real es 1 de 9 ≈ 11%). Misma familia
 > que todo lo demás: no falla, no avisa, y deja un número que se ve razonable y está mal. *`esFlojo`
 > usa `tasa_gate`, no esta, así que* A revisar *nunca estuvo contaminado.*
-> ⚠️ **Falta correr [`core/schema/015`](../../core/schema/015_salud_referentes_una_fila.sql)**, que
-> colapsa la señal por referente antes del join. **Regla que deja para esa vista: todo join nuevo
+> ✅ **[`core/schema/015`](../../core/schema/015_salud_referentes_una_fila.sql) aplicada** — la vista
+> pasó de 18 filas a **17 (una por referente)** y `@tori.trades` da **0.11**, que es su 1 de 9 real. **Regla que deja para esa vista: todo join nuevo
 > tiene que garantizar UNA fila por referente** — las CTEs de `seguidores` ya nacieron con
 > `distinct on` justamente por eso.
 >
@@ -49,7 +49,33 @@
 > distintos y la misma plataforma. No es la vista, son dos filas reales. Antes de borrar una hay que
 > mirar qué proyectos tiene cada una: si difieren, borrar la equivocada le saca fuentes a un proyecto.
 >
-> ### 🔴 Lo que falta, EN ESTE ORDEN, y es de Mani
+> ### ✅ CERRADO — las 3 migraciones aplicadas, el motor re-importado y el techo VERIFICADO EN VIVO
+> Corrida `191ddc8b` del 2026-08-02, **`ok` en 17 min**, con el techo puesto en 10:
+> `colectados 562 → asignados 912 → pretrim 754 → **filtrados 10** → supadata 10 → gate 5`.
+> **10 videos distintos transcritos, no 250: ADR-042 funciona de punta a punta.** El techo volvió a
+> **250**. *(Los `entregados=0` con `razon=supply` de 4 proyectos son artefacto del cap en 10, no una
+> señal de capacidad: con el techo real esos números no significan nada.)* Apify ~$0.83.
+>
+> 🩸 **Costó TRES intentos, y los dos primeros murieron por lo mismo: `<<DASHBOARD_URL>>` sin
+> rellenar tras el re-import.** El nodo `Leer plan (fachada)` arma su URL con
+> `$('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=motor'`; con el placeholder
+> literal la URL queda **relativa** y n8n se la pide **a sí mismo** →
+> `404 ... webhook "GET <uuid>/api/engine/run-plan" is not registered`.
+> **Por qué es la que se olvida:** `dashboard_url` es el placeholder **más nuevo** del workflow (entró
+> con la fachada de ADR-028), así que no está en la memoria muscular de los re-imports viejos —
+> `<<SUPABASE_URL>>` sí se rellenó las dos veces (por eso la fila de `runs` se escribía igual).
+> ⚠️ **Y el fallo es MUDO donde importa:** un abort ahí deja la fila en `en_curso` para siempre, sin
+> `fin` ni métricas. Parecía una corrida lenta. **Lo que lo desempató fue mirar Apify con el
+> `APIFY_TOKEN` del `.env`: cero llamadas ⇒ murió antes de scrapear, no era lentitud.** Guardá ese
+> reflejo: `runs` no distingue "colgada" de "muerta", Apify sí.
+> **Checklist para el próximo re-import de este workflow (los 6, no 2):** `<<DASHBOARD_URL>>` ·
+> `<<INSTANCE_ID>>` · `<<SUPABASE_URL>>` · `<<WEBHOOK_PATH_MOTOR>>` · `<ANTHROPIC_API_KEY>` ·
+> `<SUPADATA_API_KEY>`. Los dos últimos muerden a mitad de corrida, no al principio.
+>
+> 🧹 Quedaron 2 runs en `fallo` del 02/08 (`a375351b`, `dbdd85a0`): son los intentos muertos, no hay
+> nada que investigar ahí.
+
+> ### 🟠 Lo que queda, y es de Mani
 > **1. Aplicar [`core/schema/014`](../../core/schema/014_criterios_voz_y_perillas.sql) en el SQL
 > Editor — ANTES del commit.** El código endurece el zod de `filaVoz` a `z.string()`: si el deploy
 > llega primero y alguna voz tuviera `criterios_relevancia` null, se cae `/curar/voces` **y la
