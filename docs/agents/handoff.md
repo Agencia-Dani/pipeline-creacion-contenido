@@ -48,15 +48,29 @@
 > `cap_top_n = 250`. Los dos techos estaban calibrados al mismo punto, así que bajar uno no destrababa
 > nada.)*
 >
-> ### 🟠 Lo que queda, y es de Mani (EN ESTE ORDEN)
-> **1. Re-importar y publicar el motor** (`workflow-short-form-content`). Sin esto, poner el cap en 0
-> mata la corrida en `Traducir`. **Los 6 placeholders, no 2:** `<<DASHBOARD_URL>>` · `<<INSTANCE_ID>>` ·
-> `<<SUPABASE_URL>>` · `<<WEBHOOK_PATH_MOTOR>>` · `<ANTHROPIC_API_KEY>` · `<SUPADATA_API_KEY>`.
-> **2. Recién ahí: `Videos a transcribir por corrida` → 0** en `/curar/ajustes` (dev-only). No
-> necesita re-import: `pick` resuelve ajustes > Config y el nodo hace `if (CAP > 0)`.
-> **3. Correr y mirar los logs de n8n:** que aparezca `[Traducir] Loop completo en …ms` y que **no**
-> aparezca `[Traducir] PRESUPUESTO agotado`. Si aparece con volumen normal, el techo pasó a ser
-> Anthropic y hay que subir `concurrencia_traducir` desde `Config` (sin re-import).
+> ### ✅ Pasos 1 y 2 HECHOS (2026-08-02)
+> **1. ✅ Motor re-importado y publicado** por Mani, con el commit `f0a0936` en `origin/main`
+> (Vercel deploya `main`, así que el cockpit con el borrado también está vivo).
+> **2. ✅ `Videos a transcribir por corrida` = 0.** Verificado **punta a punta**: la fachada
+> (`?ambito=motor`) lo sirve como `0` numérico, y el nodo hace `Number(cfg.cap_top_n || 0)` +
+> `if (CAP > 0)` ⇒ **techo desactivado**. ⚠️ *Este cambio se hizo por PostgREST, no por
+> `/curar/ajustes`, así que su evento en `app.eventos` tiene `usuario_id: null` y un `origen` que lo
+> dice. Es el único de la historia de ese knob sin autor; no lo leas como un hueco.*
+>
+> ### 🟠 Lo único que queda: LA CORRIDA (y es de Mani)
+> **3. Correr y mirar.** Va a ser **la corrida más grande que hubo** (el máximo histórico son 191
+> videos transcritos, y esta no tiene techo con un backlog de 100 días para drenar). Lo que hay que
+> mirar, en orden de qué te avisa antes:
+> · **Apify primero, no `runs`.** Si algo murió en el arranque, `runs` deja la fila en `en_curso`
+>   para siempre y parece lentitud. **Cero llamadas en Apify ⇒ murió antes de scrapear** (lo más
+>   probable: `<<DASHBOARD_URL>>` sin rellenar). Ese reflejo desempató la sesión del 02/08.
+> · **`[Traducir] Loop completo en …ms`** tiene que aparecer, y **`[Traducir] PRESUPUESTO agotado`**
+>   NO. Si aparece, el techo pasó a ser Anthropic: subí `concurrencia_traducir` en `Config` (sin
+>   re-import).
+> · **`[Transcribir] PRESUPUESTO agotado`** es el que duele: cada video ahí es un video **quemado**
+>   (ya está en `processed_items`, ver arriba). Si aparece, subí `concurrencia_transcribir`.
+> · **`ventana_corrida_min` está en 60** y la estimación de esta corrida es ~27 min. Si se pasa de
+>   60, el barredor la mata en vuelo y el guard deja arrancar otra en paralelo.
 > **4. Opcional, la palanca más barata que sigue sin usar:** `Resultados por cuenta de referente`
 > está en **40** y el cap de `Config` es **50**. Subirlo a 50 son 160 crudos más por corrida, gratis.
 >
