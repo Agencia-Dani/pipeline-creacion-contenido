@@ -22,6 +22,34 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🟣 **QUIÉN USA ESTO HOY, Y LA RESTRICCIÓN QUE IMPONE (Mani, 2026-08-02).** Lo que está live
+> —los 3 workflows y el cockpit— **es de Retia**. No hay diferenciador de empresa ni instancias
+> concurrentes: hay **un** cliente (`piloto`), **una** instancia y **5 usuarios**, todos con
+> `client_id = piloto`, y el que lo usa de verdad es **Jero** (`operador`, ya con su correo en el
+> auth de Supabase). Todo el refactor multi-tenant se hace **encima de un producto en uso**.
+>
+> **La restricción, dicha como restricción: Retia no se puede quedar sin acceso ni sin motor
+> mientras dure el refactor.** De lo que viene, tres cosas se lo pueden llevar puesto:
+> · **La Fase 3 le rompe los bookmarks** (`/curar/feed` ya no existe). Entrar por la raíz `/`
+>   sigue funcionando y es el camino a darle — resuelve su cockpit y su zona inicial.
+> · **La Fase 6 (RLS)** es la única que puede dejarlo afuera de verdad: hoy el BFF lee con
+>   `service_role` y ahí pasa a leer con su sesión. Es la fase que hay que probar con la cuenta de
+>   él, no con una de dev.
+> · **El `018` de ADR-051** mueve el acceso de `usuarios.client_id` a `usuarios_clientes`. **Si no
+>   backfillea las 5 filas de arriba, los 5 pierden el cockpit el día del deploy** — Jero incluido.
+>
+> 🟠 **Y la decisión de nombres, que tiene ventana corta: si el producto es de Retia, `piloto` debería
+> llamarse `retia`.** Desde la Fase 3, `clients.id` y `instances.slug` **van en la URL**
+> (`/piloto/short-form-content/curar/feed` hoy; `/retia/reels/curar/feed` si se renombra). Renombrar
+> el `slug` es un `update` de una fila; renombrar `clients.id` es FK desde 5 tablas. **Las dos cosas
+> son baratas AHORA y caras después del merge**, porque después ya hay links repartidos y romperlos
+> dos veces seguidas es lo que hace que la gente deje de confiar en el cockpit.
+>
+> 📌 **Alta de usuarios: sigue manual y Mani quiere cambiarlo.** ADR-051 lo dejó como deuda
+> consciente con disparador *"el primer usuario que no sea de la agencia"*. **Vale confirmar si ese
+> disparador ya se cumplió**: si Jero entra como gente de Retia y no como equipo de la agencia, el
+> alta manual (invite en Supabase + `insert` a mano en el SQL Editor) ya dejó de alcanzar.
+
 > 🔴 **REFACTOR MULTI-TENANT — FASES 0 a 4 EN LA RAMA. LA `016` YA ESTÁ EN PROD (2026-08-02).**
 > El código vive en `refactor/multi-tenant-fase-0-adrs` ([PR #3](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/3)).
 >
@@ -845,6 +873,8 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 >    · **dispatcher (3):** `<<DASHBOARD_URL>>` `<<WEBHOOK_URL_MOTOR>>` `<<WEBHOOK_URL_ARCHIVADO>>` — **URLs completas**, no paths
 >    ⚠️ **`<ANTHROPIC_API_KEY>` y `<SUPADATA_API_KEY>` muerden a mitad de corrida**, no al principio.
 > 3. **Apagar los crons viejos en n8n** (motor lunes 8am, archivado domingo 6pm). El repo ya no los tiene, pero n8n conserva lo importado: si quedan vivos, el piloto corre dos veces y una muere a mitad.
+>
+> > 🔑 **De dónde salen los valores del paso 2, para no inventarlos:** `<<WEBHOOK_PATH_ARCHIVADO>>` y su URL se generaron el 2026-08-02 y viven en el **`.env` de la raíz** (`ARCHIVADO_WEBHOOK_PATH` / `ARCHIVADO_WEBHOOK_URL`), 32 hex como los otros. **El header del archivado es EL MISMO que el del motor** (`MOTOR_WEBHOOK_HEADER_*`, credencial `Webhook Motor Header` en n8n): el dispatcher dispara los dos destinos desde **un solo nodo httpRequest**, que lleva una sola credencial. Separarlos obligaría a partir el dispatcher en dos ramas. *(El descubrimiento sí conserva su propio par: no lo dispara el dispatcher, lo dispara el botón.)*
 > 4. **Activar el dispatcher** recién después del paso 3.
 > 5. **Corrida de verificación** con el techo en 10 (la más barata). Reflejo de siempre: **`runs` no distingue "colgada" de "muerta", Apify sí** — cero llamadas ⇒ murió antes de scrapear, y el sospechoso #1 sigue siendo un placeholder sin rellenar.
 > 6. **Recién ahí la `017`**, que tiene gate de confirmación humana adentro. Y el techo vuelve a 250.
