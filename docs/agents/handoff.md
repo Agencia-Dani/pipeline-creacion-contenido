@@ -22,18 +22,27 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> 🔴 **REFACTOR MULTI-TENANT — FASES 0 a 4 EN LA RAMA, NADA EN PROD (2026-08-02).** Todo el código
-> vive en `refactor/multi-tenant-fase-0-adrs` ([PR #3](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/3)),
-> y de los pasos manuales el `@casper_smc` duplicado **ya está limpio**. Falta, en este orden:
-> **la `016` en el SQL Editor → el re-import de los 4 workflows → apagar los crons viejos → la
-> corrida de verificación → la `017`.** El checklist completo, con los placeholders por workflow
-> (ya no son 6 iguales para todos) y las trampas de cada paso, está en el **cierre 86** del log.
+> 🔴 **REFACTOR MULTI-TENANT — FASES 0 a 4 EN LA RAMA. LA `016` YA ESTÁ EN PROD (2026-08-02).**
+> El código vive en `refactor/multi-tenant-fase-0-adrs` ([PR #3](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/3)).
 >
-> ⚠️ **El orden entre la `016` y el deploy es un requisito, no una recomendación:** el BFF ya pide
-> `client_id`/`instance_id` y nombra los uniques nuevos en los `onConflict`. Contra una base sin la
-> `016` eso es columna inexistente y `42P10`. **Mergear el PR deploya**, así que la migración va
-> antes del merge. *(De paso: el preview de Vercel de esa rama está roto por lo mismo — no lo leas
-> como una regresión del código.)*
+> **✅ Hecho por Mani:** el `@casper_smc` duplicado (queda 1 fila) y **la `016` aplicada**.
+> Verificado contra la base, no de palabra: `clients.parent_id` · `instances.slug`/`nombre` ·
+> **10/10 tablas de `app` con su columna de tenant y CERO filas sin tenant** (usuarios 5 · voces 3 ·
+> proyectos 6 · referentes 16 · ajustes 18 · candidatos 152 · descartes 26 · propuestos 8 ·
+> eventos 38 · transcripciones 2) · `processed_items` y `outputs` sin nulos · `v_senal_seleccion`
+> exponiendo `instance_id`. El backfill cerró entero.
+>
+> **Falta, en este orden:** el re-import de los 4 workflows → apagar los crons viejos en n8n →
+> activar el dispatcher → la corrida de verificación → **recién ahí la `017`** (que tiene su propio
+> gate de confirmación humana adentro y NO hay que correr todavía). Checklist completo con los
+> placeholders por workflow —ya no son 6 iguales para todos— en el **cierre 86** del log.
+>
+> 🟠 **Y un arreglo de 1 minuto que conviene hacer ANTES de que el equipo marque bookmarks:** la
+> `016` dejó `instances.slug` y `nombre` en **`short-form-content`**, así que la URL del cockpit hoy
+> es `/piloto/short-form-content/curar/feed` y no el `/30x/reels/...` que el plan §6 promete. **Los
+> dos campos van en la URL** (Fase 3), así que renombrarlos después rompe los links otra vez. Es un
+> `update instances set slug = 'reels', nombre = 'Reels'` (y el `clients.id`, si `piloto` va a
+> llamarse `30x`, es más caro: es FK desde 5 tablas).
 
 > 🟡 **SACAR EL TECHO DE GASTO: CÓDIGO LISTO, FALTA EL RE-IMPORT (2026-08-02).** Mani pidió sacar
 > `cap_top_n` (los planes pagos de Apify/Supadata/Claude no llegan ni a la mitad del cupo y se
@@ -825,9 +834,7 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **Un detalle del contrato que no se parcheó:** el manifest v1 exige ≥1 `outputs` con `registered: pending|yes`, y **el dispatcher no produce nada** (ADR-050 §4: no registra, no escribe). Quedó declarado como `senal_de_corrida / pending`, que es lo más honesto que admite el contrato hoy, con el comentario puesto en el yaml. Es un hueco chico de `workflow-manifest.md`, no una decisión de diseño — si molesta, es una enmienda de una línea.
 
 > ### 📋 EL CHECKLIST DEL RE-IMPORT (es de Mani, y va en este orden)
-> **Precondición: la `016` tiene que estar aplicada.** Verificado el 2026-08-02: **no lo está** (`clients.parent_id` no existe). El `@casper_smc` duplicado **ya está limpio** (1 fila) y las 3 guardas de la `016` pasan (1 cliente `piloto`, 1 instancia).
->
-> 1. **`016` en el SQL Editor.** Antes que el deploy de Vercel de esta rama, no después.
+> 1. ✅ **`016` aplicada** por Mani el 2026-08-02, y verificada contra la base (el detalle, en §Pendiente vivo). El `@casper_smc` duplicado ya estaba limpio. **Con esto, el deploy de la rama dejó de estar bloqueado.**
 > 2. **Re-importar los 3 workflows + importar el dispatcher.** Placeholders, por workflow — `<<INSTANCE_ID>>` **ya no está en ninguno**:
 >    · **motor (5):** `<<DASHBOARD_URL>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_MOTOR>>` `<ANTHROPIC_API_KEY>`×3 `<SUPADATA_API_KEY>`
 >    · **archivado (7):** los 2 de siempre + `<<WEBHOOK_PATH_ARCHIVADO>>` **(nuevo)** + `<<GOOGLE_SHEET_ID>>` `<<NOMBRE_PESTANA_SHEET>>` `<<CREDENCIAL_GOOGLE_SHEETS>>` `<ANTHROPIC_API_KEY>`
