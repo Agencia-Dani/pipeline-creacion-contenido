@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { hayBusquedaViva } from "@/lib/descubrimiento";
 import { registrarEvento } from "@/lib/eventos";
 
@@ -17,7 +17,7 @@ export type ResultadoDisparo = { ok: boolean; mensaje: string };
 // el motor decide qué corre leyendo la config. El header vive solo acá (BFF,
 // único portador de secretos) y en n8n — jamás en el browser ni en git.
 export async function correrAhora(): Promise<ResultadoDisparo> {
-  const usuario = await exigirZona("operar");
+  const { usuario, ctx } = await exigirTenant("operar");
 
   const url = process.env.MOTOR_WEBHOOK_URL;
   const nombre = process.env.MOTOR_WEBHOOK_HEADER_NOMBRE;
@@ -64,7 +64,7 @@ export async function correrAhora(): Promise<ResultadoDisparo> {
 // botón. Misma forma que el ▶ del motor: señal desnuda, sin payload, el header solo acá y en n8n.
 
 export async function buscarAhora(): Promise<ResultadoDisparo> {
-  const usuario = await exigirZona("operar");
+  const { usuario, ctx } = await exigirTenant("operar");
 
   const url = process.env.DESCUBRIMIENTO_WEBHOOK_URL;
   const nombre = process.env.DESCUBRIMIENTO_WEBHOOK_HEADER_NOMBRE;
@@ -75,7 +75,7 @@ export async function buscarAhora(): Promise<ResultadoDisparo> {
 
   // Preguntar antes de disparar: dos clicks son dos corridas de Apify pagas. Acá alcanza con esto
   // y no con el guard single-flight del motor porque hay un solo camino de entrada (este botón).
-  if (await hayBusquedaViva()) {
+  if (await hayBusquedaViva(ctx)) {
     return { ok: false, mensaje: "Ya hay una búsqueda corriendo. Esperá a que termine (tarda unos minutos)." };
   }
 
@@ -90,7 +90,7 @@ export async function buscarAhora(): Promise<ResultadoDisparo> {
     return { ok: false, mensaje: "No se pudo llegar al buscador. ¿n8n está caído? Avisale a un dev." };
   }
 
-  await registrarEvento(usuario.id, "sugeridos.buscar", {});
+  await registrarEvento(ctx, usuario.id, "sugeridos.buscar", {});
   // Las dos, porque el botón vive en las dos pantallas: se dispara desde Operar y el resultado
   // se mira en Sugeridos.
   revalidatePath("/operar");

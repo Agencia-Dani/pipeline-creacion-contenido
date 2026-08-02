@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { haceCuanto } from "@/domain/corrida";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerTranscripciones, type Transcripcion } from "@/lib/transcripciones";
 import { Copiar } from "./copiar";
 import { PegarEnlaces } from "./pegar-enlaces";
@@ -37,9 +37,9 @@ const BADGE_POR_ESTADO: Record<
 };
 
 export default async function TranscribirPage() {
-  await exigirZona("transcribir");
+  const { ctx } = await exigirTenant("transcribir");
 
-  const lista = await leerTranscripciones().catch((e) => {
+  const lista = await leerTranscripciones(ctx).catch((e) => {
     console.error("[transcribir] no se pudo leer la lista:", e);
     return null;
   });

@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CATALOGO, ajustesVisibles } from "@/domain/ajustes";
 import { leerAjustes } from "@/lib/ajustes";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { Knob } from "./knob";
 
 // La pantalla de Ajustes: el primer dominio que se corta de Airtable (D5). Postgres es el
@@ -38,8 +38,8 @@ const AVANZADO = {
 };
 
 export default async function AjustesPage() {
-  const usuario = await exigirZona("curar");
-  const filas = ajustesVisibles(await leerAjustes(), usuario.rol);
+  const { usuario, ctx } = await exigirTenant("curar");
+  const filas = ajustesVisibles(await leerAjustes(ctx), usuario.rol);
 
   // Un operador nunca recibe filas `dev` (lo filtra `ajustesVisibles`), así que para él este
   // reparto deja `deDev` vacío y el bloque de abajo no se renderiza.

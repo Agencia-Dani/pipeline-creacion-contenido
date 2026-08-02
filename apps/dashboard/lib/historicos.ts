@@ -1,5 +1,7 @@
+import { z } from "zod";
 import { esCalificacion, type Calificacion } from "@/domain/feed";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { TenantContext } from "@/domain/tenant";
+import { scoped } from "@/lib/supabase/scoped";
 
 // Todo lo aprobado, de todas las semanas. A diferencia del feed, esto **no** sale de Airtable:
 // el archivado archiva lo calificado a `outputs` y después borra el record, así que en Airtable
@@ -35,6 +37,18 @@ export type Historico = {
 const texto = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
 const numero = (v: unknown): number | null => (typeof v === "number" ? v : null);
 
+// La fila cruda de `outputs`. Antes se leía sin esquema porque el cliente tipado devolvía `any`;
+// con `scoped` el builder ya no infiere la forma, así que se declara — que es lo que hace el resto
+// de `lib/` igual. `metadata` queda como bolsa a propósito: su contenido lo escribe el motor y se
+// interpreta abajo con `texto`/`numero`, tolerando lo que falte.
+const filaOutput = z.object({
+  id: z.string(),
+  titulo: z.string().nullable(),
+  contenido_o_link: z.string().nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
+  calificado_en: z.string().nullable(),
+});
+
 /**
  * Una página de aprobados, de a `POR_PAGINA`. Devuelve también si queda más, para que el botón
  * "Cargar más" exista solo cuando sirve.
@@ -44,14 +58,13 @@ const numero = (v: unknown): number | null => (typeof v === "number" ? v : null)
  * mismo `calificado_en` pueden repetirse o saltearse entre páginas.
  */
 export async function leerAprobados(
+  ctx: TenantContext,
   pagina: number,
 ): Promise<{ filas: Historico[]; hayMas: boolean; total: number }> {
   const desde = pagina * POR_PAGINA;
-  const supabase = createAdminClient();
 
-  const { data, error, count } = await supabase
-    .from("outputs")
-    .select("id, titulo, contenido_o_link, metadata, calificado_en", { count: "exact" })
+  const { data, error, count } = await scoped(ctx)
+    .select("public.outputs", "id, titulo, contenido_o_link, metadata, calificado_en", { count: "exact" })
     .eq("estado", "aprobado")
     .order("calificado_en", { ascending: false })
     .order("id", { ascending: true })
@@ -59,10 +72,10 @@ export async function leerAprobados(
 
   if (error) throw new Error(`Supabase respondió con error leyendo el histórico: ${error.message}`);
 
-  const filas = (data ?? []).map((row) => {
-    const m = (row.metadata ?? {}) as Record<string, unknown>;
+  const filas = z.array(filaOutput).parse(data ?? []).map((row) => {
+    const m = row.metadata ?? {};
     return {
-      id: row.id as string,
+      id: row.id,
       titulo: texto(row.titulo) ?? "(sin título)",
       script: texto(row.contenido_o_link),
       proyecto: texto(m.proyecto),

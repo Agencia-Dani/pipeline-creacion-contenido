@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerProyectos } from "@/lib/proyectos";
 import {
   leerAuditoria,
@@ -20,19 +20,19 @@ import { Actividad, Auditoria, Calidad, Costos, Descubrimiento, Embudo, ErrorLec
 export const dynamic = "force-dynamic";
 
 export default async function EntenderPage() {
-  const usuario = await exigirZona("entender");
+  const { usuario, ctx } = await exigirTenant("entender");
   const esDev = usuario.rol === "dev";
 
   // `allSettled` y no `all`: una vista que falle apaga su tarjeta, no la página entera.
   const [calidad, embudo, auditoria, descubrimiento, costos, eventos, proyectos] =
     await Promise.allSettled([
-      leerCalidad(),
-      leerEmbudo(),
-      leerAuditoria(),
-      leerDescubrimiento(),
-      leerCostos(),
-      esDev ? leerEventos() : Promise.resolve([]),
-      leerProyectos(),
+      leerCalidad(ctx),
+      leerEmbudo(ctx),
+      leerAuditoria(ctx),
+      leerDescubrimiento(ctx),
+      leerCostos(ctx),
+      esDev ? leerEventos(ctx) : Promise.resolve([]),
+      leerProyectos(ctx),
     ]);
 
   // Si no se pueden leer los proyectos, la card cae a mostrar solo los que tienen datos (el

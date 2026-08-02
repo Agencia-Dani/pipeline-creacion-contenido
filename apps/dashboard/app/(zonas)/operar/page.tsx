@@ -26,7 +26,7 @@ import {
   type VistaOperar,
 } from "@/domain/corrida";
 import { leerConfigOperar } from "@/lib/config";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { cuentasPorProyecto } from "@/lib/referentes";
 import { ultimasCorridasMotor } from "@/lib/runs";
 import { leerPendientes } from "@/lib/sugeridos";
@@ -143,14 +143,14 @@ function FilaProyecto({ p }: { p: ProyectoDelPlan }) {
 }
 
 export default async function OperarPage() {
-  await exigirZona("operar");
+  const { ctx } = await exigirTenant("operar");
 
   // Cada parte falla sola: si no se puede leer la config igual se ven las corridas, y al revés.
   const [config, corridas, cuentas, propuestas] = await Promise.allSettled([
-    leerConfigOperar(),
-    ultimasCorridasMotor(),
-    cuentasPorProyecto(),
-    leerPendientes(),
+    leerConfigOperar(ctx),
+    ultimasCorridasMotor(ctx),
+    cuentasPorProyecto(ctx),
+    leerPendientes(ctx),
   ]);
 
   const runs = corridas.status === "fulfilled" ? corridas.value : null;

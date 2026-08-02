@@ -1,9 +1,10 @@
 "use server";
 
+import type { TenantContext } from "@/domain/tenant";
 import { revalidatePath } from "next/cache";
 import { motivoParaNoBorrar } from "@/domain/borrado";
 import { validarProyecto, validarVoz } from "@/domain/proyectos";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import {
   actualizarProyecto,
@@ -39,17 +40,17 @@ export type FormProyecto = {
 // La autoridad está en el servidor (plan-cockpit §3.2): la lista de voces se vuelve a leer acá
 // y se valida contra ella, porque un POST a mano no tiene por qué respetar lo que el `<select>`
 // ofrecía.
-const vocesValidas = async () => new Set((await leerVoces()).map((v) => v.id));
+const vocesValidas = async (ctx: TenantContext) => new Set((await leerVoces(ctx)).map((v) => v.id));
 
 export async function guardarVoz(id: string, form: FormVoz): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   const validacion = validarVoz(form);
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
 
   let anterior;
   try {
-    anterior = (await leerVoces()).find((v) => v.id === id);
+    anterior = (await leerVoces(ctx)).find((v) => v.id === id);
   } catch (e) {
     console.error("[voces] no se pudieron leer las voces:", e);
     return { ok: false, mensaje: "No se pudo leer. Probá de nuevo." };
@@ -57,7 +58,7 @@ export async function guardarVoz(id: string, form: FormVoz): Promise<Resultado> 
   if (!anterior) return { ok: false, mensaje: "Esa voz ya no existe. Recargá la página." };
 
   try {
-    await actualizarVoz(id, validacion.valor);
+    await actualizarVoz(ctx, id, validacion.valor);
   } catch (e) {
     console.error(`[voces] falló guardar ${id}:`, e);
     return { ok: false, mensaje: "No se pudo guardar. Probá de nuevo; si sigue, avisale a un dev." };
@@ -66,7 +67,7 @@ export async function guardarVoz(id: string, form: FormVoz): Promise<Resultado> 
   // Apagar una voz apaga TODOS sus proyectos sin tocarlos: es el cambio de config con más
   // alcance que puede hacer alguien, y sin esto no hay forma de reconstruir por qué una corrida
   // entregó de golpe la mitad.
-  await registrarEvento(usuario.id, "voces.editar", {
+  await registrarEvento(ctx, usuario.id, "voces.editar", {
     id,
     anterior: { nombre: anterior.nombre, activo: anterior.activo },
     nuevo: validacion.valor,
@@ -84,14 +85,14 @@ export async function guardarVoz(id: string, form: FormVoz): Promise<Resultado> 
 }
 
 export async function crearVozNueva(form: FormVoz): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   const validacion = validarVoz(form);
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
 
   try {
-    const id = await crearVoz(validacion.valor);
-    await registrarEvento(usuario.id, "voces.crear", { id, ...validacion.valor });
+    const id = await crearVoz(ctx, validacion.valor);
+    await registrarEvento(ctx, usuario.id, "voces.crear", { id, ...validacion.valor });
   } catch (e) {
     console.error("[voces] falló crear:", e);
     return { ok: false, mensaje: "No se pudo crear. Probá de nuevo; si sigue, avisale a un dev." };
@@ -102,14 +103,14 @@ export async function crearVozNueva(form: FormVoz): Promise<Resultado> {
 }
 
 export async function guardarProyecto(id: string, form: FormProyecto): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
-  const validacion = validarProyecto(form, await vocesValidas());
+  const validacion = validarProyecto(form, await vocesValidas(ctx));
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
 
   let anterior;
   try {
-    anterior = (await leerProyectos()).find((p) => p.id === id);
+    anterior = (await leerProyectos(ctx)).find((p) => p.id === id);
   } catch (e) {
     console.error("[proyectos] no se pudieron leer los proyectos:", e);
     return { ok: false, mensaje: "No se pudo leer. Probá de nuevo." };
@@ -117,7 +118,7 @@ export async function guardarProyecto(id: string, form: FormProyecto): Promise<R
   if (!anterior) return { ok: false, mensaje: "Ese proyecto ya no existe. Recargá la página." };
 
   try {
-    await actualizarProyecto(id, validacion.valor);
+    await actualizarProyecto(ctx, id, validacion.valor);
   } catch (e) {
     console.error(`[proyectos] falló guardar ${id}:`, e);
     return { ok: false, mensaje: "No se pudo guardar. Probá de nuevo; si sigue, avisale a un dev." };
@@ -125,7 +126,7 @@ export async function guardarProyecto(id: string, form: FormProyecto): Promise<R
 
   // Los criterios son el prompt del gate: cambiarlos cambia qué se aprueba, y la explicación de
   // "por qué esta semana entró otra cosa" vive acá o en ningún lado.
-  await registrarEvento(usuario.id, "proyectos.editar", {
+  await registrarEvento(ctx, usuario.id, "proyectos.editar", {
     id,
     anterior: {
       nombre: anterior.nombre,
@@ -142,14 +143,14 @@ export async function guardarProyecto(id: string, form: FormProyecto): Promise<R
 }
 
 export async function crearProyectoNuevo(form: FormProyecto): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
-  const validacion = validarProyecto(form, await vocesValidas());
+  const validacion = validarProyecto(form, await vocesValidas(ctx));
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
 
   try {
-    const id = await crearProyecto(validacion.valor);
-    await registrarEvento(usuario.id, "proyectos.crear", { id, ...validacion.valor });
+    const id = await crearProyecto(ctx, validacion.valor);
+    await registrarEvento(ctx, usuario.id, "proyectos.crear", { id, ...validacion.valor });
   } catch (e) {
     console.error("[proyectos] falló crear:", e);
     return { ok: false, mensaje: "No se pudo crear. Probá de nuevo; si sigue, avisale a un dev." };
@@ -167,11 +168,11 @@ export async function crearProyectoNuevo(form: FormProyecto): Promise<Resultado>
 // pero mucho menos grave que un borrado sin rastro. Mismo criterio que `sugeridos/actions.ts`.
 
 export async function borrarProyecto(id: string): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   let proyecto;
   try {
-    proyecto = (await leerProyectos()).find((p) => p.id === id);
+    proyecto = (await leerProyectos(ctx)).find((p) => p.id === id);
   } catch (e) {
     console.error("[proyectos] no se pudieron leer los proyectos:", e);
     return { ok: false, mensaje: "No se pudo leer. Probá de nuevo." };
@@ -180,14 +181,14 @@ export async function borrarProyecto(id: string): Promise<Resultado> {
 
   let motivo;
   try {
-    motivo = motivoParaNoBorrar(proyecto.nombre, await dependenciasDeProyecto(id));
+    motivo = motivoParaNoBorrar(proyecto.nombre, await dependenciasDeProyecto(ctx, id));
   } catch (e) {
     console.error(`[proyectos] no se pudo contar lo que cuelga de ${id}:`, e);
     return { ok: false, mensaje: "No se pudo comprobar si hay historia colgando. Probá de nuevo." };
   }
   if (motivo) return { ok: false, mensaje: motivo };
 
-  await registrarEvento(usuario.id, "proyectos.borrar", {
+  await registrarEvento(ctx, usuario.id, "proyectos.borrar", {
     id,
     nombre: proyecto.nombre,
     voz_id: proyecto.voz_id,
@@ -196,7 +197,7 @@ export async function borrarProyecto(id: string): Promise<Resultado> {
   });
 
   try {
-    await borrarProyectoDeLaBase(id);
+    await borrarProyectoDeLaBase(ctx, id);
   } catch (e) {
     console.error(`[proyectos] falló borrar ${id}:`, e);
     return { ok: false, mensaje: e instanceof Error ? e.message : "No se pudo borrar. Probá de nuevo." };
@@ -214,11 +215,11 @@ export async function borrarProyecto(id: string): Promise<Resultado> {
 }
 
 export async function borrarVoz(id: string): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   let voz;
   try {
-    voz = (await leerVoces()).find((v) => v.id === id);
+    voz = (await leerVoces(ctx)).find((v) => v.id === id);
   } catch (e) {
     console.error("[voces] no se pudieron leer las voces:", e);
     return { ok: false, mensaje: "No se pudo leer. Probá de nuevo." };
@@ -227,21 +228,21 @@ export async function borrarVoz(id: string): Promise<Resultado> {
 
   let motivo;
   try {
-    motivo = motivoParaNoBorrar(voz.nombre, await dependenciasDeVoz(id));
+    motivo = motivoParaNoBorrar(voz.nombre, await dependenciasDeVoz(ctx, id));
   } catch (e) {
     console.error(`[voces] no se pudo contar lo que cuelga de ${id}:`, e);
     return { ok: false, mensaje: "No se pudo comprobar si hay historia colgando. Probá de nuevo." };
   }
   if (motivo) return { ok: false, mensaje: motivo };
 
-  await registrarEvento(usuario.id, "voces.borrar", {
+  await registrarEvento(ctx, usuario.id, "voces.borrar", {
     id,
     nombre: voz.nombre,
     criterios_relevancia: voz.criterios_relevancia,
   });
 
   try {
-    await borrarVozDeLaBase(id);
+    await borrarVozDeLaBase(ctx, id);
   } catch (e) {
     console.error(`[voces] falló borrar ${id}:`, e);
     return { ok: false, mensaje: e instanceof Error ? e.message : "No se pudo borrar. Probá de nuevo." };

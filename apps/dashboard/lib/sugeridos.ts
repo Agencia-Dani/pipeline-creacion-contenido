@@ -1,6 +1,7 @@
 import { z } from "zod";
+import type { TenantContext } from "@/domain/tenant";
 import { diaISO } from "@/lib/fechas";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { scoped } from "@/lib/supabase/scoped";
 
 // La bandeja del descubrimiento (ADR-020). Desde D7 vive en Postgres: la escribe el buscador de
 // cuentas por PostgREST (ADR-035) y la resuelve la app.
@@ -48,12 +49,9 @@ const COLUMNAS =
   "referentes_propuestos_proyectos(proyecto_id)";
 
 /** Solo las pendientes: la bandeja muestra lo que hay que decidir, no el archivo. */
-export async function leerPendientes(): Promise<Sugerido[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("referentes_propuestos")
-    .select(COLUMNAS)
+export async function leerPendientes(ctx: TenantContext): Promise<Sugerido[]> {
+  const { data, error } = await scoped(ctx)
+    .select("app.referentes_propuestos", COLUMNAS)
     .eq("estado", "propuesto");
   if (error) throw new Error(`Supabase respondió con error leyendo las propuestas: ${error.message}`);
 
@@ -73,12 +71,13 @@ export async function leerPendientes(): Promise<Sugerido[]> {
     .sort((a, b) => (b.afinidad ?? 0) - (a.afinidad ?? 0));
 }
 
-export async function marcarResuelto(id: string, estado: "promovido" | "descartado"): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("referentes_propuestos")
-    .update({ estado })
+export async function marcarResuelto(
+  ctx: TenantContext,
+  id: string,
+  estado: "promovido" | "descartado",
+): Promise<void> {
+  const { data, error } = await scoped(ctx)
+    .update("app.referentes_propuestos", { estado })
     .eq("id", id)
     .select("id");
   if (error) throw new Error(`Supabase respondió con error cerrando la propuesta: ${error.message}`);

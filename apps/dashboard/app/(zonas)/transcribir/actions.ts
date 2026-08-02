@@ -1,9 +1,10 @@
 "use server";
 
+import type { TenantContext } from "@/domain/tenant";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { parsearEnlaces } from "@/domain/enlace";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import { transcribir, traducir } from "@/lib/transcribir";
 import {
@@ -22,7 +23,7 @@ export type ResultadoPegar = { ok: boolean; mensaje: string };
 const textoPegado = z.string().trim().min(1).max(20_000);
 
 export async function pegarEnlaces(texto: string): Promise<ResultadoPegar> {
-  const usuario = await exigirZona("transcribir");
+  const { usuario, ctx } = await exigirTenant("transcribir");
 
   const parseo = textoPegado.safeParse(texto);
   if (!parseo.success) {
@@ -41,13 +42,13 @@ export async function pegarEnlaces(texto: string): Promise<ResultadoPegar> {
 
   let encolados;
   try {
-    encolados = await encolarEnlaces(validos, usuario.id);
+    encolados = await encolarEnlaces(ctx, validos, usuario.id);
   } catch (e) {
     console.error("[transcribir] falló el encolado:", e);
     return { ok: false, mensaje: "No se pudo guardar la lista. Probá de nuevo; si sigue, avisale a un dev." };
   }
 
-  await registrarEvento(usuario.id, "transcribir.pegar", {
+  await registrarEvento(ctx, usuario.id, "transcribir.pegar", {
     detectados: validos.length,
     nuevos: encolados.nuevos,
     ya_estaban: encolados.yaEstaban,
@@ -74,11 +75,11 @@ const LOTE = 64;
 export type ResultadoProcesar = { procesados: number; quedan: number };
 
 export async function procesarPendientes(): Promise<ResultadoProcesar> {
-  await exigirZona("transcribir");
+  const { ctx } = await exigirTenant("transcribir");
 
   // Nota: dos personas procesando a la vez pueden agarrar el mismo enlace y pagarlo dos veces
   // (~USD 0.014). No vale un estado 'procesando' para eso: los writes ya son idempotentes.
-  const pendientes = await tomarPendientes(LOTE);
+  const pendientes = await tomarPendientes(ctx, LOTE);
   if (pendientes.length === 0) return { procesados: 0, quedan: 0 };
 
   const inicio = Date.now();
@@ -89,7 +90,7 @@ export async function procesarPendientes(): Promise<ResultadoProcesar> {
     while (Date.now() - inicio < PRESUPUESTO_MS) {
       const i = siguiente++;
       if (i >= pendientes.length) return;
-      await procesarUno(pendientes[i]);
+      await procesarUno(ctx, pendientes[i]);
       procesados++;
     }
   };
@@ -99,17 +100,17 @@ export async function procesarPendientes(): Promise<ResultadoProcesar> {
   );
 
   revalidatePath("/transcribir");
-  return { procesados, quedan: await contarPendientes() };
+  return { procesados, quedan: await contarPendientes(ctx) };
 }
 
-async function procesarUno(fila: Transcripcion): Promise<void> {
+async function procesarUno(ctx: TenantContext, fila: Transcripcion): Promise<void> {
   try {
     const { texto, idioma } = await transcribir(fila.url);
 
     if (!texto) {
       // Sin voz o Supadata no pudo. No entra al dedup (decisión de Mani): si el motor lo trae
       // después, el gate lo descarta duro por sin_guion igual (ADR-030).
-      await marcarResultado(fila.id, {
+      await marcarResultado(ctx, fila.id, {
         estado: "sin_transcript",
         error: "El video no tiene voz o no se pudo transcribir.",
       });
@@ -119,10 +120,10 @@ async function procesarUno(fila: Transcripcion): Promise<void> {
     // Script literal (ADR-009): el transcript tal cual, traducido solo si no venía en español.
     const script = idioma === "es" ? texto : await traducir(texto);
 
-    await marcarResultado(fila.id, { estado: "listo", script, idioma: idioma || "es" });
+    await marcarResultado(ctx, fila.id, { estado: "listo", script, idioma: idioma || "es" });
 
     // Recién acá, con el script en la mano, el enlace entra a la memoria del dedup.
-    await registrarEnDedup({
+    await registrarEnDedup(ctx, {
       plataforma: fila.plataforma,
       external_id: fila.external_id,
       url: fila.url,
@@ -130,6 +131,6 @@ async function procesarUno(fila: Transcripcion): Promise<void> {
   } catch (e) {
     const mensaje = e instanceof Error ? e.message : String(e);
     console.error(`[transcribir] falló ${fila.url}:`, mensaje);
-    await marcarResultado(fila.id, { estado: "fallo", error: mensaje }).catch(() => {});
+    await marcarResultado(ctx, fila.id, { estado: "fallo", error: mensaje }).catch(() => {});
   }
 }

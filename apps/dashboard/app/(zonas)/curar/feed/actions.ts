@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { esCalificacion, estadoDe } from "@/domain/feed";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { calificar, guardarNotas } from "@/lib/candidatos";
 import { registrarEvento } from "@/lib/eventos";
 
@@ -18,15 +18,15 @@ export type Resultado = { ok: boolean; mensaje: string };
 // está escrita.
 
 export async function calificarCandidato(id: string, calificacion: string): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   if (!esCalificacion(calificacion)) {
     return { ok: false, mensaje: "Esa calificación no existe." };
   }
 
   try {
-    await calificar(id, calificacion);
-    await registrarEvento(usuario.id, "candidatos.calificar", {
+    await calificar(ctx, id, calificacion);
+    await registrarEvento(ctx, usuario.id, "candidatos.calificar", {
       candidato: id,
       calificacion,
       estado: estadoDe(calificacion),
@@ -44,7 +44,7 @@ export async function calificarCandidato(id: string, calificacion: string): Prom
  * ("buen video, pero no ahora"). Sobreviven al archivado en `outputs.metadata`.
  */
 export async function guardarNotasCandidato(id: string, notas: string): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   const limpias = notas.trim();
   if (limpias.length > 2000) {
@@ -52,8 +52,8 @@ export async function guardarNotasCandidato(id: string, notas: string): Promise<
   }
 
   try {
-    await guardarNotas(id, limpias);
-    await registrarEvento(usuario.id, "candidatos.notas", { candidato: id, largo: limpias.length });
+    await guardarNotas(ctx, id, limpias);
+    await registrarEvento(ctx, usuario.id, "candidatos.notas", { candidato: id, largo: limpias.length });
   } catch (e) {
     console.error(`[feed] falló guardar notas de ${id}:`, e);
     return { ok: false, mensaje: "No se pudo guardar la nota. Probá de nuevo." };

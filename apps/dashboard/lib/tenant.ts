@@ -1,0 +1,130 @@
+import { z } from "zod";
+import {
+  armarContexto,
+  instanciasVisibles,
+  visiblesDesde,
+  type InstanciaVisible,
+  type NodoCliente,
+  type TenantContext,
+} from "@/domain/tenant";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+// De dónde sale el `TenantContext`. Es el ÚNICO archivo que lee el registro de tenants
+// (`clients`, `instances`) sin scopear, y tiene que serlo: scopear la tabla con la que se resuelve
+// el scope sería circular. Por eso esas tres tablas no están en el mapa de `scoped.ts`.
+//
+// ⚠️ **Lo que cambia en la Fase 3 es UNA función, no el modelo.** Hoy `resolverContexto` cae al
+// único cockpit del usuario porque las rutas todavía no tienen `[cliente]/[pipeline]`. Cuando la
+// Fase 3 los agregue, el `layout.tsx` va a llamar a esta misma función con los dos segmentos y el
+// resto del código no se entera. La forma del contexto ya es la definitiva.
+
+const filaCliente = z.object({ id: z.string(), parent_id: z.string().nullable() });
+const filaInstancia = z.object({
+  id: z.string(),
+  client_id: z.string(),
+  workflow_id: z.string(),
+  slug: z.string(),
+  nombre: z.string().nullable(),
+});
+
+export type Instancia = InstanciaVisible & {
+  workflowId: string;
+  slug: string;
+  nombre: string | null;
+};
+
+/** El árbol entero. Es chico (una fila por empresa) y la regla de visibilidad lo necesita completo. */
+async function leerArbolClientes(): Promise<NodoCliente[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.from("clients").select("id, parent_id");
+  if (error) throw new Error(`Supabase respondió con error leyendo clientes: ${error.message}`);
+  return z.array(filaCliente).parse(data).map((c) => ({ id: c.id, parentId: c.parent_id }));
+}
+
+/** Las instancias activas. Una instancia = un cockpit = (empresa × pipeline). */
+export async function leerInstancias(): Promise<Instancia[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("instances")
+    .select("id, client_id, workflow_id, slug, nombre")
+    .eq("estado", "active")
+    .order("client_id")
+    .order("slug");
+  if (error) throw new Error(`Supabase respondió con error leyendo instancias: ${error.message}`);
+  return z.array(filaInstancia).parse(data).map((i) => ({
+    id: i.id,
+    clientId: i.client_id,
+    workflowId: i.workflow_id,
+    slug: i.slug,
+    nombre: i.nombre,
+  }));
+}
+
+/**
+ * El contexto de un usuario para el cockpit que está mirando.
+ *
+ * `cliente` y `pipeline` son los segmentos de la URL de la Fase 3. Mientras no existan, se cae al
+ * único cockpit visible — que hoy es literalmente uno.
+ *
+ * Devuelve `null` si el usuario no puede ver eso: no distingue "no existe" de "no es tuyo", **a
+ * propósito**. Decirle a alguien que el cliente `estadox` existe pero no es suyo ya es filtrar algo.
+ * Qué hacer con el `null` lo decide el llamador: `redirect` en una página, 403 en la fachada.
+ */
+export async function resolverContexto(
+  usuario: { clientId: string },
+  cliente?: string,
+  pipeline?: string,
+): Promise<TenantContext | null> {
+  const [clientes, instancias] = await Promise.all([leerArbolClientes(), leerInstancias()]);
+  const visibles = visiblesDesde(usuario.clientId, clientes);
+  const suyas = instancias.filter((i) => visibles.includes(i.clientId));
+
+  const elegida =
+    cliente !== undefined || pipeline !== undefined
+      ? suyas.find((i) => (cliente === undefined || i.clientId === cliente) && (pipeline === undefined || i.slug === pipeline))
+      : // Sin segmentos en la URL (pre-Fase 3): el cockpit del propio cliente, y si no hay, el primero
+        // visible. `leerInstancias` viene ordenado, así que la elección es estable entre requests —
+        // un default que cambia de request en request sería un bug de caché esperando.
+        (suyas.find((i) => i.clientId === usuario.clientId) ?? suyas[0]);
+
+  if (!elegida) return null;
+  return armarContexto(usuario.clientId, elegida, clientes);
+}
+
+/** Las instancias que este usuario puede abrir: lo que alimenta el selector de la Fase 3. */
+export async function cockpitsDe(ctx: TenantContext): Promise<Instancia[]> {
+  return instanciasVisibles(ctx, await leerInstancias());
+}
+
+/** Lo que puede salir mal al resolver el tenant de la fachada. Cada caso tiene su status. */
+export type ResultadoFachada =
+  | { ok: true; ctx: TenantContext }
+  | { ok: false; motivo: "instancia_desconocida" | "instancia_ambigua" };
+
+/**
+ * El contexto de la fachada de ADR-028. **No hay usuario acá**: el motor se autentica con el header
+ * compartido, así que la autoridad no es una sesión sino la instancia que dice ser.
+ *
+ * `visibles` queda en `[clientId]` a secas, sin bajar por el árbol: un workflow corre para UNA
+ * instancia y su config es la de esa empresa. Que el humano de Retia vea a sus clientes no
+ * significa que el motor de Retia deba traerse los referentes de ellos.
+ *
+ * 🔜 **Fase 4 (ADR-048):** `instancia` pasa a ser un parámetro OBLIGATORIO y el contrato sube a
+ * `version: 2`. Hoy es opcional y, si no viene, cae a la única instancia activa — con dos, esto
+ * responde `instancia_ambigua` en vez de adivinar, que es el fail-closed de ADR-028 §4 aplicado a
+ * lo que sabemos hoy: *"una corrida sin config entrega ruido; no entregar es mejor"*, y una corrida
+ * con la config de OTRA empresa es peor que ruido.
+ */
+export async function contextoDeFachada(instanciaPedida?: string): Promise<ResultadoFachada> {
+  const instancias = await leerInstancias();
+
+  if (instanciaPedida) {
+    const elegida = instancias.find((i) => i.id === instanciaPedida);
+    if (!elegida) return { ok: false, motivo: "instancia_desconocida" };
+    return { ok: true, ctx: { clientId: elegida.clientId, visibles: [elegida.clientId], instanceId: elegida.id } };
+  }
+
+  if (instancias.length !== 1) return { ok: false, motivo: "instancia_ambigua" };
+  const unica = instancias[0];
+  return { ok: true, ctx: { clientId: unica.clientId, visibles: [unica.clientId], instanceId: unica.id } };
+}

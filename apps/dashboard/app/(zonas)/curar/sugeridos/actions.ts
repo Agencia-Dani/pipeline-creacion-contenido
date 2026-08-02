@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { esPlataforma, validarReferente } from "@/domain/referentes";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import { buscarPorHandle, crearReferente, leerProyectos } from "@/lib/referentes";
 import { leerPendientes, marcarResuelto, notaDePromocion } from "@/lib/sugeridos";
@@ -20,18 +20,18 @@ export type Resultado = { ok: boolean; mensaje: string };
 // sin dejar rastro.
 
 export async function aprobar(id: string, proyectoIds: string[]): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   let sugerido;
   try {
-    sugerido = (await leerPendientes()).find((s) => s.id === id);
+    sugerido = (await leerPendientes(ctx)).find((s) => s.id === id);
   } catch (e) {
     console.error("[sugeridos] no se pudo leer la bandeja:", e);
     return { ok: false, mensaje: "No se pudo leer las propuestas. Probá de nuevo." };
   }
   if (!sugerido) return { ok: false, mensaje: "Esa propuesta ya no está pendiente. Recargá la página." };
 
-  const proyectos = await leerProyectos();
+  const proyectos = await leerProyectos(ctx);
   const validacion = validarReferente(
     {
       handle: sugerido.handle,
@@ -45,17 +45,17 @@ export async function aprobar(id: string, proyectoIds: string[]): Promise<Result
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
 
   try {
-    const repetido = await buscarPorHandle(validacion.valor.handle, validacion.valor.plataforma);
+    const repetido = await buscarPorHandle(ctx, validacion.valor.handle, validacion.valor.plataforma);
     if (repetido) {
       // Ya estaba: se cierra la propuesta igual, si no vuelve a aparecer todas las semanas.
-      await marcarResuelto(id, "promovido");
+      await marcarResuelto(ctx, id, "promovido");
       revalidatePath("/curar/sugeridos");
       return { ok: true, mensaje: `${repetido.handle} ya estaba en el banco. La propuesta se cerró.` };
     }
 
-    const referenteId = await crearReferente(validacion.valor);
-    await marcarResuelto(id, "promovido");
-    await registrarEvento(usuario.id, "sugeridos.aprobar", {
+    const referenteId = await crearReferente(ctx, validacion.valor);
+    await marcarResuelto(ctx, id, "promovido");
+    await registrarEvento(ctx, usuario.id, "sugeridos.aprobar", {
       propuesta: id,
       referenteId,
       handle: validacion.valor.handle,
@@ -73,11 +73,11 @@ export async function aprobar(id: string, proyectoIds: string[]): Promise<Result
 }
 
 export async function descartar(id: string): Promise<Resultado> {
-  const usuario = await exigirZona("curar");
+  const { usuario, ctx } = await exigirTenant("curar");
 
   try {
-    await marcarResuelto(id, "descartado");
-    await registrarEvento(usuario.id, "sugeridos.descartar", { propuesta: id });
+    await marcarResuelto(ctx, id, "descartado");
+    await registrarEvento(ctx, usuario.id, "sugeridos.descartar", { propuesta: id });
   } catch (e) {
     console.error(`[sugeridos] falló descartar ${id}:`, e);
     return { ok: false, mensaje: "No se pudo descartar. Probá de nuevo." };

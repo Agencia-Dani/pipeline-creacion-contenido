@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BotonBuscar } from "@/components/boton-buscar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerProyectos } from "@/lib/referentes";
 import { leerPendientes } from "@/lib/sugeridos";
 import { Tarjeta } from "./tarjeta";
@@ -13,9 +13,9 @@ import { Tarjeta } from "./tarjeta";
 export const dynamic = "force-dynamic";
 
 export default async function SugeridosPage() {
-  await exigirZona("curar");
+  const { ctx } = await exigirTenant("curar");
 
-  const [proyectos, pendientes] = await Promise.all([leerProyectos(), leerPendientes()]);
+  const [proyectos, pendientes] = await Promise.all([leerProyectos(ctx), leerPendientes(ctx)]);
   const opciones = proyectos.map((p) => ({ id: p.id, nombre: p.nombre, activo: p.activo }));
 
   return (

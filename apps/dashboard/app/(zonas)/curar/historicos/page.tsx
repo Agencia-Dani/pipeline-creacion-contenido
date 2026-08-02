@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerAprobados } from "@/lib/historicos";
 import { Lista } from "./lista";
 
@@ -12,9 +12,9 @@ import { Lista } from "./lista";
 export const dynamic = "force-dynamic";
 
 export default async function HistoricosPage() {
-  await exigirZona("curar");
+  const { ctx } = await exigirTenant("curar");
 
-  const { filas, hayMas, total } = await leerAprobados(0);
+  const { filas, hayMas, total } = await leerAprobados(ctx, 0);
 
   return (
     <div className="space-y-6">

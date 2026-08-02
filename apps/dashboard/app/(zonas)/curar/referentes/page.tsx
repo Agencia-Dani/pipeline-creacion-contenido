@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerBanco, leerProyectos } from "@/lib/referentes";
 import { Pantalla } from "./pantalla";
 
@@ -15,9 +15,9 @@ import { Pantalla } from "./pantalla";
 export const dynamic = "force-dynamic";
 
 export default async function ReferentesPage() {
-  await exigirZona("curar");
+  const { ctx } = await exigirTenant("curar");
 
-  const [banco, proyectos] = await Promise.all([leerBanco(), leerProyectos()]);
+  const [banco, proyectos] = await Promise.all([leerBanco(ctx), leerProyectos(ctx)]);
 
   return (
     <div className="space-y-6">

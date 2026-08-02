@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { TenantContext } from "@/domain/tenant";
+import { scoped, type Tabla } from "@/lib/supabase/scoped";
 
 // Lecturas de la zona Entender: las vistas de las migraciones 008 (D2) y 013 (D7). Read-only
 // por construcción — acá no hay ni un write. El browser nunca toca estas vistas: pasan por el
@@ -67,12 +68,17 @@ const filaDescubrimiento = z.object({
 });
 export type FilaDescubrimiento = z.infer<typeof filaDescubrimiento>;
 
-async function leerVista<T>(vista: string, esquema: z.ZodType<T>, limite: number): Promise<T[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from(vista)
-    .select("*")
+// Las 5 vistas exponen `instance_id` desde la `016` y el filtro lo pone `scoped` (ADR-047: la
+// vista expone el eje, no filtra adentro). Sin esto, Entender sumaría el embudo y el COSTO de
+// todas las empresas en el mismo número — y un costo de más se lee como propio sin sospechar nada.
+async function leerVista<T>(
+  ctx: TenantContext,
+  vista: Extract<Tabla, `app.v_${string}`>,
+  esquema: z.ZodType<T>,
+  limite: number,
+): Promise<T[]> {
+  const { data, error } = await scoped(ctx)
+    .select(vista, "*")
     .order("semana", { ascending: false })
     .limit(limite);
   if (error) throw new Error(`Supabase respondió con error leyendo ${vista}: ${error.message}`);
@@ -80,11 +86,12 @@ async function leerVista<T>(vista: string, esquema: z.ZodType<T>, limite: number
 }
 
 // Límites pensados en semanas: ~8 de historia visible alcanzan para leer tendencia.
-export const leerCalidad = () => leerVista("v_metricas_calidad", filaCalidad, 48);
-export const leerEmbudo = () => leerVista("v_embudo_semana", filaEmbudo, 8);
-export const leerCostos = () => leerVista("v_costos_semana", filaCosto, 64);
-export const leerAuditoria = () => leerVista("v_auditoria_descartes", filaAuditoria, 8);
-export const leerDescubrimiento = () => leerVista("v_embudo_descubrimiento", filaDescubrimiento, 8);
+export const leerCalidad = (ctx: TenantContext) => leerVista(ctx, "app.v_metricas_calidad", filaCalidad, 48);
+export const leerEmbudo = (ctx: TenantContext) => leerVista(ctx, "app.v_embudo_semana", filaEmbudo, 8);
+export const leerCostos = (ctx: TenantContext) => leerVista(ctx, "app.v_costos_semana", filaCosto, 64);
+export const leerAuditoria = (ctx: TenantContext) => leerVista(ctx, "app.v_auditoria_descartes", filaAuditoria, 8);
+export const leerDescubrimiento = (ctx: TenantContext) =>
+  leerVista(ctx, "app.v_embudo_descubrimiento", filaDescubrimiento, 8);
 
 // ── La auditoría de quién tocó qué (app.eventos) ─────────────────────────────
 //
@@ -101,12 +108,9 @@ const filaEvento = z.object({
 });
 export type FilaEvento = z.infer<typeof filaEvento>;
 
-export async function leerEventos(limite = 50): Promise<FilaEvento[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("eventos")
-    .select("creado_en, tipo, detalle, usuarios(nombre)")
+export async function leerEventos(ctx: TenantContext, limite = 50): Promise<FilaEvento[]> {
+  const { data, error } = await scoped(ctx)
+    .select("app.eventos", "creado_en, tipo, detalle, usuarios(nombre)")
     .order("creado_en", { ascending: false })
     .limit(limite);
   if (error) throw new Error(`Supabase respondió con error leyendo los eventos: ${error.message}`);

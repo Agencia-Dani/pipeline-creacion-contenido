@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { leerAjustes } from "@/lib/ajustes";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerResultadosPorCuenta } from "@/lib/config";
 import { leerVocesConProyectos } from "@/lib/proyectos";
 import { cuentasPorProyecto } from "@/lib/referentes";
@@ -24,13 +24,13 @@ import { Pantalla } from "./pantalla";
 export const dynamic = "force-dynamic";
 
 export default async function VocesPage() {
-  await exigirZona("curar");
+  const { ctx } = await exigirTenant("curar");
 
   const [voces, ajustes, cuentas, propuestas] = await Promise.all([
-    leerVocesConProyectos(),
-    leerAjustes(),
-    cuentasPorProyecto(),
-    leerPendientes(),
+    leerVocesConProyectos(ctx),
+    leerAjustes(ctx),
+    cuentasPorProyecto(ctx),
+    leerPendientes(ctx),
   ]);
 
   return (

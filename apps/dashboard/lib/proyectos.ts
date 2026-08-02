@@ -9,7 +9,8 @@ import {
   type ProyectoGuardado,
   type VozGuardada,
 } from "@/domain/proyectos";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { TenantContext } from "@/domain/tenant";
+import { contarEn, scoped } from "@/lib/supabase/scoped";
 
 // IO de voces y proyectos. Lee y escribe `app.voces` + `app.proyectos` con service_role: `app.*`
 // tiene RLS sin policies, el browser no llega solo.
@@ -49,16 +50,14 @@ const COLUMNAS_VOZ = "id, nombre, descripcion, criterios_relevancia, activo";
 const COLUMNAS_PROYECTO =
   "id, nombre, descripcion, criterios_relevancia, criterios_aprendidos, advertencia_criterios, voz_id, activo, n";
 
-export async function leerVoces(): Promise<VozGuardada[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.schema("app").from("voces").select(COLUMNAS_VOZ).order("nombre");
+export async function leerVoces(ctx: TenantContext): Promise<VozGuardada[]> {
+  const { data, error } = await scoped(ctx).select("app.voces", COLUMNAS_VOZ).order("nombre");
   if (error) throw new Error(`Supabase respondió con error leyendo voces: ${error.message}`);
   return z.array(filaVoz).parse(data);
 }
 
-export async function leerProyectos(): Promise<ProyectoGuardado[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.schema("app").from("proyectos").select(COLUMNAS_PROYECTO).order("nombre");
+export async function leerProyectos(ctx: TenantContext): Promise<ProyectoGuardado[]> {
+  const { data, error } = await scoped(ctx).select("app.proyectos", COLUMNAS_PROYECTO).order("nombre");
   if (error) throw new Error(`Supabase respondió con error leyendo proyectos: ${error.message}`);
   return z.array(filaProyecto).parse(data);
 }
@@ -68,32 +67,35 @@ export async function leerProyectos(): Promise<ProyectoGuardado[]> {
  * aprendió y la advertencia que escribió. Desde D7 sale todo de la misma fila — antes había que
  * ir a buscar esos dos campos a Airtable y pisarlos acá (ADR-033).
  */
-export async function leerVocesConProyectos(): Promise<
+export async function leerVocesConProyectos(ctx: TenantContext): Promise<
   (VozGuardada & { proyectos: ProyectoGuardado[] })[]
 > {
-  const [voces, proyectos] = await Promise.all([leerVoces(), leerProyectos()]);
+  const [voces, proyectos] = await Promise.all([leerVoces(ctx), leerProyectos(ctx)]);
   return voces.map((v) => ({
     ...v,
     proyectos: proyectos.filter((p) => p.voz_id === v.id),
   }));
 }
 
-export async function leerVocesComoRegistros(ambito: "motor" | "completo"): Promise<Registro[]> {
-  return aRegistrosDeVoces(await leerVoces(), ambito);
+export async function leerVocesComoRegistros(
+  ctx: TenantContext,
+  ambito: "motor" | "completo",
+): Promise<Registro[]> {
+  return aRegistrosDeVoces(await leerVoces(ctx), ambito);
 }
 
-export async function leerProyectosComoRegistros(ambito: "motor" | "completo"): Promise<Registro[]> {
-  return aRegistrosDeProyectos(await leerProyectos(), ambito);
+export async function leerProyectosComoRegistros(
+  ctx: TenantContext,
+  ambito: "motor" | "completo",
+): Promise<Registro[]> {
+  return aRegistrosDeProyectos(await leerProyectos(ctx), ambito);
 }
 
 // ── Escritura ────────────────────────────────────────────────────────────────
 
-export async function actualizarVoz(id: string, datos: DatosVoz): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("voces")
-    .update({
+export async function actualizarVoz(ctx: TenantContext, id: string, datos: DatosVoz): Promise<void> {
+  const { data, error } = await scoped(ctx)
+    .update("app.voces", {
       nombre: datos.nombre,
       descripcion: datos.descripcion,
       criterios_relevancia: datos.criterios_relevancia,
@@ -106,12 +108,13 @@ export async function actualizarVoz(id: string, datos: DatosVoz): Promise<void> 
   if (!data || data.length === 0) throw new Error("Esa voz ya no existe.");
 }
 
-export async function actualizarProyecto(id: string, datos: DatosProyecto): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("proyectos")
-    .update({
+export async function actualizarProyecto(
+  ctx: TenantContext,
+  id: string,
+  datos: DatosProyecto,
+): Promise<void> {
+  const { data, error } = await scoped(ctx)
+    .update("app.proyectos", {
       nombre: datos.nombre,
       descripcion: datos.descripcion,
       criterios_relevancia: datos.criterios_relevancia,
@@ -135,36 +138,34 @@ export async function actualizarProyecto(id: string, datos: DatosProyecto): Prom
  * desapareció: un id que no existe ahora viola la foreign key, que es exactamente lo que uno
  * quiere que pase.
  */
-export async function crearVoz(datos: DatosVoz): Promise<string> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("voces")
-    .insert({
-      nombre: datos.nombre,
-      descripcion: datos.descripcion,
-      criterios_relevancia: datos.criterios_relevancia,
-      activo: datos.activo,
-    })
+export async function crearVoz(ctx: TenantContext, datos: DatosVoz): Promise<string> {
+  const { data, error } = await scoped(ctx)
+    .insert("app.voces", [
+      {
+        nombre: datos.nombre,
+        descripcion: datos.descripcion,
+        criterios_relevancia: datos.criterios_relevancia,
+        activo: datos.activo,
+      },
+    ])
     .select("id")
     .single();
   if (error) throw new Error(`Supabase respondió con error creando la voz: ${error.message}`);
   return data.id;
 }
 
-export async function crearProyecto(datos: DatosProyecto): Promise<string> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("proyectos")
-    .insert({
-      nombre: datos.nombre,
-      descripcion: datos.descripcion,
-      criterios_relevancia: datos.criterios_relevancia,
-      voz_id: datos.vozId,
-      activo: datos.activo,
-      n: datos.n,
-    })
+export async function crearProyecto(ctx: TenantContext, datos: DatosProyecto): Promise<string> {
+  const { data, error } = await scoped(ctx)
+    .insert("app.proyectos", [
+      {
+        nombre: datos.nombre,
+        descripcion: datos.descripcion,
+        criterios_relevancia: datos.criterios_relevancia,
+        voz_id: datos.vozId,
+        activo: datos.activo,
+        n: datos.n,
+      },
+    ])
     .select("id")
     .single();
   if (error) throw new Error(`Supabase respondió con error creando el proyecto: ${error.message}`);
@@ -175,18 +176,6 @@ export async function crearProyecto(datos: DatosProyecto): Promise<string> {
 // La regla vive en `domain/borrado.ts`: se borra solo lo que nunca produjo nada. Acá va el conteo
 // que la alimenta y el DELETE.
 
-/** Cuántas filas de una tabla de `app` apuntan a este id. `head: true` no trae los datos. */
-async function contar(tabla: string, columna: string, id: string): Promise<number> {
-  const supabase = createAdminClient();
-  const { count, error } = await supabase
-    .schema("app")
-    .from(tabla)
-    .select("id", { count: "exact", head: true })
-    .eq(columna, id);
-  if (error) throw new Error(`Supabase respondió con error contando ${tabla}: ${error.message}`);
-  return count ?? 0;
-}
-
 /**
  * Lo que retiene a un proyecto, en el orden en que la frase lo va a nombrar.
  *
@@ -194,10 +183,13 @@ async function contar(tabla: string, columna: string, id: string): Promise<numbe
  * razón — son la asignación (a qué proyecto alimenta esta cuenta), no historia. Si el proyecto deja
  * de existir, esa asignación no significa nada.
  */
-export async function dependenciasDeProyecto(id: string): Promise<Dependencia[]> {
+export async function dependenciasDeProyecto(
+  ctx: TenantContext,
+  id: string,
+): Promise<Dependencia[]> {
   const [candidatos, descartes] = await Promise.all([
-    contar("candidatos", "proyecto_id", id),
-    contar("descartes", "proyecto_id", id),
+    contarEn(ctx, "app.candidatos", "proyecto_id", id),
+    contarEn(ctx, "app.descartes", "proyecto_id", id),
   ]);
   return [
     { cuantos: candidatos, singular: "video en el feed", plural: "videos en el feed" },
@@ -210,10 +202,10 @@ export async function dependenciasDeProyecto(id: string): Promise<Dependencia[]>
  * `not null`, así que una voz con proyectos no se puede borrar ni aunque estén vacíos — habría que
  * borrarlos a ellos primero, y eso es una decisión de a uno, no un efecto secundario.
  */
-export async function dependenciasDeVoz(id: string): Promise<Dependencia[]> {
+export async function dependenciasDeVoz(ctx: TenantContext, id: string): Promise<Dependencia[]> {
   const [proyectos, candidatos] = await Promise.all([
-    contar("proyectos", "voz_id", id),
-    contar("candidatos", "voz_id", id),
+    contarEn(ctx, "app.proyectos", "voz_id", id),
+    contarEn(ctx, "app.candidatos", "voz_id", id),
   ]);
   return [
     { cuantos: proyectos, singular: "proyecto", plural: "proyectos" },
@@ -233,16 +225,14 @@ function traducirFk(error: { code?: string; message: string }, que: string): Err
   return new Error(`Supabase respondió con error borrando ${que}: ${error.message}`);
 }
 
-export async function borrarProyecto(id: string): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.schema("app").from("proyectos").delete().eq("id", id).select("id");
+export async function borrarProyecto(ctx: TenantContext, id: string): Promise<void> {
+  const { data, error } = await scoped(ctx).borrar("app.proyectos").eq("id", id).select("id");
   if (error) throw traducirFk(error, "el proyecto");
   if (!data || data.length === 0) throw new Error("Ese proyecto ya no existe.");
 }
 
-export async function borrarVoz(id: string): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.schema("app").from("voces").delete().eq("id", id).select("id");
+export async function borrarVoz(ctx: TenantContext, id: string): Promise<void> {
+  const { data, error } = await scoped(ctx).borrar("app.voces").eq("id", id).select("id");
   if (error) throw traducirFk(error, "la voz");
   if (!data || data.length === 0) throw new Error("Esa voz ya no existe.");
 }

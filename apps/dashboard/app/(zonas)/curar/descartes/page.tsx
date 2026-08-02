@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerDescartes } from "@/lib/descartes";
 import { Lista } from "./lista";
 
@@ -12,9 +12,9 @@ import { Lista } from "./lista";
 export const dynamic = "force-dynamic";
 
 export default async function DescartesPage() {
-  await exigirZona("curar");
+  const { ctx } = await exigirTenant("curar");
 
-  const descartes = await leerDescartes();
+  const descartes = await leerDescartes(ctx);
 
   return (
     <div className="space-y-6">

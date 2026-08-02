@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Corrida } from "@/domain/corrida";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { TenantContext } from "@/domain/tenant";
+import { scoped } from "@/lib/supabase/scoped";
 
 const filaRun = z.object({
   id: z.string(),
@@ -14,11 +15,12 @@ const filaRun = z.object({
 
 // Últimas corridas del motor. Mismo discriminador que usa el archivado para
 // leer runs del motor (`params->>workflow = 'motor'`, dev-doc nodo 17b).
-export async function ultimasCorridasMotor(limite = 5): Promise<Corrida[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("runs")
-    .select("id, inicio, fin, estado, trigger_type, metricas, error")
+//
+// El filtro por instancia lo pone `scoped`: con dos empresas, "las últimas corridas" son las de
+// ESTE cockpit. Sin eso, Operar mostraría la corrida de otra empresa como si fuera propia.
+export async function ultimasCorridasMotor(ctx: TenantContext, limite = 5): Promise<Corrida[]> {
+  const { data, error } = await scoped(ctx)
+    .select("public.runs", "id, inicio, fin, estado, trigger_type, metricas, error")
     .eq("params->>workflow", "motor")
     .order("inicio", { ascending: false })
     .limit(limite);

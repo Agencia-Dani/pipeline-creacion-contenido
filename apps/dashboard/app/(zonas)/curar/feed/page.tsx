@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { exigirZona } from "@/lib/auth";
+import { exigirTenant } from "@/lib/auth";
 import { leerFeed } from "@/lib/candidatos";
 import { leerDescartes } from "@/lib/descartes";
 import { Mazo } from "./mazo";
@@ -14,9 +14,9 @@ import { Mazo } from "./mazo";
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
-  await exigirZona("curar");
+  const { ctx } = await exigirTenant("curar");
 
-  const [candidatos, descartes] = await Promise.all([leerFeed(), leerDescartes()]);
+  const [candidatos, descartes] = await Promise.all([leerFeed(ctx), leerDescartes(ctx)]);
   const descartesPendientes = descartes.filter((d) => d.veredicto === null).length;
 
   return (

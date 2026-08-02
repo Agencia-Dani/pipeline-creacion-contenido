@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { armarRunPlan, armarRunPlanCompleto } from "@/domain/run-plan";
 import { leerRunPlanCrudo } from "@/lib/config";
+import { contextoDeFachada } from "@/lib/tenant";
 
 // La fachada de ADR-028: el motor pregunta qué correr ANTES de gastar créditos.
 // De qué almacenamiento sale cada dominio lo decide lib/config.ts, y va cambiando en D5
@@ -46,13 +47,25 @@ export async function GET(request: Request) {
   // ?ambito=motor (default): filtrado como ADR-028 §2. ?ambito=completo: sin filtros,
   // para archivado (necesita todas las voces) y descubrimiento (ignora `activo`).
   // Un valor desconocido es un typo en n8n: 400 y la corrida no arranca (fail-closed).
-  const ambito = new URL(request.url).searchParams.get("ambito") ?? "motor";
+  const params = new URL(request.url).searchParams;
+  const ambito = params.get("ambito") ?? "motor";
   if (ambito !== "motor" && ambito !== "completo") {
     return Response.json({ error: `ambito desconocido: ${ambito}` }, { status: 400 });
   }
 
+  // ?instancia: de quién es la config que se pide (ADR-046/048). Hoy es OPCIONAL y el contrato
+  // sigue en `version: 1` — la Fase 4 lo vuelve obligatorio y sube a 2. Mientras tanto, sin
+  // parámetro se cae a la única instancia activa, y con dos se responde 400 en vez de adivinar:
+  // servirle la config de otra empresa al motor es peor que no servirle nada (ADR-028 §4).
+  const tenant = await contextoDeFachada(params.get("instancia") ?? undefined);
+  if (!tenant.ok) {
+    const status = tenant.motivo === "instancia_desconocida" ? 403 : 400;
+    console.error(`[run-plan] no se pudo resolver la instancia: ${tenant.motivo}`);
+    return Response.json({ error: "instancia no resuelta", motivo: tenant.motivo }, { status });
+  }
+
   try {
-    const crudo = await leerRunPlanCrudo(ambito);
+    const crudo = await leerRunPlanCrudo(tenant.ctx, ambito);
     const plan =
       ambito === "motor" ? armarRunPlan(crudo, new Date()) : armarRunPlanCompleto(crudo, new Date());
     return Response.json(plan);
