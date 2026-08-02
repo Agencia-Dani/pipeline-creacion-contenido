@@ -2,6 +2,8 @@
 
 - **Estado:** aceptada — 2026-08-02 (decisión de Mani, arquitecto). Toca dos Code nodes del motor y
   el `Config`. **Obliga a re-importar** `workflow-short-form-content`. No toca contratos ni datos.
+  **Enmendada el mismo día** — ver §El techo se queda: la razón por la que existe no era la que
+  decía el título del knob.
 
 - **Contexto:** Mani pidió sacar `cap_top_n` (el techo de videos a transcribir por corrida): los
   planes pagos de Apify, Supadata y la API de Claude no llegan ni a la mitad de su cupo mensual y el
@@ -74,3 +76,40 @@
 - **Qué mirar después del primer re-import:** `[Traducir] Loop completo en …ms` en los logs de n8n, y
   que no aparezca `[Traducir] PRESUPUESTO agotado`. Si aparece con volúmenes normales, el techo real
   pasó a ser Anthropic y hay que subir `concurrencia_traducir`.
+
+---
+
+## Enmienda del 2026-08-02 (mismas horas) — el techo se queda en 250, y no por costo
+
+Con el motor ya re-importado se puso `cap_top_n = 0`, se verificó punta a punta… y al mirar qué iba a
+pasar en la corrida apareció lo que este ADR no había mirado: **`cap_top_n` no era solo un freno de
+gasto, era el que racionaba el supply.** Se revirtió a 250 en el acto (decisión de Mani).
+
+**El mecanismo:** `Leer procesados` lee `processed_items` **entera** (`limit=50000`, sin filtro de
+fecha) y `POST processed_items` corre **antes** de transcribir. O sea que todo lo que se transcribe
+entra a la memoria de dedup **para siempre**, pase o no el gate, se entregue o no. Y `Armar candidato`
+corta cada proyecto a su `N`: los `N` de hoy suman **100**. Lo que sobra de ahí no se guarda en ningún
+lado, y tampoco vuelve.
+
+| | transcribe | pasa el gate (~73%, medido 31/07) | entrega | **quema para siempre** |
+|---|---|---|---|---|
+| `cap_top_n` 250 | 250 | ~180 | 100 | ~80 |
+| `cap_top_n` 0 | ~500 (el backlog de 100 días entero) | ~365 | **100** | **~265** |
+
+**Sacar el techo no entrega un solo video más** —el techo de entrega lo ponen los `N`, no el cap—
+**y consume el pozo de una sola vez.** El backlog que la recencia en 100 días destapó dura 2-3
+semanas con el cap puesto y una sola corrida sin él.
+
+**Y el cuello real está río abajo, no río arriba.** Medido el 02/08: **143 candidatos sin calificar**
+en el feed (49 · 34 · 31 · 24 · 5) contra **9 calificados en total** desde que el feed existe. Traer
+más videos no es el problema de esta semana; cada corrida grande le suma backlog a un backlog.
+
+**Lo que esto NO cambia:** todo lo de arriba sigue en pie. `Traducir` tenía que arreglarse igual — era
+el modo de falla más caro del motor, y con el techo en 250 igual habría podido morder. Lo que cambia
+es a cuánto conviene poner el techo, no si los nodos necesitan red.
+
+**La regla que deja, y es la que evita la próxima vez:** antes de aflojar un límite, preguntá **qué
+está limitando de verdad**, no qué dice su nombre. Este se llama *Videos a transcribir por corrida* y
+se lee como presupuesto de plata; lo que gobierna es cuántas semanas dura el pozo de videos frescos.
+El corolario operativo: **el techo se sube cuando sube `sum(N)` o cuando el equipo vacía el feed**, no
+cuando sobra cupo en Supadata.

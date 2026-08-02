@@ -48,19 +48,32 @@
 > `cap_top_n = 250`. Los dos techos estaban calibrados al mismo punto, así que bajar uno no destrababa
 > nada.)*
 >
-> ### ✅ Pasos 1 y 2 HECHOS (2026-08-02)
+> ### ✅ Paso 1 HECHO — y el paso 2 se dio vuelta al mirarlo (2026-08-02)
 > **1. ✅ Motor re-importado y publicado** por Mani, con el commit `f0a0936` en `origin/main`
 > (Vercel deploya `main`, así que el cockpit con el borrado también está vivo).
-> **2. ✅ `Videos a transcribir por corrida` = 0.** Verificado **punta a punta**: la fachada
-> (`?ambito=motor`) lo sirve como `0` numérico, y el nodo hace `Number(cfg.cap_top_n || 0)` +
-> `if (CAP > 0)` ⇒ **techo desactivado**. ⚠️ *Este cambio se hizo por PostgREST, no por
-> `/curar/ajustes`, así que su evento en `app.eventos` tiene `usuario_id: null` y un `origen` que lo
-> dice. Es el único de la historia de ese knob sin autor; no lo leas como un hueco.*
+> **2. 🔄 `Videos a transcribir por corrida` se puso en 0, se verificó, y se VOLVIÓ a 250.**
+>
+> > 🚨 **El techo no era freno de gasto: era el que raciona el supply.** `Leer procesados` lee
+> > `processed_items` entera (`limit=50000`, **sin filtro de fecha**) y `POST processed_items` corre
+> > **antes** de transcribir, así que todo lo que se transcribe queda en la memoria de dedup para
+> > siempre — pase o no el gate, se entregue o no. Y la entrega la topan los `N`, que hoy suman
+> > **100**. Con el techo en 0, la corrida transcribe ~500 (el backlog de 100 días entero), entrega
+> > **los mismos 100**, y **quema ~265 videos que no vuelven**. Con 250 quema ~80 y el backlog dura
+> > 2-3 semanas. *Sacar el techo no entrega un solo video más.*
+> >
+> > **Y el cuello está río abajo:** **143 candidatos sin calificar** en el feed (49 · 34 · 31 · 24 · 5)
+> > contra **9 calificados en total** desde que el feed existe. Cada corrida grande le suma backlog a
+> > un backlog. **El techo se sube cuando sube `sum(N)` o cuando el equipo vacía el feed**, no cuando
+> > sobra cupo en Supadata. Detalle y la tabla de números: [enmienda de
+> > ADR-044](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md#enmienda-del-2026-08-02-mismas-horas--el-techo-se-queda-en-250-y-no-por-costo).
+>
+> ⚠️ *Los dos cambios de ese knob se hicieron por PostgREST, no por `/curar/ajustes`, así que sus
+> eventos en `app.eventos` tienen `usuario_id: null` y un `origen` que lo dice. Son los dos únicos de
+> la historia de ese knob sin autor; no los leas como un hueco.*
 >
 > ### 🟠 Lo único que queda: LA CORRIDA (y es de Mani)
-> **3. Correr y mirar.** Va a ser **la corrida más grande que hubo** (el máximo histórico son 191
-> videos transcritos, y esta no tiene techo con un backlog de 100 días para drenar). Lo que hay que
-> mirar, en orden de qué te avisa antes:
+> **3. Correr y mirar.** Con el techo en 250 y el backlog de 100 días, esperá que el cap **muerda**
+> (el máximo histórico transcrito son 191). Lo que hay que mirar, en orden de qué te avisa antes:
 > · **Apify primero, no `runs`.** Si algo murió en el arranque, `runs` deja la fila en `en_curso`
 >   para siempre y parece lentitud. **Cero llamadas en Apify ⇒ murió antes de scrapear** (lo más
 >   probable: `<<DASHBOARD_URL>>` sin rellenar). Ese reflejo desempató la sesión del 02/08.
@@ -71,8 +84,12 @@
 >   (ya está en `processed_items`, ver arriba). Si aparece, subí `concurrencia_transcribir`.
 > · **`ventana_corrida_min` está en 60** y la estimación de esta corrida es ~27 min. Si se pasa de
 >   60, el barredor la mata en vuelo y el guard deja arrancar otra en paralelo.
-> **4. Opcional, la palanca más barata que sigue sin usar:** `Resultados por cuenta de referente`
-> está en **40** y el cap de `Config` es **50**. Subirlo a 50 son 160 crudos más por corrida, gratis.
+> · ⚠️ **Ojo con `cap_top_n` cuando muerde: corta GLOBAL.** Si un proyecto vuelve con `evaluados: 0`,
+>   no es que no haya supply — es que el cap se lo llevó otro (pasó con el cap en 10 el 02/08).
+>
+> **4. Lo que NO es palanca ahora mismo:** subir `Resultados por cuenta de referente` de 40 a 50, que
+> era la recomendación anterior. Con el feed en 143 sin calificar y la entrega topada por `sum(N)`,
+> traer 160 crudos más solo aumenta lo que se quema. **Guardala para cuando el equipo esté al día.**
 >
 > ### ⚠️ Lo que esto NO arregla, y hay que decirlo
 > **Ningún proyecto se va a acercar a su `N` por esto.** El cuello es el **supply**, no los cortes:
@@ -795,7 +812,10 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **Borrar records (ADR-045):** la pregunta no era de UI sino de FK, y había dos mundos. **Los referentes salen limpios** (la puente cascadea y su historia se guarda por *handle en texto*, no por FK: `candidatos.referente`, `descartes.referente`, `v_senal_seleccion` desde `outputs`). **Las voces y los proyectos no**: `candidatos.proyecto_id`, `candidatos.voz_id`, `descartes.proyecto_id` y `proyectos.voz_id` son FK sin `on delete`. Se descartó el `cascade` (borraría 143 candidatos sin leer con el mismo click que borra un proyecto vacío) y el `set null` (cambia un error claro de Postgres por filas que se ven bien y no significan nada — la familia exacta que este repo viene cazando). Queda **la regla: se borra solo lo que nunca produjo nada**, y el rechazo dice **cuánta** historia hay y ofrece apagar. Hoy eso deja borrable solo *Trading Psychology*, y es correcto. Bonus: el `@casper_smc` duplicado ya se limpia sin SQL.
 **Verificación en vivo, contra la base real:** el rechazo (*«Comunicación en empresas tiene 24 videos en el feed…»*, modal abierta, URL sin cambiar) y el camino feliz, con un proyecto y un referente **de prueba creados y borrados** para no tocar el dato de Mani — la fila desaparece, la modal cierra, la lista refresca y `app.eventos` queda con el registro completo. 138 tests · typecheck · build · validador (1616 checks) · `auditar-workflows.mjs` sin hallazgos · `test-nodos.mjs` verde con sección nueva de `Traducir`.
 **El detalle de test que vale guardar:** el caso del presupuesto de `Transcribir` empezó a fallar al subir el pool a 24 — los 30 videos arrancaban en dos vueltas y ningún budget razonable llegaba a morder. Se arregló **fijando la concurrencia en 2 en ese test**, no aflojando el assert: el test prueba el presupuesto, no el throughput, y mezclarlos era lo que lo volvía frágil.
-**Siguiente sesión:** el re-import y la corrida sin techo (§Pendiente vivo, en orden). Después de eso, las dos cosas que siguen abiertas son subir `Resultados por cuenta` de 40 a 50 (el cap de `Config`) y, si se quiere ir más lejos, escalar lo que se le pide a Apify **por proyecto** — la solución de fondo que ADR-038 ya dejó identificada y que es la única que vuelve a `N` vinculante en vez de solo informada.
+**🔄 Y el cierre se dio vuelta a último momento, que es la mejor parte:** Mani re-importó, se puso el techo en 0, se verificó punta a punta… y al mirar qué iba a pasar en la corrida apareció lo que la revisión no había mirado. **`cap_top_n` no era freno de gasto: era el que raciona el supply.** `Leer procesados` lee `processed_items` **entera y sin filtro de fecha**, y el POST corre **antes** de transcribir ⇒ todo lo transcrito queda en la memoria de dedup para siempre, pase o no el gate, se entregue o no. Y la entrega la topan los `N` (`sum = 100`), no el cap. O sea: **con 0 se transcriben ~500, se entregan los mismos 100, y se queman ~265 que no vuelven.** Se revirtió a 250 en el acto. *Lo que lo destapó no fue leer más código: fue preguntarse "¿qué números va a dar esta corrida?" antes de dispararla, y darse cuenta de que el de entregados no se movía.*
+**Y el dato que reordenó la prioridad entera: el cuello está río abajo.** **143 candidatos sin calificar** contra **9 calificados en total** desde que el feed existe. Traer más videos no es el problema de esta semana, y la recomendación anterior (subir `Resultados por cuenta` de 40 a 50) queda **archivada hasta que el equipo esté al día**: hoy solo aumentaría lo que se quema.
+**La regla que deja, y vale para cualquier límite del sistema:** antes de aflojar uno, preguntá **qué está limitando de verdad**, no qué dice su nombre. Este se llama *Videos a transcribir por corrida* y se lee como presupuesto de plata; lo que gobierna es cuántas semanas dura el pozo de videos frescos.
+**Siguiente sesión:** la corrida (§Pendiente vivo tiene qué mirar, en orden de qué avisa antes). Después, lo que sigue abierto es que **el equipo consuma el feed** — todo lo demás río arriba está bloqueado por eso. Si en algún momento la capacidad de calificación sube, la solución de fondo para el `N` sigue siendo escalar lo que se le pide a Apify **por proyecto** (`ceil(N / (referentes × tasa))`), identificada en ADR-038 y todavía sin hacer.
 
 **2026-08-01 (cierre 78) — La primera revisión de UI/UX sobre el cockpit live: 10 observaciones, 3 bugs, 3 ADRs (Claude, pedido de Mani).**
 **Qué se hizo:** Mani usó la primera versión live y trajo 10 observaciones de layout/UX pensando en Majo y Jero. Se ejecutaron las 10 en un solo pase, sin tocar `Workflows/` ni `core/`: cero re-imports, cero migraciones. Commit `dce25a3`, deployado y verificado contra prod.

@@ -70,9 +70,13 @@ deliberadamente no se calcula.
 **Techo de gasto** (`cap_top_n` en el motor, *Videos a transcribir por corrida* en Ajustes):
 Cuántos videos distintos se transcriben como máximo en **toda** la corrida, todos los Proyectos
 juntos, ordenados por Heat-score. Muerde justo antes de transcribir y filtrar, que son los pasos que
-se pagan: es el presupuesto de la corrida. `0` = sin techo. No confundir con el `N` del Proyecto,
-que reparte; este limita el total, y **corta global**: cuando muerde no recorta parejo, deja
-proyectos enteros en cero (ADR-042, medido en ADR-044).
+se pagan. `0` = sin techo. No confundir con el `N` del Proyecto, que reparte; este limita el total, y
+**corta global**: cuando muerde no recorta parejo, deja proyectos enteros en cero (ADR-042, medido en
+ADR-044). 🚨 **Su nombre engaña: no es un presupuesto de plata, es el que raciona el pozo de videos
+frescos** (enmienda de ADR-044). Todo lo que se transcribe entra a `processed_items` **para siempre**
+—pase o no el gate, se entregue o no— y la entrega la topan los `N`, no esto: bajarlo a `0` no entrega
+un video más, solo consume el pozo de una corrida en vez de tres. Se sube cuando sube `sum(N)` o
+cuando el equipo vacía el feed, no cuando sobra cupo en Supadata.
 
 **Presupuesto de nodo** (`presupuesto_transcribir_s`, `presupuesto_traducir_s`):
 Cuánto tiempo puede gastar un Code node caro antes de dejar de arrancar trabajo nuevo. Existe porque
