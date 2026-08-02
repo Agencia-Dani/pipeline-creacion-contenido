@@ -5,10 +5,14 @@
 // relevancia = 5" (es una proporción 0–1) y nadie se entera hasta que el motor ordena
 // raro. Este módulo es la regla que faltaba, del lado del servidor.
 //
-// Lo que deliberadamente NO valida: los TOPES (`cap_top_n`, `cap_resultados_referente`).
-// Son dev-only y viven en el `Config` de cada workflow (ADR-016); duplicarlos acá sería
-// dos dueños para el mismo dato. El motor los sigue aplicando con Math.min, y el tope va
-// escrito en la `descripcion` del knob (que el equipo ve) — informa, no manda.
+// Lo que deliberadamente NO valida: `cap_resultados_referente`. Sigue siendo dev-only en el
+// `Config` del workflow (ADR-016); duplicarlo acá sería dos dueños para el mismo dato. El motor
+// lo aplica con Math.min y el tope va escrito en la `descripcion` del knob — informa, no manda.
+//
+// 🔀 `cap_top_n` SÍ está acá desde ADR-042, y la línea entre los dos es: un tope que **protege** a
+// otro knob se queda en el `Config`; un tope que **es presupuesto** va a la pantalla. `cap_top_n`
+// decide cuántos videos se transcriben, o sea cuánto sale la corrida: era la única perilla de
+// cantidad que costaba plata y la única que no se podía tocar sin re-importar.
 
 export type TipoAjuste = "proporcion" | "entero" | "entero_positivo" | "toggle";
 
@@ -30,7 +34,9 @@ export const CATALOGO: Record<string, Knob> = {
   "Seguidores para marcar viral": { consume: "motor", tipo: "entero" },
   "Mínimo de vistas": { consume: "motor", tipo: "entero" },
   "Mínimo de likes": { consume: "motor", tipo: "entero" },
-  "Candidatos por corrida": { consume: "motor", tipo: "entero_positivo" },
+  // `entero` y no `entero_positivo`: el motor trata el 0 como "sin techo" (`if (CAP > 0)`), y
+  // prohibirlo mataría esa salida sin querer.
+  "Videos a transcribir por corrida": { consume: "motor", tipo: "entero" },
   "Días de recencia": { consume: "motor", tipo: "entero_positivo" },
   "Resultados por cuenta de referente": { consume: "motor", tipo: "entero_positivo" },
   "Buscar por referentes en Instagram": { consume: "motor", tipo: "toggle" },

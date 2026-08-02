@@ -124,6 +124,7 @@ describe("esFlojo", () => {
     tasa_gate: tasa,
     tasa_aprobacion: null,
     videos_evaluados: evaluados,
+    seguidores: null, // no entra en el juicio de "floja": esa es la tasa, no el tamaño
   });
 
   it("con poca muestra no se juzga, por baja que sea la tasa", () => {

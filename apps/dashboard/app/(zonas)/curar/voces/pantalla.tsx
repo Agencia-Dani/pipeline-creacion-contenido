@@ -37,7 +37,18 @@ type Abierto =
   | { tipo: "alta-proyecto" }
   | null;
 
-export function Pantalla({ voces }: { voces: VozConProyectos[] }) {
+export function Pantalla({
+  voces,
+  cuentasPorProyecto,
+  resultadosPorCuenta,
+  sugeridosPendientes,
+}: {
+  voces: VozConProyectos[];
+  /** Cuántos referentes activos alimenta cada proyecto. Alimenta el techo del campo N (ADR-043). */
+  cuentasPorProyecto: Record<string, number>;
+  resultadosPorCuenta: number;
+  sugeridosPendientes: number;
+}) {
   const [abierto, setAbierto] = useState<Abierto>(null);
   const cerrar = () => setAbierto(null);
 
@@ -162,7 +173,14 @@ export function Pantalla({ voces }: { voces: VozConProyectos[] }) {
         subtitulo="Proyecto — qué busca y con qué criterios"
       >
         {proyectoAbierto && (
-          <FormularioProyecto proyecto={proyectoAbierto} voces={opcionesVoz} onListo={cerrar} />
+          <FormularioProyecto
+            proyecto={proyectoAbierto}
+            voces={opcionesVoz}
+            onListo={cerrar}
+            cuentas={cuentasPorProyecto[proyectoAbierto.id] ?? 0}
+            resultadosPorCuenta={resultadosPorCuenta}
+            sugeridosPendientes={sugeridosPendientes}
+          />
         )}
       </Modal>
 
@@ -181,7 +199,14 @@ export function Pantalla({ voces }: { voces: VozConProyectos[] }) {
         titulo="Nuevo proyecto"
         subtitulo="Un tema dentro de una voz. Después elegile referentes en Referentes."
       >
-        <AltaProyecto voces={opcionesVoz} onListo={cerrar} />
+        {/* Un proyecto nuevo todavía no tiene cuentas asignadas: el techo arranca en 0 y el aviso
+            dice justo eso, que es lo que hay que resolver antes de esperar videos. */}
+        <AltaProyecto
+          voces={opcionesVoz}
+          onListo={cerrar}
+          resultadosPorCuenta={resultadosPorCuenta}
+          sugeridosPendientes={sugeridosPendientes}
+        />
       </Modal>
     </div>
   );

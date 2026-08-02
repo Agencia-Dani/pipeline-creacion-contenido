@@ -29,13 +29,32 @@ test("una voz sin nombre no se guarda", () => {
   assert.equal(r.ok, false);
 });
 
-test("los textos vacíos de una voz se guardan como null, no como cadena vacía", () => {
-  const r = validarVoz({ nombre: " Rosario ", descripcion: "  ", criterios_relevancia: "", activo: false });
+// ADR-040: los criterios de la voz se SUMAN a los del proyecto en el gate, así que una voz sin
+// criterios no falla — juzga con la mitad del contexto, en verde. Es la misma regla que el proyecto
+// ya tenía; lo que cambió es que ahora vale para las dos puntas.
+test("una voz sin criterios no se guarda: son la espina dorsal, no un adorno", () => {
+  const r = validarVoz({ nombre: "Rosario", descripcion: "", criterios_relevancia: "", activo: true });
+  assert.equal(r.ok, false);
+  assert.match(r.ok === false ? r.error : "", /criterios/i);
+});
+
+test("criterios en blanco tampoco alcanzan: se comparan con trim", () => {
+  const r = validarVoz({ nombre: "Rosario", descripcion: "", criterios_relevancia: "   \n  ", activo: true });
+  assert.equal(r.ok, false);
+});
+
+test("la descripción de una voz SÍ sigue siendo opcional: el filtro no la lee", () => {
+  const r = validarVoz({
+    nombre: " Rosario ",
+    descripcion: "  ",
+    criterios_relevancia: "  habla de comunicación  ",
+    activo: false,
+  });
   assert.equal(r.ok, true);
   assert.deepEqual(r.ok && r.valor, {
     nombre: "Rosario",
     descripcion: null,
-    criterios_relevancia: null,
+    criterios_relevancia: "habla de comunicación",
     activo: false,
   });
 });

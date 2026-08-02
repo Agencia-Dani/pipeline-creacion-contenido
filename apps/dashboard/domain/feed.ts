@@ -71,6 +71,8 @@ export type CandidatoFeed = {
   script: string | null;
   thumbnail: string | null;
   proyecto: string;
+  /** La voz dueña del proyecto. Airtable la mostraba junto al proyecto; el corte la dejó afuera. */
+  voz: string | null;
   referente: string | null;
   urlReferente: string | null;
   heat: number | null;
@@ -80,6 +82,8 @@ export type CandidatoFeed = {
   views: number | null;
   likes: number | null;
   seguidores: number | null;
+  /** Interacción sobre seguidores. La columna existía desde `009` y no la leía nadie. */
+  engagement: number | null;
   viralPorTamano: boolean;
   calificacion: Calificacion | null;
   estado: Estado;

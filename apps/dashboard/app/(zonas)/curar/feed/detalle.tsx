@@ -41,6 +41,7 @@ export function Detalle({
       subtitulo={
         candidato && (
           <>
+            {candidato.voz && `${candidato.voz} · `}
             {candidato.proyecto || "(sin proyecto)"}
             {candidato.referente && ` · ${candidato.referente}`}
             {candidato.idioma && ` · original en ${candidato.idioma}`}
@@ -86,6 +87,11 @@ function Contenido({ candidato }: { candidato: CandidatoFeed }) {
             relevancia {candidato.relevanciaScore.toFixed(2)}
           </Badge>
         )}
+        {candidato.engagement !== null && (
+          <Badge variant="outline" title="Interacción sobre seguidores: qué tanto respondió la audiencia de esa cuenta.">
+            engagement {candidato.engagement.toFixed(3)}
+          </Badge>
+        )}
         {candidato.views !== null && <span className="text-muted-foreground">{miles(candidato.views)} vistas</span>}
         {candidato.likes !== null && <span className="text-muted-foreground">{miles(candidato.likes)} likes</span>}
         {candidato.seguidores !== null && (
@@ -102,6 +108,19 @@ function Contenido({ candidato }: { candidato: CandidatoFeed }) {
           </a>
         )}
       </div>
+
+      {/* Los tres números en cristiano. Antes vivían solo en el `title` de cada badge: invisible en
+          touch, y algo que hay que descubrir por accidente. El detalle largo está en el onboarding
+          §7 y no se duplica acá — esto es lo mínimo para no tener que ir a leerlo. */}
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        <strong className="text-foreground">heat</strong> es el orden en que llegan (mezcla vistas,
+        likes, engagement y relevancia): arriba = más caliente, y el número exacto no importa.{" "}
+        <strong className="text-foreground">relevancia</strong> es cuánto pega con los criterios del
+        proyecto, y es la que se arregla escribiendo mejores criterios.{" "}
+        <strong className="text-foreground">engagement</strong> es cuánto respondió la audiencia de
+        esa cuenta, no la de ustedes. Un heat alto con relevancia baja es viral-vacío: sirve para
+        entender qué funciona, no para copiarlo.
+      </p>
 
       {candidato.relevanciaRazon && (
         <div className="rounded-md bg-muted/50 p-3">

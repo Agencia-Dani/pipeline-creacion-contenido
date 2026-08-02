@@ -54,9 +54,22 @@ describe("validarAjuste", () => {
     assert.equal(validarAjuste("Mínimo de vistas", -1).ok, false);
   });
 
-  it("los que arrancan en 1 rechazan el 0: 'Candidatos por corrida = 0' es una corrida vacía", () => {
-    assert.equal(validarAjuste("Candidatos por corrida", 0).ok, false);
-    assert.equal(validarAjuste("Candidatos por corrida", 1).ok, true);
+  it("los que arrancan en 1 rechazan el 0: 'Propuestas por corrida = 0' es una búsqueda vacía", () => {
+    assert.equal(validarAjuste("Propuestas por corrida", 0).ok, false);
+    assert.equal(validarAjuste("Propuestas por corrida", 1).ok, true);
+  });
+
+  // ADR-042: el techo de gasto es `entero` y no `entero_positivo` a propósito. El motor trata el 0
+  // como "sin techo" (`if (CAP > 0)`), así que prohibirlo mataría esa salida sin querer.
+  it("el techo de gasto admite 0, que en el motor significa 'sin techo'", () => {
+    assert.equal(validarAjuste("Videos a transcribir por corrida", 0).ok, true);
+    assert.equal(validarAjuste("Videos a transcribir por corrida", 250).ok, true);
+    assert.equal(validarAjuste("Videos a transcribir por corrida", -1).ok, false);
+    assert.equal(validarAjuste("Videos a transcribir por corrida", 10.5).ok, false);
+  });
+
+  it("una clave que ya no existe no valida: 'Candidatos por corrida' murió con ADR-042", () => {
+    assert.equal(validarAjuste("Candidatos por corrida", 100).ok, false);
   });
 
   it("normaliza el string del input HTML, que es como va a llegar siempre", () => {
@@ -75,18 +88,18 @@ describe("validarAjuste", () => {
 
 describe("ajustesVisibles", () => {
   const filas = [
-    { clave: "Candidatos por corrida", visibilidad: "equipo" },
+    { clave: "Mínimo de vistas", visibilidad: "equipo" },
     { clave: "Peso de relevancia", visibilidad: "dev" },
     { clave: "Knob viejo de Airtable", visibilidad: "equipo" },
   ];
 
   it("el operador solo ve los de equipo", () => {
-    assert.deepEqual(ajustesVisibles(filas, "operador").map((f) => f.clave), ["Candidatos por corrida"]);
+    assert.deepEqual(ajustesVisibles(filas, "operador").map((f) => f.clave), ["Mínimo de vistas"]);
   });
 
   it("el dev ve todos los del catálogo", () => {
     assert.deepEqual(ajustesVisibles(filas, "dev").map((f) => f.clave), [
-      "Candidatos por corrida",
+      "Mínimo de vistas",
       "Peso de relevancia",
     ]);
   });

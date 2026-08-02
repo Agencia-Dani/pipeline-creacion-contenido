@@ -22,7 +22,19 @@ export type RunPlan = {
   ajustes: Registro[];
 };
 
-const DEFAULT_CANDIDATOS_POR_CORRIDA = 100; // fail-open, mismo default que el AJUSTE_MAP
+/**
+ * La red para un proyecto con `N` en null, y **nada más que eso**.
+ *
+ * Hasta ADR-042 esto era el default del knob global `Candidatos por corrida`, que el equipo podía
+ * mover. Ese knob murió: estaba inerte (el form exige `N` desde ADR-038, así que ningún proyecto
+ * cae acá) y su descripción describía a `cap_top_n`, que es otra cosa. Hoy `N` es la única perilla
+ * de cantidad que existe.
+ *
+ * El número se queda igual al `top_n` del `Config` del motor, que es donde cae la misma decisión
+ * del otro lado. Si alguna vez aparece una fila con `n` null —escrita por fuera del cockpit— la
+ * corrida no revienta.
+ */
+export const N_SI_EL_PROYECTO_NO_LO_DICE = 100;
 
 // La variante para el archivado (necesita TODAS las voces para resolver nombres) y el
 // descubrimiento (ignora `activo` a propósito, cierre 49): mismo shape, cero filtros,
@@ -54,10 +66,6 @@ export function armarRunPlan(
 ): RunPlan {
   const vocesActivas = new Set(entrada.voces.map((v) => v.id));
 
-  const fila = entrada.ajustes.find((a) => a.fields.clave === "Candidatos por corrida");
-  const valor = fila?.fields.valor;
-  const defaultN = typeof valor === "number" && valor > 0 ? valor : DEFAULT_CANDIDATOS_POR_CORRIDA;
-
   const proyectos = entrada.proyectos
     .filter((p) => {
       const voz = p.fields.voz_default;
@@ -68,7 +76,7 @@ export function armarRunPlan(
       const n = p.fields.N;
       return {
         id: p.id,
-        fields: { ...p.fields, N: typeof n === "number" && n > 0 ? n : defaultN },
+        fields: { ...p.fields, N: typeof n === "number" && n > 0 ? n : N_SI_EL_PROYECTO_NO_LO_DICE },
       };
     });
 

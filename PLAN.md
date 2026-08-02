@@ -199,7 +199,7 @@ afuera (humano en el loop por diseño).
 > **Esta tabla cubre solo las decisiones fundacionales (001–009).** De ADR-010 en adelante el índice
 > completo y al día vive en **[`docs/adr/README.md`](./docs/adr/README.md)**, que es su único dueño —
 > mantener dos listas de lo mismo garantiza que una de las dos mienta (y esta ya venía mintiendo por
-> omisión: van 39). Acá quedan las que fijaron la forma del sistema.
+> omisión: van 43). Acá quedan las que fijaron la forma del sistema.
 
 ### 3.2 Abiertas (bloquean lo que se indica)
 

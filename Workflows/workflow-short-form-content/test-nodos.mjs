@@ -35,7 +35,9 @@ const seccion = (t) => console.log('\n── ' + t);
 // ════════════════════════════════════════════════════════════════════════════
 // Armar plan de corrida — C.1 (N por proyecto) + C.2 (gate por Voces.activo)
 // ════════════════════════════════════════════════════════════════════════════
-const CFG_PLAN = { top_n: 100, dias_recencia: 7, resultados_referente: 20, cap_resultados_referente: 50, cap_top_n: 100, buscar_referente_ig: 1, buscar_referente_tiktok: 1 };
+// Espeja el nodo `Config` del workflow.json vivo. `cap_top_n` decía 100 acá y 250 allá: el drift
+// que ADR-042 resolvió a favor del que está corriendo.
+const CFG_PLAN = { top_n: 100, dias_recencia: 7, resultados_referente: 20, cap_resultados_referente: 50, cap_top_n: 250, buscar_referente_ig: 1, buscar_referente_tiktok: 1 };
 
 // OJO: las voces vienen filtradas por {activo} — antes lo hacía Airtable server-side, ahora la
 // fachada con ?ambito=motor (D4). Igual que en n8n: una voz apagada = una voz que no está en la
@@ -137,11 +139,13 @@ seccion('C.1 — N por proyecto (ADR-024)');
   check('N=0 cae al global (no entrega cero)', plan.projects.p1.n === 100, String(plan.projects.p1.n));
 }
 {
+  // ADR-042: 'Candidatos por corrida' se borró del catálogo y del AJUSTE_MAP. Ya no hay ningún
+  // ajuste que pueda mover la N por defecto — el 100 que queda es la red del Config, no una perilla.
   const { plan } = runPlan({
     proyectos: [P('p1', 'x', ['v1'])], vocesActivas: [V('v1', 'V')],
     ajustes: [{ id: 'a1', fields: { clave: 'Candidatos por corrida', valor: 33 } }],
   });
-  check('el global de Ajustes pisa el default de Config', plan.projects.p1.n === 33, String(plan.projects.p1.n));
+  check('el knob global murió: un ajuste con esa clave ya no mueve la N (ADR-042)', plan.projects.p1.n === 100, String(plan.projects.p1.n));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -161,6 +165,29 @@ const runCorte = (items, plan, cfg = {}) => {
 };
 const vid = (id, pid, heat, extra = {}) => Object.assign(
   { external_id: id, proyecto_id: pid, heat_score: heat, username: 'ref1', descripcion: 'v' + id, script: 'txt', url: '', plataforma: 'ig' }, extra);
+
+seccion('C.1 — el techo de gasto sale de Ajustes (ADR-042)');
+{
+  // La precedencia que estrena el re-import. Si esto se rompe, la corrida NO falla: transcribe
+  // 250 y la factura llega el mes que viene. Por eso se fija acá y no solo en producción.
+  const { plan } = runPlan({
+    proyectos: [P('p1', 'x', ['v1'], { N: 5 })], vocesActivas: [V('v1', 'V')],
+    ajustes: [{ id: 'a1', fields: { clave: 'Videos a transcribir por corrida', valor: 10 } }],
+  });
+  check('el ajuste pisa el cap_top_n del Config', plan.cap_top_n === 10, String(plan.cap_top_n));
+}
+{
+  const { plan } = runPlan({ proyectos: [P('p1', 'x', ['v1'])], vocesActivas: [V('v1', 'V')], ajustes: [] });
+  check('sin el ajuste cae al Config (250), no a 0 = sin techo', plan.cap_top_n === 250, String(plan.cap_top_n));
+}
+{
+  // 0 es legal y significa "sin techo": el validador de la app lo permite a propósito.
+  const { plan } = runPlan({
+    proyectos: [P('p1', 'x', ['v1'])], vocesActivas: [V('v1', 'V')],
+    ajustes: [{ id: 'a1', fields: { clave: 'Videos a transcribir por corrida', valor: 0 } }],
+  });
+  check('un 0 explícito llega como 0 (sin techo), no se confunde con "vacío"', plan.cap_top_n === 0, String(plan.cap_top_n));
+}
 
 seccion('C.1 — el corte final va por proyecto');
 {

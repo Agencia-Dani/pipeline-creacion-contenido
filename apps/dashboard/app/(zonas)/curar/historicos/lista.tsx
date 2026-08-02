@@ -5,16 +5,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
+import { fecha } from "@/lib/fechas";
 import type { Historico } from "@/lib/historicos";
+import { miles } from "@/lib/utils";
 import { cargarMas } from "./actions";
 
 // Todo lo aprobado, de todas las semanas, de a 25. Sin miniatura: el thumbnail era un
 // attachment de Airtable que muere con el record y nunca se archivó — el histórico es texto.
 
-const miles = (n: number) => new Intl.NumberFormat("es-AR").format(n);
-
-const fecha = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const fechaDe = (iso: string | null) => (iso ? fecha(iso, true) : "—");
 
 export function Lista({
   inicial,
@@ -71,7 +70,7 @@ export function Lista({
               {h.referente && ` · ${h.referente}`}
             </p>
             <p className="text-xs text-muted-foreground">
-              {fecha(h.calificadoEn)}
+              {fechaDe(h.calificadoEn)}
               {h.views !== null && ` · ${miles(h.views)} vistas`}
             </p>
           </button>
@@ -104,7 +103,7 @@ function Detalle({ historico, onCerrar }: { historico: Historico | null; onCerra
           <>
             {historico.proyecto ?? "(sin proyecto)"}
             {historico.voz && ` · ${historico.voz}`}
-            {` · aprobado el ${fecha(historico.calificadoEn)}`}
+            {` · aprobado el ${fechaDe(historico.calificadoEn)}`}
           </>
         )
       }
@@ -138,7 +137,9 @@ function Detalle({ historico, onCerrar }: { historico: Historico | null; onCerra
             {historico.notas && (
               <div className="rounded-md bg-muted/50 p-3">
                 <p className="mb-1 text-xs font-medium text-muted-foreground">Notas del equipo</p>
-                <p className="text-sm">{historico.notas}</p>
+                {/* `whitespace-pre-wrap` respeta los saltos que escribió el equipo; `break-words`
+                    evita que una URL larga desborde la caja. Igual que el guion, más abajo. */}
+                <p className="whitespace-pre-wrap break-words text-sm">{historico.notas}</p>
               </div>
             )}
 

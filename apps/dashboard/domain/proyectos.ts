@@ -10,6 +10,8 @@
 //    avisando por consola — o sea el dato podía romperse en silencio y el aviso lo leía nadie.
 //  · `criterios_relevancia` obligatorio. Sin criterios el gate no tiene con qué juzgar y aprueba
 //    o rechaza por ruido; el form de Airtable dejaba crear el proyecto igual (mapa-campos §5.1-6).
+//    **Desde ADR-040 la regla vale también para la VOZ**, que era donde seguía siendo opcional
+//    pese a que sus criterios entran al gate de todos sus proyectos.
 
 export type Validacion<T> = { ok: true; valor: T } | { ok: false; error: string };
 
@@ -19,7 +21,15 @@ const opcional = (v: unknown): string | null => (limpio(v) === "" ? null : limpi
 export type DatosVoz = {
   nombre: string;
   descripcion: string | null;
-  criterios_relevancia: string | null;
+  /**
+   * Obligatorio desde ADR-040, y `not null` en Postgres desde la migración `014`.
+   *
+   * Estos criterios se SUMAN a los de cada proyecto en el gate, no los reemplazan: son la mitad
+   * del juicio de relevancia de todos sus proyectos. Una voz sin criterios no falla — juzga con la
+   * mitad del contexto, en verde y sin avisar. `descripcion` sigue siendo opcional a propósito:
+   * esa es para el equipo y el filtro no la lee.
+   */
+  criterios_relevancia: string;
   activo: boolean;
 };
 
@@ -32,12 +42,20 @@ export function validarVoz(entrada: {
   const nombre = limpio(entrada.nombre);
   if (nombre === "") return { ok: false, error: "Ponele un nombre a la voz." };
 
+  const criterios = limpio(entrada.criterios_relevancia);
+  if (criterios === "") {
+    return {
+      ok: false,
+      error: "Escribí los criterios de la voz: el filtro los suma a los de cada uno de sus proyectos.",
+    };
+  }
+
   return {
     ok: true,
     valor: {
       nombre,
       descripcion: opcional(entrada.descripcion),
-      criterios_relevancia: opcional(entrada.criterios_relevancia),
+      criterios_relevancia: criterios,
       activo: entrada.activo === true,
     },
   };
@@ -128,7 +146,7 @@ export type VozGuardada = {
   id: string;
   nombre: string;
   descripcion: string | null;
-  criterios_relevancia: string | null;
+  criterios_relevancia: string; // not null desde la migración `014` (ADR-040)
   activo: boolean;
 };
 

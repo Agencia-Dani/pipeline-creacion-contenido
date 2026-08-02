@@ -22,6 +22,83 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🟡 **SEGUNDA RONDA DE REVISIÓN UI/UX — CÓDIGO LISTO, FALTAN 2 PASOS MANUALES DE MANI (2026-08-01).**
+> 7 observaciones de Mani sobre el cockpit live. Como en la primera ronda, **tres eran defectos y no
+> preferencias**, y una era una pantalla que decía algo falso. Salieron 4 ADRs:
+> [040](../adr/ADR-040-los-criterios-de-la-voz-son-obligatorios.md) ·
+> [041](../adr/ADR-041-la-metadata-del-referente-es-derivada.md) ·
+> [042](../adr/ADR-042-el-techo-de-gasto-se-toca-desde-el-cockpit.md) ·
+> [043](../adr/ADR-043-el-techo-se-muestra-la-entrega-no-se-promete.md).
+>
+> ### 🔴 Lo que falta, EN ESTE ORDEN, y es de Mani
+> **1. Aplicar [`core/schema/014`](../../core/schema/014_criterios_voz_y_perillas.sql) en el SQL
+> Editor — ANTES del commit.** El código endurece el zod de `filaVoz` a `z.string()`: si el deploy
+> llega primero y alguna voz tuviera `criterios_relevancia` null, se cae `/curar/voces` **y la
+> fachada `/api/engine/run-plan` que alimenta a n8n**. Las 3 voces vivas tienen criterios
+> (545–649 chars), así que el riesgo real es cero — pero el orden se respeta igual.
+> **2. Re-importar y publicar el motor** (`workflow-short-form-content`). Después del deploy, no
+> antes: si el workflow llega primero, `pick` no encuentra la clave nueva y cae al `Config` (250).
+> No rompe nada, pero el knob no hace nada y ese silencio confunde.
+> **3. El hecho-cuando, y es una corrida real:** poner *Videos a transcribir por corrida* en **10**,
+> correr, y confirmar en `runs.metricas` que se transcribieron **10 videos distintos, no 250**.
+> Después devolverlo a **250**. ⚠️ Si el cambio no agarró, **la corrida sale verde igual** y
+> transcribe 250 — la misma familia de fallo silencioso que los 4 hallazgos de D7. Es la corrida más
+> barata que se hizo hasta ahora, justamente por el cap en 10.
+>
+> ### Los tres hallazgos que no eran lo que parecían
+> 1. **La hora de Actividad estaba mal por la misma razón que el repo declara timezone obligatoria en
+>    el manifest** (`workflow-manifest.md:32`, «incidente real»). `entender/secciones.tsx` es un
+>    Server Component y `toLocaleString` sin `timeZone` usa la del proceso: en Vercel, **UTC**. Todo
+>    salía 5 h adelantado. Ahora hay un `lib/fechas.ts` con `America/Bogota`, que era la zona que el
+>    repo ya había elegido para los crons. De paso se arregló un primo: `notaDePromocion` **persistía**
+>    la fecha UTC, así que aprobar un sugerido de noche dejaba escrito el día siguiente, para siempre.
+> 2. **«Candidatos por corrida» tenía una descripción falsa en la base.** Decía *«Cuántos videos
+>    distintos trae la corrida en total»* — eso describe a `cap_top_n`, que es **otro knob**. Lo que
+>    hacía era ser el default de `N` para proyectos con `N` vacío, y desde ADR-038 **no aplicaba a
+>    ninguno**. Estaba inerte y mentía: se borró (ADR-042).
+> 3. **Las notas se corrían de lado porque el control era un `<Input>` de una línea**, no un textarea
+>    (`referentes/pantalla.tsx`). Y `sugeridos/actions.ts` escribe ahí automáticamente ~250 chars al
+>    aprobar: en prod, `@smcandict` 243 y `@trademachineoff` 226.
+>
+> ### Lo que hay que saber antes de tocar las perillas de cantidad
+> 🚨 **«Los knobs se esconden, NO se borran» era demasiado general.** Hay que mirar **caso por caso**
+> qué valor tiene el `Config` del workflow, porque es ahí donde cae la clave borrada:
+> · `Candidatos por corrida`: ajustes 100, `Config` `top_n` 100 ⇒ **se borró, cayó parada.**
+> · `Días de recencia`: ajustes 200, `Config` **7** ⇒ **borrarla tira la recencia a 7 en silencio.**
+> El aviso de ADR-038 sigue vigente para la recencia y para `Resultados por cuenta`.
+>
+> 🔀 **El gatillo de `fields.uuid` se disparó y NO se usó.** El handoff dejó anotado que `fields.uuid`
+> y el `uuidDe` sin trabajo mueren «en el próximo re-import que haga falta por otra cosa». Este
+> re-import es ese. Se decidió **no aprovecharlo**: son cambios sin relación, y si la corrida de
+> verificación sale mal quedan dos sospechosos. La próxima vez ya no hay excusa de costo.
+>
+> ### Lo demás que entró
+> · **Criterios de voz obligatorios** al crear y al editar, `not null` en Postgres (ADR-040). Para n8n
+>   el campo pasa de "a veces null" a "siempre string": es un **aflojamiento**, no un cambio de
+>   contrato — por eso no lo obliga a re-importar.
+> · **Seguidores en Referentes**, derivados en `v_salud_referentes` (ADR-041). **9 de 17 cuentas van a
+>   mostrar número**; las otras 8 se sembraron a mano y no tienen el dato en ningún lado ⇒ «—».
+> · **`voz` y `engagement` vuelven al Feed** — eran las dos únicas pérdidas reales del corte en esa
+>   pestaña. Y la **calidad global** vuelve a Entender, **sin migración**: `v_metricas_calidad` ya
+>   trae los conteos crudos, y `calidadGlobal()` recalcula la precisión **desde las sumas** (promediar
+>   precisiones de proyectos con volúmenes distintos da un número creíble y equivocado).
+> · **Ajustes separa un bloque «Avanzado (solo devs)».** Antes un rol `dev` veía los 18 mezclados sin
+>   ninguna marca, que es por qué la perilla inerte seguía llamando la atención.
+> · **El techo de crudos** (ADR-043) debajo del campo `N`, en `/operar`, y con helper text en 6
+>   lugares. **No es un pronóstico**: `domain/corrida.ts:17-25` decidió a propósito no estimar la
+>   entrega, y esto es una multiplicación (`cuentas × resultados por cuenta`). Si alguien más adelante
+>   quiere poner un «te van a llegar ~12», el razonamiento está en ADR-043 para no re-litigarlo.
+> · **La migración `014` también registra `visibilidad`**, que el flip de ADR-038 había dejado solo en
+>   prod: una base recreada desde `core/schema/` salía con los 18 knobs en dev y **el equipo no veía
+>   ninguno**.
+>
+> **Verde antes de commitear:** `npm run validate` 1589 checks · **131 tests** del dashboard ·
+> `typecheck` · `build` · `auditar-workflows.mjs` sin hallazgos · `test-nodos.mjs` todo en verde (con
+> 3 casos nuevos para la precedencia del techo de gasto). ⚠️ El mock `CFG_PLAN` de `test-nodos.mjs`
+> tenía `cap_top_n: 100` contra los **250** del `workflow.json` vivo: mismo drift que el contrato
+> congelado, corregido a favor del que está corriendo.
+
+
 > 🟢 **REVISIÓN UI/UX DE LA PRIMERA VERSIÓN LIVE — EN PRODUCCIÓN 2026-08-01 (commit `dce25a3`).**
 > 10 observaciones de Mani sobre el cockpit recién deployado. Tres resultaron ser **bugs, no
 > preferencias**, y una obligó a decir algo incómodo sobre la máquina. Cero re-imports de n8n, cero

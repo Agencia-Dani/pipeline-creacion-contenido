@@ -2,6 +2,8 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
   armarVistaOperar,
+  pideMasQueElTecho,
+  techoDeCrudos,
   duracionLegible,
   embudoPorProyecto,
   entregaLegible,
@@ -214,5 +216,61 @@ describe("embudoPorProyecto", () => {
     assert.equal(encontrado?.corrida.id, conEmbudo.id);
     assert.equal(encontrado?.filas.length, 2);
     assert.equal(ultimoEmbudo([vieja]), null);
+  });
+});
+
+// ADR-043: el techo no es un pronóstico, es una multiplicación. La distinción importa porque
+// `domain/corrida.ts` decidió a propósito NO estimar la entrega.
+describe("techoDeCrudos", () => {
+  it("es cuentas por resultados: 3 cuentas con el knob en 40 miran 120 videos", () => {
+    assert.equal(techoDeCrudos(3, 40), 120);
+  });
+
+  it("sin cuentas el techo es 0, aunque el knob esté alto", () => {
+    assert.equal(techoDeCrudos(0, 40), 0);
+  });
+
+  it("no devuelve negativos si algún dato viene roto", () => {
+    assert.equal(techoDeCrudos(-2, 40), 0);
+    assert.equal(techoDeCrudos(3, -40), 0);
+  });
+});
+
+describe("pideMasQueElTecho", () => {
+  it("pedir 50 con un techo de 120 no dispara el aviso", () => {
+    assert.equal(pideMasQueElTecho(50, 120), false);
+  });
+
+  it("pedir 50 con un techo de 40 sí: no alcanza ni en el mejor caso", () => {
+    assert.equal(pideMasQueElTecho(50, 40), true);
+  });
+
+  it("pedir exactamente el techo NO avisa: es alcanzable, aunque improbable", () => {
+    assert.equal(pideMasQueElTecho(40, 40), false);
+  });
+
+  it("un proyecto sin cuentas siempre avisa", () => {
+    assert.equal(pideMasQueElTecho(1, 0), true);
+  });
+});
+
+describe("armarVistaOperar + techo", () => {
+  it("calcula el techo de cada proyecto con sus propias cuentas", () => {
+    const vista = armarVistaOperar(
+      [{ id: "vozA", nombre: "Cora" }],
+      [
+        { id: "p1", nombre: "Con tres", n: 15, vozId: "vozA" },
+        { id: "p2", nombre: "Sin cuentas", n: 15, vozId: "vozA" },
+      ],
+      40,
+      new Map([["p1", 3]]),
+    );
+    assert.deepEqual(
+      vista.porVoz[0].proyectos.map((p) => [p.nombre, p.cuentas, p.techo]),
+      [
+        ["Con tres", 3, 120],
+        ["Sin cuentas", 0, 0],
+      ],
+    );
   });
 });

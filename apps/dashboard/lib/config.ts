@@ -25,10 +25,18 @@ export async function leerRunPlanCrudo(ambito: "motor" | "completo" = "motor") {
   return { voces, proyectos, ajustes, referentes };
 }
 
+/**
+ * Cuántos videos crudos baja el motor por cada cuenta de referente. Es el otro factor del techo
+ * de crudos (ADR-043) y la palanca de supply más barata que tiene el equipo.
+ *
+ * Fail-open como el motor (ADR-011): sin fila o vacío, el default del `Config` del workflow.
+ */
+export const RESULTADOS_POR_CUENTA_POR_DEFECTO = 20;
+
 export async function leerConfigOperar(): Promise<{
   voces: Voz[];
   proyectos: Proyecto[];
-  defaultN: number;
+  resultadosPorCuenta: number;
 }> {
   const [vocesRaw, proyectosRaw, ajustes] = await Promise.all([
     leerVoces(),
@@ -45,9 +53,11 @@ export async function leerConfigOperar(): Promise<{
     .filter((p) => p.activo)
     .map((p) => ({ id: p.id, nombre: p.nombre, n: p.n, vozId: p.voz_id }));
 
-  // Fail-open como el motor (ADR-011): sin fila o valor vacío → default del AJUSTE_MAP.
-  const valor = ajustes.find((a) => a.clave === "Candidatos por corrida")?.valor;
-  const defaultN = typeof valor === "number" && valor > 0 ? valor : 100;
+  return { voces, proyectos, resultadosPorCuenta: leerResultadosPorCuenta(ajustes) };
+}
 
-  return { voces, proyectos, defaultN };
+/** El knob de supply, normalizado. Lo usan Operar y el campo `N` de Voces y proyectos. */
+export function leerResultadosPorCuenta(ajustes: { clave: string; valor: number | null }[]): number {
+  const valor = ajustes.find((a) => a.clave === "Resultados por cuenta de referente")?.valor;
+  return typeof valor === "number" && valor > 0 ? valor : RESULTADOS_POR_CUENTA_POR_DEFECTO;
 }

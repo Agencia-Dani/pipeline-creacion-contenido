@@ -42,17 +42,19 @@ const filaCandidato = z.object({
   views: z.coerce.number().nullable(),
   likes: z.coerce.number().nullable(),
   seguidores: z.coerce.number().nullable(),
+  engagement: z.coerce.number().nullable(),
   viral_por_tamano: z.boolean(),
   calificacion: z.string().nullable(),
   estado: z.string(),
   notas_equipo: z.string().nullable(),
   proyectos: z.object({ nombre: z.string() }).nullable(),
+  voces: z.object({ nombre: z.string() }).nullable(),
 });
 
 const COLUMNAS =
   "id, titulo, script, thumbnail_url, referente, url_referente, heat_score, relevancia_score, " +
-  "relevancia_razon, idioma, views, likes, seguidores, viral_por_tamano, calificacion, estado, " +
-  "notas_equipo, proyectos(nombre)";
+  "relevancia_razon, idioma, views, likes, seguidores, engagement, viral_por_tamano, " +
+  "calificacion, estado, notas_equipo, proyectos(nombre), voces(nombre)";
 
 /** Todo lo que hay en el feed, con el proyecto ya resuelto a nombre por la FK. */
 export async function leerFeed(): Promise<CandidatoFeed[]> {
@@ -66,6 +68,7 @@ export async function leerFeed(): Promise<CandidatoFeed[]> {
     script: r.script,
     thumbnail: r.thumbnail_url,
     proyecto: r.proyectos?.nombre ?? "",
+    voz: r.voces?.nombre ?? null,
     referente: r.referente,
     urlReferente: r.url_referente,
     heat: r.heat_score,
@@ -75,6 +78,7 @@ export async function leerFeed(): Promise<CandidatoFeed[]> {
     views: r.views,
     likes: r.likes,
     seguidores: r.seguidores,
+    engagement: r.engagement,
     viralPorTamano: r.viral_por_tamano,
     calificacion: esCalificacion(r.calificacion) ? r.calificacion : null,
     estado: (r.estado as Estado) ?? "nuevo",

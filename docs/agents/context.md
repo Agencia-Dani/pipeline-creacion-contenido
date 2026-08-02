@@ -48,8 +48,8 @@ proyectos es dos candidatos, cada uno con su voz, su heat-score y su juicio de r
 
 **Videos por corrida** (el `N` del Proyecto):
 Cuántos candidatos **pide** un Proyecto cada vez que corre el motor. Es la **única** perilla de
-cantidad que ve el equipo, y es obligatoria (ADR-038; antes vacío significaba "usá el global", y
-había otras dos que movían lo mismo).
+cantidad que existe (ADR-038 la dejó como la única *visible*; ADR-042 borró el default global
+`Candidatos por corrida` que seguía compitiendo con ella). Es obligatoria.
 
 ⚠️ **Es un techo, no un contrato.** El motor nunca entrega más que `N` —el corte de `Armar
 candidato` es exacto— pero entregar menos es lo normal: la entrega es *best-effort sobre el supply
@@ -58,6 +58,20 @@ lo que el dedup ya mostró. Por eso **la pantalla nunca dice «hasta N»**: dice
 lado, lo que la última corrida entregó de verdad. *Decir el número solo sería prometer algo que la
 máquina no garantiza.* Cuando queda corto, la palanca casi siempre es **más referentes**, no un `N`
 más alto.
+
+**Techo de crudos**:
+Cuántos videos llega a **mirar** una corrida para un Proyecto, antes de filtrar nada:
+`referentes activos × resultados por cuenta de referente`. Es un límite superior aritmético, **no un
+pronóstico** — sobreestima a propósito (ignora el dedup y el fan-out), y por eso es seguro: si el
+`N` pedido no entra ni en el techo, no hay criterio que lo arregle y la palanca son las cuentas
+(ADR-043). Es lo que la pantalla muestra al lado del `N`, en vez de la entrega estimada que
+deliberadamente no se calcula.
+
+**Techo de gasto** (`cap_top_n` en el motor, *Videos a transcribir por corrida* en Ajustes):
+Cuántos videos distintos se transcriben como máximo en **toda** la corrida, todos los Proyectos
+juntos, ordenados por Heat-score. Muerde justo antes de transcribir y filtrar, que son los pasos que
+se pagan: es el presupuesto de la corrida. `0` = sin techo. No confundir con el `N` del Proyecto,
+que reparte; este limita el total (ADR-042).
 
 **Heat-score**:
 El número con que el motor ordena los candidatos de caliente a frío. Combina la relevancia/calidad

@@ -1,14 +1,17 @@
 // Dominio puro (C3): qué va a correr y cómo leer una corrida.
-// Espeja el gate del motor (proyecto activo de voz activa + N resuelta contra el
-// default global, ADR-024) para que la pantalla Operar muestre lo mismo que el
-// motor va a decidir. El scoring, el gate y el corte NO viven acá (ADR-028).
+// Espeja el gate del motor (proyecto activo de voz activa) para que la pantalla Operar muestre lo
+// mismo que el motor va a decidir. El scoring, el gate y el corte NO viven acá (ADR-028).
+
+// Relativo y con extensión, no `@/domain/...`: `npm test` corre estos `.ts` directo en Node, que
+// no resuelve el alias de tsconfig. Es el primer módulo de dominio que importa a otro.
+import { N_SI_EL_PROYECTO_NO_LO_DICE } from "./run-plan.ts";
 
 export type Voz = { id: string; nombre: string };
 
 export type Proyecto = {
   id: string;
   nombre: string;
-  // null = campo vacío en Airtable. 0 también significa "usar el default" (contrato §1).
+  // null u 0 = fila que no dice cuántos quiere. La app ya no puede crear una así (ADR-038).
   n: number | null;
   vozId: string | null;
 };
@@ -31,11 +34,37 @@ export type ProyectoDelPlan = {
   pide: number;
   /** Referentes activos que lo alimentan. Es lo que hay que subir cuando falta fuente. */
   cuentas: number;
+  /** Cuántos videos crudos llega a mirar la corrida para este proyecto (ADR-043). */
+  techo: number;
   /** Lo que entregó la última corrida con datos. `null` = todavía no hay historia. */
   ultimaEntrega: number | null;
   /** Por qué quedó corto la última vez, si quedó. */
   razonFaltante: RazonFaltante | null;
 };
+
+/**
+ * **El techo de crudos** (ADR-043): cuántos videos llega a MIRAR la corrida para este proyecto,
+ * antes de filtrar nada.
+ *
+ * `cuentas × resultados por cuenta`. No es un pronóstico y por eso puede convivir con la decisión
+ * de arriba: es un límite superior aritmético, verdadero por construcción. Un proyecto con 3
+ * cuentas y el knob en 40 mira 120 videos crudos; si pide 50, está pidiendo que pase el filtro el
+ * 42%, y las tasas reales están a la vista en Referentes.
+ *
+ * Sobreestima a propósito —ignora el dedup y el fan-out— porque eso es lo que lo vuelve seguro:
+ * si ni siquiera el techo alcanza, la conclusión no depende de ninguna tasa.
+ */
+export function techoDeCrudos(cuentas: number, resultadosPorCuenta: number): number {
+  return Math.max(0, cuentas) * Math.max(0, resultadosPorCuenta);
+}
+
+/**
+ * Si el proyecto pide más de lo que la corrida llega a mirar, no hay filtro que lo salve: faltan
+ * cuentas. Es la señal que dispara el aviso, y sin cuentas cargadas (techo 0) también es cierta.
+ */
+export function pideMasQueElTecho(pide: number, techo: number): boolean {
+  return pide > techo;
+}
 
 export type VistaOperar = {
   porVoz: { voz: Voz; proyectos: ProyectoDelPlan[] }[];
@@ -44,9 +73,10 @@ export type VistaOperar = {
 };
 
 /**
- * `defaultN` sigue existiendo solo para filas viejas con `n` en null: el motor las resuelve
- * contra el global, así que la pantalla muestra el mismo número que el motor va a usar. Desde
- * esta versión el form exige N, o sea que no se crean filas nuevas así.
+ * `resultadosPorCuenta` es el knob de supply, y entra solo para calcular el techo (ADR-043).
+ * Antes acá llegaba un `defaultN` que salía del knob global `Candidatos por corrida`; ese knob
+ * murió con ADR-042 y su lugar lo toma una constante: `N_SI_EL_PROYECTO_NO_LO_DICE`, que es una
+ * red para filas con `n` null y ya no una perilla que alguien pueda mover.
  *
  * El join con el embudo va **por nombre de proyecto** y no por id: las claves de
  * `metricas.por_proyecto` todavía son record ids de Airtable en las corridas ya registradas, y
@@ -56,7 +86,7 @@ export type VistaOperar = {
 export function armarVistaOperar(
   voces: Voz[],
   proyectos: Proyecto[],
-  defaultN: number,
+  resultadosPorCuenta: number,
   cuentasPorProyecto: Map<string, number> = new Map(),
   embudo: EmbudoProyecto[] = [],
 ): VistaOperar {
@@ -72,11 +102,13 @@ export function armarVistaOperar(
       continue;
     }
     const ultima = porNombre.get(proyecto.nombre);
+    const cuentas = cuentasPorProyecto.get(proyecto.id) ?? 0;
     grupo.proyectos.push({
       id: proyecto.id,
       nombre: proyecto.nombre,
-      pide: proyecto.n && proyecto.n > 0 ? proyecto.n : defaultN,
-      cuentas: cuentasPorProyecto.get(proyecto.id) ?? 0,
+      pide: proyecto.n && proyecto.n > 0 ? proyecto.n : N_SI_EL_PROYECTO_NO_LO_DICE,
+      cuentas,
+      techo: techoDeCrudos(cuentas, resultadosPorCuenta),
       ultimaEntrega: ultima ? ultima.entregados : null,
       razonFaltante: ultima ? ultima.razonFaltante : null,
     });

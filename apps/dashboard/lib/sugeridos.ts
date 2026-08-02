@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { diaISO } from "@/lib/fechas";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // La bandeja del descubrimiento (ADR-020). Desde D7 vive en Postgres: la escribe el buscador de
@@ -86,7 +87,9 @@ export async function marcarResuelto(id: string, estado: "promovido" | "descarta
 
 /** La nota con la que nace un referente promovido: la misma que escribía `Preparar promoción`. */
 export function notaDePromocion(sugerido: { afinidad: number | null; razon: string | null }, hoy: Date): string {
-  const fecha = hoy.toISOString().slice(0, 10);
+  // `diaISO` y no `toISOString()`: esta fecha se GUARDA. Con la de UTC, aprobar de noche dejaba
+  // escrito el día siguiente, para siempre.
+  const fecha = diaISO(hoy);
   const afinidad = sugerido.afinidad != null ? ` (afinidad ${sugerido.afinidad})` : "";
   const razon = sugerido.razon ? `: ${sugerido.razon.slice(0, 300)}` : "";
   return `Promovido por descubrimiento ${fecha}${afinidad}${razon}`;

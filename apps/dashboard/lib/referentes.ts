@@ -30,6 +30,7 @@ const filaSalud = z.object({
   videos_evaluados: z.coerce.number().nullable(),
   tasa_gate: z.coerce.number().nullable(),
   tasa_aprobacion: z.coerce.number().nullable(),
+  seguidores: z.coerce.number().nullable(), // migración `014` (ADR-041)
 });
 
 export type Proyecto = { id: string; nombre: string; vozId: string; activo: boolean };
@@ -45,7 +46,12 @@ export async function leerProyectos(): Promise<Proyecto[]> {
   }));
 }
 
-const SIN_SALUD: Salud = { tasa_gate: null, tasa_aprobacion: null, videos_evaluados: null };
+const SIN_SALUD: Salud = {
+  tasa_gate: null,
+  tasa_aprobacion: null,
+  videos_evaluados: null,
+  seguidores: null,
+};
 
 async function leerPares(): Promise<Map<string, string[]>> {
   const supabase = createAdminClient();
@@ -68,7 +74,10 @@ export async function leerBanco(): Promise<ReferenteDelBanco[]> {
   const [referentes, pares, salud] = await Promise.all([
     supabase.schema("app").from("referentes").select("id, handle, plataforma, activo, notas").order("handle"),
     leerPares(),
-    supabase.schema("app").from("v_salud_referentes").select("id, videos_evaluados, tasa_gate, tasa_aprobacion"),
+    supabase
+      .schema("app")
+      .from("v_salud_referentes")
+      .select("id, videos_evaluados, tasa_gate, tasa_aprobacion, seguidores"),
   ]);
   if (referentes.error) throw new Error(`Supabase respondió con error leyendo referentes: ${referentes.error.message}`);
   if (salud.error) throw new Error(`Supabase respondió con error leyendo la salud: ${salud.error.message}`);

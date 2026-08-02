@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { miles } from "@/lib/utils";
 import {
   MIN_MUESTRA_PARA_SENALAR,
   PLATAFORMAS,
@@ -197,6 +199,16 @@ function Fila({
           {referente.handle}
         </button>
         <Badge variant="secondary">{referente.plataforma}</Badge>
+        {/* Se veían en Sugeridos y se perdían al aprobar. Ahora se derivan (ADR-041): es lo último
+            que vio el motor, y «—» cuando el sistema no tiene el dato. */}
+        {salud.seguidores !== null && (
+          <span
+            className="text-xs text-muted-foreground"
+            title="Seguidores que vio el motor la última vez que trajo un video de esta cuenta."
+          >
+            {miles(salud.seguidores)} seguidores
+          </span>
+        )}
         {avisoCruzaVoces && (
           <Badge variant="outline" title="Alimenta proyectos de más de una voz. El motor lo permite: cada video llega una sola vez, al proyecto que mejor pega.">
             cruza voces
@@ -374,11 +386,18 @@ function Formulario({
 
       <div className="space-y-1">
         <Label htmlFor="ref-notas">Notas</Label>
-        <Input
+        <p className="text-xs text-muted-foreground">
+          Para ustedes: el motor no las lee. Sirven para acordarse de por qué entró la cuenta.
+        </p>
+        {/* Era un <Input> de una línea, y aprobar un sugerido escribe acá una nota automática de
+            ~250 caracteres: el texto se corría de lado en vez de bajar de renglón. El Textarea
+            trae `field-sizing-content`, así que además crece con lo que haya. */}
+        <Textarea
           id="ref-notas"
           value={form.notas}
           onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
           disabled={enviando}
+          rows={3}
           placeholder="Por qué la agregaron"
         />
       </div>

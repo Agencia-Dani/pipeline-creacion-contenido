@@ -38,3 +38,35 @@ export function diagnosticoCriterio(
 
   return { nivel, texto };
 }
+
+// ── La fila GLOBAL de la semana ──────────────────────────────────────────────
+
+export type CalidadGlobal = {
+  calificados: number;
+  aprobados: number;
+  descartados: number;
+  precision: number | null;
+};
+
+/**
+ * El agregado semanal que Airtable tenía en la fila `GLOBAL` de *Métricas Global* y que el corte
+ * se llevó: al cockpit le quedó solo la calidad POR PROYECTO.
+ *
+ * No hace falta ninguna vista nueva — `v_metricas_calidad` ya trae los conteos crudos. Lo que sí
+ * importa es **cómo** se agrega: `precision` se recalcula desde las sumas
+ * (`aprobados / (aprobados + descartados)`), no promediando las precisiones de cada proyecto. El
+ * promedio de proporciones no es la proporción del total, y con proyectos de volúmenes distintos
+ * da un número que se ve razonable y está mal (paradoja de Simpson).
+ *
+ * `null` cuando no hay nada calificado: no es lo mismo que 0% de precisión.
+ */
+export function calidadGlobal(filas: { aprobados: number; descartados: number; calificados: number }[]): CalidadGlobal {
+  const total = { calificados: 0, aprobados: 0, descartados: 0 };
+  for (const f of filas) {
+    total.calificados += f.calificados;
+    total.aprobados += f.aprobados;
+    total.descartados += f.descartados;
+  }
+  const juzgados = total.aprobados + total.descartados;
+  return { ...total, precision: juzgados > 0 ? total.aprobados / juzgados : null };
+}

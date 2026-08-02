@@ -193,7 +193,7 @@ Los escribe **MOTOR** (`Preparar batch Airtable`) salvo donde diga otra cosa. **
 |---|---|---|---|
 | `titulo` · `script` | MOTOR | ARCH → `outputs` + Sheet · `Destilar` (`_snip`) | ✅ |
 | `idioma` · `views` · `likes` · `seguidores` · `heat_score` | MOTOR | ARCH → `outputs.metadata` + Sheet | ✅ |
-| `engagement` | MOTOR | ARCH → `outputs.metadata` (**no** al Sheet) | ✅ Menor asimetría, deliberada o inocua. |
+| `engagement` | MOTOR | ARCH → `outputs.metadata` (**no** al Sheet) | ✅ Menor asimetría, deliberada o inocua. **Recuperado 2026-08-01**: el cockpit propio no lo seleccionaba y ahora es un badge del record del feed, junto a heat y relevancia. |
 | `relevancia_score` | MOTOR (`Gate`) | ARCH → `outputs.metadata` + Sheet **+ `Computar métricas`** (`score_aprobados`/`separacion_gate`) | ✅ Load-bearing: alimenta el diagnóstico del criterio. |
 | `relevancia_razon` | MOTOR (`Gate`) | ARCH → `outputs.metadata` + Sheet | ✅ |
 | `referente` · `url_referente` | MOTOR | ARCH → `outputs.metadata` + `source_items` | ✅ |
@@ -258,7 +258,7 @@ también (*Salud* + *Costos*). **No hay páginas huérfanas** — el problema no
 
 | Página | Tabla | Edita | Propósito | Veredicto |
 |---|---|---|---|---|
-| **Feed de Calificación** | `Candidatos` | `calificacion`, `estado`, `notas_equipo` (+ `titulo`, `thumbnail`, `referente` ⚠️) | el loop central: el equipo califica | 🟠 edita 3 campos de la máquina (§5.1-4) |
+| **Feed de Calificación** ✅ *(`voz` y `engagement` recuperados el 2026-08-01: eran las dos únicas pérdidas reales del corte en esta pestaña)* | `Candidatos` | `calificacion`, `estado`, `notas_equipo` (+ `titulo`, `thumbnail`, `referente` ⚠️) | el loop central: el equipo califica | 🟠 edita 3 campos de la máquina (§5.1-4) |
 | **Proyectos** | `Proyectos` | `nombre`, `activo`, `descripcion`, `voz_default`, `criterios_relevancia` | el equipo define qué se busca | 🔴 **no muestra `criterios_aprendidos` ni `advertencia_criterios`** (§5.1-2) |
 | **Voces** | `Voces` | `nombre`, `descripcion`, `criterios_relevancia` | el eje organizativo | ✅ (le falta `activo` → **E.1** + **B.5**) |
 | **Referentes** | `Referentes` | `handle`, `plataforma`, `proyecto`, `activo`, `notas` | alta y toggle de fuentes | ✅ |

@@ -142,6 +142,12 @@ export function aRegistrosDelPlan(
 // ── Lecturas que la pantalla necesita ────────────────────────────────────────
 
 export type Salud = {
+  /**
+   * Los seguidores que vio el motor la última vez, o los que traía la propuesta si todavía no
+   * produjo ningún candidato (ADR-041). `null` = el sistema no tiene el dato, y decirlo es más
+   * honesto que inventarlo — pasa con las cuentas sembradas a mano.
+   */
+  seguidores: number | null;
   tasa_gate: number | null;
   tasa_aprobacion: number | null;
   videos_evaluados: number | null;

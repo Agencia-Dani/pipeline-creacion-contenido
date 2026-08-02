@@ -250,7 +250,7 @@ Una Voz = un personaje o marca para la que curan contenido (ej: "Cora", "30X ins
 |---|---|
 | `nombre` | el nombre de la voz. Ej: "Cora" |
 | `descripcion` | quién es / de qué tiene autoridad |
-| `criterios_relevancia` | qué le sirve a este cliente puntual (opcional; afina el filtro por encima del tema del Proyecto) |
+| `criterios_relevancia` | **obligatorio.** Qué le sirve a este cliente puntual. El filtro los **suma** a los criterios de cada proyecto de esta voz, así que sin ellos juzga con la mitad del contexto y deja pasar de más. Ya no se puede crear ni guardar una voz sin esto |
 | `activo` | ✅ para que la voz corra. **Es el interruptor maestro:** destildarlo pausa **todos** los proyectos de esa voz de una (aunque los proyectos sigan en `activo`). Ideal para pausar un cliente entero sin tocar proyecto por proyecto |
 
 > **La voz apagada sigue recibiendo propuestas de cuentas.** El buscador de cuentas nuevas (§8.1) le
@@ -398,7 +398,13 @@ lista de "perilla = valor" en español claro.
 > referente*— y ninguna decía cuál mandaba. **Las tres desaparecieron de su pantalla.** Ahora hay
 > **un solo número y está en el proyecto**: `Curar → Voces y proyectos → tocá el proyecto →
 > "Videos por corrida"`. Lo que pongan ahí es lo que el proyecto pide, y no cae contra ningún
-> default escondido. La ventana de búsqueda quedó fija y ancha (100 días): con el sistema
+> default escondido — la perilla vieja *Candidatos por corrida* ya no existe, se borró.
+>
+> 🆕 **Y ahora la pantalla les dice si el número es alcanzable.** Debajo del campo aparece cuántos
+> videos crudos llega a mirar la corrida para ese proyecto: es `cuentas × 40`. Con 3 cuentas son
+> 120, así que pedir 50 es pedir que pase el filtro casi la mitad, y eso no suele pasar. **Si el
+> aviso sale en naranja, la palanca son más cuentas, no un número más alto** — y lo más barato es
+> aprobar las que ya están esperando en *Sugeridos*. Pueden guardar igual: es un aviso, no un freno. La ventana de búsqueda quedó fija y ancha (100 días): con el sistema
 > anti-repetidos nunca les va a traer dos veces el mismo video, así que achicarla solo servía para
 > traer menos.
 

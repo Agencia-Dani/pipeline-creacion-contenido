@@ -11,7 +11,7 @@ const ahora = new Date("2026-07-20T08:00:00Z");
 const reg = (id: string, fields: Registro["fields"]): Registro => ({ id, fields });
 
 describe("armarRunPlan (ADR-028)", () => {
-  it("proyecto activo de voz apagada NO entra; N vacía o 0 se resuelve con el ajuste global", () => {
+  it("proyecto activo de voz apagada NO entra; N vacía o 0 cae en la red de 100", () => {
     const plan = armarRunPlan(
       {
         voces: [reg("vozA", { nombre: "Cora", activo: true })],
@@ -23,25 +23,28 @@ describe("armarRunPlan (ADR-028)", () => {
           reg("p5", { nombre: "sin voz", N: 5 }),
         ],
         referentes: [reg("r1", { handle: "@a", activo: true })],
-        ajustes: [reg("a1", { clave: "Candidatos por corrida", valor: 30 })],
+        ajustes: [],
       },
       ahora,
     );
     assert.deepEqual(
       plan.proyectos.map((p) => [p.fields.nombre, p.fields.N]),
-      [["TP", 20], ["TfT", 30], ["N cero", 30]],
+      [["TP", 20], ["TfT", 100], ["N cero", 100]],
     );
     assert.equal(plan.version, RUN_PLAN_VERSION);
     assert.equal(plan.generado_en, "2026-07-20T08:00:00.000Z");
   });
 
-  it("sin fila de ajuste (o valor no numérico) la N default es 100, fail-open como el AJUSTE_MAP", () => {
+  // ADR-042: `Candidatos por corrida` se borró. Era el default global de N, competía con el número
+  // del proyecto, y desde ADR-038 no aplicaba a ninguno. Este test fija que la red que quedó en su
+  // lugar es una CONSTANTE: ningún ajuste la mueve, ni siquiera uno que se llame igual que el viejo.
+  it("ningún ajuste puede mover la N por defecto: el knob global murió (ADR-042)", () => {
     const plan = armarRunPlan(
       {
         voces: [reg("vozA", { nombre: "Cora" })],
         proyectos: [reg("p1", { nombre: "TP", voz_default: ["vozA"] })],
         referentes: [],
-        ajustes: [reg("a1", { clave: "Candidatos por corrida" })],
+        ajustes: [reg("a1", { clave: "Candidatos por corrida", valor: 30 })],
       },
       ahora,
     );

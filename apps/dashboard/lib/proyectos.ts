@@ -28,7 +28,7 @@ const filaVoz = z.object({
   id: z.string(),
   nombre: z.string(),
   descripcion: z.string().nullable(),
-  criterios_relevancia: z.string().nullable(),
+  criterios_relevancia: z.string(), // not null desde la `014` (ADR-040)
   activo: z.boolean(),
 });
 

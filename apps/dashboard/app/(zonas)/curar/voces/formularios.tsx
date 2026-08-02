@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { pideMasQueElTecho, techoDeCrudos } from "@/domain/corrida";
 import {
   crearProyectoNuevo,
   crearVozNueva,
@@ -92,23 +94,41 @@ function Pie({
 }
 
 /**
- * El número de videos por corrida. Es el ÚNICO knob de cantidad que ve el equipo: los tres
- * globales que competían con él (`Candidatos por corrida`, `Días de recencia`, `Resultados por
- * cuenta de referente`) pasaron a `visibilidad = 'dev'`. Por eso ya no tiene placeholder que
- * diga "si lo dejás vacío usa el global": vacío ahora es un error del servidor.
+ * El número de videos por corrida. Desde ADR-042 es la ÚNICA perilla de cantidad que existe: el
+ * default global que competía con él (`Candidatos por corrida`) se borró, y los otros dos knobs
+ * de supply son dev-only. Por eso vacío ya no significa "usá el global": es un error del servidor.
+ *
+ * Y desde ADR-043 el campo dice, mientras se escribe, si el número es alcanzable. No pronostica la
+ * entrega —eso se descartó a propósito, ver `domain/corrida.ts`— sino que muestra el **techo de
+ * crudos**, que es una multiplicación: `cuentas × resultados por cuenta`. Si el proyecto pide más
+ * de lo que la corrida llega a mirar, no hay filtro que lo arregle y la palanca son las cuentas.
  */
 function CampoN({
   valor,
   onChange,
   enviando,
+  cuentas,
+  resultadosPorCuenta,
+  sugeridosPendientes,
 }: {
   valor: string;
   onChange: (v: string) => void;
   enviando: boolean;
+  cuentas: number;
+  resultadosPorCuenta: number;
+  sugeridosPendientes: number;
 }) {
+  const techo = techoDeCrudos(cuentas, resultadosPorCuenta);
+  const pide = Number(valor.trim());
+  const noAlcanza = Number.isFinite(pide) && pide > 0 && pideMasQueElTecho(pide, techo);
+
   return (
     <div className="space-y-1">
       <Label htmlFor="proy-n">Videos por corrida</Label>
+      <p className="text-xs text-muted-foreground">
+        Es un techo, no una promesa: si las cuentas no dan para tanto, llegan menos. Subir el número
+        no crea videos — los crea sumar referentes.
+      </p>
       <Input
         id="proy-n"
         value={valor}
@@ -117,6 +137,44 @@ function CampoN({
         inputMode="numeric"
         className="w-24 tabular-nums"
       />
+      {cuentas === 0 ? (
+        <p className="text-xs text-amber-700 dark:text-amber-500">
+          ⚠️ Este proyecto no tiene ninguna cuenta asignada: pida lo que pida, no va a traer nada.{" "}
+          <Link href="/curar/referentes" className="underline">
+            Asignale referentes
+          </Link>
+          .
+        </p>
+      ) : noAlcanza ? (
+        <p className="text-xs text-amber-700 dark:text-amber-500">
+          ⚠️ Con {cuentas === 1 ? "1 cuenta" : `${cuentas} cuentas`} la corrida mira{" "}
+          <strong>{techo}</strong> videos crudos, y de ahí sale todo lo que pasa el filtro. Pedir{" "}
+          {pide} es pedir que pase más de la mitad: no suele pasar.{" "}
+          {sugeridosPendientes > 0 ? (
+            <>
+              Hay{" "}
+              <Link href="/curar/sugeridos" className="underline">
+                {sugeridosPendientes} cuenta{sugeridosPendientes === 1 ? "" : "s"} esperando
+                aprobación
+              </Link>
+              , que es la palanca más barata.
+            </>
+          ) : (
+            <>
+              Sumá cuentas en{" "}
+              <Link href="/curar/referentes" className="underline">
+                Referentes
+              </Link>
+              .
+            </>
+          )}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Con {cuentas === 1 ? "1 cuenta" : `${cuentas} cuentas`} la corrida mira {techo} videos
+          crudos antes de filtrar.
+        </p>
+      )}
     </div>
   );
 }
@@ -155,6 +213,9 @@ export function FormularioVoz({ voz, onListo }: { voz: VozFila; onListo: () => v
       </div>
       <div className="space-y-1">
         <Label htmlFor="voz-desc">Descripción</Label>
+        <p className="text-xs text-muted-foreground">
+          Para ustedes, no para la máquina: el filtro no lee esto, lee los criterios de abajo.
+        </p>
         <Input
           id="voz-desc"
           value={form.descripcion}
@@ -188,10 +249,16 @@ export function FormularioProyecto({
   proyecto,
   voces,
   onListo,
+  cuentas,
+  resultadosPorCuenta,
+  sugeridosPendientes,
 }: {
   proyecto: ProyectoFila;
   voces: OpcionVoz[];
   onListo: () => void;
+  cuentas: number;
+  resultadosPorCuenta: number;
+  sugeridosPendientes: number;
 }) {
   const original = formDeProyecto(proyecto);
   const [form, setForm] = useState(original);
@@ -233,6 +300,10 @@ export function FormularioProyecto({
         </div>
         <div className="space-y-1">
           <Label htmlFor="proy-voz">Voz</Label>
+          <p className="max-w-xs text-xs text-muted-foreground">
+            Hereda sus criterios: se suman a los de acá, no los reemplazan. Y si la voz está
+            apagada, este proyecto no corre aunque esté prendido.
+          </p>
           <Select
             id="proy-voz"
             value={form.vozId}
@@ -246,12 +317,15 @@ export function FormularioProyecto({
             ))}
           </Select>
         </div>
-        <CampoN
-          valor={form.n}
-          onChange={(n) => setForm((f) => ({ ...f, n }))}
-          enviando={enviando}
-        />
       </div>
+      <CampoN
+        valor={form.n}
+        onChange={(n) => setForm((f) => ({ ...f, n }))}
+        enviando={enviando}
+        cuentas={cuentas}
+        resultadosPorCuenta={resultadosPorCuenta}
+        sugeridosPendientes={sugeridosPendientes}
+      />
       <div className="space-y-1">
         <Label htmlFor="proy-desc">Descripción</Label>
         <Input
@@ -322,7 +396,11 @@ export function AltaVoz({ onListo }: { onListo: () => void }) {
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="alta-voz-crit">Criterios de la voz (opcional)</Label>
+        <Label htmlFor="alta-voz-crit">Criterios de la voz</Label>
+        <p className="text-xs text-muted-foreground">
+          Obligatorios (ADR-040): son la espina dorsal. El filtro los suma a los criterios de cada
+          proyecto de esta voz, así que sin ellos juzga con la mitad del contexto y aprueba de más.
+        </p>
         <Textarea
           id="alta-voz-crit"
           value={form.criterios_relevancia}
@@ -335,7 +413,7 @@ export function AltaVoz({ onListo }: { onListo: () => void }) {
         Nace apagada: prendela cuando tenga proyectos y referentes cargados.
       </p>
       <Pie
-        cambiado={form.nombre.trim() !== ""}
+        cambiado={form.nombre.trim() !== "" && form.criterios_relevancia.trim() !== ""}
         enviando={enviando}
         resultado={resultado}
         onGuardar={enviar}
@@ -345,7 +423,17 @@ export function AltaVoz({ onListo }: { onListo: () => void }) {
   );
 }
 
-export function AltaProyecto({ voces, onListo }: { voces: OpcionVoz[]; onListo: () => void }) {
+export function AltaProyecto({
+  voces,
+  onListo,
+  resultadosPorCuenta,
+  sugeridosPendientes,
+}: {
+  voces: OpcionVoz[];
+  onListo: () => void;
+  resultadosPorCuenta: number;
+  sugeridosPendientes: number;
+}) {
   // Arranca con un número puesto, no vacío: el N es obligatorio y un campo en blanco haría
   // rebotar el alta por lo único que nadie espera tener que completar.
   const vacio: FormProyecto = {
@@ -396,8 +484,15 @@ export function AltaProyecto({ voces, onListo }: { voces: OpcionVoz[]; onListo: 
             ))}
           </Select>
         </div>
-        <CampoN valor={form.n} onChange={(n) => setForm((f) => ({ ...f, n }))} enviando={enviando} />
       </div>
+      <CampoN
+        valor={form.n}
+        onChange={(n) => setForm((f) => ({ ...f, n }))}
+        enviando={enviando}
+        cuentas={0} // un proyecto que todavía no existe no tiene cuentas asignadas
+        resultadosPorCuenta={resultadosPorCuenta}
+        sugeridosPendientes={sugeridosPendientes}
+      />
       <div className="space-y-1">
         <Label htmlFor="alta-proy-crit">Criterios de relevancia</Label>
         <p className="text-xs text-muted-foreground">

@@ -25,7 +25,7 @@ en §Agent skills; acá solo se ubican.
   que reemplaza a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–039, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–043, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).

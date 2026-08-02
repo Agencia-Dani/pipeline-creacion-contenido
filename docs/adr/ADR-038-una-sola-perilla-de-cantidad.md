@@ -83,3 +83,24 @@
     número.
   - **Borrar los knobs del catálogo y hardcodear en el `Config` del motor.** Más limpio
     conceptualmente, pero exige re-import y abre el modo de fallo silencioso descrito arriba.
+
+---
+
+## Enmienda — 2026-08-01, misma tarde ([ADR-042](./ADR-042-el-techo-de-gasto-se-toca-desde-el-cockpit.md))
+
+Dos cosas que esta decisión dejó a medias y se cerraron al revisar la pantalla ya deployada:
+
+1. **El flip a `visibilidad = 'dev'` se había aplicado a mano en el SQL Editor y no quedó en ninguna
+   migración.** Como el DEFAULT de la columna es `'dev'`, una base recreada desde `core/schema/` salía
+   con los 18 knobs en dev y **el equipo no veía ni una perilla**. La migración
+   [014](../../core/schema/014_criterios_voz_y_perillas.sql) lo registra.
+
+2. **«Los knobs se esconden, NO se borran» era una regla demasiado general.** El aviso nació de un
+   caso real —borrar `Días de recencia` tiraría la recencia de 200 a 7, porque el `Config` del motor
+   tiene 7— pero se escribió como si valiera para los tres. No vale: hay que mirar caso por caso qué
+   valor tiene el `Config`, porque es ahí donde cae la clave borrada.
+
+   `Candidatos por corrida` tenía 100 en `ajustes` y 100 en el `Config`: caía parada. Encima estaba
+   inerte (ningún proyecto con `N` vacío) y su descripción describía a otro knob. **Se borró.**
+   `Días de recencia` y `Resultados por cuenta de referente` siguen vivos y dev-only, y el aviso de
+   arriba les sigue valiendo entero.

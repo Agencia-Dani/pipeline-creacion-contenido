@@ -1,6 +1,7 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { diagnosticoCriterio } from "@/domain/entender";
+import { calidadGlobal, diagnosticoCriterio } from "@/domain/entender";
+import { fecha, fechaHora } from "@/lib/fechas";
 import type {
   FilaAuditoria,
   FilaCalidad,
@@ -16,11 +17,9 @@ import type {
 const usd = (n: number) => `$${n.toFixed(2)}`;
 const pct = (n: number | null) => (n == null ? "—" : `${Math.round(n * 100)}%`);
 const num = (n: number | null) => (n == null ? "—" : String(n));
-const semanaDel = (iso: string) =>
-  `semana del ${new Date(`${iso}T00:00:00`).toLocaleDateString("es", {
-    day: "numeric",
-    month: "short",
-  })}`;
+// `iso` acá es un `date` puro de Postgres (`2026-08-01`), sin hora. Se le pega el mediodía para que
+// ningún corrimiento de zona lo empuje al día anterior.
+const semanaDel = (iso: string) => `semana del ${fecha(`${iso}T12:00:00`)}`;
 
 export function ErrorLectura({ que }: { que: string }) {
   return (
@@ -40,6 +39,24 @@ export function ErrorLectura({ que }: { que: string }) {
 // sin calificar simplemente no aparecía — y un proyecto ausente se lee como "no existe", no como
 // "nadie lo calificó". Es la misma familia de silencio que la card de auditoría ya advierte:
 // un número que falta no es un cero, y un cero sin muestra no es una buena noticia.
+/**
+ * El total de la semana, que Airtable tenía como fila `GLOBAL` y el corte se había llevado. Va
+ * arriba de los proyectos porque es la respuesta a "¿cómo venimos?", que es lo primero que se
+ * pregunta; el desglose contesta "¿y quién la está bajando?".
+ */
+function Global({ filas }: { filas: FilaCalidad[] }) {
+  const g = calidadGlobal(filas);
+  return (
+    <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+      <span className="font-medium">Total de la semana</span>{" "}
+      <span className="text-muted-foreground">
+        {g.calificados} calificados · {g.aprobados} aprobados · {g.descartados} descartados ·
+        precisión {pct(g.precision)}
+      </span>
+    </div>
+  );
+}
+
 export function Calidad({ filas, activos }: { filas: FilaCalidad[]; activos: string[] }) {
   if (filas.length === 0 && activos.length === 0) {
     return (
@@ -60,6 +77,7 @@ export function Calidad({ filas, activos }: { filas: FilaCalidad[]; activos: str
       <p className="text-sm font-medium">
         {ultimaSemana ? semanaDel(ultimaSemana) : "Todavía sin calificaciones"}
       </p>
+      {actuales.length > 0 && <Global filas={actuales} />}
       {actuales.map((f) => {
         const d = diagnosticoCriterio(f.separacion_gate, f.precision);
         return (
@@ -436,14 +454,9 @@ export function Actividad({ filas }: { filas: FilaEvento[] }) {
     <ul className="divide-y text-sm">
       {filas.map((e, i) => (
         <li key={i} className="flex flex-wrap items-baseline gap-x-2 py-1.5">
-          <span className="tabular-nums text-muted-foreground">
-            {new Date(e.creado_en).toLocaleString("es", {
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
+          {/* Esta sección se renderiza en el SERVIDOR, así que sin `timeZone` explícita salía en
+              UTC — la hora que mostraba no era la hora a la que el equipo hizo las cosas. */}
+          <span className="tabular-nums text-muted-foreground">{fechaHora(e.creado_en)}</span>
           <span className="font-medium">{e.usuarios?.nombre ?? "alguien"}</span>
           <span>{ACCION[e.tipo] ?? e.tipo}</span>
         </li>

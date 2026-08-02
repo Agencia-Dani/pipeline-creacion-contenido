@@ -19,6 +19,7 @@ import {
   entregaLegible,
   haceCuanto,
   hayCorridaViva,
+  pideMasQueElTecho,
   ultimoEmbudo,
   type Corrida,
   type ProyectoDelPlan,
@@ -59,7 +60,10 @@ function FilaProyecto({ p }: { p: ProyectoDelPlan }) {
         <span className="font-medium">{p.nombre}</span>
         <span className="text-muted-foreground">
           pide <span className="font-medium text-foreground tabular-nums">{p.pide}</span> ·{" "}
-          {p.cuentas === 1 ? "1 cuenta" : `${p.cuentas} cuentas`} ·{" "}
+          <span title="Videos crudos que la corrida llega a mirar para este proyecto: sus cuentas por los resultados que baja de cada una.">
+            {p.cuentas === 1 ? "1 cuenta" : `${p.cuentas} cuentas`} (mira {p.techo})
+          </span>{" "}
+          ·{" "}
           {p.ultimaEntrega === null ? (
             // No es lo mismo que "entregó 0": puede que la corrida ni lo haya mirado. Se dice lo
             // que sabemos —que no hay dato— y no una interpretación que podría ser falsa.
@@ -79,6 +83,22 @@ function FilaProyecto({ p }: { p: ProyectoDelPlan }) {
           ⚠️ Sin cuentas que lo alimenten no va a traer nada.{" "}
           <Link href="/curar/referentes" className="underline">
             Asignale referentes
+          </Link>
+          .
+        </p>
+      ) : pideMasQueElTecho(p.pide, p.techo) ? (
+        // Este aviso gana sobre el de abajo, y no es lo mismo: aquel mira la corrida pasada, este
+        // es aritmética sobre la próxima. Si el proyecto pide más videos de los que la corrida
+        // llega a MIRAR, ningún ajuste de criterios lo arregla — faltan cuentas (ADR-043).
+        <p className="text-xs text-amber-700 dark:text-amber-500">
+          ⚠️ Pide {p.pide} de {p.techo} videos crudos que llega a mirar: no le alcanza ni en el mejor
+          caso.{" "}
+          <Link href="/curar/referentes" className="underline">
+            Sumá cuentas
+          </Link>{" "}
+          o bajale el número en{" "}
+          <Link href="/curar/voces" className="underline">
+            Voces y proyectos
           </Link>
           .
         </p>
@@ -141,7 +161,7 @@ export default async function OperarPage() {
       ? armarVistaOperar(
           config.value.voces,
           config.value.proyectos,
-          config.value.defaultN,
+          config.value.resultadosPorCuenta,
           cuentas.status === "fulfilled" ? cuentas.value : new Map(),
           embudo?.filas ?? [],
         )

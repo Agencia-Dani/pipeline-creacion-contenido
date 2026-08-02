@@ -40,7 +40,7 @@ Una temática aislada (los resultados no se cruzan entre proyectos). Ej: Comunic
 | `advertencia_criterios` | texto largo | **lint de los criterios manuales** (criterio vago / sin lista negativa / Voz incoherente) — lo escribe la **misma** llamada de destilación; visible al equipo, el gate **NO lo lee** (ADR-022/M2) |
 | `voz_default` | link → `Voces` | la **única** voz del proyecto (un proyecto = una voz; una voz puede servir a varios proyectos). Afina el filtro de relevancia por encima del tema (ADR-010) |
 | `activo` | checkbox | si entra en las corridas |
-| `N` | número (entero) | **cuántos candidatos entrega ESTE proyecto en una corrida** (ADR-024). Vacía o 0 → usa el global `Candidatos por corrida` de `Ajustes` como default. El corte final va **por proyecto**, cada uno a su N, por heat compuesto tras el gate. Nunca supera `cap_top_n` (techo duro de transcripción **total**: si muerde antes, algún proyecto queda por debajo de su N — el cap manda) |
+| `N` | número (entero) | **cuántos candidatos entrega ESTE proyecto en una corrida** (ADR-024). 🧊 *Histórico: vacía o 0 usaba el global `Candidatos por corrida`. Ese knob se borró en ADR-042 y hoy `N` es obligatorio; lo que queda es una constante de 100 como red.* El corte final va **por proyecto**, cada uno a su N, por heat compuesto tras el gate. Nunca supera `cap_top_n` (techo duro de transcripción **total**: si muerde antes, algún proyecto queda por debajo de su N — el cap manda) |
 
 > **Cambio ADR-015/016:** `dias_recencia`, `top_n` y los 4 toggles de eje salieron del Proyecto. La
 > ventana y los resultados por referente son **globales** (tabla `Ajustes`); la plataforma de búsqueda
@@ -155,6 +155,9 @@ sembrados para producir algo.
 
 **Topes de costo (dev-only, en Config — no editables por el equipo):** `cap_resultados_referente` **50**
 (techo de `Resultados por cuenta de referente`; el motor usa `min(valor_equipo, cap)`) · `cap_top_n`
+> 🧊 **Enmienda ADR-042 (2026-08-01):** `cap_top_n` **dejó de ser dev-only del `Config`** y hoy se
+> toca desde el cockpit como *Videos a transcribir por corrida*. Su valor vivo es **250**, no el 100
+> que dice este doc congelado. `cap_resultados_referente` sí sigue donde estaba.
 100 (techo duro de transcripción por corrida; protege el backfill — es el gobernador de créditos real)
 · `cap_descartes` 10 (tope de rechazos top-K por score que se
 exponen al equipo — ADR-021, enmienda 2026-07-13) · `presupuesto_transcribir_s` 780 (si el loop de
