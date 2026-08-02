@@ -1,6 +1,10 @@
 # ADR-046 — El cockpit también es multi-tenant: `client_id`/`instance_id` en `app`, con doble grano
 
-- **Estado:** aceptada — 2026-08-02. **Extiende [ADR-003](./ADR-003-multicliente-desde-dia-1.md)**
+- **Estado:** aceptada — 2026-08-02 · **enmendada el mismo día por
+  [ADR-051](./ADR-051-el-acceso-es-membresia-explicita.md)**, que reemplaza `usuarios.client_id`
+  (una empresa por persona) por membresías explícitas y le saca a `clients.parent_id` el gobierno
+  del acceso. **Los granos y las columnas de este ADR siguen en pie tal cual**; lo que cambia es
+  quién alcanza qué. **Extiende [ADR-003](./ADR-003-multicliente-desde-dia-1.md)**
   al schema que no existía cuando ADR-003 se escribió. Es la decisión **A + B** del
   [plan multi-tenant §2](../agents/plan-multi-tenant.md) (el diagnóstico con evidencia está en su §1;
   el SQL, en su §4 — acá va el porqué).
