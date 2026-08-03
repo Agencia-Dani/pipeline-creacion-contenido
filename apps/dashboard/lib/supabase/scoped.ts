@@ -105,11 +105,14 @@ function filtrar<Q>(q: Q, tabla: Tabla, ctx: TenantContext): Q {
   const columna = columnaDe(tabla);
   if (columna === null) return q;
   const builder = q as ConFiltros;
-  // El grano empresa filtra por `in (visibles)`, no por `eq`: un usuario de Retia tiene que ver
-  // los datos de sus clientes (ADR-046). Con un solo nivel, `visibles` es un array de uno.
+  // 🔒 Los dos granos filtran por **el cockpit abierto**, nunca por "las empresas del usuario"
+  // (ADR-051). Acá hubo un `in (visibles)` que parecía inofensivo con un tenant y no lo era: apenas
+  // alguien alcanzara dos empresas, una pantalla de EstadoX habría mostrado también los proyectos
+  // de 30X — sin error, sin aviso. La membresía decide a qué cockpit entrás; adentro manda el
+  // cockpit.
   const filtrado =
     columna === "client_id"
-      ? builder.in("client_id", [...ctx.visibles])
+      ? builder.eq("client_id", ctx.clientId)
       : builder.eq("instance_id", ctx.instanceId);
   return filtrado as Q;
 }

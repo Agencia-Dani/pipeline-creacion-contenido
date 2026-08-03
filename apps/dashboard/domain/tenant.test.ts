@@ -2,127 +2,109 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   armarContexto,
+  empresasAlcanzables,
   instanciasVisibles,
-  PROFUNDIDAD_MAXIMA,
   puedeVerCliente,
   puedeVerInstancia,
-  visiblesDesde,
-  type NodoCliente,
-  type TenantContext,
+  rolEn,
+  ROL_DE_DUENO,
+  type Alcance,
 } from "./tenant.ts";
 
-// El árbol del caso real de ADR-046: tres empresas sin padre y un cliente de Retia.
-const ARBOL: NodoCliente[] = [
-  { id: "30x", parentId: null },
-  { id: "estadox", parentId: null },
-  { id: "retia", parentId: null },
-  { id: "viera", parentId: "retia" },
+const EMPRESAS = ["30x", "estadox", "retia"];
+
+// Los tres perfiles reales de ADR-051.
+const jero: Alcance = { esDueno: false, membresias: [{ clientId: "retia", rol: "operador" }] };
+const jefeDeEstadox: Alcance = { esDueno: false, membresias: [{ clientId: "estadox", rol: "sponsor" }] };
+const mani: Alcance = { esDueno: true, membresias: [] };
+const enDos: Alcance = {
+  esDueno: false,
+  membresias: [
+    { clientId: "30x", rol: "operador" },
+    { clientId: "estadox", rol: "sponsor" },
+  ],
+};
+
+test("una membresía alcanza su empresa y ninguna otra", () => {
+  assert.deepEqual(empresasAlcanzables(jero, EMPRESAS), ["retia"]);
+  assert.equal(puedeVerCliente(jero, "retia"), true);
+  assert.equal(puedeVerCliente(jero, "30x"), false);
+  assert.equal(puedeVerCliente(jero, "estadox"), false);
+});
+
+test("una cuenta puede estar en varias empresas — el caso que mató a usuarios.client_id", () => {
+  assert.deepEqual(empresasAlcanzables(enDos, EMPRESAS).sort(), ["30x", "estadox"]);
+  assert.equal(puedeVerCliente(enDos, "retia"), false);
+});
+
+test("el dueño alcanza todas, INCLUIDAS las que se creen después", () => {
+  assert.deepEqual(empresasAlcanzables(mani, EMPRESAS), EMPRESAS);
+  // El punto entero del flag frente a tres membresías: una empresa nueva no hay que acordarse.
+  assert.deepEqual(empresasAlcanzables(mani, [...EMPRESAS, "cliente-nuevo"]).at(-1), "cliente-nuevo");
+  assert.equal(puedeVerCliente(mani, "cliente-nuevo"), true);
+});
+
+test("sin membresías y sin ser dueño no se alcanza nada", () => {
+  const recienInvitado: Alcance = { esDueno: false, membresias: [] };
+  assert.deepEqual(empresasAlcanzables(recienInvitado, EMPRESAS), []);
+  assert.equal(puedeVerCliente(recienInvitado, "30x"), false);
+  assert.equal(rolEn(recienInvitado, "30x"), null);
+});
+
+// ── El rol, que ahora es POR empresa
+
+test("el rol depende de la empresa, no de la persona", () => {
+  assert.equal(rolEn(enDos, "30x"), "operador");
+  assert.equal(rolEn(enDos, "estadox"), "sponsor");
+  assert.equal(rolEn(enDos, "retia"), null);
+});
+
+test("el dueño entra a cualquier empresa con el rol de la agencia", () => {
+  assert.equal(rolEn(mani, "retia"), ROL_DE_DUENO);
+  assert.equal(rolEn(mani, "cualquiera"), ROL_DE_DUENO);
+});
+
+test("si un dueño además tiene membresía, gana la membresía", () => {
+  // No es teórico: es lo que pasa si alguien le crea una fila "por las dudas". Que gane la explícita
+  // hace que bajarle el rol en una empresa concreta sea posible.
+  const duenoConMembresia: Alcance = { esDueno: true, membresias: [{ clientId: "estadox", rol: "sponsor" }] };
+  assert.equal(rolEn(duenoConMembresia, "estadox"), "sponsor");
+  assert.equal(rolEn(duenoConMembresia, "30x"), ROL_DE_DUENO);
+});
+
+// ── Instancias y contexto
+
+const instancias = [
+  { id: "i-30x-reels", clientId: "30x" },
+  { id: "i-estadox-reels", clientId: "estadox" },
+  { id: "i-retia-reels", clientId: "retia" },
 ];
 
-const ctx = (clientId: string, instanceId = "i-1"): TenantContext => ({
-  clientId,
-  visibles: visiblesDesde(clientId, ARBOL),
-  instanceId,
+test("el selector solo lista los cockpits alcanzables", () => {
+  assert.deepEqual(instanciasVisibles(jero, instancias).map((i) => i.id), ["i-retia-reels"]);
+  assert.deepEqual(instanciasVisibles(enDos, instancias).map((i) => i.id), ["i-30x-reels", "i-estadox-reels"]);
+  assert.equal(instanciasVisibles(mani, instancias).length, 3);
 });
 
-test("sin padre, un cliente se ve solo a sí mismo", () => {
-  assert.deepEqual(visiblesDesde("30x", ARBOL), ["30x"]);
-  assert.deepEqual(visiblesDesde("estadox", ARBOL), ["estadox"]);
+test("puedeVerInstancia pregunta por la empresa de la instancia, no por la abierta", () => {
+  assert.equal(puedeVerInstancia(enDos, { id: "otra", clientId: "estadox" }), true);
+  assert.equal(puedeVerInstancia(enDos, { id: "otra", clientId: "retia" }), false);
 });
 
-test("el padre ve al hijo — el segundo nivel es una fila, no una migración (ADR-046)", () => {
-  assert.deepEqual(visiblesDesde("retia", ARBOL), ["retia", "viera"]);
+test("🔒 el contexto lleva la empresa DEL COCKPIT, no la del usuario", () => {
+  // Es la línea que impide que una pantalla de EstadoX muestre los proyectos de 30X.
+  const abierto = armarContexto(enDos, { id: "i-estadox-reels", clientId: "estadox" });
+  assert.deepEqual(abierto?.ctx, { clientId: "estadox", instanceId: "i-estadox-reels" });
+  assert.equal(abierto?.rol, "sponsor");
 });
 
-test("la visibilidad BAJA, no sube: el hijo no ve al padre ni a sus tíos", () => {
-  assert.deepEqual(visiblesDesde("viera", ARBOL), ["viera"]);
-  assert.equal(puedeVerCliente(ctx("viera"), "retia"), false);
-  assert.equal(puedeVerCliente(ctx("viera"), "30x"), false);
+test("armarContexto RECHAZA un cockpit ajeno — es el 403 de la fachada y el redirect de las páginas", () => {
+  assert.equal(armarContexto(jero, { id: "i-30x-reels", clientId: "30x" }), null);
+  assert.equal(armarContexto(jefeDeEstadox, { id: "i-retia-reels", clientId: "retia" }), null);
 });
 
-test("las empresas no se ven entre sí", () => {
-  assert.equal(puedeVerCliente(ctx("30x"), "estadox"), false);
-  assert.equal(puedeVerCliente(ctx("estadox"), "30x"), false);
-  assert.equal(puedeVerCliente(ctx("30x"), "30x"), true);
-});
-
-test("baja varios niveles, no solo uno", () => {
-  const cadena: NodoCliente[] = [
-    { id: "a", parentId: null },
-    { id: "b", parentId: "a" },
-    { id: "c", parentId: "b" },
-    { id: "d", parentId: "c" },
-  ];
-  assert.deepEqual(visiblesDesde("a", cadena).sort(), ["a", "b", "c", "d"]);
-  assert.deepEqual(visiblesDesde("c", cadena).sort(), ["c", "d"]);
-});
-
-// ── Los ciclos: el trigger de la `016` los rechaza al escribir, pero si alguno entra por otra
-// vía esto NO puede colgar el request (ADR-046, y por eso existe PROFUNDIDAD_MAXIMA).
-
-test("un ciclo A→B→A no cuelga y no repite ids", () => {
-  const ciclo: NodoCliente[] = [
-    { id: "a", parentId: "b" },
-    { id: "b", parentId: "a" },
-  ];
-  const visibles = visiblesDesde("a", ciclo);
-  assert.deepEqual(visibles.sort(), ["a", "b"]);
-  assert.equal(new Set(visibles).size, visibles.length);
-});
-
-test("un cliente que es su propio padre no se duplica", () => {
-  assert.deepEqual(visiblesDesde("x", [{ id: "x", parentId: "x" }]), ["x"]);
-});
-
-test("una cadena más profunda que el tope se corta en vez de colgar", () => {
-  const larga: NodoCliente[] = Array.from({ length: PROFUNDIDAD_MAXIMA + 5 }, (_, i) => ({
-    id: `n${i}`,
-    parentId: i === 0 ? null : `n${i - 1}`,
-  }));
-  const visibles = visiblesDesde("n0", larga);
-  assert.equal(visibles.length, PROFUNDIDAD_MAXIMA + 1);
-  assert.equal(visibles[0], "n0");
-});
-
-// ── Instancias
-
-test("puedeVerInstancia pregunta por el CLIENTE de la instancia, no por la que está abierta", () => {
-  const c = ctx("retia", "i-reels-retia");
-  // Otra instancia de la misma empresa: la puede abrir aunque no sea la que tiene abierta.
-  assert.equal(puedeVerInstancia(c, { id: "i-linkedin-retia", clientId: "retia" }), true);
-  // Una del hijo: también, porque la visibilidad baja.
-  assert.equal(puedeVerInstancia(c, { id: "i-reels-viera", clientId: "viera" }), true);
-  // Una de otra empresa: no.
-  assert.equal(puedeVerInstancia(c, { id: "i-reels-30x", clientId: "30x" }), false);
-});
-
-test("instanciasVisibles filtra la lista del selector", () => {
-  const todas = [
-    { id: "i1", clientId: "retia" },
-    { id: "i2", clientId: "viera" },
-    { id: "i3", clientId: "30x" },
-  ];
-  assert.deepEqual(
-    instanciasVisibles(ctx("retia"), todas).map((i) => i.id),
-    ["i1", "i2"],
-  );
-  assert.deepEqual(instanciasVisibles(ctx("viera"), todas).map((i) => i.id), ["i2"]);
-});
-
-// ── armarContexto: el borde donde se rechaza una instancia ajena
-
-test("armarContexto arma el contexto de una instancia propia", () => {
-  const c = armarContexto("retia", { id: "i-1", clientId: "retia" }, ARBOL);
-  assert.deepEqual(c, { clientId: "retia", visibles: ["retia", "viera"], instanceId: "i-1" });
-});
-
-test("armarContexto acepta una instancia de un descendiente", () => {
-  const c = armarContexto("retia", { id: "i-2", clientId: "viera" }, ARBOL);
-  assert.equal(c?.instanceId, "i-2");
-});
-
-test("armarContexto RECHAZA una instancia ajena — es el 403 de la fachada (ADR-048)", () => {
-  assert.equal(armarContexto("30x", { id: "i-3", clientId: "estadox" }, ARBOL), null);
-  // Y hacia arriba tampoco: el hijo no puede abrir el cockpit del padre.
-  assert.equal(armarContexto("viera", { id: "i-4", clientId: "retia" }, ARBOL), null);
+test("el dueño arma contexto en cualquier cockpit", () => {
+  const abierto = armarContexto(mani, { id: "i-estadox-reels", clientId: "estadox" });
+  assert.equal(abierto?.ctx.clientId, "estadox");
+  assert.equal(abierto?.rol, ROL_DE_DUENO);
 });

@@ -1,121 +1,113 @@
-// Dominio puro (C3): de quién es cada cosa. Sin IO, sin React, sin supabase — la misma
-// disciplina que `domain/roles.ts`, y por la misma razón: el server tiene que poder hacer
+// Dominio puro (C3): de quién es cada cosa y quién alcanza qué. Sin IO, sin React, sin supabase —
+// la misma disciplina que `domain/roles.ts`, y por la misma razón: el server tiene que poder hacer
 // cumplir la regla, y la regla tiene que poder testearse sin base.
 //
-// Gobernado por ADR-046 (doble grano + `clients.parent_id`) y ADR-047 (la Capa 1).
+// Gobernado por ADR-046 (doble grano) y **ADR-051** (el acceso es membresía explícita).
 //
-// La distinción que ordena todo el archivo, y que es la decisión B de ADR-046:
-//   · **cliente** = la EMPRESA. Cruza pipelines: la voz, el proyecto y el banco de referentes son
-//     los mismos para reels y para LinkedIn.
+// Las dos distinciones que ordenan el archivo:
+//   · **cliente** = la EMPRESA. Cruza pipelines: voces, proyectos y referentes son los mismos para
+//     reels y para LinkedIn.
 //   · **instancia** = un PIPELINE de esa empresa. Los knobs de reels no son los de LinkedIn.
 //
-// El rol dice QUÉ zona ve alguien (`roles.ts`); el tenant dice DE QUIÉN son los datos que ve.
-// Son ortogonales y se componen: hace falta pasar los dos.
+// Y la regla que ADR-051 dejó, que es la que evita mezclar empresas en una pantalla:
+//
+//   > **La membresía decide a qué cockpits entrás. NO decide qué filas ves adentro.**
+//   > Adentro, el filtro es siempre la empresa del cockpit abierto.
 
-/** El contexto que atraviesa todo `lib/`. Sin esto no se puede construir una query (ADR-047). */
+import type { Rol } from "./roles";
+
+/**
+ * El contexto que atraviesa todo `lib/`. Sin esto no se puede construir una query (ADR-047).
+ *
+ * `clientId` es **la empresa del cockpit abierto**, no la del usuario. La diferencia importa desde
+ * que alguien puede alcanzar más de una: si acá viviera "las empresas del usuario", una pantalla de
+ * 30X mostraría también los proyectos de EstadoX, sin que nada avise.
+ */
 export type TenantContext = {
-  /** El cliente al que pertenece el usuario. */
   clientId: string;
-  /** `clientId` + sus descendientes. Es contra esta lista que se filtra el grano empresa. */
-  visibles: readonly string[];
-  /** La instancia del cockpit abierto: (empresa × pipeline). */
   instanceId: string;
 };
 
-/** Una fila de `clients`, reducida a lo que la regla necesita. */
-export type NodoCliente = { id: string; parentId: string | null };
+/** Una fila de `app.usuarios_clientes`. */
+export type Membresia = { clientId: string; rol: Rol };
+
+/** Lo que hace falta saber de un usuario para decidir qué alcanza. */
+export type Alcance = {
+  esDueno: boolean;
+  membresias: readonly Membresia[];
+};
 
 /** Una fila de `instances`, reducida a lo que la regla necesita. */
 export type InstanciaVisible = { id: string; clientId: string };
 
 /**
- * Tope de profundidad del árbol de clientes.
+ * El rol con el que la agencia entra a cualquier cockpit.
  *
- * ⚠️ No es un límite de producto: es el cinturón del cinturón-y-tirantes de ADR-046. El trigger de
- * la migración `016` rechaza el ciclo al escribir, pero un ciclo que entre por otra vía (un
- * restore, un `alter table ... disable trigger`) colgaría ESTE recorrido en cada request. Un tope
- * convierte "la app no responde" en "la app devuelve de más y se nota". 10 niveles de agencias
- * anidadas es varias veces más de lo que el negocio puede sostener.
+ * Los dueños no tienen membresía (ADR-051: el flag es justamente para no depender de filas que
+ * alguien tiene que acordarse de crear), así que su rol no está escrito en ningún lado y hay que
+ * elegirlo. `dev` es el que corresponde: son quienes operan la máquina, y es el único que ve las
+ * cuatro zonas.
  */
-export const PROFUNDIDAD_MAXIMA = 10;
+export const ROL_DE_DUENO: Rol = "dev";
 
 /**
- * Los clientes que ve alguien de `clientId`: el suyo y sus descendientes.
+ * Las empresas que esta persona alcanza.
  *
- * Baja por el árbol, no sube: un usuario de Retia ve a los clientes de Retia; uno de un cliente de
- * Retia no ve a Retia ni a sus hermanos. Es la regla de visibilidad de ADR-046, y es la que hace
- * que sumar un sub-cliente sea una fila y no una migración.
- *
- * Tolera ciclos por diseño (ver `PROFUNDIDAD_MAXIMA`): visita cada id una sola vez y corta por
- * profundidad. Un árbol corrupto devuelve un resultado acotado en vez de colgar el request.
+ * Un dueño alcanza todas — incluidas las que se creen después, que es el punto entero del flag
+ * frente a tres membresías que alguien tendría que acordarse de agregar (ADR-051).
  */
-export function visiblesDesde(clientId: string, clientes: readonly NodoCliente[]): string[] {
-  const hijosDe = new Map<string, string[]>();
-  for (const c of clientes) {
-    if (c.parentId === null || c.parentId === c.id) continue;
-    hijosDe.set(c.parentId, [...(hijosDe.get(c.parentId) ?? []), c.id]);
-  }
-
-  const visibles: string[] = [];
-  const vistos = new Set<string>();
-  let frontera = [clientId];
-
-  for (let nivel = 0; nivel <= PROFUNDIDAD_MAXIMA && frontera.length > 0; nivel++) {
-    const siguiente: string[] = [];
-    for (const id of frontera) {
-      if (vistos.has(id)) continue;
-      vistos.add(id);
-      visibles.push(id);
-      siguiente.push(...(hijosDe.get(id) ?? []));
-    }
-    frontera = siguiente;
-  }
-
-  return visibles;
+export function empresasAlcanzables(
+  usuario: Alcance,
+  todasLasEmpresas: readonly string[],
+): string[] {
+  if (usuario.esDueno) return [...todasLasEmpresas];
+  return usuario.membresias.map((m) => m.clientId);
 }
 
-/** ¿Este contexto alcanza a este cliente? */
-export function puedeVerCliente(ctx: TenantContext, clientId: string): boolean {
-  return ctx.visibles.includes(clientId);
+/** ¿Esta persona entra a esta empresa? */
+export function puedeVerCliente(usuario: Alcance, clientId: string): boolean {
+  return usuario.esDueno || usuario.membresias.some((m) => m.clientId === clientId);
+}
+
+/** ¿Y a este cockpit? Se pregunta por la EMPRESA de la instancia, no por la que tenga abierta. */
+export function puedeVerInstancia(usuario: Alcance, instancia: InstanciaVisible): boolean {
+  return puedeVerCliente(usuario, instancia.clientId);
 }
 
 /**
- * ¿Este contexto alcanza a esta instancia?
+ * Con qué rol entra esta persona a esta empresa. `null` = no entra.
  *
- * Se pregunta por el CLIENTE de la instancia, no por `ctx.instanceId`: un usuario puede tener el
- * cockpit abierto en una instancia y tener derecho a otra (el selector de empresa/pipeline de la
- * Fase 3). Confundir "la que está abierta" con "las que puede abrir" sería un bug de navegación
- * disfrazado de bug de permisos.
+ * Es la pregunta que antes tenía una sola respuesta global (`usuarios.rol`) y ahora tiene una por
+ * empresa — que es la forma que toma cuando el que pregunta es el dueño de una de ellas.
  */
-export function puedeVerInstancia(ctx: TenantContext, instancia: InstanciaVisible): boolean {
-  return puedeVerCliente(ctx, instancia.clientId);
+export function rolEn(usuario: Alcance, clientId: string): Rol | null {
+  const propia = usuario.membresias.find((m) => m.clientId === clientId);
+  if (propia) return propia.rol;
+  return usuario.esDueno ? ROL_DE_DUENO : null;
 }
 
-/**
- * Arma el contexto, o dice por qué no puede.
- *
- * Devuelve `null` en vez de tirar: el llamador (`lib/tenant.ts`) sabe si eso es un `redirect` (una
- * página) o un 403 (la fachada), y esa decisión no es del dominio.
- */
-export function armarContexto(
-  clientId: string,
-  instancia: InstanciaVisible,
-  clientes: readonly NodoCliente[],
-): TenantContext | null {
-  const visibles = visiblesDesde(clientId, clientes);
-  if (!visibles.includes(instancia.clientId)) return null;
-  return { clientId, visibles, instanceId: instancia.id };
-}
-
-/**
- * Las instancias que este usuario puede abrir, para el selector de la Fase 3.
- *
- * Vive acá y no en la pantalla porque es la misma regla de visibilidad: si la pantalla la
- * reimplementara, habría dos definiciones de "sus empresas" y una de las dos se quedaría vieja.
- */
+/** Los cockpits que esta persona puede abrir: lo que alimenta el selector del nav. */
 export function instanciasVisibles<T extends InstanciaVisible>(
-  ctx: TenantContext,
+  usuario: Alcance,
   instancias: readonly T[],
 ): T[] {
-  return instancias.filter((i) => puedeVerInstancia(ctx, i));
+  return instancias.filter((i) => puedeVerInstancia(usuario, i));
+}
+
+/**
+ * Arma el contexto de un cockpit, o dice que no.
+ *
+ * Devuelve `null` en vez de tirar: el llamador sabe si eso es un `redirect` (una página) o un 403
+ * (la fachada), y esa decisión no es del dominio.
+ *
+ * ⚠️ Fijate que el `clientId` que sale es **el de la instancia**, no el del usuario. Es la línea
+ * que hace cumplir la regla de ADR-051.
+ */
+export function armarContexto(
+  usuario: Alcance,
+  instancia: InstanciaVisible,
+): { ctx: TenantContext; rol: Rol } | null {
+  const rol = rolEn(usuario, instancia.clientId);
+  if (rol === null) return null;
+  return { ctx: { clientId: instancia.clientId, instanceId: instancia.id }, rol };
 }

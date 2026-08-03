@@ -39,8 +39,8 @@ export default async function ZonasLayout({
   // que sí le toca. Sin decir cuál de las dos cosas fue (`lib/tenant.ts`).
   if (!sesion) redirect("/");
 
-  const zonas = zonasDe(usuario.rol);
-  const cockpits = await cockpitsDe(sesion.ctx);
+  const zonas = zonasDe(sesion.rol);
+  const cockpits = await cockpitsDe(usuario);
   // Del cockpit RESUELTO, no de los segmentos crudos: la URL es entrada, no verdad. Si lo que vino
   // no es exactamente lo que se resolvió, el nav tiene que apuntar a lo que se resolvió — si no, la
   // pantalla muestra los datos de un cockpit y los links de otro.
@@ -73,7 +73,7 @@ export default async function ZonasLayout({
             <span className="text-sm text-muted-foreground">
               {usuario.nombre}
             </span>
-            <Badge variant="secondary">{usuario.rol}</Badge>
+            <Badge variant="secondary">{sesion.rol}</Badge>
             <form action={cerrarSesion}>
               <Button variant="ghost" size="sm" type="submit">
                 Salir

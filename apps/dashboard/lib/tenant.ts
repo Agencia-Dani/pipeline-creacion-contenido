@@ -1,23 +1,23 @@
 import { z } from "zod";
+import { esRol, type Rol } from "@/domain/roles";
 import {
   armarContexto,
   instanciasVisibles,
-  visiblesDesde,
+  type Alcance,
   type InstanciaVisible,
-  type NodoCliente,
+  type Membresia,
   type TenantContext,
 } from "@/domain/tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // De dónde sale el `TenantContext`. Es el ÚNICO archivo que lee el registro de tenants
-// (`clients`, `instances`) sin scopear, y tiene que serlo: scopear la tabla con la que se resuelve
-// el scope sería circular. Por eso esas tres tablas no están en el mapa de `scoped.ts`.
+// (`clients`, `instances`, `usuarios_clientes`) sin scopear, y tiene que serlo: scopear la tabla
+// con la que se resuelve el scope sería circular. Por eso no están en el mapa de `scoped.ts`.
 //
-// Desde la Fase 3 las rutas traen `[cliente]/[pipeline]` y `resolverContexto` los recibe; sin
-// segmentos (la raíz, o una acción que no los conoce) sigue cayendo al cockpit por defecto del
-// usuario. La forma del contexto no cambió en ninguna de las dos fases, que era la apuesta.
+// Desde ADR-051 el acceso son **membresías**, no un recorrido del árbol: `clients.parent_id` se
+// quedó como linaje (de quién es este cliente) y no lo lee nadie desde acá. Si algún día hace falta
+// agrupar el selector por casa matriz, ese es su uso — no el permiso.
 
-const filaCliente = z.object({ id: z.string(), parent_id: z.string().nullable() });
 const filaInstancia = z.object({
   id: z.string(),
   client_id: z.string(),
@@ -26,18 +26,43 @@ const filaInstancia = z.object({
   nombre: z.string().nullable(),
 });
 
+const filaMembresia = z.object({ client_id: z.string(), rol: z.string() });
+
 export type Instancia = InstanciaVisible & {
   workflowId: string;
   slug: string;
   nombre: string | null;
 };
 
-/** El árbol entero. Es chico (una fila por empresa) y la regla de visibilidad lo necesita completo. */
-async function leerArbolClientes(): Promise<NodoCliente[]> {
+/**
+ * Las membresías de una persona.
+ *
+ * Con el cliente admin y no con la sesión: `app.usuarios_clientes` tiene RLS sin policies (el
+ * patrón del schema `app`), así que el browser no la alcanza ni por accidente. Quien decide qué
+ * puede ver alguien no puede ser una tabla que ese alguien pueda leer desde el navegador.
+ */
+export async function leerMembresias(usuarioId: string): Promise<Membresia[]> {
   const supabase = createAdminClient();
-  const { data, error } = await supabase.from("clients").select("id, parent_id");
+  const { data, error } = await supabase
+    .schema("app")
+    .from("usuarios_clientes")
+    .select("client_id, rol")
+    .eq("usuario_id", usuarioId);
+  if (error) throw new Error(`Supabase respondió con error leyendo membresías: ${error.message}`);
+
+  return z.array(filaMembresia).parse(data).flatMap((m) =>
+    // Un rol que no está en el enum es dato corrupto, no un caso a tolerar: se descarta la
+    // membresía entera. Fallar hacia "no ve nada" es la única dirección segura acá.
+    esRol(m.rol) ? [{ clientId: m.client_id, rol: m.rol as Rol }] : [],
+  );
+}
+
+/** Los ids de todas las empresas. Lo necesita el dueño, que alcanza las que existan. */
+async function leerEmpresas(): Promise<string[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.from("clients").select("id");
   if (error) throw new Error(`Supabase respondió con error leyendo clientes: ${error.message}`);
-  return z.array(filaCliente).parse(data).map((c) => ({ id: c.id, parentId: c.parent_id }));
+  return z.array(z.object({ id: z.string() })).parse(data).map((c) => c.id);
 }
 
 /** Las instancias activas. Una instancia = un cockpit = (empresa × pipeline). */
@@ -59,44 +84,52 @@ export async function leerInstancias(): Promise<Instancia[]> {
   }));
 }
 
-/** El cockpit abierto: con qué scopear (`ctx`) y cuál es (`cockpit`, que además arma la URL). */
-export type Sesion = { ctx: TenantContext; cockpit: Instancia };
+/** El cockpit abierto: con qué scopear (`ctx`), cuál es (`cockpit`) y con qué permisos (`rol`). */
+export type Sesion = { ctx: TenantContext; cockpit: Instancia; rol: Rol };
 
 /**
  * El contexto de un usuario para el cockpit que está mirando.
  *
- * `cliente` y `pipeline` son los dos segmentos de la URL (`/30x/reels/...`). Si no vienen —la raíz,
- * o una acción que no los conoce— se cae al cockpit por defecto del usuario.
+ * `cliente` y `pipeline` son los dos segmentos de la URL (`/retia/reels/...`). Si no vienen —la
+ * raíz, o una acción que no los conoce— se cae al primero que alcance.
  *
- * Devuelve `null` si el usuario no puede ver eso: no distingue "no existe" de "no es tuyo", **a
- * propósito**. Decirle a alguien que el cliente `estadox` existe pero no es suyo ya es filtrar algo.
- * Qué hacer con el `null` lo decide el llamador: `redirect` en una página, 403 en la fachada.
+ * Devuelve `null` si no puede ver eso: **no distingue "no existe" de "no es tuyo"**, a propósito.
+ * Decirle a alguien que el cliente `estadox` existe pero no es suyo ya es filtrar algo. Qué hacer
+ * con el `null` lo decide el llamador: `redirect` en una página, 403 en la fachada.
  */
 export async function resolverContexto(
-  usuario: { clientId: string },
+  usuario: Alcance,
   cliente?: string,
   pipeline?: string,
 ): Promise<Sesion | null> {
-  const [clientes, instancias] = await Promise.all([leerArbolClientes(), leerInstancias()]);
-  const visibles = visiblesDesde(usuario.clientId, clientes);
-  const suyas = instancias.filter((i) => visibles.includes(i.clientId));
+  const instancias = await leerInstancias();
+  const suyas = instanciasVisibles(usuario, instancias);
 
   const elegida =
     cliente !== undefined || pipeline !== undefined
-      ? suyas.find((i) => (cliente === undefined || i.clientId === cliente) && (pipeline === undefined || i.slug === pipeline))
-      : // Sin segmentos en la URL (pre-Fase 3): el cockpit del propio cliente, y si no hay, el primero
-        // visible. `leerInstancias` viene ordenado, así que la elección es estable entre requests —
-        // un default que cambia de request en request sería un bug de caché esperando.
-        (suyas.find((i) => i.clientId === usuario.clientId) ?? suyas[0]);
+      ? suyas.find(
+          (i) =>
+            (cliente === undefined || i.clientId === cliente) &&
+            (pipeline === undefined || i.slug === pipeline),
+        )
+      : // Sin segmentos: el primero que alcance. `leerInstancias` viene ordenado, así que la
+        // elección es estable entre requests — un default que cambia de request en request sería
+        // un bug de caché esperando.
+        suyas[0];
 
   if (!elegida) return null;
-  const ctx = armarContexto(usuario.clientId, elegida, clientes);
-  return ctx ? { ctx, cockpit: elegida } : null;
+  const armado = armarContexto(usuario, elegida);
+  return armado ? { ...armado, cockpit: elegida } : null;
 }
 
-/** Las instancias que este usuario puede abrir: lo que alimenta el selector de la Fase 3. */
-export async function cockpitsDe(ctx: TenantContext): Promise<Instancia[]> {
-  return instanciasVisibles(ctx, await leerInstancias());
+/** Los cockpits que este usuario puede abrir: lo que alimenta el selector del nav. */
+export async function cockpitsDe(usuario: Alcance): Promise<Instancia[]> {
+  return instanciasVisibles(usuario, await leerInstancias());
+}
+
+/** Las empresas que alcanza, para las pantallas que necesitan enumerarlas. */
+export async function empresasDe(usuario: Alcance): Promise<string[]> {
+  return usuario.esDueno ? leerEmpresas() : usuario.membresias.map((m) => m.clientId);
 }
 
 /** Lo que puede salir mal al resolver el tenant de la fachada. Cada caso tiene su status. */
@@ -108,16 +141,10 @@ export type ResultadoFachada =
  * El contexto de la fachada de ADR-028. **No hay usuario acá**: el motor se autentica con el header
  * compartido, así que la autoridad no es una sesión sino la instancia que dice ser.
  *
- * `visibles` queda en `[clientId]` a secas, sin bajar por el árbol: un workflow corre para UNA
- * instancia y su config es la de esa empresa. Que el humano de Retia vea a sus clientes no
- * significa que el motor de Retia deba traerse los referentes de ellos.
- *
  * **La instancia es OBLIGATORIA desde ADR-048 (`version: 2`).** No hay caída a "la única activa":
  * ese default se sostenía solo mientras existiera exactamente una, y su modo de falla el día que
  * hubiera dos era mudo — el dispatcher se olvida del payload y la corrida escribe en el tenant
- * equivocado, en verde. Es el fail-closed de ADR-028 §4 llevado hasta el final: *"una corrida sin
- * config entrega ruido; no entregar es mejor"*, y una corrida con la config de OTRA empresa es
- * peor que ruido.
+ * equivocado, en verde. Es el fail-closed de ADR-028 §4 llevado hasta el final.
  */
 export async function contextoDeFachada(instanciaPedida?: string): Promise<ResultadoFachada> {
   if (!instanciaPedida) return { ok: false, motivo: "instancia_ausente" };
@@ -125,15 +152,15 @@ export async function contextoDeFachada(instanciaPedida?: string): Promise<Resul
   const instancias = await leerInstancias();
   const elegida = instancias.find((i) => i.id === instanciaPedida);
   if (!elegida) return { ok: false, motivo: "instancia_desconocida" };
-  return { ok: true, ctx: { clientId: elegida.clientId, visibles: [elegida.clientId], instanceId: elegida.id } };
+  return { ok: true, ctx: { clientId: elegida.clientId, instanceId: elegida.id } };
 }
 
 /**
  * Las instancias activas de un pipeline: lo que consume el dispatcher de ADR-050 por
  * `GET /api/engine/instancias?workflow=<slug>`.
  *
- * Sin `TenantContext` a propósito, y es la misma razón por la que este archivo entero vive fuera de
- * `scoped.ts`: el dispatcher pregunta **quiénes corren**, o sea justo lo que todavía no puede
+ * Sin contexto de tenant a propósito, y es la misma razón por la que este archivo entero vive fuera
+ * de `scoped.ts`: el dispatcher pregunta **quiénes corren**, o sea justo lo que todavía no puede
  * scopear. Su autoridad es el header compartido, igual que la de `run-plan`.
  */
 export async function instanciasDePipeline(workflowId: string): Promise<Instancia[]> {

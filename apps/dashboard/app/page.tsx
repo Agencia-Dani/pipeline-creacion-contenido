@@ -21,7 +21,7 @@ export default async function Home() {
   redirect(
     rutaZona(
       { cliente: sesion.cockpit.clientId, pipeline: sesion.cockpit.slug },
-      zonaInicial(usuario.rol),
+      zonaInicial(sesion.rol),
     ),
   );
 }

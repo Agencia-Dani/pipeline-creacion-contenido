@@ -13,7 +13,7 @@ export type ResultadoGuardar = { ok: boolean; mensaje: string };
 // el rol no puede tocar, pero eso es cosmética. Acá se vuelve a leer la fila real y se vuelve
 // a filtrar por rol — un POST a mano no alcanza para mover un knob de dev.
 export async function guardar(clave: string, valor: string): Promise<ResultadoGuardar> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+  const { usuario, ctx, cockpit, rol } = await exigirTenant("curar");
 
   let filas;
   try {
@@ -23,7 +23,7 @@ export async function guardar(clave: string, valor: string): Promise<ResultadoGu
     return { ok: false, mensaje: "No se pudo leer la configuración. Probá de nuevo." };
   }
 
-  const fila = ajustesVisibles(filas, usuario.rol).find((f) => f.clave === clave);
+  const fila = ajustesVisibles(filas, rol).find((f) => f.clave === clave);
   if (!fila) return { ok: false, mensaje: "Ese ajuste no existe o no lo podés editar." };
 
   const validacion = validarAjuste(clave, valor);

@@ -44,9 +44,9 @@ export default async function AjustesPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { usuario, ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const { usuario, ctx, cockpit, rol } = await exigirTenant("curar", cliente, pipeline);
   const base = comoRuta(cockpit);
-  const filas = ajustesVisibles(await leerAjustes(ctx), usuario.rol);
+  const filas = ajustesVisibles(await leerAjustes(ctx), rol);
 
   // Un operador nunca recibe filas `dev` (lo filtra `ajustesVisibles`), así que para él este
   // reparto deja `deDev` vacío y el bloque de abajo no se renderiza.

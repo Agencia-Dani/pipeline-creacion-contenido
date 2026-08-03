@@ -25,8 +25,13 @@ export default async function EntenderPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { usuario, ctx } = await exigirTenant("entender", cliente, pipeline);
-  const esDev = usuario.rol === "dev";
+  const { usuario, ctx, rol } = await exigirTenant("entender", cliente, pipeline);
+  const esDev = rol === "dev";
+  // ADR-052: el `sponsor` NO ve lo que nos cuestan los proveedores. Con clientes externos
+  // logueándose, `v_costos_semana` (consumo × `app.tarifas`) es el margen de la agencia, y la
+  // única zona que un sponsor ve es justamente esta. El corte va acá, en el servidor: esconder la
+  // tarjeta en React dejaría los números viajando igual al browser.
+  const veCostos = rol !== "sponsor";
 
   // `allSettled` y no `all`: una vista que falle apaga su tarjeta, no la página entera.
   const [calidad, embudo, auditoria, descubrimiento, costos, eventos, proyectos] =
@@ -35,7 +40,7 @@ export default async function EntenderPage({
       leerEmbudo(ctx),
       leerAuditoria(ctx),
       leerDescubrimiento(ctx),
-      leerCostos(ctx),
+      veCostos ? leerCostos(ctx) : Promise.resolve([]),
       esDev ? leerEventos(ctx) : Promise.resolve([]),
       leerProyectos(ctx),
     ]);
@@ -125,6 +130,7 @@ export default async function EntenderPage({
         </CardContent>
       </Card>
 
+      {veCostos && (
       <Card>
         <CardHeader>
           <CardTitle>Costos de la semana</CardTitle>
@@ -141,6 +147,7 @@ export default async function EntenderPage({
           )}
         </CardContent>
       </Card>
+      )}
 
       {esDev && (
         <Card>
