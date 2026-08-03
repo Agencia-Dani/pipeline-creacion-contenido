@@ -144,7 +144,7 @@
       "typeVersion": 4.2,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "onError": "continueRegularOutput",
@@ -185,7 +185,7 @@
       "typeVersion": 4.2,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "onError": "continueRegularOutput",
@@ -219,7 +219,7 @@
       "typeVersion": 4.2,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "onError": "continueRegularOutput",
@@ -244,7 +244,7 @@
       "typeVersion": 4.2,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "onError": "continueRegularOutput",
@@ -477,7 +477,7 @@
       "typeVersion": 4.2,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "id": "post-propuestos-pg",
@@ -540,7 +540,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -571,7 +571,7 @@
       "typeVersion": 4.2,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "onError": "continueRegularOutput",

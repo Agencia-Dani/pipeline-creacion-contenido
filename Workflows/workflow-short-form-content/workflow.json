@@ -305,7 +305,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "executeOnce": true,
@@ -334,7 +334,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "executeOnce": true,
@@ -372,7 +372,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "onError": "continueRegularOutput",
@@ -503,7 +503,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -540,7 +540,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "executeOnce": true
@@ -595,7 +595,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "alwaysOutputData": true
@@ -637,7 +637,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -697,7 +697,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -755,7 +755,7 @@
       },
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -816,7 +816,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },

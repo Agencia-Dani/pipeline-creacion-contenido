@@ -22,6 +22,68 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## ✅ EL REFACTOR MULTI-TENANT ESTÁ EN PRODUCCIÓN (2026-08-03, madrugada)
+>
+> **Los 6 pasos del runbook están hechos y verificados contra la base y contra n8n, no de palabra.**
+> `retia/reels` es el cockpit vivo; las URLs son `/retia/reels/...` y **entrar por la raíz `/` lleva
+> solo** (es el link que hay que darle al equipo — los bookmarks viejos murieron).
+>
+> | | Paso | Verificado con |
+> |---|---|---|
+> | 1 | Renombre `piloto` → `retia`, slug → `reels` | 1 cliente, 1 instancia, 0 filas apuntando a otra cosa. **Los defaults puente se movieron** (probado insertando sin `client_id`) |
+> | 2 | Merge `b1b8212` + deploy | `run-plan` responde **400 sin instancia · 403 ajena · 200 con `version: 2`**, y `fields.uuid` no viaja en ninguna de las 4 listas |
+> | 3 | Re-import de los 4 workflows | Coinciden con el repo **nodo por nodo** (34·22·8·20), 0 placeholders, **24 llamadas a PostgREST bien scopeadas** (20 por instancia + 4 por `id=eq.`) |
+> | 4 | Crons viejos apagados | 60 workflows en n8n, **5 activos**: los 4 nuestros + el *Error Workflow*. Los crons viven en el dispatcher (lunes 8am · domingo 18:00) |
+> | 5 | Corrida de verificación | `ok` en 16,7 min **con `instance_id`** · embudo 545→836→12→1 · `supadata: 10` (el cap mordió exacto) · **0 filas fuera de `retia`** |
+> | 6 | `017` aplicada | Las 10 columnas en `not null` sin default · el arbiter viejo da **`42P10`** · el nuevo escribe |
+>
+> ### 🩸 Y la prueba que convierte esto en un hecho, no en una promesa
+> Se creó una **segunda instancia** de `retia` (`slug: prueba-dedup` — que de paso prueba el unique
+> nuevo de la `016`, el que antes prohibía dos instancias del mismo pipeline), se metió un
+> `external_id` **que ya existía** para la instancia real, y **entró**. Dos filas, mismo video, dos
+> instancias. Antes de la `017` eso era imposible. Las dos filas de prueba se borraron y los
+> conteos volvieron a la línea base (651 · 1 instancia · 1 cliente).
+>
+> ### 🚨 LO QUE APRENDIMOS Y NO ESTABA EN NINGÚN CHECKLIST: LAS CREDENCIALES
+> El checklist del re-import cubría los **placeholders** y no decía una palabra de las
+> **credenciales**. Costó dos intentos fallidos, los dos del mismo tipo: una credencial elegida mal
+> de un desplegable. **El repo tenía la culpa**: sus `workflow.json` referencian credenciales por
+> *nombre y sin id*, y el nombre de Supabase (`Supabase Registro`) **no existe en n8n** — la real se
+> llama `Supabase account`. Al no poder emparejar, n8n las pide a mano: 25 clicks, y ahí se cuelan
+> los errores.
+> **Ya está corregido en el repo** (25 referencias), así que el próximo import engancha solo.
+> **La tabla de qué credencial va en qué nodo — verificada contra n8n el 2026-08-03:**
+>
+> | Workflow | Nodo | Credencial |
+> |---|---|---|
+> | motor | `Disparo on-demand (webhook)` | `Webhook Motor Header` |
+> | motor | `Leer plan (fachada)` | `Run Plan Header` |
+> | archivado | `Disparo por instancia (webhook)` | `Webhook Motor Header` ← **el mismo que el motor, a propósito** |
+> | archivado | `Leer plan (fachada)` | `Run Plan Header` |
+> | archivado | `Append al Sheet Histórico` | la de Google Sheets (se elige a mano, no es texto) |
+> | descubrimiento | `Buscar ahora (webhook)` | `Webhook Descubrimiento Header` |
+> | descubrimiento | `Leer plan (fachada)` | `Run Plan Header` |
+> | **dispatcher** | `Leer instancias (fachada)` | **`Run Plan Header`** ← el que falló |
+> | **dispatcher** | `Disparar por instancia` | **`Webhook Motor Header`** |
+> | los 25 nodos de Supabase | — | `Supabase account` |
+>
+> ⚠️ **Los dos fallos fueron por poner `Webhook Motor Header` donde iba otra.** Es fácil: el
+> desplegable las muestra juntas y los nombres se parecen. **Al re-importar, revisá los nodos de
+> `fachada` primero** — son los que rompen al arrancar.
+>
+> ### 🟢 Lo bueno de cómo falló
+> Los dos errores dieron **403 en el primer nodo**, antes de tocar Apify, Supadata o Haiku. Cero
+> pesos gastados en dos intentos fallidos. Es el fail-closed de ADR-028 funcionando como se diseñó.
+>
+> ### Lo que sigue
+> **Nada bloquea la operación.** Lo que queda es construcción, en este orden: merge de
+> `refactor/membresias` + `018` + `019` (ADR-051/052) → **Capa 2 (RLS)**, que con clientes externos
+> ya no es diferible → paginación del feed → LinkedIn como pipeline N+1.
+>
+> 🔸 *Detalle que no molesta: `instances.config_ref` sigue diciendo `clients/piloto/…` y el
+> directorio `clients/piloto/` no se renombró. Es config de prueba de la era piloto y su consumidor
+> (`deploy.mjs`) está deprecado — renombrarlo etiquetaría datos falsos como si fueran de Retia.*
+
 > 🟣 **QUIÉN USA ESTO HOY, Y LA RESTRICCIÓN QUE IMPONE (Mani, 2026-08-02).** Lo que está live
 > —los 3 workflows y el cockpit— **es de Retia**. No hay diferenciador de empresa ni instancias
 > concurrentes: hay **un** cliente (`piloto`), **una** instancia y **5 usuarios**, todos con
@@ -902,6 +964,17 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-03 (cierre 88) — El refactor multi-tenant entró a produccion: los 6 pasos del runbook, con Alejandro al teclado (Claude).**
+**Que se hizo:** se ejecutaron los 6 pasos de punta a punta en una sola sesion. Alejandro corrio el SQL y n8n; yo verifique cada paso contra la base y contra la API de n8n, nunca de palabra. El estado y la tabla de resultados estan arriba, en **Pendiente vivo**.
+**Lo que mas cuesta y no estaba escrito: LAS CREDENCIALES DEL RE-IMPORT.** Dos intentos fallidos, los dos por una credencial elegida mal de un desplegable — `Webhook Motor Header` donde iba `Run Plan Header` (dispatcher) y donde iba `Webhook Descubrimiento Header` (descubrimiento). **La causa raiz era del repo:** los `workflow.json` referencian credenciales *por nombre y sin id*, y el nombre de Supabase que declaraban (`Supabase Registro`) **no existe en n8n** — la real es `Supabase account`. Sin match, n8n las pide a mano: 25 clicks. **Corregido en el repo** (25 referencias en los 3 workflows), asi que el proximo import engancha solo. La tabla nodo→credencial quedo en Pendiente vivo.
+**Como fallo, que es la parte buena:** los dos errores dieron **403 en el primer nodo**, antes de Apify/Supadata/Haiku. Dos intentos fallidos, cero pesos. El fail-closed de ADR-028 hizo exactamente lo suyo.
+**La prueba que cierra el refactor, y va con datos:** segunda instancia de `retia` + el mismo `external_id` que ya existia → **entro**. Dos filas, mismo video, dos instancias. Antes de la `017` era imposible, y ese era el peor hallazgo del diagnostico (el dedup global le habria dado a la segunda empresa un *"el motor no trae contenido"* sin un solo error). Filas de prueba borradas, conteos de vuelta en la linea base.
+**Dos cosas que dije mal y corregi en el momento, por si sirven de calibracion:** (1) di por viejo un workflow porque su `Config` tenia `instance_id` — la Fase 4 **conserva** ese campo, lo que cambia es que ahora es una expresion que lee el body; lo resolvi comparando nodo por nodo contra el repo en vez de por una heuristica. (2) dije que la corrida con el cap en 10 tardaria 5-10 min: **el cap abarata, no acorta** — lo lento es Apify, que hace una llamada por referente (16), y tardo 16,7 min.
+**Una trampa de herramienta, para el proximo:** un `PATCH` a PostgREST con **acentos** en el cuerpo fallo en silencio desde el shell (JSON mal codificado, la respuesta era un objeto de error que parecia una lista vacia). Con el texto sin tildes entro. Si un PATCH "no matchea" y la fila existe, mira la codificacion antes que el filtro.
+**Verde:** `validate` · `auditar-workflows.mjs` sin hallazgos.
+**Que sigue:** nada bloquea la operacion. Construccion, en orden: merge de `refactor/membresias` + `018` + `019` → **Capa 2 (RLS)** → paginacion del feed → LinkedIn.
+
 
 **2026-08-02 (cierre 86) — Fase 4 del refactor multi-tenant: `run-plan` v2, el motor por instancia y el dispatcher (Claude, pedido de Mani).**
 **Qué se hizo:** la fase que **obliga al re-import**, entera y en el repo. El contrato sube a **`version: 2`** con `?instancia=<uuid>` **obligatorio**, `<<INSTANCE_ID>>` deja de existir como placeholder, nace `GET /api/engine/instancias`, y nace [`Workflows/workflow-dispatcher/`](../../Workflows/workflow-dispatcher/). `typecheck` 0 · **158 tests** · `build` · `validate` **1786 checks / 5 workflows** · `auditar-workflows.mjs` sin hallazgos · `test-nodos.mjs` verde con dos secciones nuevas. **Nada aplicado en prod: el re-import es de Mani.**
