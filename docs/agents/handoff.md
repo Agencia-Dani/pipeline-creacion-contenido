@@ -22,29 +22,31 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## 🔴 EL RUNBOOK ABIERTO (cierre 92 → para Mani): membresías + LinkedIn. **El orden no es negociable.**
+> ## 🔴 LO ABIERTO AL CIERRE 93 (2026-08-03). Tres cosas, y las tres se encontraron MIDIENDO.
 >
-> **Al cerrar el 2026-08-03 los pasos 1 y 2 están HECHOS y verificados contra la base. El siguiente
-> es el 3, y es un merge que ya está desbloqueado.** La rama `refactor/membresias` tiene `main`
-> adentro, está verde y **pusheada** (`43199f1`); LinkedIn ya es un pipeline del repo.
+> **El runbook de membresías + LinkedIn está casi cerrado:** el merge entró a `main` (`ad2de5b`),
+> la `020` y la `021` están aplicadas, y el alta de EstadoX y 30X también. Lo que queda no es el
+> runbook, son estos tres, en este orden:
 >
-> > ### ⏳ PROD ESTÁ EN LA VENTANA DEL EXPAND, Y ESO TIENE FECHA DE VENCIMIENTO
-> > Hoy conviven la tabla nueva (`app.usuarios_clientes`, poblada) y las columnas viejas
-> > (`usuarios.rol`, `usuarios.client_id`, todavía vivas), y **Vercel sigue sirviendo el código
-> > viejo, que lee las columnas**. Es estable — es exactamente para lo que el expand/contract
-> > existe — pero **desde ahora `usuarios.rol` es una copia congelada**: si alguien cambia un rol,
-> > lo cambia en la membresía y la columna vieja queda vieja, sin que nada avise. Por eso los pasos
-> > 3→5 no se dejan para dentro de dos semanas.
->
-> | # | Paso | Quién | Estado / por qué va acá |
+> | # | Qué | Quién | Por qué es urgente |
 > |---|---|---|---|
-> | 1 | Aplicar **`018_membresias.sql`** | Alejandro | ✅ **HECHO el 03/08.** Iba antes del merge: la `018` no borra las columnas viejas, así que el código desplegado sigue andando con ella puesta. Al revés, Vercel habría deployado código que lee una tabla inexistente y **los 5 perdían el cockpit, Jero incluido** |
-> | 2 | Verificar el backfill | Alejandro | ✅ **HECHO y medido contra la base:** `app.usuarios_clientes` = **5 filas, todas `retia`** (2 `dev` + 3 `operador`) · `es_dueno` = **Alejandro Dávila y Manuel Mejia**, los correctos. No hubo que corregir ningún rol |
-> | 3 | **Merge de `refactor/membresias` → `main` + push** (dispara el deploy de Vercel) | **Mani** | 👈 **ACÁ ARRANCA.** Ya es seguro: la tabla está puesta. **No se hizo en la sesión a propósito** — Alejandro la cerró antes, y un deploy no se dispara de salida sin nadie mirando |
-> | 4 | Probar el login **con la cuenta de Jero**, no con una de dev | Mani | La única prueba que vale. Un dev es `es_dueno` y entra **aunque las membresías estén rotas**: probar con la cuenta propia no prueba nada |
-> | 5 | Aplicar **`019_membresias_cierre.sql`** | Mani | Después del deploy verificado. Tiene gate de confirmación humana (hay que descomentar el `insert into _cierre_membresias`). Es la que cierra la ventana del expand |
-> | 6 | Aplicar **`020_pipeline_linkedin.sql`** | Mani | Crea las 4 tablas de LinkedIn y **registra `linkedin` en `workflows`**. Sin esa fila el paso 7 falla por FK |
-> | 7 | El alta de las empresas y sus cockpits (SQL abajo) | Mani | Necesita la `020` corrida |
+> | 1 | 🔑 **Rotar la API key de Anthropic** | **Mani** | Estuvo **commiteada y pusheada a GitHub** en la rama `refactor/multi-tenant-fase-0-adrs` (commit `d98d45a`, *"n8n snapshots"*): 4 snapshots del live con la key en claro dentro del `jsCode`. La rama ya se borró en local y en `origin`, **pero eso no es el arreglo** — GitHub retiene objetos sin referencia y se piden por SHA. Después de rotar: `.env` + `n8n:push` a motor, descubrimiento y archivado. `main` nunca la tuvo |
+> | 2 | ✍️ **Firmar y correr la `019`** | Mani | **NO se aplicó, aunque parezca que sí.** Su gate humano (línea 23, `-- insert into _cierre_membresias values (true);`) sigue comentado, así que el `raise exception` del §0 aborta la transacción entera y no pasa nada. Medido: `app.usuarios` **todavía devuelve `rol` y `client_id`**. Las dos condiciones del gate ya se cumplen (deploy hecho, login probado con cuenta operador) |
+> | 3 | 🩸 **El archivado no archiva nada desde el 01/08, y cierra en verde** | Mani/Claude | `IF — hay calificados` todavía pregunta `($json.records \|\| []).length > 0`: `records` era el sobre de **Airtable**, y PostgREST devuelve el array pelado ⇒ la condición da `false` **siempre**. Entró en `6e86481` (D7). **Medido:** la corrida del 02/08 cerró `ok` con `metricas.archivados: 9`, el último `outputs` es del **26/07**, y los 9 candidatos calificados el 01/08 **siguen vivos** en `app.candidatos`. `archivados` cuenta lo que se **leyó**, no lo que se archivó, así que el registro tampoco lo delata. Se arregla con `n8n:push -- archivado --nodos "IF — hay calificados"`, sin re-import |
+>
+> **Y después, el paso que quedó explícitamente para otra sesión:** el **flip de `scoped.ts`**
+> (Fase 6, paso 2 de 2). Ver §14.3 del [plan multi-tenant](./plan-multi-tenant.md).
+>
+> ### Lo que sí quedó cerrado del runbook viejo
+> | # | Paso | Estado |
+> |---|---|---|
+> | 1–2 | `018` + backfill | ✅ Alejandro, 03/08. 5 usuarios → 5 membresías, `es_dueno` en los dos correctos |
+> | 3 | Merge `refactor/membresias` → `main` + push | ✅ **HECHO (`ad2de5b`)**, fast-forward limpio |
+> | 4 | Probar el login con una cuenta operador | ✅ Mani: se ve bien |
+> | 5 | `019_membresias_cierre.sql` | ⛔ **NO aplicada** — ver el punto 2 de arriba |
+> | 6 | `020_pipeline_linkedin.sql` | ✅ aplicada: las 4 tablas responden y `linkedin` está en `workflows` |
+> | 7 | El alta de EstadoX y 30X (SQL abajo) | ✅ aplicada: `clients` = **3** · `instances` = **4** (`retia/reels` active · `retia/linkedin` **draft** · `estadox/linkedin` active · `30x/linkedin` active), exactamente como se diseñó |
+> | + | **`021_rls_capa_2.sql`** (Fase 6, paso 1) | ✅ aplicada. Es **inerte** hasta el flip: el BFF sigue en `service_role`, que bypassa RLS |
 >
 > ### El SQL del paso 7 — las dos empresas nuevas y los tres cockpits de LinkedIn
 >
@@ -1076,6 +1078,32 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-03 (cierre 93) — El refactor llegó a prod y la Capa 2 quedó escrita; tres cosas rotas aparecieron por medir, no por leer (Claude, pedido de Mani).**
+**Qué se hizo:** el **merge a `main`** (paso 3, `ad2de5b`), los docs de los 5 workflows migrados a la forma nueva de ADR-053, la **`021` de RLS** escrita y verificada contra un Postgres 16 real, y el repo limpiado a una sola rama. Mani aplicó la `020`, la `021` y el alta de EstadoX y 30X.
+
+**🔑 Hay una API key de Anthropic commiteada y pusheada a GitHub, y `main` nunca la tuvo.** La rama `refactor/multi-tenant-fase-0-adrs` (`d98d45a`, *"n8n snapshots"*) commiteó 5 snapshots del live; 4 traen la key en claro adentro del `jsCode` (motor ×6, motor ×6, descubrimiento ×4, archivado ×2). `.n8n-snapshots/` **sí** está en `.gitignore` (línea 12), así que entró con `add -f` o antes de la regla. La rama se borró en local y en `origin`, **pero borrar no es el arreglo**: hay que **rotar**. Es el punto 1 de §Pendiente vivo. *El validador de secretos corre sobre el working tree, no sobre las ramas: un `git add -f` se le escapa entero.*
+
+**⛔ La `019` no se aplicó, y todo indicaba que sí.** Mani la corrió, no dio error visible, y `app.usuarios` **sigue teniendo `rol` y `client_id`**. Es el gate humano del §0 abortando la transacción entera — exactamente para lo que existe. *La lección de método: una migración con gate no se da por aplicada porque se haya corrido; se da por aplicada cuando se mide su efecto.* Se midió por PostgREST, no por memoria.
+
+**🩸 El archivado no archiva nada desde el 01/08 y cierra en verde.** Lo encontró el task del README (`c7c282e`) y se **verificó contra prod, independientemente**: la corrida del 02/08 cerró `estado: ok` con `metricas.archivados: 9`, el último `outputs` es del **26/07**, y los 9 candidatos calificados el 01/08 siguen vivos en `app.candidatos`. La causa: `IF — hay calificados` pregunta por `$json.records`, el sobre de **Airtable**; PostgREST devuelve el array pelado ⇒ `false` siempre. Entró en `6e86481` (D7), cuando el nodo de lectura migró a PostgREST y el IF quedó con la forma vieja. Los nodos de abajo sí se migraron (usan `_filas`), **por eso nada explota**. Y `metricas.archivados` cuenta lo **leído**, no lo archivado, así que el registro tampoco lo delata. *La tercera vez este mes que un cambio de D7 deja un contador mintiendo en cero mientras la ejecución termina verde.*
+
+**🩸 La Fase 6 tenía un agujero que ningún plan tenía escrito: las 27 vistas no eran `security_invoker`.** En Postgres una vista corre con los permisos de **su dueño**, así que escribir policies sobre las tablas base y dejar las vistas como estaban habría dejado toda la zona *Entender* sin RLS — y no se habría notado, porque con un tenant devuelven las filas correctas igual. **Medido con un A/B:** apagando `security_invoker` en `v_metricas_calidad`, un operador de Retia pasa a ver **2 filas en vez de 1**, las de EstadoX incluidas. Sin error y sin aviso. Es la familia de la `015`.
+
+**Y dos cosas más las encontró la corrida, no el diseño**, las dos habrían roto *Entender* el día del flip: con `security_invoker` la vista necesita que **el usuario** alcance todo lo que cruza, así que `clients`/`instances`/`workflows` (los cruzan `v_outputs_recientes` y `v_salud_referentes`) y las 6 vistas de `public` necesitan sus propios grants. *Este archivo llegó a decir por escrito que el registro no necesitaba policies "a propósito", y era falso.*
+
+**La `021` va partida en dos a propósito**, con el mismo expand/contract de la `016`/`017` y la `018`/`019`: **paso 1** (aplicada) escribe grants, 2 funciones de alcance (`security definer` + `stable` + `search_path` pinneado), 17 policies y `security_invoker` en las 12 vistas, y **no cambia nada** porque el BFF sigue en `service_role`; **paso 2** es el flip de `scoped.ts`, una línea, y ahí el aislamiento se vuelve real. ADR-047 dice que la Capa 2 es *"la fase con más riesgo de romper lo que funciona"* — partirla deja el paso caro verificable sin que nadie pueda perder el cockpit.
+**🔒 Y la razón por la que RLS NO reemplaza al filtro de `scoped.ts`, escrita en la migración para que nadie lo borre por redundante:** RLS acota a **todas las empresas del usuario** (es lo máximo que puede saber la base, que no sabe qué cockpit hay abierto); `scoped.ts` acota **al cockpit abierto**, que es más angosto.
+
+**✅ Verificado contra un Postgres 16 real:** `001→018` + `021` de cero, con el seed de prod y **una segunda empresa con datos propios** — el escenario que en producción todavía no existía. Operador de Retia: ve 1 fila donde hay 2, y pedir explícito `where client_id = 'estadox'` da **0**, no un error. Dueño sin membresías: ve las 2. Anónimo: `permission denied for schema app`. **Las 12 vistas responden** como operador (ninguna con `42501`) y el dueño ve **el doble** en todas — ese "el doble" es la señal de que la vista scopea.
+
+**Los docs de los 5 workflows dicen la forma nueva** (`ad2de5b`): cada uno abre con **§Operación** — cambiar un workflow es `n8n:push`, el re-import queda **solo para topología** — y los placeholders quedaron rotulados como tales. De paso se corrigieron dos cosas que no eran viejas sino **falsas**: la tabla de placeholders del archivado tenía 3 de 6 filas muertas y nombraba dos credenciales inexistentes (`Airtable PAT`, `Supabase Registro`), y `CLAUDE.md` decía que la `018` no estaba aplicada.
+
+**Limpieza del repo:** de 8 ramas a **1**. Se mergeó el README del archivado (`c7c282e`, el task), se sacó el worktree, se borraron 6 ramas locales ya en `main` y las 2 de `origin`. Quedan `main` y las dos del bot de Vercel.
+
+**Verde:** `typecheck` 0 · **165 tests** · `validate` **2028 checks / 7 workflows** · `n8n:diff` **limpio en los 5** contra el live.
+**⚠️ Lo que NO se vio corriendo:** el cockpit de LinkedIn y los dos selectores nuevos. El alta se aplicó, pero **nadie abrió una pantalla** — la prueba de §Qué tiene que verse después del paso 7 sigue pendiente.
+**Qué sigue:** los 3 de §Pendiente vivo (rotar · firmar la `019` · el `IF` del archivado) y después el **flip de `scoped.ts`**. Skills sugeridas: `/diagnose` para el IF del archivado (hay un modo de falla medido y un fix de un nodo), `/grill-with-docs` antes del flip.
 
 **2026-08-03 (cierre 92) — Los dos ejes del día: las membresías listas para prod, y LinkedIn entrando como pipeline (Claude, con Alejandro).**
 **Qué se hizo:** el merge de `refactor/membresias` con `main` (verde, sin aplicar), y LinkedIn construido hasta donde se puede construir sin las respuestas que faltan. **Dos ADRs nuevos (055, 056), la migración `020`, el manifest del workflow y la superficie del cockpit.** Nada aplicado en prod: el runbook ordenado está arriba, en §Pendiente vivo.
