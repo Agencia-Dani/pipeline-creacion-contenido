@@ -26,7 +26,14 @@
 >
 > **Los 6 pasos del runbook están hechos y verificados contra la base y contra n8n, no de palabra.**
 > `retia/reels` es el cockpit vivo; las URLs son `/retia/reels/...` y **entrar por la raíz `/` lleva
-> solo** (es el link que hay que darle al equipo — los bookmarks viejos murieron).
+> solo** (es el link que hay que darle al equipo).
+>
+> ✅ **Los bookmarks viejos YA NO mueren (cierre 89, `e5c6668`).** Decía acá que morían, y era cierto
+> hasta ese commit: la Fase 3 había dejado páginas solo para las **zonas**, así que `/retia/reels`,
+> `/retia` y todo link pre-refactor daban **404 pelado**. Ahora `[cliente]` y `[cliente]/[pipeline]`
+> son rutas de verdad y rebotan a la zona inicial del rol, y como los links viejos tienen 1–2
+> segmentos, **los atrapan esas mismas rutas y caen solos en el cockpit correcto**. Hay además un
+> `not-found.tsx` para lo que ni eso matchea. *No hace falta avisarle nada a Jero.*
 >
 > | | Paso | Verificado con |
 > |---|---|---|
@@ -92,8 +99,8 @@
 >
 > **La restricción, dicha como restricción: Retia no se puede quedar sin acceso ni sin motor
 > mientras dure el refactor.** De lo que viene, tres cosas se lo pueden llevar puesto:
-> · **La Fase 3 le rompe los bookmarks** (`/curar/feed` ya no existe). Entrar por la raíz `/`
->   sigue funcionando y es el camino a darle — resuelve su cockpit y su zona inicial.
+> · ~~**La Fase 3 le rompe los bookmarks**~~ ✅ **cerrado en el cierre 89**: los links viejos ahora
+>   rebotan solos al cockpit. Entrar por la raíz `/` sigue siendo el camino a darle igual.
 > · **La Fase 6 (RLS)** es la única que puede dejarlo afuera de verdad: hoy el BFF lee con
 >   `service_role` y ahí pasa a leer con su sesión. Es la fase que hay que probar con la cuenta de
 >   él, no con una de dev.
@@ -964,6 +971,17 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-03 (cierre 89) — El 404 que dejó la Fase 3: la base del cockpit no era una ruta (Claude, reporte de Alejandro).**
+**Qué pasó:** Alejandro reportó *"el cockpit no está funcionando del todo"* → **404 Page not found**. El diagnóstico empezó descartando lo caro: `clients` y `instances` en prod son `retia` / `retia`+`reels`+`active`, las **5 filas de `app.usuarios` con `client_id = retia`**, la raíz responde `307 → /login`, `typecheck` y **158 tests** verdes. **No era el refactor.**
+**La causa, y es un hueco que la Fase 3 dejó abierto:** solo existían páginas para las **zonas**. `/retia/reels` y `/retia` eran 404 aunque el cockpit exista — y lo agrava que `baseDe()` / `rutaDe(c)` del **propio dominio** construyen justo esa URL (`rutas.test.ts` ya la testea como válida). Encima **no había `not-found.tsx` en toda la app**, así que cualquier ruta sin match caía en el 404 default de Next: pantalla en blanco, sin decir qué pasó y sin salida.
+**Arreglado en `e5c6668` (pusheado a `main`, 3 archivos nuevos, nada modificado):** `app/[cliente]/[pipeline]/page.tsx` → zona inicial del rol · `app/[cliente]/page.tsx` → primer cockpit suyo de esa empresa · `app/not-found.tsx` → pantalla con el botón a `/`. Los tres reusan `resolverContexto` + `zonaInicial`, que ya existían; ajeno o inexistente sale por `redirect("/")`, que es la salida de emergencia que `app/page.tsx` ya se documentaba como ser.
+**🟢 El efecto colateral que salió mejor de lo planeado: los bookmarks pre-Fase 3 se arreglaron solos.** Las rutas viejas tienen **uno o dos segmentos** (`/operar`, `/curar/feed`), así que ahora las atrapan las rutas dinámicas nuevas: `resolverContexto` no encuentra ningún cliente llamado `curar`, devuelve `null` y rebotan al cockpit correcto. **No hay que avisarle nada a Jero** — contra lo que decía §Pendiente vivo (*"los bookmarks viejos murieron"*), ya no mueren. El `not-found` quedó para lo que ni eso matchea (3 segmentos o más).
+**Una decisión chica, dicha para que no se re-litigue:** el `not-found` **no redirige a propósito**. El que llega ahí se equivocó de mucho y un salto silencioso le esconde que la URL está mal; además `redirect()` adentro de un `not-found` es frágil (en respuestas streameadas termina siendo un salto de cliente). Los que se equivocaron de poco ya rebotan solos por las rutas de arriba.
+**Verde:** `typecheck` · **158 tests** · `build` (el mapa de rutas muestra `/[cliente]` y `/[cliente]/[pipeline]` registradas) · `validate` **1786 checks**.
+**⚠️ Lo que NO se verificó, y es honesto decirlo:** el redirect **corriendo**. La cadena completa necesita sesión iniciada y no había navegador disponible en la sesión. Se comprueba en 10 segundos con el deploy arriba: `/retia/reels` tiene que caer en `/retia/reels/operar`.
+**Qué sigue:** sin cambios respecto del cierre 88 — merge de `refactor/membresias` + `018`/`019` → **Capa 2 (RLS)** → paginación del feed → LinkedIn. Y para *ver* las tres empresas separadas hace falta darlas de alta: hoy hay un cliente y una instancia, así que el `SelectorCockpit` existe pero el layout no lo dibuja (`opciones.length > 1`).
+
 
 **2026-08-03 (cierre 88) — El refactor multi-tenant entró a produccion: los 6 pasos del runbook, con Alejandro al teclado (Claude).**
 **Que se hizo:** se ejecutaron los 6 pasos de punta a punta en una sola sesion. Alejandro corrio el SQL y n8n; yo verifique cada paso contra la base y contra la API de n8n, nunca de palabra. El estado y la tabla de resultados estan arriba, en **Pendiente vivo**.
