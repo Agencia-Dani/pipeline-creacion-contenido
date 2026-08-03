@@ -30,9 +30,58 @@
 >
 > | # | Qué | Quién | Por qué es urgente |
 > |---|---|---|---|
-> | 1 | 🔑 **Rotar la API key de Anthropic** | **Mani** | Estuvo **commiteada y pusheada a GitHub** en la rama `refactor/multi-tenant-fase-0-adrs` (commit `d98d45a`, *"n8n snapshots"*): 4 snapshots del live con la key en claro dentro del `jsCode`. La rama ya se borró en local y en `origin`, **pero eso no es el arreglo** — GitHub retiene objetos sin referencia y se piden por SHA. Después de rotar: `.env` + `n8n:push` a motor, descubrimiento y archivado. `main` nunca la tuvo |
+> | 1 | 🔑 **Rotar la API key de Anthropic** | **Mani** | Estuvo **commiteada y pusheada a GitHub** en la rama `refactor/multi-tenant-fase-0-adrs` (commit `d98d45a`, *"n8n snapshots"*): 4 snapshots del live con la key en claro dentro del `jsCode`. La rama ya se borró en local y en `origin`, **pero eso no es el arreglo** — GitHub retiene objetos sin referencia y se piden por SHA. `main` nunca la tuvo. **El procedimiento está abajo y NO es un `n8n:push`** |
 > | 2 | ✍️ **Firmar y correr la `019`** | Mani | **NO se aplicó, aunque parezca que sí.** Su gate humano (línea 23, `-- insert into _cierre_membresias values (true);`) sigue comentado, así que el `raise exception` del §0 aborta la transacción entera y no pasa nada. Medido: `app.usuarios` **todavía devuelve `rol` y `client_id`**. Las dos condiciones del gate ya se cumplen (deploy hecho, login probado con cuenta operador) |
-> | 3 | 🩸 **El archivado no archiva nada desde el 01/08, y cierra en verde** | Mani/Claude | `IF — hay calificados` todavía pregunta `($json.records \|\| []).length > 0`: `records` era el sobre de **Airtable**, y PostgREST devuelve el array pelado ⇒ la condición da `false` **siempre**. Entró en `6e86481` (D7). **Medido:** la corrida del 02/08 cerró `ok` con `metricas.archivados: 9`, el último `outputs` es del **26/07**, y los 9 candidatos calificados el 01/08 **siguen vivos** en `app.candidatos`. `archivados` cuenta lo que se **leyó**, no lo que se archivó, así que el registro tampoco lo delata. Se arregla con `n8n:push -- archivado --nodos "IF — hay calificados"`, sin re-import |
+> | 3 | 🩸 **El archivado no archiva nada desde el 01/08, y cierra en verde** | Mani/Claude | `IF — hay calificados` todavía pregunta `($json.records \|\| []).length > 0`: `records` era el sobre de **Airtable**, y PostgREST devuelve el array pelado ⇒ la condición da `false` **siempre**. Entró en `6e86481` (D7). **REPRODUCIDO A PEDIDO el 03/08** (ver abajo). Se arregla con `n8n:push -- archivado --nodos "IF — hay calificados"`, sin re-import |
+>
+> #### La reproducción controlada del 03/08 — el task de arreglo arranca con esto medido
+> Se disparó el archivado a mano (`POST` al webhook con `{instancia}` de `retia/reels`). Antes y
+> después, contra la base:
+>
+> | | Antes | Después | Esperado si funcionara |
+> |---|---|---|---|
+> | candidatos calificados | **9** | **9** | 0 |
+> | `outputs` totales | **79** | **79** | 88 |
+> | último `outputs` | 26/07 | **26/07** | 03/08 |
+> | la corrida | — | `estado: ok` en **3,3 s**, `metricas.archivados: 9` | — |
+>
+> O sea: **leyó 9, reportó 9 archivados, escribió 0 y borró 0, y cerró verde en 3 segundos.** Los
+> 3,3 s son en sí la señal: una corrida que archiva de verdad escribe a Supabase, appendea al Sheet
+> y borra, y la del 26/07 (61 archivados) no se hace en ese tiempo.
+> *El barrido de higiene no borró nada: se contó antes de disparar y había **0** candidatos `nuevo`
+> más viejos que 20 días.*
+>
+> ✅ **Y de paso cerró lo que faltaba del cierre 90.** Esa corrida escribió
+> `params.execution_id: "123"`, y se verificó contra la API de n8n que es **real**: mismo
+> `workflowId` que `N8N_WF_ARCHIVADO`, `status: success`, `startedAt` 21:19:56.703 contra un
+> `runs.inicio` de 21:19:57.295. **ADR-054 verificado end-to-end en una corrida de verdad**, que era
+> justamente lo único que quedaba pendiente de comprobar.
+>
+> ### 🔑 Cómo se rota la key de Anthropic, y por qué `n8n:push` NO sirve acá
+>
+> **La key no es una credencial de n8n: va inline en el `jsCode` de 6 nodos.** Medido contra los
+> `workflow.json` el 03/08 — no hay ninguna credencial `anthropic*` en la instancia:
+>
+> | Workflow | Nodos que la llevan |
+> |---|---|
+> | motor | `Pre-trim relevancia` · `Traducir (Claude Haiku)` · `Gate de relevancia` |
+> | descubrimiento | `Vetting relevancia (Haiku)` · `Vetting TikTok (Haiku)` |
+> | archivado | `Destilar criterios` |
+>
+> **El orden importa, y al revés de lo que parece:**
+> 1. Rotar en la consola de Anthropic.
+> 2. **Editar los 6 nodos a mano en n8n.** ⚠️ **`n8n:push` no puede hacerlo**: el repo guarda
+>    `<ANTHROPIC_API_KEY>` y `n8n-sync` **aprende el valor del propio live** (esa es toda la idea de
+>    ADR-053: una tabla a mano sería una segunda verdad). Si empujás antes de cambiarlo en n8n, el
+>    push **reescribe la key vieja**, porque es la que aprendió.
+> 3. Actualizar `ANTHROPIC_API_KEY` en el `.env` de la raíz (a mano; es local y gitignored).
+> 4. `npm run n8n:diff` para confirmar verde.
+>
+> 🛟 **La red que ya existe si el paso 2 queda a medias:** el mapa de placeholders se aprende de los
+> 5 workflows a la vez, así que si un workflow tiene la key nueva y otro la vieja, el placeholder
+> entra en **conflicto** y `n8n-sync` lo **descarta** (`for (const k of conflictos) mapa.delete(k)`).
+> El push queda con un placeholder sin resolver y **falla cerrado** en vez de escribir el valor
+> equivocado. Un `n8n:diff` después de rotar te dice si quedó alguno sin cambiar.
 >
 > **Y después, el paso que quedó explícitamente para otra sesión:** el **flip de `scoped.ts`**
 > (Fase 6, paso 2 de 2). Ver §14.3 del [plan multi-tenant](./plan-multi-tenant.md).
@@ -99,7 +148,14 @@
 > (`instagram, tiktok`)** · `linkedin` registrado en `workflows`. **El SQL del alta también se corrió
 > ahí mismo** y es de donde salió el hallazgo del `draft` de arriba.
 
-> ## 🔎 LO ÚNICO QUE FALTA VERIFICAR (cierre 90): que `params.execution_id` aparezca en una corrida REAL
+> ## ✅ CERRADO EL 2026-08-03 (cierre 93): `params.execution_id` aparece en una corrida real
+>
+> **Ya no falta nada acá.** La corrida del archivado del 03/08 (21:19, `on_demand`) escribió
+> `params.execution_id: "123"`, y se verificó contra `GET /api/v1/executions/123`: mismo
+> `workflowId` que `N8N_WF_ARCHIVADO`, `status: success`, `startedAt` a 0,6 s del `runs.inicio`.
+> ADR-054 queda verificado end-to-end. Lo de abajo es el enunciado original, como registro.
+>
+> <details><summary>El pendiente original (cierre 90)</summary>
 >
 > Los 3 `Abrir run` ya graban `params.execution_id = $execution.id` en producción y el error handler
 > ya cierra por esa llave ([ADR-054](../adr/ADR-054-cada-run-lleva-su-execution-id.md)). Se probó
@@ -128,6 +184,8 @@
 > importar cualquiera de los 5, hay que **actualizar su `N8N_WF_*` en el `.env`** y volver a apuntar
 > lo que lo referencie (`settings.errorWorkflow` de los otros 4), o el alias del diff apunta al
 > muerto y te miente en verde.
+>
+> </details>
 
 > ## ✅ EL REFACTOR MULTI-TENANT ESTÁ EN PRODUCCIÓN (2026-08-03, madrugada)
 >
@@ -1104,6 +1162,16 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **Verde:** `typecheck` 0 · **165 tests** · `validate` **2028 checks / 7 workflows** · `n8n:diff` **limpio en los 5** contra el live.
 **⚠️ Lo que NO se vio corriendo:** el cockpit de LinkedIn y los dos selectores nuevos. El alta se aplicó, pero **nadie abrió una pantalla** — la prueba de §Qué tiene que verse después del paso 7 sigue pendiente.
 **Qué sigue:** los 3 de §Pendiente vivo (rotar · firmar la `019` · el `IF` del archivado) y después el **flip de `scoped.ts`**. Skills sugeridas: `/diagnose` para el IF del archivado (hay un modo de falla medido y un fix de un nodo), `/grill-with-docs` antes del flip.
+
+**— Addendum del mismo cierre, después de las tres preguntas de Mani —**
+
+**🔑 Rotar la key de Anthropic NO es un `n8n:push`, y eso es contraintuitivo.** La key **no es una credencial de n8n**: va inline en el `jsCode` de **6 nodos** (motor ×3, descubrimiento ×2, archivado ×1; medido contra los `workflow.json`, no hay ninguna credencial `anthropic*` en la instancia). Y `n8n-sync` **aprende el valor del live**, así que un push antes de cambiarla a mano **reescribe la key vieja**. El orden correcto y la red de seguridad —el placeholder entra en conflicto y se descarta, o sea falla cerrado— quedaron escritos en §Pendiente vivo. *Es la primera vez que "los placeholders se aprenden del live" juega en contra en vez de a favor, y valía anotarlo.*
+
+**⛔ La `019` volvió a rebotar, y el error es el correcto.** `P0001: 019: falta confirmar el deploy del refactor`. No es un bug: es el gate del §0 haciendo su trabajo. Falta borrarle el `-- ` a la línea 23 (`insert into _cierre_membresias values (true);`) **antes** de pegar el archivo en el SQL Editor.
+
+**🩸 El bug del archivado, reproducido a pedido y con números.** Se disparó a mano contra `retia/reels`. **Antes:** 9 calificados · 79 `outputs` · último 26/07. **Después:** 9 · 79 · 26/07, y la corrida `ok` en **3,3 s** con `archivados: 9`. Leyó 9, reportó 9, escribió 0, borró 0, cerró verde. *Los 3,3 s son la señal más barata que hay: la corrida del 26/07 archivó 61 y no se hace en ese tiempo.* El barrido de higiene no borró nada (se contó antes: **0** candidatos `nuevo` de más de 20 días). El próximo task arranca con el antes/después ya medido.
+
+**✅ Y esa misma corrida cerró el último pendiente del cierre 90.** Escribió `params.execution_id: "123"`, verificado contra `GET /api/v1/executions/123`: mismo `workflowId`, `status: success`, `startedAt` a 0,6 s del `runs.inicio`. **ADR-054 verificado end-to-end en una corrida real.** El bloque de §Pendiente vivo que lo pedía quedó marcado como cerrado.
 
 **2026-08-03 (cierre 92) — Los dos ejes del día: las membresías listas para prod, y LinkedIn entrando como pipeline (Claude, con Alejandro).**
 **Qué se hizo:** el merge de `refactor/membresias` con `main` (verde, sin aplicar), y LinkedIn construido hasta donde se puede construir sin las respuestas que faltan. **Dos ADRs nuevos (055, 056), la migración `020`, el manifest del workflow y la superficie del cockpit.** Nada aplicado en prod: el runbook ordenado está arriba, en §Pendiente vivo.
