@@ -134,7 +134,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Ejecutar manual').isExecuted ? 'manual' : 'on_demand' }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"descubrimiento\" } }",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Ejecutar manual').isExecuted ? 'manual' : 'on_demand' }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"descubrimiento\", \"execution_id\": \"{{ $execution.id }}\" } }",
         "options": {
           "timeout": 15000
         }

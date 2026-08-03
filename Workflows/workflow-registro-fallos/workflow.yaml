@@ -1,0 +1,74 @@
+# Manifest — cumple core/contracts/workflow-manifest.md (v1)
+#
+# La red de seguridad del registro: cuando CUALQUIER workflow del pipeline se cae, n8n dispara
+# este, que cierra ese `runs` como `fallo` en vez de dejarlo colgado en `en_curso`. Es lo que
+# hace que "corrida muerta" y "corrida que nunca terminó de reportar" sean distinguibles en el
+# cockpit. Se versiona desde el cierre 90; antes vivía solo en la instancia de n8n.
+#
+# Encuentra el run por `params.execution_id` en vez de por instancia (ADR-054). Re-importado y
+# verificado end-to-end el 2026-08-03: se dispara, captura el id de la ejecución caída y su PATCH
+# sale limpio contra Supabase. Los 4 workflows lo tienen en Settings → Error Workflow.
+contract_version: 1
+
+id: registro-fallos
+name: "Registro — Error Workflow (fallos → Supabase)"
+description: >
+  El error handler global de la instancia. Lo dispara n8n cuando otro workflow termina en
+  excepción: arma un mensaje con workflow + nodo + url de la ejecución y marca como `fallo` el
+  run de ESA ejecución, encontrado por el `execution_id` que el workflow caído grabó en
+  `params` al abrirlo (ADR-054). No procesa contenido ni cuesta plata.
+engine: n8n
+status: active                    # re-importado y activo desde 2026-08-03 (ADR-054)
+owner: mani
+
+triggers:
+  # ⚠️ HUECO DEL CONTRATO v1: el disparador real es el `Error Trigger` de n8n (lo invoca el motor
+  # de n8n cuando otro workflow falla), y `webhook` es el tipo más cercano de los 5 que admite el
+  # contrato. Anotado como hueco, no como diseño — mismo criterio que `outputs` en el dispatcher.
+  - type: webhook
+
+inputs:
+  # No hay config por cliente: es infraestructura de la instancia, no un pipeline de un cliente.
+  client_config: "n/a — global por diseño; se configura en Settings → Error Workflow de cada workflow"
+  filters: []
+  credentials:
+    - supabase_api                # credencial n8n 'Supabase account' (supabaseApi)
+
+stages:                           # no recorre el embudo: solo escribe en el registro
+  colectar: "El payload del Error Trigger: $json.execution (id, error, lastNodeExecuted, url) y $json.workflow"
+  normalizar: "Preparar datos del fallo: execution_id + error_msg = '[workflow] mensaje · nodo: X · url'"
+  filtrar_scorear: n/a
+  enriquecer: n/a
+  generar: n/a
+  calidad: n/a
+  entregar: "PATCH runs?params->>execution_id=eq.<id> → estado=fallo, fin, error (ADR-054)"
+  notificar: n/a
+
+outputs:
+  - type: registro_de_fallo
+    destination_native: supabase  # tabla `app.runs`
+    registered: yes               # ES el registro: no reporta a otro lado, escribe acá
+
+runbook:
+  setup: >
+    ⚠️ ORDEN OBLIGATORIO: primero los 3 `Abrir run` tienen que estar escribiendo
+    `params.execution_id` en producción (`npm run n8n:push -- motor|descubrimiento|archivado
+    --nodos "Abrir run en el registro" --apply`), porque este workflow busca por esa clave: si se
+    re-importa antes, no encuentra nada y sigue sin registrar. Después: re-importar workflow.json
+    (reemplaza los 5 nodos viejos por 3) → resolver <<SUPABASE_URL>> → mapear la credencial
+    supabaseApi 'Supabase account' en `Marcar run como fallo` → en cada workflow que deba
+    reportar: Settings → Error Workflow → este.
+  start: "Activar en n8n. No tiene cron ni webhook propio: queda a la espera de que otro falle."
+  stop: "Desactivar en n8n, o quitarlo del Error Workflow de cada workflow que lo apunta."
+  test: >
+    Forzar una excepción en un workflow que lo tenga como Error Workflow (un Code node con
+    `throw new Error('test')`) DESPUÉS de que abra su run, y verificar que la fila correcta
+    quedó marcada: `select estado, error, params->>'execution_id' from runs order by inicio desc
+    limit 1`. El `execution_id` tiene que ser el de la ejecución que se cayó (se ve en la URL de
+    la ejecución en n8n), y `estado` = 'fallo'.
+  docs:
+    - README.md
+    - ../../core/contracts/ingesta-registro.md
+    - ../../docs/adr/ADR-054-cada-run-lleva-su-execution-id.md
+
+cost_per_run: "$0. Un Code node y hasta dos requests a PostgREST; no toca ningún servicio pago."

@@ -53,7 +53,7 @@ La service role key bypassa RLS — vive SOLO en n8n (y en el gestor de contrase
   "instance_id": "{{ $json.instance_id }}",
   "trigger_type": "cron",
   "estado": "en_curso",
-  "params": {}
+  "params": { "workflow": "motor", "execution_id": "{{ $execution.id }}" }
 }
 ```
 
@@ -69,7 +69,19 @@ La service role key bypassa RLS — vive SOLO en n8n (y en el gestor de contrase
   > `runs` viola la FK y `run-plan` responde 400: los dos frenos muerden **antes** de Apify. Lo que
   > NO puede pasar es que corra igual y le escriba las filas a otra empresa.
 - `params`: en corridas cron va vacío o con los defaults; en corridas `on_demand` lleva lo que
-  el formulario pidió.
+  el formulario pidió. Además lleva **dos claves de identidad, obligatorias**:
+  - `workflow`: qué pipeline corrió (`motor` · `descubrimiento` · `archivado`). Los tres comparten
+    instancia, así que sin esto `instance_id` no alcanza para saber quién escribió la fila.
+  - `execution_id`: **`{{ $execution.id }}`, el id de la ejecución de n8n que produjo este run**
+    ([ADR-054](../../docs/adr/ADR-054-cada-run-lleva-su-execution-id.md)). Es lo que hace que una
+    corrida sea identificable **desde afuera de sí misma**: cuando el workflow se cae, el Error
+    Trigger recibe ese mismo id y el error handler cierra la fila exacta con
+    `PATCH /runs?params->>execution_id=eq.<id>`. Sin esto, lo único que se puede buscar es
+    "algún run en_curso de este tenant", que con el dispatcher (una ejecución por instancia) y
+    tres pipelines por instancia toca la fila equivocada o varias.
+    > Vive en `params` y no en una columna propia a propósito: `runs` es chico y no necesita
+    > índice, y una columna ataría el arreglo a la cola de migraciones. El ADR tiene escrito el
+    > disparador para graduarlo.
 - La respuesta trae el `id` del run → se conserva en el flujo para los pasos 2 y 3.
 
 ### 2. Reportar outputs (uno por pieza producida, o batch)

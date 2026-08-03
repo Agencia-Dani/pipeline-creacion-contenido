@@ -621,7 +621,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Disparo on-demand (webhook)').isExecuted ? 'on_demand' : ($('Ejecutar manual').isExecuted ? 'manual' : 'cron') }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"motor\" } }",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Disparo on-demand (webhook)').isExecuted ? 'on_demand' : ($('Ejecutar manual').isExecuted ? 'manual' : 'cron') }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"motor\", \"execution_id\": \"{{ $execution.id }}\" } }",
         "options": {
           "timeout": 15000
         }
