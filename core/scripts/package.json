@@ -4,7 +4,13 @@
   "type": "module",
   "description": "Validador del contrato de workflows del pipeline (core/contracts/workflow-manifest.md)",
   "scripts": {
-    "validate": "node validate.mjs"
+    "validate": "node validate.mjs",
+    "n8n:diff": "node n8n-sync.mjs diff",
+    "n8n:pull": "node n8n-sync.mjs pull",
+    "n8n:push": "node n8n-sync.mjs push",
+    "n8n:restore": "node n8n-sync.mjs restore",
+    "n8n:test": "node test-n8n-sync.mjs",
+    "n8n:orden": "node n8n-sync.mjs orden"
   },
   "dependencies": {
     "yaml": "^2.4.0"
