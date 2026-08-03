@@ -22,6 +22,36 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🔎 LO ÚNICO QUE FALTA VERIFICAR (cierre 90): que `params.execution_id` aparezca en una corrida REAL
+>
+> Los 3 `Abrir run` ya graban `params.execution_id = $execution.id` en producción y el error handler
+> ya cierra por esa llave ([ADR-054](../adr/ADR-054-cada-run-lleva-su-execution-id.md)). Se probó
+> end-to-end con un workflow desechable que se cae a propósito: el handler se disparó, capturó el id
+> de la ejecución caída y su `PATCH` salió limpio contra Supabase. **Lo que todavía no pasó es una
+> corrida de verdad**, así que ninguna fila de `runs` tiene la clave todavía. Después del próximo
+> cron (lunes 8:00):
+>
+> ```sql
+> select estado, params->>'workflow', params->>'execution_id', inicio from runs order by inicio desc limit 5;
+> ```
+>
+> Las 3 últimas tienen que traer `execution_id` no nulo. Si viene nulo, el `Abrir run` de ese
+> workflow no se empujó — se ve con `npm run n8n:diff` y se arregla con `n8n:push`.
+>
+> ### ⚠️ La regla nueva que sale de esta sesión: **`npm run n8n:diff` después de CADA import**
+> El error handler se rompió **dos veces por lo mismo** (la copia original y el re-import del
+> 2026-08-03): `<<SUPABASE_URL>>` quedó literal en el campo URL de un nodo HTTP. `<<…>>` no es
+> sintaxis de expresión de n8n, así que el request muere — y como el nodo va con
+> `onError: continueRegularOutput`, **la ejecución termina en verde igual**. Las dos veces lo
+> encontró un diff, nunca una corrida. El nodo *parece* configurado porque la credencial queda en
+> verde y el placeholder vive adentro del campo URL.
+>
+> ### ⚠️ Importar en n8n NO actualiza en el lugar: crea un workflow con id NUEVO
+> El re-import del error handler creó `gBcKmzxc4EgXMwzv` y dejó el original archivado. Si volvés a
+> importar cualquiera de los 5, hay que **actualizar su `N8N_WF_*` en el `.env`** y volver a apuntar
+> lo que lo referencie (`settings.errorWorkflow` de los otros 4), o el alias del diff apunta al
+> muerto y te miente en verde.
+
 > ## ✅ EL REFACTOR MULTI-TENANT ESTÁ EN PRODUCCIÓN (2026-08-03, madrugada)
 >
 > **Los 6 pasos del runbook están hechos y verificados contra la base y contra n8n, no de palabra.**
@@ -971,6 +1001,20 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-03 (cierre 90) — Tocar un workflow deja de ser un re-import, y el error handler que nunca había funcionado (Claude).**
+**Qué se hizo:** dos ADRs y sus dos implementaciones, las dos ya en producción. **[ADR-053](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md):** `core/scripts/n8n-sync.mjs` parchea los workflows por la API pública de n8n en vez de re-importarlos. **[ADR-054](../adr/ADR-054-cada-run-lleva-su-execution-id.md):** cada run graba el id de su ejecución y el error handler cierra por ahí. Commits `c560754` y `3d54a15`.
+**El principio de ADR-053, que es lo que hay que entender antes de tocarlo:** *el repo es la forma, el live es el estado.* Nunca se empuja el repo entero — se toma el live como base (que ya tiene credenciales, ids internos de Apify y settings de instancia) y se le aplican los `parameters` del repo. **Los placeholders no se mapean en el `.env`: se APRENDEN del propio live**, alineando cada string del repo contra su gemelo (`const KEY = '<ANTHROPIC_API_KEY>'` contra `const KEY = 'sk-ant-…'` enseña el valor). Se descartó la tabla `<<X>> → $VAR` porque es una segunda verdad que se atrasa sola el día que alguien cambia una URL en n8n.
+**La semántica del PUT se MIDIÓ contra la instancia, con workflows desechables, no se supuso.** Y tres de esas mediciones cambiaron el diseño: `settings` **mergea** (por eso `binaryMode`/`timezone`/`errorWorkflow` sobreviven sin mandarlos — era el riesgo que más miedo daba y resultó ser ninguno), `nodes` **reemplaza** (siempre va el array completo), y un PUT sobre un workflow **activo** lo deja activo con `webhookId` y `path` intactos. El `versionId` **no** sirve de rollback (no cambió en uno de dos saves), así que el snapshot es propio, en `.n8n-snapshots/` (gitignored).
+**El diff clasifica en vez de listar, y esa es la diferencia entre útil e ignorable:** el diff crudo daba **26 diferencias**, todas normalizaciones de n8n. Clasificadas (drift · topología · orden · defaults que n8n borra · campos que agrega · resourceLocators de Apify), quedó **1 accionable**. Un diff ruidoso se aprende a ignorar y ahí se esconde el drift real.
+**🩸 El hallazgo que encontró el diff, y que estaba corriendo hace meses:** en el motor, `Armar candidato` abría dos ramas y **el orden estaba invertido** — `Resumen del run → Cerrar run` corría ANTES que `Preparar candidatos → POST Candidatos`. O sea: `Cerrar run` escribía `estado: 'ok'` **con métricas de N candidatos antes de insertarlos**, y `POST Candidatos` no tiene `onError`, así que un fallo suyo dejaba un run registrado como exitoso con la tabla vacía. En el orden del repo, el mismo fallo corta el workflow, el run queda `en_curso` y lo levanta el barredor de zombies. **Se midió cómo ordena n8n v1** (3 ramas cuyos órdenes por X y por Y eran distintos): **por Y, arriba primero, desempata X**. Arreglado con `npm run n8n:orden -- motor --apply`.
+**🩸 El segundo hallazgo: el *Error Workflow* nunca funcionó, ni un día.** Apareció al versionarlo (no estaba en git). Buscaba el run por `instance_id=eq.<<INSTANCE_ID>>` —placeholder literal— y ADR-048 además le había sacado el piso: la instancia viaja en el payload del webhook, que el Error Trigger **no recibe**. Y aunque se resolviera, `instance_id` identifica al **tenant**, no a la **corrida**: con el dispatcher (una ejecución por instancia) y tres pipelines compartiendo instancia, tocaba la fila equivocada o varias. **La llave pasó a ser `$execution.id`** — medido: existe adentro del workflow, el Error Trigger recibe *ese mismo* id, y PostgREST filtra `params->>clave` (así que **no hizo falta migrar**, que importa porque la cola está trabada: la `017` espera y `018`/`019` ya están pedidas).
+**Lo que se borró y por qué:** la rama `¿Había run abierto?` → `Insertar run de fallo`. No es implementable: `runs.instance_id` es `not null references instances(id)`, así que un run de fallo huérfano exige inventar un tenant, y eso es la Capa 1 de ADR-047. Cubría caerse *antes* de abrir el run — 4 nodos, dos de ellos requests a Supabase, o sea que su modo de falla dominante es "Supabase no responde", donde tampoco se podría escribir la fila.
+**⚠️ Gotchas para el próximo (los tres están en §Pendiente vivo):** (1) **el diff va después de CADA import** — el mismo `<<SUPABASE_URL>>` se coló dos veces y las dos en silencio, porque `onError: continue` termina la ejecución en verde con el request roto; (2) **importar crea un workflow con id NUEVO**, nunca actualiza en el lugar (hay que tocar `N8N_WF_*` en el `.env` y re-apuntar `settings.errorWorkflow`); (3) **cambios de topología no van por `push`** — el push los detecta y se niega, van por re-import.
+**Verde:** `validate` **1897 checks** · `auditar-workflows.mjs` sin hallazgos · `n8n:test` **15/15** · `n8n:diff` con **los 5 workflows en sync**. n8n quedó con 61 workflows, 56 archivados, **5 activos y todos correctos**.
+**Qué sigue:** sin cambios de fondo — merge de `refactor/membresias` + `018`/`019` → **Capa 2 (RLS)** → paginación del feed → LinkedIn. Lo único nuevo es la verificación de §Pendiente vivo: mirar que `params.execution_id` aparezca después del cron del lunes.
+**Skills sugeridas para la próxima sesión:** `/diagnose` si el `execution_id` no aparece en la corrida real; `/grill-with-docs` antes de meterse con la Capa 2 (RLS), que es la decisión grande que queda.
+
 
 **2026-08-03 (cierre 89) — El 404 que dejó la Fase 3: la base del cockpit no era una ruta (Claude, reporte de Alejandro).**
 **Qué pasó:** Alejandro reportó *"el cockpit no está funcionando del todo"* → **404 Page not found**. El diagnóstico empezó descartando lo caro: `clients` y `instances` en prod son `retia` / `retia`+`reels`+`active`, las **5 filas de `app.usuarios` con `client_id = retia`**, la raíz responde `307 → /login`, `typecheck` y **158 tests** verdes. **No era el refactor.**
