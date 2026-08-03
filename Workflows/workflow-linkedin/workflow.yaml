@@ -1,0 +1,125 @@
+# Manifest — cumple core/contracts/workflow-manifest.md (v1)
+#
+# El pipeline N+1 (ADR-055), y el test real del invariante #3 de PLAN §F5: si LinkedIn entra sin
+# tocar el núcleo más allá de su propia migración, "clonar y configurar" deja de ser una promesa.
+#
+# ⚠️ ESTADO REAL, 2026-08-03 — leelo antes de creerle a las etapas de abajo.
+#   Existen: los ADRs (055/056), las tablas (`core/schema/020_pipeline_linkedin.sql`) y la
+#   superficie del cockpit (las zonas del pipeline, ADR-056).
+#   NO existe: el `workflow.json`. Este manifest describe el diseño acordado, no algo que corra —
+#   por eso `status: draft`. Las etapas marcadas [POR CONSTRUIR] están bloqueadas por cosas que no
+#   son técnicas y están listadas en ADR-055 §Consecuencias: no hay definición de "funcionó", no
+#   existe el banco de referentes, y no hay inventario de voces de EstadoX ni de Retia.
+contract_version: 1
+
+id: linkedin
+name: "Máquina de LinkedIn — referentes y texto, con fotos"
+description: >
+  Detecta contenido que ya funcionó —incluido el de otros idiomas— por dos carriles: el archivo
+  propio de la voz (anécdotas que nadie más tiene) y material ajeno de Pinterest y referentes en
+  inglés (formatos para rebrandear). Un humano cura qué entra, la máquina produce el post en la voz
+  de la cuenta con su firma obligatoria, y lo deja en una cola para que una persona lo apruebe y
+  publique. NADIE publica solo: en un canal que no quiere ser automatizado el costo de equivocarse
+  es la cuenta, no un reintento.
+engine: n8n
+status: draft
+owner: alejo
+
+triggers:
+  # Sin cron acá, y no es un olvido: los crons viven en el dispatcher desde la Fase 4 (ADR-050). Un
+  # cron local no tendría de dónde sacar la instancia y solo produciría corridas que abortan después
+  # de `Abrir run`, dejando la fila en `en_curso` para siempre — el fallo mudo que ya costó una
+  # sesión, una vez por semana.
+  - type: webhook               # POST con { instancia } en el body, del dispatcher o del botón ▶.
+                                # Guard single-flight POR INSTANCIA, header auth, path aleatorio:
+                                # el mismo patrón de los otros cuatro. Path = <<WEBHOOK_PATH_LINKEDIN>>.
+  - type: manual                # "Execute Workflow" para probar. Sin payload: se le pega el uuid de
+                                # la instancia a la expresión de Config.instance_id. Vacío ⇒ 400.
+
+inputs:
+  # La config NO se edita en el nodo: se lee por la fachada (ADR-035, "n8n lee su config por la
+  # fachada, escribe sus resultados por PostgREST"). El `client_config` queda declarado por contrato.
+  client_config: "clients/{cliente}/linkedin.yaml"
+  config_node: "Nodo 'Config': supabase_url, dashboard_url. instance_id sale del payload (ADR-048)."
+  run_plan: "GET /api/engine/run-plan?instancia=<uuid>&ambito=linkedin — voces, sus perfiles de LinkedIn (firma, espaciado, separación) y el banco de referentes."
+  filters:
+    # El umbral es POR CARRIL, y esa es la diferencia estructural con reels (ADR-055 §2).
+    - { key: umbral_reacciones, type: number, scope: client, desc: "Carril copiable, fuente LinkedIn: piso de reacciones. NO aplica al carril personal, que no compite con nadie" }
+    - { key: pins_por_consulta, type: number, scope: client, default: 20, desc: "Carril copiable, fuente Pinterest: cuántos pins traer por filtro. Acá el umbral es de pertinencia y formato, no de viralidad — un pin no tiene reacciones que comparar" }
+    - { key: dias_recencia,     type: number, scope: client, default: 30, desc: "Ventana de fetch" }
+    - { key: n_por_voz,         type: number, scope: client, desc: "Candidatos por voz al feed. Una sola perilla de cantidad (ADR-038)" }
+    - { key: ventana_corrida_min, type: number, scope: client, default: 60, desc: "Single-flight por instancia (ADR-023): un run 'en_curso' más joven que esto es corrida viva. Tiene que quedar POR ENCIMA de la corrida más larga posible" }
+  credentials:                  # SOLO NOMBRES — los valores viven en n8n / gestor, JAMÁS en git
+    - apify_token               # scrape de Pinterest y de las fuentes del carril copiable
+    - anthropic_api_key         # gate de relevancia + generación en voz
+    - supabase_service_role     # credencial n8n 'Supabase account'
+    - webhook_motor_header      # credencial n8n 'Webhook Motor Header' — protege el trigger
+    - run_plan_header           # credencial n8n 'Run Plan Header' — la fachada
+  # NINGUNA credencial de LinkedIn: la máquina no publica (ADR-055 §5). Y ninguna de Supadata:
+  # no hay nada que transcribir.
+
+stages:                         # las 8 etapas canónicas de PLAN §2.4 (n/a si no aplica)
+  colectar: >
+    [POR CONSTRUIR] Bifurcada en dos carriles (ADR-055 §2). Copiable: Apify sobre Pinterest (por
+    filtro) y sobre las fuentes en inglés del banco (app.referentes_linkedin). Personal: el archivo
+    propio de la voz. 🔴 El banco NO EXISTE en ninguna marca todavía — Fernando, textual: "no tengo
+    el listado de referentes". Hay que construirlo, no capturarlo.
+  normalizar: >
+    [POR CONSTRUIR] Pins y posts → content_item, el formato común que ya especifica
+    core/contracts/schemas/. Cada pieza carga su `carril` y su `fuente`: no son etiquetas
+    descriptivas, deciden qué umbral se le aplica y qué trabajo tiene después.
+  filtrar_scorear: >
+    [POR CONSTRUIR] Umbral por carril: el copiable-LinkedIn mide reacciones, el copiable-Pinterest
+    mide pertinencia y formato (un pin no tiene con qué comparar), y el personal no mide nada porque
+    no compite. Dedup contra app.candidatos_linkedin por (instance_id, external_id) — scopeado, que
+    es la lección más cara del refactor multi-tenant: el unique global le vacía el supply a la
+    segunda empresa sin un solo error.
+  enriquecer: n/a               # LinkedIn ya es texto. Es la declaración que ADR-049 §4 pedía como
+                                # afirmación verificable, y tiene consecuencia en la superficie: la
+                                # zona `transcribir` no existe en este cockpit (ADR-056).
+  generar: >
+    [POR CONSTRUIR — bloqueado] Claude con el perfil de voz + 2 a 4 posts reales como few-shot +
+    cache_control, el patrón que ya funciona en reels. En el carril copiable la imagen NO se genera:
+    se REBRANDEA (paleta de la marca, traducción al español, firma al pie).
+    🔴 Bloqueado por el pedido más barato del proyecto y que sigue sin hacerse: 3–4 posts que
+    Fernando sienta que salieron perfectos, por cuenta. Sin ellos la generación sale genérica.
+  calidad: >
+    [POR CONSTRUIR] El validador determinista de ADR-055 §4, que corre DESPUÉS del LLM y antes de
+    que nada llegue a un humano: R-1 (el gancho es un bloque continuo de 2–3 líneas sin línea en
+    blanco — un \n\n antes de la línea 2 esconde el post detrás del "ver más") y R-2 (firma
+    obligatoria al cierre, sin excepción). Las dos se imponen a todas las voces y son código, no
+    prompt. R-3 y R-4 no se validan acá: son placeholders de la voz.
+  entregar: >
+    [POR CONSTRUIR] Candidatos a app.candidatos_linkedin por PostgREST (ADR-035) con estado 'nuevo',
+    descartes borderline a app.descartes_linkedin para auditar falsos negativos, y registro de la
+    corrida en runs/outputs. Todo con el instance_id del payload.
+  notificar: n/a                # el equipo vive en el cockpit; no hay email
+
+outputs:
+  - type: post_linkedin
+    destination_native: postgres      # app.candidatos_linkedin (ADR-049: un pipeline, sus tablas)
+    registered: pending               # reporta al registro central cuando exista el workflow.json
+
+runbook:
+  setup: >
+    Aplicar core/schema/020_pipeline_linkedin.sql (registra el pipeline en `workflows` y crea las 4
+    tablas) → crear la instancia: insert into instances (client_id, workflow_id, slug, nombre) →
+    importar el workflow.json en n8n → reemplazar <<WEBHOOK_PATH_LINKEDIN>> → enganchar las
+    credenciales (ver la tabla nodo→credencial del handoff: los nodos de `fachada` primero, son los
+    que rompen al arrancar) → agregar el cron de este pipeline al dispatcher → ACTIVAR.
+  start: "Lo dispara el dispatcher y el botón ▶ del cockpit. Acá solo hay que dejarlo ACTIVO."
+  stop: "Desactivar el workflow en n8n."
+  test: >
+    Antes de que exista el workflow.json, lo que sí se verifica es el cockpit: crear una instancia
+    de linkedin y comprobar que /<empresa>/<slug> abre, que el nav NO dibuja `transcribir`, y que
+    entrar a mano a /<empresa>/<slug>/transcribir redirige (ADR-056: la UI esconde, el servidor
+    impide).
+  docs:
+    - README.md
+    - ../../docs/adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md
+    - ../../docs/adr/ADR-056-las-zonas-son-rol-interseccion-pipeline.md
+
+cost_per_run: >
+  Por medir. Estructuralmente más barato que reels: no hay transcripción (Supadata sale del todo) y
+  la traducción es de texto corto, no de 170 transcripciones. El costo dominante pasa a ser el
+  scrape de Apify más una llamada de gate y una de generación por pieza que sobrevive.

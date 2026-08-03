@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import type { Alcance, TenantContext } from "@/domain/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { puedeVerZona, type Rol, type Zona } from "@/domain/roles";
+import { zonasDePipeline } from "@/domain/pipelines";
+import { baseDe, comoRuta } from "@/domain/rutas";
 import { leerMembresias, resolverContexto, type Instancia } from "@/lib/tenant";
 
 /**
@@ -73,9 +75,23 @@ export async function exigirTenant(
   // que sí le toca. Sin decir cuál de las dos cosas fue.
   if (!sesion) redirect("/");
 
-  // El rol se evalúa contra ESTE cockpit. La misma persona puede ser operadora en una empresa y
-  // sponsor en otra, así que la zona se autoriza por cockpit, no por cuenta.
-  if (!puedeVerZona(sesion.rol, zona)) redirect(`/${cliente ?? sesion.cockpit.clientId}/${pipeline ?? sesion.cockpit.slug}`);
+  // La zona se autoriza contra DOS cosas, y ninguna alcanza sola (ADR-056):
+  //
+  //   1. **El rol en ESTE cockpit.** La misma persona puede ser operadora en una empresa y sponsor
+  //      en otra, así que el permiso es por cockpit, no por cuenta.
+  //   2. **Lo que este pipeline implementa.** `transcribir` no existe en LinkedIn: su etapa
+  //      `enriquecer` es `n/a` (ADR-055), o sea que la pantalla no tendría contra qué tabla correr.
+  //
+  // El layout esconde las zonas que no van; esto impide entrar a mano. La UI esconde, el servidor
+  // impide — y acá está el servidor.
+  const permitida =
+    puedeVerZona(sesion.rol, zona) &&
+    zonasDePipeline(sesion.cockpit.workflowId).includes(zona);
+
+  // A la base del cockpit RESUELTO, no a los segmentos que vinieron: si la URL traía basura, ya
+  // fue rechazada arriba, y si traía otro cockpit válido el redirect tiene que apuntar al que
+  // efectivamente se abrió. La base rebota sola a la zona inicial.
+  if (!permitida) redirect(baseDe(comoRuta(sesion.cockpit)));
 
   return { usuario, ...sesion };
 }

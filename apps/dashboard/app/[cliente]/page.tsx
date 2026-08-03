@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { usuarioActual } from "@/lib/auth";
 import { resolverContexto } from "@/lib/tenant";
 import { rutaZona } from "@/domain/rutas";
-import { zonaInicial } from "@/domain/roles";
+import { zonasDe } from "@/domain/roles";
+import { zonaInicialEn } from "@/domain/pipelines";
 
 // Una empresa sin pipeline (`/retia`) cae en el primer cockpit suyo que el usuario pueda abrir.
 //
@@ -20,12 +21,16 @@ export default async function BaseDelCliente({
   const sesion = await resolverContexto(usuario, cliente);
   if (!sesion) redirect("/");
 
+  // El rol sale de la sesión, no del usuario (ADR-051): sin cockpit no hay rol, y acá el cockpit
+  // lo acaba de elegir `resolverContexto`. La zona además tiene que existir en el pipeline que
+  // eligió (ADR-056) — si no, a la raíz, sin inventar una zona.
+  const zona = zonaInicialEn(zonasDe(sesion.rol), sesion.cockpit.workflowId);
+  if (!zona) redirect("/");
+
   redirect(
     rutaZona(
       { cliente: sesion.cockpit.clientId, pipeline: sesion.cockpit.slug },
-      // El rol sale de la sesión, no del usuario (ADR-051): sin cockpit no hay rol, y acá el
-      // cockpit lo acaba de elegir `resolverContexto`.
-      zonaInicial(sesion.rol),
+      zona,
     ),
   );
 }

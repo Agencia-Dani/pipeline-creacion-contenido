@@ -2,11 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SelectorCockpit, type OpcionCockpit } from "@/components/selector-cockpit";
+import {
+  SelectorEquipo,
+  SelectorPipeline,
+  type OpcionCockpit,
+} from "@/components/selector-cockpit";
 import { usuarioActual } from "@/lib/auth";
 import { cockpitsDe, resolverContexto } from "@/lib/tenant";
 import { comoRuta, rutaZona } from "@/domain/rutas";
 import { zonasDe, type Zona } from "@/domain/roles";
+import { zonasVisibles } from "@/domain/pipelines";
 import { cerrarSesion } from "@/app/actions";
 
 const ETIQUETAS: Record<Zona, string> = {
@@ -39,7 +44,10 @@ export default async function ZonasLayout({
   // que sí le toca. Sin decir cuál de las dos cosas fue (`lib/tenant.ts`).
   if (!sesion) redirect("/");
 
-  const zonas = zonasDe(sesion.rol);
+  // La intersección de ADR-056: lo que el rol alcanza Y lo que este pipeline implementa. Se keyea
+  // por `workflowId` y no por el slug de la URL, porque el slug es de la INSTANCIA y renombrar un
+  // cockpit no puede cambiarle las zonas.
+  const zonas = zonasVisibles(zonasDe(sesion.rol), sesion.cockpit.workflowId);
   const cockpits = await cockpitsDe(usuario);
   // Del cockpit RESUELTO, no de los segmentos crudos: la URL es entrada, no verdad. Si lo que vino
   // no es exactamente lo que se resolvió, el nav tiene que apuntar a lo que se resolvió — si no, la
@@ -49,8 +57,16 @@ export default async function ZonasLayout({
   const opciones: OpcionCockpit[] = cockpits.map((c) => ({
     cliente: c.clientId,
     pipeline: c.slug,
-    etiqueta: `${c.clientId} · ${c.nombre ?? c.slug}`,
+    etiqueta: c.nombre ?? c.slug,
+    empresa: c.clientId,
   }));
+
+  // Las dos condiciones de ADR-056, y son independientes: se puede tener dos equipos con un
+  // pipeline cada uno, o un equipo con dos pipelines. Cada control aparece por su cuenta.
+  const equipos = new Set(opciones.map((o) => o.cliente)).size;
+  const pipelinesDelEquipo = opciones.filter(
+    (o) => o.cliente === enRuta.cliente,
+  ).length;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -65,10 +81,14 @@ export default async function ZonasLayout({
             ))}
           </nav>
           <div className="flex items-center gap-3">
-            {/* Solo si hay a dónde saltar: con un cockpit el selector es ruido, y un operador de
-                una empresa no tiene por qué enterarse de que existen las otras. */}
-            {opciones.length > 1 && (
-              <SelectorCockpit cockpits={opciones} actual={enRuta} />
+            {/* Solo si hay a dónde saltar. La condición del equipo es además lo que hace que
+                nadie vea el nombre de una empresa ajena: sin más de una membresía, no hay
+                control. */}
+            {equipos > 1 && (
+              <SelectorEquipo cockpits={opciones} actual={enRuta} />
+            )}
+            {pipelinesDelEquipo > 1 && (
+              <SelectorPipeline cockpits={opciones} actual={enRuta} />
             )}
             <span className="text-sm text-muted-foreground">
               {usuario.nombre}
