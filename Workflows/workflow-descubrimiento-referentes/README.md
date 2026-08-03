@@ -81,12 +81,18 @@ TT a juzgar sobre contenido como IG. Un piso de seguidores sería un knob de una
 
 ## Operación
 
-Importar `workflow.json` en n8n, completar el nodo `Config` (`<<AIRTABLE_BASE_ID>>`,
-`<<SUPABASE_URL>>`, `<<INSTANCE_ID>>`) y la `<ANTHROPIC_API_KEY>` en **ambos** code de vetting
-(`Vetting relevancia (Haiku)` y `Vetting TikTok (Haiku)`), mapear credenciales (Airtable PAT,
-Supabase Registro, apifyApi). Cron: lunes 9:00
-`America/Bogota` (1h después del motor, con la señal fresca del archivado del domingo). El resto
-del runbook (test incluido) está en [workflow.yaml](./workflow.yaml).
+**Cambiar este workflow ya no es re-importarlo** (ADR-053): se parchea el live por la API con
+`cd core/scripts && npm run n8n:push -- descubrimiento --nodos "…"`, y `npm run n8n:diff` dice si el
+live corre lo que dice el repo. El re-import completo queda solo para cambios de topología, y ahí sí
+hay que rellenar los placeholders del `Config` (`<<SUPABASE_URL>>`, `<ANTHROPIC_API_KEY>` en **ambos**
+code de vetting) y mapear las credenciales `Supabase account`, `Run Plan Header`,
+`Webhook Descubrimiento Header` y la de Apify. `<<INSTANCE_ID>>` y `<<AIRTABLE_BASE_ID>>` ya no
+existen: el tenant viaja en el payload del webhook (ADR-048) y Airtable murió en D7 (ADR-035).
+
+**No tiene cron: se dispara desde el cockpit** (botón *Buscar cuentas nuevas*, que pega al webhook
+`Buscar ahora`) o a mano con *Execute Workflow*. El cron semanal se sacó a propósito en `270d107`;
+el dispatcher solo tiene los del motor y el archivado. El resto del runbook (test incluido) está en
+[workflow.yaml](./workflow.yaml).
 
 **Flujo del equipo (no-code):** revisar la vista de `Referentes propuestos` → marcar `estado`
 `aprobado` o `descartado` → a la corrida siguiente los aprobados aparecen en `Referentes` y el

@@ -198,6 +198,13 @@ re-importar workflows son D4 y D7** — y eso es a propósito: el re-import es e
 histórico del sistema, así que la fachada de ADR-028 lo concentra en dos momentos en vez de uno por
 dominio.
 
+> 📌 **Nota del 2026-08-03.** Ese *"eslabón débil"* sigue siendo cierto como historia y fue lo que
+> motivó este diseño, pero desde
+> [ADR-053](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md) un cambio de `parameters` se
+> aplica con `npm run n8n:push` y ya no cuesta un re-import. Lo que todavía lo cuesta es la
+> **topología** — ver [plan-multi-tenant §14.2](./plan-multi-tenant.md), donde queda escrito por qué
+> eso ahora es una decisión y no un límite de la API.
+
 ### D0 — Fundación *(el andamio, sin dominio todavía)*
 Scaffolding de `apps/dashboard/` · Tailwind + shadcn · Supabase Auth con magic link · `app.usuarios`
 + RLS con los 3 roles · layout con las 3 zonas vacías · deploy a Vercel · `tsc` y `node:test` como

@@ -90,6 +90,23 @@
     workflow desechable de 3 ramas cuyos órdenes por X y por Y eran distintos.
   - **El re-import completo no muere:** sigue siendo el camino cuando cambia la topología (nodos
     nuevos, conexiones nuevas, credenciales nuevas). El sync cubre el 90% barato, no el 100%.
+
+    > 🔎 **Hallazgo del 2026-08-03, pendiente de decisión — la razón #1 de arriba ya no es cierta.**
+    > Este ADR descarta empujar nodos nuevos porque *"el repo guarda `<<CREDENCIAL_GOOGLE_SHEETS>>`,
+    > un nombre sin id"*. Medido contra la instancia (API v1.1.1): **`GET /api/v1/credentials` existe
+    > y responde 200** con las 12 credenciales y su `{id, name, type}`, así que el mapa nombre→id se
+    > puede **aprender de la instancia**, exactamente igual que se aprenden los placeholders y por la
+    > misma razón (una tabla a mano sería una segunda verdad). Y los nombres del repo **ya coinciden**
+    > con los reales desde el arreglo del 03/08: `Supabase account` ×26, `Run Plan Header` ×4,
+    > `Webhook Motor Header` ×3, `Webhook Descubrimiento Header` ×1; el único que sigue siendo
+    > placeholder es `<<CREDENCIAL_GOOGLE_SHEETS>>`, que se aprende del live como cualquier otro.
+    >
+    > O sea: **cubrir topología es ahora una decisión, no una limitación de la API.** Lo que queda por
+    > decidir es si conviene —un `push` que crea nodos también puede borrarlos, y `nodes` **reemplaza**—
+    > y con qué red (¿`--nodos` explícito obligatorio? ¿confirmación humana cuando el delta borra?).
+    > La instancia además expone `POST /workflows`, `/activate`, `/deactivate`, `/archive` y
+    > `GET /executions`, todos sin usar. **`/variables` y `/projects` dan 403 por licencia**, así que
+    > no son opción para config por tenant. Cuando se decida, es **enmienda de este ADR**, no uno nuevo.
   - `core/scripts/` gana una dependencia dura de la API de n8n. Si n8n cambia el schema del `PUT`,
     `n8n-sync` se rompe; por eso valida contra el OpenAPI **de la instancia** y no contra una copia.
   - El repo sigue sin ser fuente de verdad de lo que corre. **`diff` es lo que lo mantiene honesto**,

@@ -200,29 +200,29 @@
 > disparador ya se cumplió**: si Jero entra como gente de Retia y no como equipo de la agencia, el
 > alta manual (invite en Supabase + `insert` a mano en el SQL Editor) ya dejó de alcanzar.
 
-> 🔴 **REFACTOR MULTI-TENANT — FASES 0 a 4 EN LA RAMA. LA `016` YA ESTÁ EN PROD (2026-08-02).**
-> El código vive en `refactor/multi-tenant-fase-0-adrs` ([PR #3](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/3)).
+> ✅ **REFACTOR MULTI-TENANT — FASES 0 a 4 EN PRODUCCIÓN. LA `016` Y LA `017` APLICADAS.**
+> *(Este bloque decía «Fases 0 a 4 en la rama» y listaba cinco pasos pendientes — re-import, apagar
+> crons, activar dispatcher, corrida de verificación, `017`. **Los cinco están hechos.** También murió
+> acá el aviso del `slug`: hoy es `reels`, y el del techo de gasto: el re-import pasó.)*
 >
-> **✅ Hecho por Mani:** el `@casper_smc` duplicado (queda 1 fila) y **la `016` aplicada**.
-> Verificado contra la base, no de palabra: `clients.parent_id` · `instances.slug`/`nombre` ·
-> **10/10 tablas de `app` con su columna de tenant y CERO filas sin tenant** (usuarios 5 · voces 3 ·
-> proyectos 6 · referentes 16 · ajustes 18 · candidatos 152 · descartes 26 · propuestos 8 ·
-> eventos 38 · transcripciones 2) · `processed_items` y `outputs` sin nulos · `v_senal_seleccion`
-> exponiendo `instance_id`. El backfill cerró entero.
+> **El estado medido, con sus números, vive en un solo lugar:**
+> [plan-multi-tenant §0](./plan-multi-tenant.md) (base + n8n + repo, verificado el 2026-08-03) y el
+> checklist con marcas en **§12**. No lo dupliques acá.
 >
-> **Falta, en este orden:** el re-import de los 4 workflows → apagar los crons viejos en n8n →
-> activar el dispatcher → la corrida de verificación → **recién ahí la `017`** (que tiene su propio
-> gate de confirmación humana adentro y NO hay que correr todavía). Checklist completo con los
-> placeholders por workflow —ya no son 6 iguales para todos— en el **cierre 86** del log.
+> **Lo que falta está escrito para ejecutarse, en [plan-multi-tenant §14](./plan-multi-tenant.md):**
+> **§14.1** la `018`/`019` sin mergear · **§14.2** `n8n:push` sin topología · **§14.3** RLS ·
+> **§14.4** el Sheet global · **§14.5** knobs y cupos compartidos.
 >
-> 🟠 **Y un arreglo de 1 minuto que conviene hacer ANTES de que el equipo marque bookmarks:** la
-> `016` dejó `instances.slug` y `nombre` en **`short-form-content`**, así que la URL del cockpit hoy
-> es `/piloto/short-form-content/curar/feed` y no el `/30x/reels/...` que el plan §6 promete. **Los
-> dos campos van en la URL** (Fase 3), así que renombrarlos después rompe los links otra vez. Es un
-> `update instances set slug = 'reels', nombre = 'Reels'` (y el `clients.id`, si `piloto` va a
-> llamarse `30x`, es más caro: es FK desde 5 tablas).
+> 🚨 **Lo único de ahí que puede lastimar a alguien hoy, y por eso se repite acá:** la **`018`**
+> mueve el acceso de `usuarios.client_id` a `app.usuarios_clientes`. **Si no backfillea las 5 filas
+> de `app.usuarios` en la misma transacción, los 5 usuarios pierden el cockpit el día del deploy —
+> Jero incluido.** Se verifica con `select count(*) from app.usuarios_clientes;` → **5**, antes de
+> que Vercel deploye.
 
-> 🟡 **SACAR EL TECHO DE GASTO: CÓDIGO LISTO, FALTA EL RE-IMPORT (2026-08-02).** Mani pidió sacar
+> ✅ **SACAR EL TECHO DE GASTO — CERRADO (2026-08-02/03).** *El re-import se hizo, el techo quedó en
+> **250** por decisión (no por costo), y la corrida de verificación salió `ok`. Lo de abajo se
+> conserva porque su hallazgo sigue vigente y es de los caros de re-derivar: **el cap POSTERGA, el
+> presupuesto QUEMA**, y el cuello es el supply, no los cortes.* Mani pidió sacar
 > `cap_top_n` (los planes pagos de Apify/Supadata/Claude no llegan ni a la mitad del cupo y se
 > resetean solos) y que el motor sea lo más preciso posible trayendo el `N` de cada proyecto. La
 > revisión encontró que **el cap no era lo que frenaba, y sacarlo hoy habría roto la corrida**.
@@ -271,7 +271,7 @@
 > eventos en `app.eventos` tienen `usuario_id: null` y un `origen` que lo dice. Son los dos únicos de
 > la historia de ese knob sin autor; no los leas como un hueco.*
 >
-> ### 🟠 Lo único que queda: LA CORRIDA (y es de Mani)
+> ### ✅ La corrida se hizo (03/08 02:36 UTC, `ok`) — la guía de qué mirar queda para la próxima
 > **3. Correr y mirar.** Con el techo en 250 y el backlog de 100 días, esperá que el cap **muerda**
 > (el máximo histórico transcrito son 191). Lo que hay que mirar, en orden de qué te avisa antes:
 > · **Apify primero, no `runs`.** Si algo murió en el arranque, `runs` deja la fila en `en_curso`
@@ -1001,6 +1001,29 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-03 (cierre 91) — Revisión de estado de los dos ejes, y tres huecos que solo aparecen midiendo (Claude, pedido de Mani).**
+**Qué se hizo:** una revisión completa del estado real —qué está hecho, qué está live, qué falta, qué está roto— por los dos ejes que cambiaron juntos (**la API key de n8n** y **el producto pasando de individual a repartido**), y después la alineación de los docs con lo medido. **Cero código, cero cambios en prod.** Todo lo que sigue se leyó de Supabase y de la API de n8n el 03/08, no del handoff — que es el punto: el estado real ya no se podía reconstruir leyendo.
+**Lo verde, para que quede el número:** `clients` 1 (`retia`) · `instances` 1 (`retia`/`reels`) · `app.usuarios` 5, las 5 en `retia` · 5 workflows activos y `n8n:diff` **limpio en los 5** · 158 tests + `typecheck` + `build` · `validate` 1897 · `auditar-workflows` sin hallazgos. **Las Fases 0–4 están en producción y no hay nada roto para Retia hoy.**
+
+**🩸 Los tres huecos, y los tres muerden con la SEGUNDA empresa, no con esta.** Están escritos para ejecutarse en **[plan-multi-tenant §14](./plan-multi-tenant.md)** — cada uno con evidencia, qué lo destraba y hecho-cuando. Acá el titular:
+· **El Google Sheet del histórico es UNO SOLO** (§14.4). En el archivado, `instance_id` viaja por el body pero `sheet_id`/`sheet_tab` son **constantes del nodo `Config`**. Con un solo workflow sirviendo a todas las instancias, los aprobados de la empresa B se appendean al Sheet de Retia. **No estaba anotado en ningún ADR ni en el plan.** La regla que lo arregla ya existe (ADR-035: *n8n lee su config por la fachada*), pero toca `core/contracts/run-plan.md`, así que necesita ADR.
+· **La `018`/`019` está escrita y no está en ninguna parte** (§14.1). `origin/refactor/membresias`, un commit (`3f2d43f`), merge-base **anterior** al merge de las Fases 0–4 (le faltan 4 commits de `main`). `app.usuarios_clientes` no existe en prod. **Si la `018` no backfillea las 5 filas en la misma transacción, los 5 usuarios pierden el cockpit — Jero incluido.**
+· **El aislamiento entre empresas hoy es solo TypeScript** (§14.3). RLS está *enabled* en todo pero **sin una sola policy**; el BFF lee con `service_role`. Probado con la anon key: `app.candidatos` → 401, `public.runs` → 200 con **0 filas**. No hay fuga hacia afuera, y por eso no es una emergencia — pero adentro del BFF un `.eq()` olvidado no lo atrapa nada.
+
+**🟡 Y el hallazgo que cambia el eje 2: la razón que da ADR-053 para no cubrir topología ya no es cierta.** El ADR descarta empujar nodos nuevos porque *"el repo guarda un nombre sin id"*. **`GET /api/v1/credentials` existe y responde 200** con las 12 credenciales y su `{id, name, type}` — el mapa nombre→id se puede **aprender de la instancia**, igual que los placeholders. Y los nombres del repo **ya coinciden** con los reales (`Supabase account` ×26, `Run Plan Header` ×4, `Webhook Motor Header` ×3). O sea: cubrir topología pasó de ser un límite de la API a ser una decisión de red de seguridad (`nodes` **reemplaza**, así que un push que crea nodos también puede borrarlos). Anotado como **hallazgo abierto dentro del propio ADR-053** y como §14.2. *(De paso: `/variables` y `/projects` dan **403 por licencia** — no sirven para config por tenant, vale saberlo antes de diseñar sobre ellos.)*
+
+**🧹 Dos fuentes de verdad, y la que vivía en `core/` era la equivocada.** `core/n8n/error-workflow-registro.json` era la versión de **5 nodos** con la rama `Insertar run de fallo` que ADR-054 borra. Se eliminó y `core/n8n/README.md` quedó como puntero a `Workflows/workflow-registro-fallos/`. La razón de fondo, que vale para cualquier JSON futuro: **`n8n:diff` compara contra `Workflows/*/workflow.json`, así que un workflow guardado fuera de esa carpeta queda fuera del bucle de feedback por construcción** y se desactualiza en silencio. Se repuntaron `ROADMAP.md` (B5, ahora `[x]`) e `ingesta-registro.md`.
+
+**Docs alineados:** `plan-multi-tenant.md` (§0 estado medido + §12 con columna de estado + §14 pendientes + la fila del Sheet en §10) · `handoff` §Pendiente vivo (el bloque decía que faltaban 5 pasos que **están hechos**) · `CLAUDE.md` (`core/schema/` decía 15 aplicadas; son 17) · `docs/adr/README.md` (dos líneas en blanco partían la tabla en tres) · `run-plan.md` y `plan-cockpit-propio.md` (el *"re-import coordinado"* ya casi nunca lo es) · el README del descubrimiento (pedía placeholders de Airtable y anunciaba un cron que se sacó a propósito en `270d107`).
+
+**🔑 `.env` y `.env.local`: Airtable podado de los dos y el PAT revocado.** La app no lo lee en ningún archivo (verificado sobre `app/`, `lib/`, `domain/`: el único `process.env` dinámico es `leerClave` en `lib/transcribir.ts`, y solo pide Supadata y Anthropic) y los workflows tienen 0 llamadas a `api.airtable.com` desde D7. Quedaron sin credencial `setup-airtable.mjs` y `verificar-corrida.mjs`, **a propósito y con el aviso en su cabecera** — para que el próximo que los abra sepa en 5 segundos que no están rotos, sino jubilados.
+
+**⚠️ Lo que NO se hizo, y es deliberado:** ninguno de los tres huecos se arregló. Se **registraron**. Los tres necesitan una decisión (dos de ellos un ADR) y ninguno bloquea a Retia hoy.
+
+**Un dato para calibrar, no es tarea:** la última corrida real fue el 03/08 02:36 UTC y su `params` **no tiene `execution_id`** — es anterior al push de ADR-054 (05:2x UTC). El live ya lo escribe y el handler ya cierra por ahí, pero eso **todavía no se probó con una corrida de verdad**. Se cierra solo en la próxima.
+
+**Skills sugeridas para la próxima sesión:** `/grill-with-docs` para el ADR del Sheet por instancia (§14.4) — es el más barato de los tres y el único que rompe aislamiento; después el mismo skill para la Capa 2 (RLS), que es la decisión grande.
 
 **2026-08-03 (cierre 90) — Tocar un workflow deja de ser un re-import, y el error handler que nunca había funcionado (Claude).**
 **Qué se hizo:** dos ADRs y sus dos implementaciones, las dos ya en producción. **[ADR-053](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md):** `core/scripts/n8n-sync.mjs` parchea los workflows por la API pública de n8n en vez de re-importarlos. **[ADR-054](../adr/ADR-054-cada-run-lleva-su-execution-id.md):** cada run graba el id de su ejecución y el error handler cierra por ahí. Commits `c560754` y `3d54a15`.

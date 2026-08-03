@@ -8,7 +8,9 @@
 > **Estado (2026-06-23, ADR-014):** el motor de reels reporta corridas con *Abrir run en el registro*
 > + *Cerrar run en el registro* (Continue On Fail); **ya no escribe filas por-item a `outputs`** (se
 > quitaron *Preparar outputs Supabase* / *Reportar outputs al registro*). El **archivado** es el dueño
-> de `outputs`. El error workflow vive en [`core/n8n/error-workflow-registro.json`](../n8n/README.md).
+> de `outputs`. El error workflow vive en
+> [`Workflows/workflow-registro-fallos/`](../../Workflows/workflow-registro-fallos/) (se mudó de
+> `core/n8n/` el 2026-08-03 — el porqué, en [`core/n8n/README.md`](../n8n/README.md)).
 
 > **Estado (2026-08-01, [ADR-035](../../docs/adr/ADR-035-contrato-de-escritura-por-postgrest.md)):**
 > este contrato dejó de cubrir solo `runs`/`outputs`. Desde D7 **todo lo que n8n escribe va por acá**,

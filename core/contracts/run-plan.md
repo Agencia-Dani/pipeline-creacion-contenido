@@ -103,7 +103,13 @@ reemplaza (`Leer Voces` / `Leer Proyectos` / `Leer Referentes` / `Leer Ajustes`)
 
 `version` gobierna la compatibilidad (ADR-028 §5): mientras no cambie, la app puede cambiar de dónde
 salen los datos (Airtable → Postgres, dominio por dominio) sin tocar n8n. Un cambio de **forma**
-sube la versión y **ahí sí** hay re-import coordinado.
+sube la versión y **ahí sí** hay que tocar n8n de forma coordinada.
+
+> 📌 **Desde [ADR-053](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md) eso ya casi
+> nunca es un re-import.** Un bump que solo cambia cómo un nodo lee el plan es un cambio de
+> `parameters`: va por `npm run n8n:push -- <alias> --nodos "…"`, con dry-run y rollback. El re-import
+> completo queda para lo que mueve **topología** (nodos o conexiones nuevas), que es lo único que el
+> push se niega a hacer.
 
 **Historia, corta:** `1` sirvió todo D5–D7, incluido el flip de ids de
 [ADR-035](../../docs/adr/ADR-035-contrato-de-escritura-por-postgrest.md) — que anunció un bump y

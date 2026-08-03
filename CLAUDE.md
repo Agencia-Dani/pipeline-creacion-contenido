@@ -33,10 +33,12 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–017; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-02 hay **15 aplicadas** en prod: la `016` (multi-tenant) y la `017` (su cierre)
-  están escritas y verificadas contra un Postgres real, pero **no aplicadas** — y la `017` no se puede
-  correr hasta después del re-import de la Fase 4 (su cabecera explica por qué).
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–019; se aplican a mano en el SQL Editor,
+  en orden). Al 2026-08-03 hay **17 aplicadas** en prod: la `016` (multi-tenant) y la `017` (su cierre,
+  después del re-import de la Fase 4) entraron el 02–03/08. La **`018`/`019` (membresías, ADR-051/052)
+  están escritas y NO aplicadas**: viven solo en la rama `refactor/membresias`, sin mergear. ⚠️ La `018`
+  mueve el acceso de `usuarios.client_id` a `usuarios_clientes` — si no backfillea las 5 filas de
+  `app.usuarios`, los 5 usuarios pierden el cockpit el día del deploy (Jero incluido).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
@@ -93,6 +95,11 @@ módulos), `/handoff` (compactar una sesión).
   archivado · errores`. **Cambios de topología (nodos o conexiones nuevas) siguen siendo re-import
   completo: el push los detecta y se niega.** Su test: `npm run n8n:test` (⚠️ crea y borra un
   workflow desechable e inactivo en n8n; corrélo si tocaste `n8n-sync.mjs`).
+  🟡 *La topología es el **único ritual manual que queda**, y ya no por un límite de la API:
+  `GET /credentials` existe y responde, así que el mapa nombre→id se puede aprender igual que los
+  placeholders. Falta decidir la red de seguridad (`nodes` **reemplaza**: un push que crea nodos
+  también puede borrarlos). Escrito para retomarlo en
+  [plan-multi-tenant §14.2](docs/agents/plan-multi-tenant.md).*
 - **Arreglar el orden de ejecución de las ramas:** `npm run n8n:orden -- <alias> [--apply]`. En n8n
   v1 las hermanas corren por posición en el canvas (Y menor primero, desempata X — **medido**, no
   asumido), así que arrastrar un nodo cambia la semántica sin tocar código. El comando permuta las
