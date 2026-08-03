@@ -22,6 +22,61 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🔴 EL RUNBOOK DE HOY (cierre 92): membresías + LinkedIn. **El orden no es negociable.**
+>
+> La rama `refactor/membresias` ya tiene `main` adentro y está verde, y LinkedIn ya es un pipeline
+> del repo. **Lo que falta es SQL a mano y un merge, en este orden exacto.** Los pasos 1 y 2 son los
+> únicos que pueden lastimar a alguien.
+>
+> | # | Paso | Quién | Por qué va acá y no antes |
+> |---|---|---|---|
+> | 1 | Aplicar **`018_membresias.sql`** en el SQL Editor | Alejandro | 🚨 **Va ANTES del merge.** La `018` no borra `usuarios.rol` ni `usuarios.client_id`, así que el código que Vercel sirve hoy sigue andando con ella puesta. Al revés —merge primero— Vercel deploya código que lee `app.usuarios_clientes`, que **no existe**, y **los 5 pierden el cockpit, Jero incluido** |
+> | 2 | Verificar: `select count(*) from app.usuarios_clientes;` → **5** · `select nombre, rol, es_dueno from app.usuarios order by es_dueno desc;` → los 2 `es_dueno` son **Alejandro Dávila y Manuel Mejia** | Alejandro | ✅ **Confirmado con Alejandro el 03/08: el backfill `es_dueno = (rol = 'dev')` ya da los correctos.** No hay que corregir ningún rol. Alejo Carvajal, Manuel 30X y Jero quedan `operador` de Retia |
+> | 3 | Merge de `refactor/membresias` → `main` + push (deploy de Vercel) | Claude | Recién con la tabla puesta |
+> | 4 | Probar el login **con la cuenta de Jero**, no con una de dev | Alejandro | Es la que se puede perder, y es la única prueba que vale. Un dev es `es_dueno` y entra aunque las membresías estén rotas — probar con la propia cuenta **no prueba nada** |
+> | 5 | Aplicar **`019_membresias_cierre.sql`** | Alejandro | Después del deploy verificado. Tiene gate de confirmación humana. Mientras la `019` no corra, `usuarios.rol` es una **copia congelada**: cambiar un rol lo cambia en la membresía y la columna vieja queda vieja |
+> | 6 | Aplicar **`020_pipeline_linkedin.sql`** | Alejandro | Crea las 4 tablas y **registra `linkedin` en `workflows`**. Sin esa fila el paso 7 falla por FK |
+> | 7 | El alta de las empresas y sus cockpits (SQL abajo) | Alejandro | Necesita la `020` corrida |
+>
+> ### El SQL del paso 7 — las dos empresas nuevas y los tres cockpits de LinkedIn
+>
+> ```sql
+> begin;
+>
+> -- Las dos marcas que faltaban. `estado` acá es 'activo' (español) — ojo, en `instances` es
+> -- 'active' (inglés). Las dos tablas usan vocabularios distintos desde la `001` y es fácil errarle.
+> insert into clients (id, nombre, estado) values
+>   ('estadox', 'EstadoX', 'activo'),
+>   ('30x',     '30X',     'activo');
+>
+> -- Un cockpit de LinkedIn por marca (ADR-055: un cockpit = una fila en `instances`).
+> -- `active` y no `draft` porque el cockpit solo lista instancias activas — con `draft` la pantalla
+> -- no aparece. Es seguro: el dispatcher no tiene cron de LinkedIn y no existe el workflow en n8n,
+> -- así que activar acá no dispara nada ni gasta un peso.
+> insert into instances (client_id, workflow_id, slug, nombre, estado) values
+>   ('retia',   'linkedin', 'linkedin', 'LinkedIn', 'active'),
+>   ('estadox', 'linkedin', 'linkedin', 'LinkedIn', 'active'),
+>   ('30x',     'linkedin', 'linkedin', 'LinkedIn', 'active');
+>
+> commit;
+> ```
+>
+> **Sin membresías nuevas, y es a propósito** (decidido con Alejandro el 03/08): los dos devs son
+> `es_dueno` y alcanzan las tres empresas sin necesitar fila. Jero, Alejo y Manuel 30X siguen viendo
+> **solo Retia** — no se enteran de que existen las otras, que es exactamente lo que el selector de
+> equipo tiene que garantizar.
+>
+> ### Qué tiene que verse después del paso 7 (la prueba de que funcionó)
+> · Entrando con **tu** cuenta: aparecen **los dos selectores** (equipo con 3 opciones, pipeline con
+>   2 en Retia y 1 en las otras) · en el cockpit de LinkedIn **el nav NO dibuja `Transcribir`** y
+>   entrar a mano a `/retia/linkedin/transcribir` **redirige** · con la cuenta de **Jero**: ningún
+>   selector de equipo, y `/estadox/linkedin` lo rebota a su cockpit de Retia.
+>
+> ⚠️ **Lo que NO se verificó de la `020`:** correrla contra un Postgres real. La `018`/`019` se
+> probaron con 001→019 sobre Postgres 16 en Docker; acá **Docker no estaba levantado**. Solo crea
+> tablas nuevas y no toca nada existente, así que el peor caso es un error de sintaxis que el SQL
+> Editor muestra sin romper nada — pero está dicho, no dado por bueno.
+
 > ## 🔎 LO ÚNICO QUE FALTA VERIFICAR (cierre 90): que `params.execution_id` aparezca en una corrida REAL
 >
 > Los 3 `Abrir run` ya graban `params.execution_id = $execution.id` en producción y el error handler
@@ -1001,6 +1056,27 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-03 (cierre 92) — Los dos ejes del día: las membresías listas para prod, y LinkedIn entrando como pipeline (Claude, con Alejandro).**
+**Qué se hizo:** el merge de `refactor/membresias` con `main` (verde, sin aplicar), y LinkedIn construido hasta donde se puede construir sin las respuestas que faltan. **Dos ADRs nuevos (055, 056), la migración `020`, el manifest del workflow y la superficie del cockpit.** Nada aplicado en prod: el runbook ordenado está arriba, en §Pendiente vivo.
+
+**🩸 El conflicto del merge que git NO ve, y es el que importa.** El merge chocó en un solo archivo (el log de este handoff, trivial). El de verdad no lo marca nadie: las dos páginas que `main` agregó en el cierre 89 llaman `zonaInicial(usuario.rol)`, y en esta rama **`usuarioActual()` ya no devuelve `rol`** — ADR-051, *sin cockpit no hay rol*. Lo destapó `typecheck`, no git. Pasaron a leer `sesion.rol`, que **es lo correcto y no solo lo que compila**: es el rol en ESE cockpit, y la misma persona puede ser operadora en una empresa y sponsor en otra. *Merge limpio ≠ merge correcto: acá el compilador fue la red, y por eso el merge va de `main` hacia la rama y no al revés.*
+
+**🔑 El hallazgo del eje de LinkedIn, y no estaba en ningún plan: la zona `transcribir` no existe ahí.** LinkedIn ya es texto, así que su etapa `enriquecer` es `n/a`. Eso suena a detalle del manifest y **no lo es**: significa que *"qué zonas tiene este cockpit"* deja de ser una pregunta del **rol** y pasa a ser también del **pipeline**. De ahí sale **ADR-056**: las zonas visibles son `zonasDe(rol) ∩ zonasDePipeline(workflowId)`, aplicada en los dos lados de la costura que ya existía —el layout esconde, `exigirTenant` impide—. Y se keyea por `workflowId`, **no** por el slug de la URL: el slug es de la instancia y renombrar un cockpit no puede cambiarle las zonas.
+
+**El selector se partió en dos, por un comentario de Alejandro en el medio de la sesión** (*"debería haber un selector de equipos que muestre solo el equipo al que pertenece"*). Uno plano mentía en los dos sentidos: con LinkedIn adentro, alguien de **una** empresa vería dos opciones en un control que significaba *cambiar de empresa*; y alguien de dos empresas tendría empresa y pipeline mezclados en el mismo string, o sea que **saltar de equipo y saltar de trabajo serían el mismo gesto**. Ahora son `SelectorEquipo` + `SelectorPipeline`, cada uno con su propia condición de aparecer. La del equipo (`> 1 membresía`) es lo que hace que **nadie vea el nombre de una empresa ajena**.
+
+**ADR-055 cerró una pregunta que llevaba abierta desde el 28/07:** dónde se construye la máquina de LinkedIn. Se decidió **acá, como pipeline N+1**, y con eso muere `maquina-linkedin/ADR 001 §3` (se escribió allá el **ADR 004**, y ese repo pasó a ser el de **diseño**; este es el de construcción). Se descartó el repo propio porque duplicaría cockpit, login, membresías, dedup e histórico —todo lo que acaba de costar el refactor— y le daría al equipo **dos logins para dos pipelines de la misma empresa**.
+**Lo que ADR-055 importa de la entrevista a Fernando, y es lo que destraba el proyecto:** la etapa 1 se bifurca en dos carriles y **la fuente del copiable NO es LinkedIn, es Pinterest e inglés**. El material que se rebrandea es visual y nunca nació en LinkedIn — buscarlo ahí era buscarlo en el peor sitio, y encima en el único que no se deja rastrear. El riesgo *"LinkedIn no se deja scrapear"*, que era el bloqueante #1, **se resolvió por rodeo, no por fuerza**.
+
+**Una tabla que ADR-049 no había previsto: `app.voces_linkedin`.** La firma (R-2), el espaciado (R-3) y la separación mínima (R-4) **no tienen sentido sin saber que hablamos de LinkedIn**, y `app.voces` es de grano empresa y la comparten los dos pipelines. Meterlas ahí era exactamente la tabla ancha llena de nulls que ADR-049 descartó. La regla del propio ADR-049 la autoriza: *¿cambia de forma según el pipeline? es propio.*
+**Y una trampa de FK que casi queda para el final:** `instances.workflow_id` referencia `workflows`, así que sin una fila `linkedin` ahí **el cockpit no se puede crear**. La `020` lo registra ella misma en vez de dejarlo como un paso suelto que alguien tiene que acordarse de correr.
+
+**🔴 Lo que sigue bloqueado y NO es técnico** (está en ADR-055 §Consecuencias y en el README del workflow, para que no haya que re-derivarlo): no hay **definición de "funcionó"** —lo que hay es *"impresiones y reacciones"*, volumen puro, y construir sobre eso converge en el post motivacional con máximas reacciones y cero clientes—, **no existe el banco de referentes** (*"no tengo el listado"*), y **faltan los few-shot** (3–4 posts perfectos por cuenta, el pedido más barato del proyecto). Por eso **no hay `workflow.json`, y el manifest lo dice**: lo que se construyó es la detección, la curación y el cockpit, que es lo que sí se puede sin esas respuestas.
+
+**Verde:** `typecheck` 0 · **165 tests** (157 + 8 de `pipelines.test.ts`) · `build` · `validate` **2019 checks / 7 workflows** · `auditar-workflows` sin hallazgos.
+**⚠️ Lo que NO se verificó, dicho como tal:** la **`020` no se corrió contra un Postgres real** — Docker no levantó en toda la sesión. La `018`/`019` sí se habían probado con 001→019 sobre Postgres 16. Y **nada de esto se vio corriendo**: el cockpit de LinkedIn no existe hasta que se apliquen la `020` y el alta.
+**Qué sigue:** el runbook de 7 pasos de §Pendiente vivo. Después: **Capa 2 (RLS)**, que con la segunda empresa dada de alta deja de ser diferible — su disparador escrito en ADR-047 es justamente *"antes de que un segundo cliente real tenga usuarios en producción"*.
 
 **2026-08-03 (cierre 91) — Revisión de estado de los dos ejes, y tres huecos que solo aparecen midiendo (Claude, pedido de Mani).**
 **Qué se hizo:** una revisión completa del estado real —qué está hecho, qué está live, qué falta, qué está roto— por los dos ejes que cambiaron juntos (**la API key de n8n** y **el producto pasando de individual a repartido**), y después la alineación de los docs con lo medido. **Cero código, cero cambios en prod.** Todo lo que sigue se leyó de Supabase y de la API de n8n el 03/08, no del handoff — que es el punto: el estado real ya no se podía reconstruir leyendo.
