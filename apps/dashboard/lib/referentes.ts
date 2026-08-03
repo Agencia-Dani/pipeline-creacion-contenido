@@ -7,8 +7,9 @@ import {
   type DatosReferente,
   type Salud,
 } from "@/domain/referentes";
+import type { TenantContext } from "@/domain/tenant";
 import { leerProyectos as leerProyectosDePostgres } from "@/lib/proyectos";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { scoped } from "@/lib/supabase/scoped";
 
 // IO del banco de referentes (D5, corte 2/4). Lee y escribe `app.referentes` +
 // `app.referentes_proyectos` (la relación N:M de ADR-032) con service_role: `app.*` tiene RLS
@@ -37,8 +38,8 @@ export type Proyecto = { id: string; nombre: string; vozId: string; activo: bool
 export type ReferenteDelBanco = z.infer<typeof filaReferente> & { proyectoIds: string[]; salud: Salud };
 
 /** La proyección que la pantalla de referentes necesita: el picker de proyectos y su voz. */
-export async function leerProyectos(): Promise<Proyecto[]> {
-  return (await leerProyectosDePostgres()).map((p) => ({
+export async function leerProyectos(ctx: TenantContext): Promise<Proyecto[]> {
+  return (await leerProyectosDePostgres(ctx)).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     vozId: p.voz_id,
@@ -53,12 +54,12 @@ const SIN_SALUD: Salud = {
   seguidores: null,
 };
 
-async function leerPares(): Promise<Map<string, string[]>> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("referentes_proyectos")
-    .select("referente_id, proyecto_id");
+// La puente no lleva columna de tenant: hereda por FK (ADR-046). Trae los pares de todos los
+// tenants y el cruce lo hace `leerBanco` contra SU banco, que sí viene scopeado — un par de otra
+// empresa no tiene con qué engancharse.
+async function leerPares(ctx: TenantContext): Promise<Map<string, string[]>> {
+  const { data, error } = await scoped(ctx)
+    .select("app.referentes_proyectos", "referente_id, proyecto_id");
   if (error) throw new Error(`Supabase respondió con error leyendo los proyectos de cada referente: ${error.message}`);
 
   const pares = new Map<string, string[]>();
@@ -69,15 +70,11 @@ async function leerPares(): Promise<Map<string, string[]>> {
 }
 
 /** El banco completo con sus proyectos y su salud: lo que la pantalla necesita, en una pasada. */
-export async function leerBanco(): Promise<ReferenteDelBanco[]> {
-  const supabase = createAdminClient();
+export async function leerBanco(ctx: TenantContext): Promise<ReferenteDelBanco[]> {
   const [referentes, pares, salud] = await Promise.all([
-    supabase.schema("app").from("referentes").select("id, handle, plataforma, activo, notas").order("handle"),
-    leerPares(),
-    supabase
-      .schema("app")
-      .from("v_salud_referentes")
-      .select("id, videos_evaluados, tasa_gate, tasa_aprobacion, seguidores"),
+    scoped(ctx).select("app.referentes", "id, handle, plataforma, activo, notas").order("handle"),
+    leerPares(ctx),
+    scoped(ctx).select("app.v_salud_referentes", "id, videos_evaluados, tasa_gate, tasa_aprobacion, seguidores"),
   ]);
   if (referentes.error) throw new Error(`Supabase respondió con error leyendo referentes: ${referentes.error.message}`);
   if (salud.error) throw new Error(`Supabase respondió con error leyendo la salud: ${salud.error.message}`);
@@ -101,9 +98,9 @@ export async function leerBanco(): Promise<ReferenteDelBanco[]> {
  * Cuenta solo las activas a propósito: una cuenta apagada no le pide nada a Apify, así que
  * contarla haría parecer que hay fuente donde no la hay.
  */
-export async function cuentasPorProyecto(): Promise<Map<string, number>> {
+export async function cuentasPorProyecto(ctx: TenantContext): Promise<Map<string, number>> {
   const cuentas = new Map<string, number>();
-  for (const referente of await leerBanco()) {
+  for (const referente of await leerBanco(ctx)) {
     if (!referente.activo) continue;
     for (const proyectoId of referente.proyectoIds) {
       cuentas.set(proyectoId, (cuentas.get(proyectoId) ?? 0) + 1);
@@ -117,35 +114,40 @@ export async function cuentasPorProyecto(): Promise<Map<string, number>> {
  * de D7: se leía Proyectos acá solo para mapear cada uuid a su record id de Airtable, y ahora el
  * contrato habla uuid de punta a punta.
  */
-export async function leerReferentesComoRegistros(ambito: "motor" | "completo"): Promise<Registro[]> {
-  return aRegistrosDelPlan(await leerBanco(), ambito);
+export async function leerReferentesComoRegistros(
+  ctx: TenantContext,
+  ambito: "motor" | "completo",
+): Promise<Registro[]> {
+  return aRegistrosDelPlan(await leerBanco(ctx), ambito);
 }
 
 // ── Escritura ────────────────────────────────────────────────────────────────
 
 /** Los proyectos de un referente se reemplazan enteros: es un conjunto, no un acumulado. */
-async function fijarProyectos(referenteId: string, proyectoIds: string[]): Promise<void> {
-  const supabase = createAdminClient();
-  const { error: errorBorrado } = await supabase
-    .schema("app")
-    .from("referentes_proyectos")
-    .delete()
+async function fijarProyectos(
+  ctx: TenantContext,
+  referenteId: string,
+  proyectoIds: string[],
+): Promise<void> {
+  const { error: errorBorrado } = await scoped(ctx)
+    .borrar("app.referentes_proyectos")
     .eq("referente_id", referenteId);
   if (errorBorrado) throw new Error(`No se pudieron limpiar los proyectos: ${errorBorrado.message}`);
 
-  const { error } = await supabase
-    .schema("app")
-    .from("referentes_proyectos")
-    .insert(proyectoIds.map((proyecto_id) => ({ referente_id: referenteId, proyecto_id })));
+  const { error } = await scoped(ctx).insert(
+    "app.referentes_proyectos",
+    proyectoIds.map((proyecto_id) => ({ referente_id: referenteId, proyecto_id })),
+  );
   if (error) throw new Error(`No se pudieron guardar los proyectos: ${error.message}`);
 }
 
-export async function actualizarReferente(id: string, datos: DatosReferente): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("referentes")
-    .update({
+export async function actualizarReferente(
+  ctx: TenantContext,
+  id: string,
+  datos: DatosReferente,
+): Promise<void> {
+  const { data, error } = await scoped(ctx)
+    .update("app.referentes", {
       handle: conArroba(datos.handle),
       plataforma: datos.plataforma,
       activo: datos.activo,
@@ -157,26 +159,25 @@ export async function actualizarReferente(id: string, datos: DatosReferente): Pr
   if (error) throw new Error(`Supabase respondió con error guardando el referente: ${error.message}`);
   if (!data || data.length === 0) throw new Error("Ese referente ya no existe.");
 
-  await fijarProyectos(id, datos.proyectoIds);
+  await fijarProyectos(ctx, id, datos.proyectoIds);
 }
 
 /** Devuelve el uuid del referente nuevo. Sin `airtable_id`: nació acá (ADR-027 — Postgres es el dueño). */
-export async function crearReferente(datos: DatosReferente): Promise<string> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("referentes")
-    .insert({
-      handle: conArroba(datos.handle),
-      plataforma: datos.plataforma,
-      activo: datos.activo,
-      notas: datos.notas,
-    })
+export async function crearReferente(ctx: TenantContext, datos: DatosReferente): Promise<string> {
+  const { data, error } = await scoped(ctx)
+    .insert("app.referentes", [
+      {
+        handle: conArroba(datos.handle),
+        plataforma: datos.plataforma,
+        activo: datos.activo,
+        notas: datos.notas,
+      },
+    ])
     .select("id")
     .single();
   if (error) throw new Error(`Supabase respondió con error creando el referente: ${error.message}`);
 
-  await fijarProyectos(data.id, datos.proyectoIds);
+  await fijarProyectos(ctx, data.id, datos.proyectoIds);
   return data.id;
 }
 
@@ -185,8 +186,12 @@ export async function crearReferente(datos: DatosReferente): Promise<string> {
  * la que la salud se atribuye, así que dos filas para la misma cuenta parten su historia en dos
  * y le piden a Apify lo mismo dos veces. En Airtable pasó (hay un `@casper_smc` duplicado).
  */
-export async function buscarPorHandle(handle: string, plataforma: string): Promise<ReferenteDelBanco | null> {
-  const banco = await leerBanco();
+export async function buscarPorHandle(
+  ctx: TenantContext,
+  handle: string,
+  plataforma: string,
+): Promise<ReferenteDelBanco | null> {
+  const banco = await leerBanco(ctx);
   return banco.find((r) => normalizarHandle(r.handle) === handle && r.plataforma === plataforma) ?? null;
 }
 
@@ -203,9 +208,8 @@ export async function buscarPorHandle(handle: string, plataforma: string): Promi
  * Apagar sigue siendo lo correcto para "no la busques más pero quiero seguir viéndola"; borrar es
  * para la fila que no debería existir: la repetida, la que se cargó con un typo.
  */
-export async function borrarReferente(id: string): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.schema("app").from("referentes").delete().eq("id", id).select("id");
+export async function borrarReferente(ctx: TenantContext, id: string): Promise<void> {
+  const { data, error } = await scoped(ctx).borrar("app.referentes").eq("id", id).select("id");
   if (error) throw new Error(`Supabase respondió con error borrando el referente: ${error.message}`);
   if (!data || data.length === 0) throw new Error("Ese referente ya no existe.");
 }

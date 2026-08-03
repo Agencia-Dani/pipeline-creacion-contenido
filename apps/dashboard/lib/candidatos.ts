@@ -6,7 +6,8 @@ import {
   type CandidatoFeed,
   type Estado,
 } from "@/domain/feed";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { TenantContext } from "@/domain/tenant";
+import { scoped } from "@/lib/supabase/scoped";
 
 // El feed de calificación. Desde D7 los candidatos viven **en Postgres**: los escribe el motor por
 // PostgREST (ADR-035) y los lee el archivado por el mismo canal. Airtable ya no participa.
@@ -56,10 +57,9 @@ const COLUMNAS =
   "relevancia_razon, idioma, views, likes, seguidores, engagement, viral_por_tamano, " +
   "calificacion, estado, notas_equipo, proyectos(nombre), voces(nombre)";
 
-/** Todo lo que hay en el feed, con el proyecto ya resuelto a nombre por la FK. */
-export async function leerFeed(): Promise<CandidatoFeed[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.schema("app").from("candidatos").select(COLUMNAS);
+/** Todo lo que hay en el feed de ESTE cockpit, con el proyecto ya resuelto a nombre por la FK. */
+export async function leerFeed(ctx: TenantContext): Promise<CandidatoFeed[]> {
+  const { data, error } = await scoped(ctx).select("app.candidatos", COLUMNAS);
   if (error) throw new Error(`Supabase respondió con error leyendo el feed: ${error.message}`);
 
   return z.array(filaCandidato).parse(data).map((r) => ({
@@ -92,25 +92,36 @@ export async function leerFeed(): Promise<CandidatoFeed[]> {
  * Escribir solo `calificacion` dejaría al candidato en `nuevo` — invisible para el archivado y
  * purgado a los 20 días sin pasar por el histórico.
  */
-export async function calificar(id: string, calificacion: Calificacion): Promise<void> {
-  await actualizar(id, camposDeCalificacion(calificacion));
+export async function calificar(
+  ctx: TenantContext,
+  id: string,
+  calificacion: Calificacion,
+): Promise<void> {
+  await actualizar(ctx, id, camposDeCalificacion(calificacion));
 }
 
 /**
  * Las notas son la válvula de escape de ADR-034: "buen video pero no lo quiero" dejó de ser
  * expresable con el emoji. No se pierden — el archivado las lleva a `outputs.metadata`.
  */
-export async function guardarNotas(id: string, notas: string): Promise<void> {
-  await actualizar(id, { notas_equipo: notas });
+export async function guardarNotas(ctx: TenantContext, id: string, notas: string): Promise<void> {
+  await actualizar(ctx, id, { notas_equipo: notas });
 }
 
-/** Fail-loud si el candidato ya no existe: el barrido del domingo pudo habérselo llevado. */
-async function actualizar(id: string, campos: Record<string, unknown>): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("candidatos")
-    .update(campos)
+/**
+ * Fail-loud si el candidato ya no existe: el barrido del domingo pudo habérselo llevado.
+ *
+ * Y desde ADR-047, "no existe" incluye "no es de este cockpit": el filtro de `scoped` entra en el
+ * `update`, así que calificar un id de otra empresa no lo toca — devuelve 0 filas y tira. Ese
+ * mensaje es el mismo a propósito: no confirma que el id exista en otro lado.
+ */
+async function actualizar(
+  ctx: TenantContext,
+  id: string,
+  campos: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await scoped(ctx)
+    .update("app.candidatos", campos)
     .eq("id", id)
     .select("id");
   if (error) throw new Error(`Supabase respondió con error guardando el candidato: ${error.message}`);

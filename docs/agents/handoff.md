@@ -22,6 +22,107 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> 🟣 **QUIÉN USA ESTO HOY, Y LA RESTRICCIÓN QUE IMPONE (Mani, 2026-08-02).** Lo que está live
+> —los 3 workflows y el cockpit— **es de Retia**. No hay diferenciador de empresa ni instancias
+> concurrentes: hay **un** cliente (`piloto`), **una** instancia y **5 usuarios**, todos con
+> `client_id = piloto`, y el que lo usa de verdad es **Jero** (`operador`, ya con su correo en el
+> auth de Supabase). Todo el refactor multi-tenant se hace **encima de un producto en uso**.
+>
+> **La restricción, dicha como restricción: Retia no se puede quedar sin acceso ni sin motor
+> mientras dure el refactor.** De lo que viene, tres cosas se lo pueden llevar puesto:
+> · **La Fase 3 le rompe los bookmarks** (`/curar/feed` ya no existe). Entrar por la raíz `/`
+>   sigue funcionando y es el camino a darle — resuelve su cockpit y su zona inicial.
+> · **La Fase 6 (RLS)** es la única que puede dejarlo afuera de verdad: hoy el BFF lee con
+>   `service_role` y ahí pasa a leer con su sesión. Es la fase que hay que probar con la cuenta de
+>   él, no con una de dev.
+> · **El `018` de ADR-051** mueve el acceso de `usuarios.client_id` a `usuarios_clientes`. **Si no
+>   backfillea las 5 filas de arriba, los 5 pierden el cockpit el día del deploy** — Jero incluido.
+>
+> 🟠 **DECIDIDO (Mani, 2026-08-02): `piloto` → `retia` y el slug → `reels`, ANTES del merge.**
+> Desde la Fase 3 los dos van en la URL: `/piloto/short-form-content/curar/feed` hoy,
+> `/retia/reels/curar/feed` después. Se hace antes del merge porque después ya hay links repartidos,
+> y romperlos dos veces seguidas es lo que hace que la gente deje de confiar en el cockpit.
+>
+> > 🚨 **No es un `update clients set id = 'retia'`: eso falla.** Las **6 FKs** que apuntan a
+> > `clients.id` están declaradas `references clients (id)` **a secas, sin `on update cascade`**
+> > (la `001` y la `016`). Hay que crear, repuntar y borrar. Y la trampa que no se ve: **la `016`
+> > dejó DEFAULTS puente apuntando a `'piloto'`** en las 4 tablas de grano empresa, y viven hasta
+> > la `017` — si no se mueven, el primer insert que no mande `client_id` explícito viola la FK.
+> >
+> > ```sql
+> > begin;
+> >
+> > -- 1. Nace el cliente nuevo con los datos del viejo.
+> > insert into clients (id, nombre, estado, creado_en, parent_id)
+> > select 'retia', 'Retia', estado, creado_en, parent_id   -- 👉 confirmá el nombre visible
+> > from clients where id = 'piloto';
+> >
+> > -- 2. Repuntar TODO lo que le apunta. Los conteos son los de prod al 2026-08-02:
+> > update instances      set client_id = 'retia' where client_id = 'piloto';  -- 1
+> > update clients        set parent_id = 'retia' where parent_id = 'piloto';  -- 0 (no hay árbol aún)
+> > update app.usuarios   set client_id = 'retia' where client_id = 'piloto';  -- 5  ← Jero acá
+> > update app.voces      set client_id = 'retia' where client_id = 'piloto';  -- 3
+> > update app.proyectos  set client_id = 'retia' where client_id = 'piloto';  -- 6
+> > update app.referentes set client_id = 'retia' where client_id = 'piloto';  -- 16
+> >
+> > -- 3. Los defaults puente de la 016. SIN ESTO se rompe el primer insert.
+> > alter table app.usuarios   alter column client_id set default 'retia';
+> > alter table app.voces      alter column client_id set default 'retia';
+> > alter table app.proyectos  alter column client_id set default 'retia';
+> > alter table app.referentes alter column client_id set default 'retia';
+> >
+> > -- 4. Recién ahora.
+> > delete from clients where id = 'piloto';
+> >
+> > -- 5. El otro segmento de la URL. `slug`/`nombre` no los referencia nadie.
+> > update instances set slug = 'reels', nombre = 'Reels'
+> >  where workflow_id = 'short-form-content';
+> >
+> > commit;
+> > ```
+> >
+> > **Verificar después** (las tres tienen que dar lo esperado, no "parecer bien"):
+> > `select id, nombre from clients;` → una fila, `retia` ·
+> > `select client_id, slug from instances;` → `retia` / `reels` ·
+> > `select count(*) from app.usuarios where client_id <> 'retia';` → **0**.
+> >
+> > **Lo que NO cambia, y conviene saberlo:** el **`instances.id` es el mismo uuid**, así que
+> > `N8N_INSTANCE_ID`, los workflows re-importados y el dispatcher **no se tocan**. Y el código no
+> > tiene el slug hardcodeado en ningún lado (verificado: solo aparece en un comentario).
+> >
+> > 🔸 **Dos cosas que quedan desalineadas a propósito:** `instances.config_ref` sigue diciendo
+> > `clients/piloto/…` y el directorio `clients/piloto/` **no se renombró**. Ese yaml es config de
+> > prueba de la era piloto (una voz falsa de "IA y productividad", cuentas de muestra) y su único
+> > consumidor es `deploy.mjs`, que está **deprecado**. Renombrarlo etiquetaría datos falsos como si
+> > fueran de Retia; limpiarlo o borrarlo es otra tarea.
+>
+> 📌 **Alta de usuarios: sigue manual y Mani quiere cambiarlo.** ADR-051 lo dejó como deuda
+> consciente con disparador *"el primer usuario que no sea de la agencia"*. **Vale confirmar si ese
+> disparador ya se cumplió**: si Jero entra como gente de Retia y no como equipo de la agencia, el
+> alta manual (invite en Supabase + `insert` a mano en el SQL Editor) ya dejó de alcanzar.
+
+> 🔴 **REFACTOR MULTI-TENANT — FASES 0 a 4 EN LA RAMA. LA `016` YA ESTÁ EN PROD (2026-08-02).**
+> El código vive en `refactor/multi-tenant-fase-0-adrs` ([PR #3](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/3)).
+>
+> **✅ Hecho por Mani:** el `@casper_smc` duplicado (queda 1 fila) y **la `016` aplicada**.
+> Verificado contra la base, no de palabra: `clients.parent_id` · `instances.slug`/`nombre` ·
+> **10/10 tablas de `app` con su columna de tenant y CERO filas sin tenant** (usuarios 5 · voces 3 ·
+> proyectos 6 · referentes 16 · ajustes 18 · candidatos 152 · descartes 26 · propuestos 8 ·
+> eventos 38 · transcripciones 2) · `processed_items` y `outputs` sin nulos · `v_senal_seleccion`
+> exponiendo `instance_id`. El backfill cerró entero.
+>
+> **Falta, en este orden:** el re-import de los 4 workflows → apagar los crons viejos en n8n →
+> activar el dispatcher → la corrida de verificación → **recién ahí la `017`** (que tiene su propio
+> gate de confirmación humana adentro y NO hay que correr todavía). Checklist completo con los
+> placeholders por workflow —ya no son 6 iguales para todos— en el **cierre 86** del log.
+>
+> 🟠 **Y un arreglo de 1 minuto que conviene hacer ANTES de que el equipo marque bookmarks:** la
+> `016` dejó `instances.slug` y `nombre` en **`short-form-content`**, así que la URL del cockpit hoy
+> es `/piloto/short-form-content/curar/feed` y no el `/30x/reels/...` que el plan §6 promete. **Los
+> dos campos van en la URL** (Fase 3), así que renombrarlos después rompe los links otra vez. Es un
+> `update instances set slug = 'reels', nombre = 'Reels'` (y el `clients.id`, si `piloto` va a
+> llamarse `30x`, es más caro: es FK desde 5 tablas).
+
 > 🟡 **SACAR EL TECHO DE GASTO: CÓDIGO LISTO, FALTA EL RE-IMPORT (2026-08-02).** Mani pidió sacar
 > `cap_top_n` (los planes pagos de Apify/Supadata/Claude no llegan ni a la mitad del cupo y se
 > resetean solos) y que el motor sea lo más preciso posible trayendo el `N` de cada proyecto. La
@@ -801,6 +902,94 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-02 (cierre 86) — Fase 4 del refactor multi-tenant: `run-plan` v2, el motor por instancia y el dispatcher (Claude, pedido de Mani).**
+**Qué se hizo:** la fase que **obliga al re-import**, entera y en el repo. El contrato sube a **`version: 2`** con `?instancia=<uuid>` **obligatorio**, `<<INSTANCE_ID>>` deja de existir como placeholder, nace `GET /api/engine/instancias`, y nace [`Workflows/workflow-dispatcher/`](../../Workflows/workflow-dispatcher/). `typecheck` 0 · **158 tests** · `build` · `validate` **1786 checks / 5 workflows** · `auditar-workflows.mjs` sin hallazgos · `test-nodos.mjs` verde con dos secciones nuevas. **Nada aplicado en prod: el re-import es de Mani.**
+**🚨 La tensión que el plan no tenía resuelta, y que cambió el diseño: los crons se quedaban sin instancia.** El motor tenía 3 triggers y el archivado 2, y **ni el cron ni el manual tienen payload**. Un cron que sobrevive a esta fase no corre como antes: corre y **aborta**, después de `Abrir run`, dejando una fila en `en_curso` para siempre — el mismo fallo mudo que ya costó una sesión (*"parecía una corrida lenta"*), una vez por semana. Así que **los dos crons se mudaron al dispatcher con su horario intacto** (lunes 8am · domingo 6pm), y eso corrige una línea de ADR-050 que decía lo contrario (*"cada workflow conserva su trigger natural"*) mientras su propio diagrama ya decía esto. Está escrito como [enmienda en el ADR](../adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md#enmienda-del-2026-08-02-implementación--los-crons-sí-se-mudan-y-el-archivado-necesitó-un-webhook), no en silencio.
+**🔎 Y el hueco que apareció al mirar los triggers: el archivado no tenía webhook.** Era cron + manual, o sea **ninguna puerta por la que recibir una instancia** — y la necesita, porque su `candidatos?estado=neq.nuevo` sin filtro archiva los calificados de **todas** las empresas dentro de una corrida, los escribe en el `outputs` del tenant equivocado y después **los borra**. Le entró `Disparo por instancia (webhook)`. Costo: un placeholder más (`<<WEBHOOK_PATH_ARCHIVADO>>`) y un segundo cron en el dispatcher.
+**El `Ejecutar manual` se conservó, y sin reintroducir un default silencioso.** `Config.instance_id` es una expresión que lee el body del webhook y cae a `''`; para una corrida manual se pega el uuid en ese `''` (anotado en el nodo). **En git va vacío siempre**, y vacío ⇒ `run-plan` 400 ⇒ no arranca. Es lo contrario del default que ADR-048 descartó: aquel caía al piloto (y escribía en la empresa equivocada, en verde), este aborta.
+**Lo que se relevó y NO eran 7 URLs, eran 13.** El checklist del cierre 82 se quedó corto: faltaban los **cuatro `runs` del single-flight y del barredor** en los tres workflows (sin `&instance_id=eq.` la corrida de una empresa le bloquea el arranque a otra, y el barredor le marca `fallo` los zombies ajenos) y el **DELETE de `Barrer candidatos sin calificar`**, que sin filtro le borra el feed sin calificar a las otras empresas. Todas están puestas; la lista completa, abajo.
+**☠️ `fields.uuid` murió, y con él los tres `uuidDe`.** Quedaba anotado que *"muere en el próximo re-import que haga falta por otra cosa"* — este es ese. El mapa era identidad desde el paso 3 de D7, así que `uuidDe[d.proyecto_id] || null` y `d.proyecto_id || null` son lo mismo: verificado siguiendo el id hasta `Armar plan de corrida`, donde `projects` se keyea por el `p.id` del plan. **Se le agregó test:** `Preparar candidatos` y `Preparar descartes` no estaban cubiertos por `test-nodos.mjs` y son los que escriben el cockpit — sus dos modos de falla (fila sin `instance_id` ⇒ tenant equivocado; `proyecto_id` perdido ⇒ todo al grupo *(sin proyecto)*) entregan **en verde**, mal.
+**Un detalle del contrato que no se parcheó:** el manifest v1 exige ≥1 `outputs` con `registered: pending|yes`, y **el dispatcher no produce nada** (ADR-050 §4: no registra, no escribe). Quedó declarado como `senal_de_corrida / pending`, que es lo más honesto que admite el contrato hoy, con el comentario puesto en el yaml. Es un hueco chico de `workflow-manifest.md`, no una decisión de diseño — si molesta, es una enmienda de una línea.
+
+> ### 📋 EL CHECKLIST DEL RE-IMPORT (es de Mani, y va en este orden)
+> 1. ✅ **`016` aplicada** por Mani el 2026-08-02, y verificada contra la base (el detalle, en §Pendiente vivo). El `@casper_smc` duplicado ya estaba limpio. **Con esto, el deploy de la rama dejó de estar bloqueado.**
+>
+> > 🧪 **Y con la `016` puesta, el contrato v2 se probó CONTRA LA BASE REAL antes de gastar el re-import** (dev server local + las credenciales del `.env`, todo lecturas): `?instancia` ausente ⇒ **400 `instancia_ausente`** · inexistente ⇒ **403 `instancia_desconocida`** · sin header ⇒ **403 `header_ausente_o_distinto`** · instancia real ⇒ **200 con `version: 2`**, 3 voces · 5 proyectos (los 6 menos el de voz apagada, o sea el gate vivo) · 16 referentes · 18 ajustes, y **`fields.uuid` ausente en las cuatro listas**. El endpoint nuevo: sin `?workflow` ⇒ 400 · `short-form-content` ⇒ la instancia · un pipeline que no existe ⇒ **200 con lista vacía**, que es lo que evita que el dispatcher entre a su rama de fallo por un caso normal.
+> > **Lo que esto NO prueba:** nada del lado de n8n. Los `jsCode` y las URLs nuevas recién se ejercitan en la corrida del paso 5.
+> 2. **Re-importar los 3 workflows + importar el dispatcher.** Placeholders, por workflow — `<<INSTANCE_ID>>` **ya no está en ninguno**:
+>    · **motor (5):** `<<DASHBOARD_URL>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_MOTOR>>` `<ANTHROPIC_API_KEY>`×3 `<SUPADATA_API_KEY>`
+>    · **archivado (7):** los 2 de siempre + `<<WEBHOOK_PATH_ARCHIVADO>>` **(nuevo)** + `<<GOOGLE_SHEET_ID>>` `<<NOMBRE_PESTANA_SHEET>>` `<<CREDENCIAL_GOOGLE_SHEETS>>` `<ANTHROPIC_API_KEY>`
+>    · **descubrimiento (4):** `<<DASHBOARD_URL>>` `<<SUPABASE_URL>>` `<<WEBHOOK_PATH_DESCUBRIMIENTO>>` `<ANTHROPIC_API_KEY>`×2
+>    · **dispatcher (3):** `<<DASHBOARD_URL>>` `<<WEBHOOK_URL_MOTOR>>` `<<WEBHOOK_URL_ARCHIVADO>>` — **URLs completas**, no paths
+>    ⚠️ **`<ANTHROPIC_API_KEY>` y `<SUPADATA_API_KEY>` muerden a mitad de corrida**, no al principio.
+> 3. **Apagar los crons viejos en n8n** (motor lunes 8am, archivado domingo 6pm). El repo ya no los tiene, pero n8n conserva lo importado: si quedan vivos, el piloto corre dos veces y una muere a mitad.
+>
+> > 🔑 **De dónde salen los valores del paso 2, para no inventarlos:** `<<WEBHOOK_PATH_ARCHIVADO>>` y su URL se generaron el 2026-08-02 y viven en el **`.env` de la raíz** (`ARCHIVADO_WEBHOOK_PATH` / `ARCHIVADO_WEBHOOK_URL`), 32 hex como los otros. **El header del archivado es EL MISMO que el del motor** (`MOTOR_WEBHOOK_HEADER_*`, credencial `Webhook Motor Header` en n8n): el dispatcher dispara los dos destinos desde **un solo nodo httpRequest**, que lleva una sola credencial. Separarlos obligaría a partir el dispatcher en dos ramas. *(El descubrimiento sí conserva su propio par: no lo dispara el dispatcher, lo dispara el botón.)*
+> 4. **Activar el dispatcher** recién después del paso 3.
+> 5. **Corrida de verificación** con el techo en 10 (la más barata). Reflejo de siempre: **`runs` no distingue "colgada" de "muerta", Apify sí** — cero llamadas ⇒ murió antes de scrapear, y el sospechoso #1 sigue siendo un placeholder sin rellenar.
+> 6. **Recién ahí la `017`**, que tiene gate de confirmación humana adentro. Y el techo vuelve a 250.
+>
+> **Con una sola instancia esto no prueba nada por sí solo** (el resultado es idéntico al de antes). Lo que lo prueba es el paso 7 de [plan §11.3](./plan-multi-tenant.md): con dos instancias, N videos distintos por instancia y ninguno cruzado, mirado con un `select`.
+
+**Qué sigue, y el cierre 85 le cambió el orden a esto mientras se escribía.** El plan §12 ponía la Capa 2 (RLS) en el anteúltimo lugar; **ADR-051 activó su disparador**, así que la secuencia de código pasa a ser: **`018_membresias.sql` + el refactor de las guardias → Capa 2 (RLS) → #7 paginación del feed → #9 Fase 5 (LinkedIn)**. Lo que la Fase 4 le deja a la 5 ya está: `?workflow=<slug>` en el dispatcher y `instances` como (pipeline × empresa) es todo lo que un pipeline nuevo necesita del núcleo.
+**🔁 Y lo que el cierre 85 le va a tocar a ESTA fase, para que no sorprenda:** ADR-051 saca `rol` de `usuarioActual()` y unifica las guardias en `exigirTenant`. De lo que se escribió acá, lo único que queda en su camino son los dos botones de Operar (`exigirTenant("operar")`); **la fachada no se toca** — `run-plan` e `instancias` se autentican por header compartido y no tienen usuario, así que las membresías les son ajenas por diseño.
+**🔧 Dos drifts pre-existentes que encontré y NO toqué** (no los creó esta fase, y arreglarlos a la pasada mezcla cambios): el manifest del descubrimiento declara `type: cron` lunes 9am pero su `workflow.json` **no tiene cron** desde la enmienda de ADR-020 (es el botón *Buscar ahora*); y el `dev-doc §3.2` lo lista igual. El manifest del archivado decía "diario 9:00" contra el `0 18 * * 0` del JSON — **ese sí quedó corregido**, porque el trigger es justo lo que esta fase cambió.
+
+**2026-08-02 (cierre 85) — El modelo de acceso: membresías en vez de herencia. ADR-051 + ADR-052, sin una línea de código (Claude, diseño con Alejandro).**
+**Qué pasó:** Alejandro trajo una idea —*"el cockpit tiene una especie de auth: los asociados con 30X solo ven 30X, y los únicos que ven todo son los devs"*— y al aterrizarla salieron **cuatro hechos que ADR-046 no tenía** y que le cambian el modelo de acceso. Salieron 2 ADRs; **nada construido todavía**, a propósito: `core/` solo cambia con ADR.
+**Lo que se descubrió, en orden de impacto:** (1) **las tres empresas son clientes EXTERNOS**, o sea que gente de afuera se loguea — el aislamiento deja de ser higiene y pasa a ser una promesa reclamable; (2) **una cuenta puede pertenecer a varias empresas** con un switch en el nav, lo que mata `usuarios.client_id` singular; (3) **los dueños son dos y además tienen que ser invisibles** para el cliente (el *"secret owner"* son dos requisitos pegados: acceso total **e** invisibilidad); (4) **el equipo de la agencia no es transversal** — Majo y Jero son de una empresa y no tocan las otras, así que "ser de la agencia" tampoco implica ver todo.
+**🔎 Y un hallazgo del código que ya está escrito, que el ADR arregla:** `scoped.ts` filtra el grano empresa por **`client_id in (visibles)` — el subárbol entero del usuario, sin importar qué cockpit esté abierto**. Con alguien que alcance más de una empresa, eso **mezcla voces, proyectos y referentes de varias en una sola pantalla**. Hoy no se ve porque hay un tenant; con el segundo sería otra vez un número que se ve razonable y está mal. La regla que lo cierra: **la membresía decide a qué cockpits entrás, no qué filas ves adentro.**
+**[ADR-051](../adr/ADR-051-el-acceso-es-membresia-explicita.md):** `app.usuarios_clientes (usuario_id, client_id, rol)` reemplaza a `usuarios.client_id` y a `usuarios.rol` · **el rol vive en la membresía** · `usuarios.es_dueno` como flag (y fuera de toda lista de personas) · **`clients.parent_id` deja de gobernar acceso** y queda como linaje. *La propuesta inicial era que el rol FUERA la empresa (`30X`, `EstadoX`, `Retia`); se descartó porque obliga a `EstadoX-operador`/`EstadoX-sponsor`/`EstadoX-dev` — tres roles nuevos por cliente— y pierde la pregunta de qué puede hacer alguien adentro.*
+**[ADR-052](../adr/ADR-052-el-sponsor-externo-no-ve-el-costo-del-proveedor.md):** el `sponsor` ve **una sola zona, Entender**… que es justo la que muestra `app.tarifas`. O sea que **la única pantalla del jefe de un cliente externo le mostraba lo que cuestan los proveedores de la agencia**. Se corta el bloque de costos, **en el servidor** (`display:none` sobre datos que ya viajaron no esconde nada).
+**🚨 Lo que esto le hace a la secuencia: la Capa 2 (RLS) deja de ser la última fase.** El disparador que ADR-047 dejó escrito —*"antes de que un segundo cliente real tenga usuarios en producción"*— **está activado**. Y encima los clientes externos **curan su propio feed**, o sea que escriben en la base desde el cockpit: la combinación que más le exige a RLS. La buena noticia es que con membresías la policy se abarata: `es_dueno or client_id in (select …)`, sin recursión — con herencia por árbol habría necesitado un CTE recursivo **por fila leída**.
+**⚠️ Y un refactor que hay que presupuestar: `usuarioActual()` deja de devolver `rol`**, porque el rol pasa a depender del cockpit abierto. Toca 7 lugares y **da vuelta un orden**: `app/page.tsx` hoy elige la zona inicial por el rol y después resuelve el cockpit; va a tener que resolver el cockpit primero. `exigirZona` sola deja de alcanzar y las guardias se unifican en `exigirTenant`. Es refactor de lo que se construyó en las Fases 2 y 3.
+**Decisión de Alejandro con el riesgo sobre la mesa: el alta de usuarios sigue MANUAL una vuelta más.** Vale saber cuál es el riesgo que se aceptó: una membresía con la empresa equivocada mete a alguien en el cockpit de otro cliente **sin un solo error**. La mitigación acordada no es código: la migración `018` deja escrita la query de verificación post-alta y correrla es parte del alta. **Disparador para automatizarla: el primer usuario que no sea de la agencia.**
+**Qué sigue:** la migración **`018_membresias.sql`** + el refactor de las guardias, y después la **Capa 2**. Ojo con el orden respecto de Mani: la `016` sigue sin aplicarse y **va primero**. `npm run validate` en verde (1688 checks).
+
+**2026-08-02 (cierre 84) — Fase 3 del refactor multi-tenant: un cockpit por (empresa × pipeline), con el tenant en la URL (Claude).**
+**Qué se hizo:** el árbol de rutas entero se movió a **`app/[cliente]/[pipeline]/(zonas)/`** (con `git mv`, así que el historial de cada archivo sigue). Las URLs pasan a ser **`/30x/reels/curar/feed`**. Nuevos: `domain/rutas.ts` (puro, 6 tests), `components/selector-cockpit.tsx`, `(zonas)/usar-cockpit.ts`. `typecheck` 0 · **157 tests** · `build` verde, con las 13 rutas de zona bajo los dos segmentos. **No toca prod hasta el deploy**, pero **este sí cambia lo que ve el equipo**: ver abajo.
+**🚨 Lo único con consecuencia para Majo y Jero: los bookmarks se rompen.** `/curar/feed` deja de existir; ahora es `/30x/reels/curar/feed`. La guía de [onboarding](../onboarding-equipo-redes.md) **no hardcodea URLs**, así que no hay que reescribirla — pero **entrar por la raíz `/` sigue funcionando y ahora es el camino recomendado**: resuelve el cockpit del usuario y su zona inicial, y es la salida de emergencia a la que caen todos los `redirect("/")`. Conviene avisarles antes del deploy y decirles que re-marquen.
+**Las tres reglas que quedaron escritas, porque son las que hacen que esto no se pudra:** (1) **ningún `href` ni `revalidatePath` se escribe a mano** — se arman con `domain/rutas.ts`, que es puro y testeado; con el prefijo variable, cada string a mano es una chance de mandar a alguien (o de revalidar) el cockpit equivocado. (2) **los segmentos crudos de la URL solo sirven para RESOLVER**: todo lo que se renderiza se arma con el cockpit que devolvió `exigirTenant`, o la pantalla puede terminar mostrando los datos de un cockpit y los links de otro. (3) los componentes cliente leen el cockpit de la URL con `usarCockpit()` en vez de recibirlo por props tres niveles abajo solo para armar un `href`.
+**⚠️ El layout NO es la guardia, y está comentado en el archivo para que nadie lo lea así:** en el App Router el layout y la página renderizan **en paralelo**, así que un chequeo ahí no llega a tiempo para proteger a la página. El layout valida para lo suyo (no dibujar el nav de un cockpit que no existe) y cada `page.tsx` valida lo suyo con `exigirTenant`. Es la misma división que ya tenía `proxy.ts` — que **no cambió y no tenía que cambiar**.
+**Dos cosas que se movieron y conviene saber por qué:** `cerrarSesion` salió de `(zonas)/actions.ts` a **`app/actions.ts`** — la usan el nav (adentro del tenant) y `/sin-rol` (afuera, donde el usuario justamente puede no tener tenant todavía), así que colgarla de un cliente estaba mal. Y `FilaProyecto` de Operar recibe el cockpit **por prop**: es un helper de servidor, no un componente cliente, así que no puede leer la URL.
+**Detalle de Next 16 que hay que tener presente al tocar rutas:** `params` es un **Promise** y se `await`ea; los componentes cliente usan `useParams()`. Está en `node_modules/next/dist/docs/`, que es lo que manda el `AGENTS.md` del dashboard. Y ojo con el `.next/` viejo: después de mover el árbol, `typecheck` tira errores fantasma de `.next/types/validator.ts` apuntando a las rutas viejas hasta que se borra la carpeta.
+**Qué sigue — Fase 4 (`run-plan` v2 + motor parametrizado + dispatcher):** es la que **obliga al re-import** y la que después habilita correr la `017`. El checklist de las 7 URLs de PostgREST que hay que tocar además de los 6 placeholders está en el cierre 82. Y sigue pendiente lo de Mani: limpiar el `@casper_smc` duplicado y aplicar la `016` **antes** de que Vercel deploye esto.
+
+**2026-08-02 (cierre 83) — Fase 2 del refactor multi-tenant: la Capa 1, el tenant que el compilador no deja olvidar (Claude).**
+**Qué se hizo:** la Capa 1 de [ADR-047](../adr/ADR-047-aislamiento-en-dos-capas.md) entera. `domain/tenant.ts` (puro, 13 tests nuevos) · **`lib/supabase/scoped.ts`** · `lib/tenant.ts` (el resolvedor) · `lib/auth.ts` con `exigirTenant` · **los 13 archivos de `lib/` que hacían IO** · los **21 de `app/`** que los llaman. `typecheck` en 0, **151 tests** verdes, `build` verde. **No toca prod**: es tipado y ruteo de un parámetro. Rama y PR: [#3](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/3).
+**La pieza que importa es `scoped.ts`, y su garantía está verificada, no afirmada.** Envuelve el acceso a Supabase de forma que no se pueda construir una query sin `TenantContext`, y el mapa tabla→grano (24 entradas) vive ahí y solo ahí. Lo probé con dos archivos de prueba que **tienen que romper**: una tabla que no está en el mapa da `TS2345` con la lista de las válidas, y `scoped()` sin contexto da `TS2554`. Los dos casos son error de compilación, que es la única forma conocida de ganarle a un `.eq()` olvidado.
+**El typecheck produjo la lista de trabajo y no dejó terminar hasta vaciarla — 83 → 0.** Ese es el punto entero de la fase y funcionó tal cual: no enumeré un solo archivo a mano.
+**⚠️ El orden de deploy es un requisito, no una recomendación: la `016` va ANTES de este código.** El BFF pasó a pedir `client_id`/`instance_id` y a nombrar los uniques nuevos en los `onConflict` de `lib/transcripciones.ts`. Contra una base sin la `016` eso es columna inexistente y `42P10`. Es la misma trampa que la `014`, que también tenía que ir antes de su código. Quedó escrito en el README del dashboard, arriba del setup.
+**Lo que cambió de comportamiento y conviene saber (todo no-op con un tenant):** los knobs pasan a ser **por instancia** (la PK compuesta de la `016`, así que un `update` por `clave` ya no puede pisar el ajuste de otra empresa) · el single-flight del buscador pasa a ser **por instancia** (ADR-050) · calificar un candidato de otro cockpit ahora devuelve *"ese candidato ya no está en el feed"* en vez de escribirlo — el filtro entra en el `update`, no solo en el `select` · un usuario **sin `client_id` cae en `/sin-rol`**, igual que uno sin rol: las dos son la misma alta a medias, y el `insert` manual del alta ahora lleva cliente.
+**La fachada quedó a medio camino, a propósito y con el borde declarado.** `/api/engine/run-plan` no tiene sesión (se autentica por header compartido), así que resuelve su tenant con `contextoDeFachada`: acepta `?instancia=` **opcional** —forward-compatible con ADR-048— y si no viene cae a la única instancia activa. **Con dos instancias y sin parámetro responde 400 en vez de adivinar**, que es el fail-closed de ADR-028 §4 aplicado a lo que sabemos hoy: servirle al motor la config de otra empresa es peor que no servirle nada. El contrato **sigue en `version: 1`**; subirlo a 2 y volver el param obligatorio es la Fase 4.
+**Un detalle de tipos que va a volver si alguien toca `scoped.ts`:** el genérico recursivo (`Q extends Filtrable<Q>`) sobre el builder de supabase-js hace que tsc se rinda con `TS2589` *"type instantiation is excessively deep"*. Está resuelto con un tipo plano y un cast localizado, comentado en el archivo. Mismo motivo para el `as string` del schema: sin `database.types.ts` generado, los genéricos ya colapsan a `any` y el literal no compra tipado, pero sí arma una unión de 2×24 que revienta.
+**Qué sigue — Fase 3:** rutas `[cliente]/[pipeline]`, el `layout.tsx` resolviendo `(cliente, pipeline) → instance` en el servidor, y el selector de empresa/pipeline (visible solo si el usuario tiene más de uno). **El modelo ya está**: `resolverContexto(usuario, cliente, pipeline)` acepta los dos segmentos desde hoy y no los recibe de nadie — la Fase 3 es cablearlos, no rediseñar. Y sigue pendiente lo de Mani: limpiar el `@casper_smc` duplicado y aplicar la `016`.
+
+**2026-08-02 (cierre 82) — Fase 1 del refactor multi-tenant: la fundación de datos, partida en dos migraciones y verificada contra un Postgres real (Claude).**
+**Qué se hizo:** [`core/schema/016_multi_tenant.sql`](../../core/schema/016_multi_tenant.sql) + [`017_multi_tenant_cierre.sql`](../../core/schema/017_multi_tenant_cierre.sql). **Ninguna está aplicada en prod todavía** — se aplican a mano, y la `017` ni siquiera se puede correr hasta después del re-import. Rama `refactor/multi-tenant-fase-0-adrs`.
+**🧪 No es SQL "revisado": se corrió.** Se levantó un Postgres 16 descartable en Docker, se aplicaron las **15 migraciones en orden** sobre datos sembrados parecidos a prod, y encima la `016` y la `017`. Todo verde de cero, dos veces. Lo que eso probó, y que ningún review a ojo hubiera dado: la regresión de la `015` **no vuelve con dos tenants** (3 filas para 3 referentes), la misma cuenta vigilada por dos empresas devuelve **0.44 y 0.99 por separado** en vez de un número contaminado, y el `on_conflict` viejo del motor tira exactamente `42P10` en cuanto se corre la `017`. *(Stubs necesarios para que las 15 corran fuera de Supabase: `auth.users`, `auth.uid()`, los roles `authenticated`/`service_role`. Está en el scratchpad, no en el repo.)*
+**🚨 Tres trampas de orden que el plan no tenía, y una es cara.** El plan traía la de siempre (nullable → backfill → not null). Las otras dos salieron de preguntar **quién escribe cada tabla**:
+· **Un `unique` que n8n nombra en un `on_conflict=` NO se puede reemplazar antes del re-import.** PostgREST exige que el arbiter coincida con un unique existente; si no, `42P10` y el insert muere entero. Son dos: `processed_items?on_conflict=platform,external_id` (motor, **antes** de transcribir) y `outputs?on_conflict=external_id` (archivado, **al entregar** — o sea después de pagar Apify + Supadata + Haiku). Correr el §4.3 del plan tal cual en la Fase 1 **rompía el dedup del motor en la corrida siguiente**. Por eso los dos van por expand/contract: el unique nuevo nace en la `016`, el viejo muere en la `017`. **Es la razón entera de que la Fase 1 sean dos archivos.**
+· **Toda columna de tenant nace con un DEFAULT puente al piloto.** Entre la `016` y la Fase 2/4 hay una ventana donde el BFF y n8n siguen insertando sin mandar tenant. Sin default esas filas nacen en null y, apenas la Capa 1 empiece a filtrar, **desaparecen de las pantallas** — un candidato pagado que no se ve. Los defaults mueren en la `017`, y ese es el único motivo por el que son seguros.
+**⚠️ Y una corrección al SQL del plan que rompía el archivado:** el índice nuevo de `outputs` **no lleva `where external_id is not null`**. La `005` sacó ese predicado justamente porque Postgres no acepta un índice parcial como arbiter de ON CONFLICT y PostgREST no repite el predicado (`42P10`, verificado en vivo en su día). Copiarlo del plan reintroducía el bug que la `005` arregló.
+**🔎 Dos huecos de inventario, no de criterio:** (1) **`app.transcripciones` no estaba en la lista del plan** y es de grano instancia — traía además un **sexto** unique global (`plataforma, external_id`), de la misma familia que los cinco que el plan sí encontró. Se agregó a la tabla de granos de [ADR-046](../adr/ADR-046-el-cockpit-es-multi-tenant.md). (2) **Las vistas no son 8, son 12**: faltaban `v_embudo_descubrimiento`, `v_historico_seleccionados`, `v_selecciones_por_dia` y `v_senal_tema`; y `v_falsos_negativos` no existe con ese nombre — es `app.v_auditoria_descartes` (ADR-036).
+**Dos decisiones de diseño que vale la pena conocer:** `outputs.instance_id` **se deriva con un trigger** desde `runs`, no con un default — es el dato exacto en vez de una suposición (mismo principio que ADR-041) y de paso **no le suma un séptimo ítem al checklist del re-import**: el archivado sigue insertando igual. Y el tenant piloto **se autodetecta** en un bloque de guardas en vez de escribirse en el archivo, así que no hay un solo id en el repo.
+**Las guardas de la `016`, que abortan antes de tocar nada:** las 15 previas aplicadas · **`@casper_smc` duplicado** (probado: aborta con el handle en el mensaje) · exactamente 1 cliente y 1 instancia, con la salida manual documentada si algún día no.
+**📋 Lo que esto le AGREGA al checklist de la Fase 4 (URLs exactas, ya relevadas):** además de los 6 placeholders, el re-import tiene que meterle la instancia a **7 lecturas/escrituras que hoy no filtran nada**: `processed_items?select=external_id,platform&limit=50000` (⚠️ **la más importante: el constraint arregla la escritura, pero el dedup sigue leyendo GLOBAL hasta que este GET filtre**) · `processed_items?on_conflict=` → `instance_id,platform,external_id` · `outputs?on_conflict=` → `instance_id,external_id` · `candidatos?select=external_id&external_id=not.is.null` · `candidatos?estado=neq.nuevo`, `?estado=eq.nuevo&creado_en=lt.` (archivado) · `referentes_propuestos?select=handle,plataforma` · y **`v_senal_seleccion` en los dos workflows**, que ahora devuelve una fila por instancia: sin `&instance_id=eq.`, el heat-score aprende del vecino.
+**Verde:** `npm run validate` → 1670 checks, 0 errores. No se tocó código de app: typecheck/tests/auditor no tienen nada nuevo que mirar.
+**Qué sigue — Fase 2 (Capa 1), y su punto entero es no enumerar archivos a mano:** `domain/tenant.ts` + `lib/supabase/scoped.ts` + los ~15 de `lib/`; `npm run typecheck` produce la lista y no deja terminar hasta que esté vacía. **Antes de eso, lo de Mani:** limpiar el `@casper_smc` duplicado (desde el cockpit, mirando qué proyectos cuelgan de cada fila) y aplicar la `016` en el SQL Editor. La `017` **no**: esa espera al re-import.
+
+**2026-08-02 (cierre 81) — Fase 0 del refactor multi-tenant: los 5 ADRs (046–050). Cero código, a propósito (Claude, pedido de Alejandro).**
+**Qué se hizo:** se ejecutó la **Fase 0** de [plan-multi-tenant.md §3](./plan-multi-tenant.md) — cinco ADRs en `docs/adr/`, el índice actualizado, y nada más. `core/` solo cambia con ADR y los ADRs eran justamente lo que faltaba, así que **no se escribió una línea de SQL ni de TypeScript**. Rama: `refactor/multi-tenant-fase-0-adrs`.
+· **[046](../adr/ADR-046-el-cockpit-es-multi-tenant.md)** — el cockpit es multi-tenant: `client_id`/`instance_id` en `app` con **doble grano**, `clients.parent_id`, y los 5 uniques globales reparados. **Extiende ADR-003, no lo corrige:** cuando ADR-003 se escribió el cockpit era Airtable y el aislamiento lo daba la herramienta; cubrió el registro porque el producto no existía. Eso está dicho así en el ADR para que nadie lo lea como deuda sucia.
+· **[047](../adr/ADR-047-aislamiento-en-dos-capas.md)** — dos capas, con **el disparador de la Capa 2 escrito**: entra *antes de que un segundo cliente real tenga usuarios en producción*, y la instancia de prueba de la verificación **no** lo dispara (cliente ficticio, sin usuarios). Queda dicho por qué la Capa 1 no se salta ni con RLS puesto: la fachada y n8n **no tienen sesión de usuario**, ahí el único filtro posible es el tipado.
+· **[048](../adr/ADR-048-run-plan-v2-motor-por-instancia.md)** — `run-plan` v2 + `?instancia` obligatorio + `/api/engine/instancias`, y `<<INSTANCE_ID>>` **derogado como constante de instancia**.
+· **[049](../adr/ADR-049-un-pipeline-sus-tablas.md)** — un pipeline, sus tablas; el enum `app.plataforma` no se toca.
+· **[050](../adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md)** — el dispatcher dispara **una ejecución por instancia**, con la tabla punto-por-punto de por qué **no** es el workflow padre que ADR-006 descartó (y ADR-006 ya lo autoriza como C9, textual).
+**⚠️ Lo único que se encontró y NO se parcheó — para Mani, es una decisión, no un bug de esta sesión.** [ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md) declara en sus consecuencias que `core/contracts/run-plan.md` **sube a `version: 2`** por el flip de ids (record id de Airtable → uuid). **Ese bump nunca se ejecutó: el contrato sigue en `1`**, y con razón — el flip terminó siendo pass-through (`fields.uuid` viajaba en paralelo, el mapa `uuidDe` quedó identidad) y por eso el paso 3 de D7 no necesitó un tercer re-import. O sea que la decisión de ADR-035 está bien; lo que quedó viejo es esa línea suya. **No se editó ADR-035.** ADR-048 lleva una *Nota de numeración* explicando la historia y declarando que **él** es el que sube el contrato a v2 —el mismo idioma que ADR-035 usó para su propia nota de numeración con ADR-029—. Si Mani prefiere que ADR-035 lleve una enmienda apuntando acá, es una línea.
+**Verde:** `npm run validate` → **1670 checks, 0 errores** (la baseline en `main` es 1625; el delta son los 5 archivos nuevos entrando al escaneo de secretos — se verificó stasheando). No se corrió nada más porque **no se tocó código**: ni `typecheck`, ni `npm test`, ni `auditar-workflows.mjs` tienen nada nuevo que mirar.
+**Qué sigue — Fase 1, y el orden importa más que el SQL:** `core/schema/016_multi_tenant.sql` ([plan §4](./plan-multi-tenant.md)). Tres cosas que no se pueden invertir: (1) **🧹 limpiar el `@casper_smc` duplicado ANTES** —con `client_id not null` esa fila se congela en el modelo nuevo, y hay que mirar qué proyectos cuelgan de cada una antes de borrar, porque borrar la equivocada le saca fuentes a un proyecto (ADR-045 ya permite hacerlo desde el cockpit, sin SQL); (2) las columnas **nacen nullable → backfill → recién ahí `not null`**, o la migración falla sobre datos vivos; (3) `v_salud_referentes` es la vista delicada: la regla de la [`015`](../../core/schema/015_salud_referentes_una_fila.sql) —*"todo join nuevo tiene que garantizar UNA fila por referente"*— se respeta, porque agregar el eje de tenant es exactamente el cambio que reintroduce el fan-out.
 
 **2026-08-02 (cierre 80) — Sacar el techo de gasto: el cap no era el problema, y sacarlo así habría roto la corrida. Más: borrar records en el cockpit (Claude, pedido de Mani).**
 **Qué se hizo:** Mani trajo tres cosas — recencia ya en 100, "no debería haber cap para regular costos, quiero el motor lo más preciso posible trayendo el `N` por proyecto, revisá qué lo está afectando", y "dejame borrar voces, proyectos y referentes". La revisión del punto 2 dio vuelta el pedido: **el cap no era lo que frenaba, y sacarlo tal como estaba el motor habría matado la corrida y quemado videos para siempre.** Salieron 2 ADRs ([044](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md), [045](../adr/ADR-045-se-borra-solo-lo-que-nunca-produjo-nada.md)) y todo el código está listo; el re-import es de Mani (§Pendiente vivo).

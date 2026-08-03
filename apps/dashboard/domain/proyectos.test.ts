@@ -164,15 +164,16 @@ test("sin destilar todavía, los campos viajan null y no undefined", () => {
   assert.equal(r.fields.advertencia_criterios, null);
 });
 
-test("fields.uuid sobrevive al paso 3 y ahora es igual al id: eso es lo que evita el 3er re-import", () => {
-  // Los cuatro consumidores en n8n resuelven el uuid con `uuidDe[x.id] = x.fields.uuid`. Con los
-  // dos ids iguales ese mapa queda IDENTIDAD, así que el flip no obliga a re-importar nada.
-  // Borrar el campo sí obligaría: por eso se queda hasta el próximo re-import.
+test("fields.uuid ya NO viaja: murió en el re-import de la Fase 4 (ADR-048 §5)", () => {
+  // Era redundante desde el paso 3 del expand/contract —valía lo mismo que el `id`— y se quedaba
+  // solo porque sacarlo costaba un re-import propio. El de la instancia ya se paga, así que se va
+  // junto con los mapas `uuidDe` de los tres workflows. Es un assert de AUSENCIA a propósito: si
+  // alguien lo revive, el motor vuelve a tener dos ids para la misma cosa.
   const [v] = aRegistrosDeVoces([voz()], "motor");
-  assert.equal(v.fields.uuid, v.id);
+  assert.equal("uuid" in v.fields, false);
 
   const [p] = aRegistrosDeProyectos([proyecto()], "motor");
-  assert.equal(p.fields.uuid, p.id);
+  assert.equal("uuid" in p.fields, false);
 });
 
 test("N viaja tal cual: la resolución contra el global la hace armarRunPlan", () => {

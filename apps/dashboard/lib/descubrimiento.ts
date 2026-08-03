@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { TenantContext } from "@/domain/tenant";
+import { scoped } from "@/lib/supabase/scoped";
 
 // El buscador de cuentas corre **solo cuando alguien lo pide** (enmienda de ADR-020, 2026-08-01):
 // el cron de los lunes salió. La razón es medida, no estética — había 8 propuestas pendientes y
@@ -19,13 +20,14 @@ const filaRun = z.object({ id: z.string(), inicio: z.string(), estado: z.string(
  *
  * La ventana es la misma que usa el barredor de zombies: un `en_curso` más viejo que eso no es
  * una corrida viva, es una que murió sin cerrar y no tiene por qué bloquear la próxima.
+ *
+ * ⚠️ El single-flight pasa a ser **por instancia** (ADR-050): una búsqueda viva de otra empresa no
+ * tiene por qué bloquear la de esta. Lo da `scoped`, no un `.eq()` que haya que acordarse de poner.
  */
-export async function hayBusquedaViva(ventanaMin = 60): Promise<boolean> {
-  const supabase = createAdminClient();
+export async function hayBusquedaViva(ctx: TenantContext, ventanaMin = 60): Promise<boolean> {
   const desde = new Date(Date.now() - ventanaMin * 60_000).toISOString();
-  const { data, error } = await supabase
-    .from("runs")
-    .select("id, inicio, estado")
+  const { data, error } = await scoped(ctx)
+    .select("public.runs", "id, inicio, estado")
     .eq("params->>workflow", "descubrimiento")
     .eq("estado", "en_curso")
     .gte("inicio", desde)

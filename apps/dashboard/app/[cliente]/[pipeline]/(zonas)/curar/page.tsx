@@ -1,0 +1,116 @@
+import { comoRuta, rutaDe } from "@/domain/rutas";
+import Link from "next/link";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { exigirTenant } from "@/lib/auth";
+
+export default async function CurarPage({
+  params,
+}: {
+  params: Promise<{ cliente: string; pipeline: string }>;
+}) {
+  const { cliente, pipeline } = await params;
+  const { cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const base = comoRuta(cockpit);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Curar</h1>
+        <p className="text-muted-foreground">
+          Acá vas a calificar candidatos y mantener referentes, voces y proyectos.
+        </p>
+      </div>
+
+      <Link href={rutaDe(base, "curar/feed")} className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Feed</CardTitle>
+            <CardDescription>
+              Los videos que el motor trajo, para calificar. 🔥 y 👍 lo aprueban, 👎 lo descarta:
+              con un click alcanza. Ya no se califica en Airtable.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href={rutaDe(base, "curar/descartes")} className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Descartes</CardTitle>
+            <CardDescription>
+              Los que el filtro mató por poco. Marcar cuáles eran buenos es lo que corrige los
+              criterios. Lo que no marques sigue esperando: la lista ya no se borra.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href={rutaDe(base, "curar/historicos")} className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Históricos</CardTitle>
+            <CardDescription>
+              Todo lo aprobado, de todas las semanas, con su transcripción. El feed se vacía; esto
+              no.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href={rutaDe(base, "curar/voces")} className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Voces y proyectos</CardTitle>
+            <CardDescription>
+              Los clientes y sus temas: qué busca cada uno, con qué criterios y cuántos videos
+              pide por corrida — ese número es el único que manda. Apagar una voz apaga sus
+              proyectos.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href={rutaDe(base, "curar/referentes")} className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Referentes</CardTitle>
+            <CardDescription>
+              El banco de cuentas de las que el motor trae videos: agregar, apagar las que
+              rinden poco y elegir a qué proyectos alimenta cada una. Ya no se tocan en Airtable.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href={rutaDe(base, "curar/sugeridos")} className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Sugeridos</CardTitle>
+            <CardDescription>
+              Las cuentas nuevas que el buscador propone cada lunes. Aprobar una la suma al
+              banco sola.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+      <Link href={rutaDe(base, "curar/ajustes")} className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardHeader>
+            <CardTitle>Ajustes</CardTitle>
+            <CardDescription>
+              Las perillas del sistema: qué tan exigente es el filtro y en qué plataformas
+              busca. Cuántos videos trae cada proyecto se decide en Voces y proyectos.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
+    </div>
+  );
+}

@@ -2,29 +2,6 @@
   "name": "Motor de reels — referentes → candidatos (ADR-009)",
   "nodes": [
     {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "weeks",
-              "triggerAtDay": [
-                1
-              ],
-              "triggerAtHour": 8
-            }
-          ]
-        }
-      },
-      "id": "cron-semanal",
-      "name": "Cron — semanal (lunes 8am)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        0,
-        240
-      ]
-    },
-    {
       "parameters": {},
       "id": "ejecutar-manual",
       "name": "Ejecutar manual",
@@ -54,7 +31,7 @@
             {
               "id": "c3",
               "name": "instance_id",
-              "value": "<<INSTANCE_ID>>",
+              "value": "={{ $('Disparo on-demand (webhook)').isExecuted ? (($('Disparo on-demand (webhook)').first().json.body || {}).instancia || '') : '' }}",
               "type": "string"
             },
             {
@@ -188,7 +165,9 @@
       "position": [
         280,
         400
-      ]
+      ],
+      "notes": "instance_id sale del payload del webhook ({ instancia }), no de un placeholder (ADR-048).\nPara «Ejecutar manual»: reemplazá el '' final de la expresión por el uuid de la instancia.\nEn git va VACÍO a propósito — vacío hace que run-plan responda 400 y la corrida no arranque.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -307,7 +286,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,idioma,tasa_seleccion' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/v_senal_seleccion?select=referente,idioma,tasa_seleccion&instance_id=eq.' + $('Config').first().json.instance_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "options": {
@@ -337,7 +316,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items?select=external_id,platform&limit=50000' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items?select=external_id,platform&instance_id=eq.' + $('Config').first().json.instance_id + '&limit=50000' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "options": {
@@ -367,7 +346,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/candidatos?select=external_id&external_id=not.is.null' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/candidatos?select=external_id&external_id=not.is.null&instance_id=eq.' + $('Config').first().json.instance_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -473,7 +452,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Preparar candidatos (D7) — filas planas para PostgREST (ADR-035).\n// Se acabaron los `fields`, los links, el `typecast` y los batches de 10: PostgREST acepta el\n// array entero de una y `proyecto_id`/`voz_id` son FKs de verdad.\n// record id de Airtable → uuid de Postgres, desde `fields.uuid` (el campo de transición que la\n// fachada sirve al lado del `id` viejo, paso 1 del corte). Sin uuid la fila viaja sin proyecto:\n// cae en el grupo `(sin proyecto)` del feed, que es visible y raro a propósito — antes, con\n// `typecast: true`, el mismo caso creaba un proyecto FANTASMA en silencio.\nconst _plan = $('Leer plan (fachada)').first().json || {};\nconst uuidDe = {};\n(_plan.proyectos || []).forEach(x => { const u = (x.fields || {}).uuid; if (u) uuidDe[x.id] = u; });\n(_plan.voces || []).forEach(x => { const u = (x.fields || {}).uuid; if (u) uuidDe[x.id] = u; });\n\nconst filas = $input.all().map(i => {\n  const d = i.json;\n  return {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || null,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano === true,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || null,\n    estado: 'nuevo',\n    // ADR-029: la 3ª línea de defensa del dedup. Desde D7 la columna tiene UNIQUE, así que el\n    // duplicado lo frena la base y no una comparación en JS (`Prefer: ignore-duplicates`).\n    external_id: d.external_id || null,\n    // La URL cruda del CDN. Airtable la re-hosteaba; ahora nadie: viene firmada y con expiry, y\n    // la tarjeta del feed cae a su placeholder cuando vence (hallazgo 2 de D7).\n    thumbnail_url: d.thumbnail_url || null,\n    proyecto_id: uuidDe[d.proyecto_id] || null,\n    voz_id: uuidDe[d.voz_id] || null\n  };\n});\nconst _sinProy = filas.filter(f => !f.proyecto_id).length;\nif (_sinProy) console.log('[Entrega] ⚠️ ' + _sinProy + ' candidato(s) sin proyecto resoluble');\nconsole.log('[Entrega] ' + filas.length + ' candidatos a Postgres');\nreturn filas.length ? [{ json: { filas } }] : [];"
+        "jsCode": "// Preparar candidatos (D7) — filas planas para PostgREST (ADR-035).\n// Se acabaron los `fields`, los links, el `typecast` y los batches de 10: PostgREST acepta el\n// array entero de una y `proyecto_id`/`voz_id` son FKs de verdad.\n// Los ids del plan YA son los uuid de Postgres, así que el mapa `uuidDe` que traducía desde\n// `fields.uuid` murió con el contrato v2 (ADR-048 §5): era identidad desde el paso 3 del corte.\n// Sin proyecto resoluble la fila viaja sin él y cae en el grupo `(sin proyecto)` del feed, que es\n// visible y raro a propósito — antes, con `typecast: true`, creaba un proyecto FANTASMA en silencio.\n\nconst filas = $input.all().map(i => {\n  const d = i.json;\n  return {\n    titulo: d.titulo, script: d.script, idioma: d.idioma || null,\n    referente: d.referente, url_referente: d.url_referente,\n    views: d.views, likes: d.likes, seguidores: d.seguidores, engagement: d.engagement,\n    heat_score: d.heat_score, viral_por_tamano: d.viral_por_tamano === true,\n    relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n    relevancia_razon: d.relevancia_razon || null,\n    estado: 'nuevo',\n    // De quién es esta fila. Sin esto la 017 la rechaza (not null) y antes de la 017 caería en el\n    // default puente al piloto — o sea en la empresa equivocada, en silencio.\n    instance_id: $('Config').first().json.instance_id,\n    // ADR-029: la 3ª línea de defensa del dedup. Desde D7 la columna tiene UNIQUE, así que el\n    // duplicado lo frena la base y no una comparación en JS (`Prefer: ignore-duplicates`).\n    external_id: d.external_id || null,\n    // La URL cruda del CDN. Airtable la re-hosteaba; ahora nadie: viene firmada y con expiry, y\n    // la tarjeta del feed cae a su placeholder cuando vence (hallazgo 2 de D7).\n    thumbnail_url: d.thumbnail_url || null,\n    proyecto_id: d.proyecto_id || null,\n    voz_id: d.voz_id || null\n  };\n});\nconst _sinProy = filas.filter(f => !f.proyecto_id).length;\nif (_sinProy) console.log('[Entrega] ⚠️ ' + _sinProy + ' candidato(s) sin proyecto resoluble');\nconsole.log('[Entrega] ' + filas.length + ' candidatos a Postgres');\nreturn filas.length ? [{ json: { filas } }] : [];"
       },
       "id": "preparar-candidatos",
       "name": "Preparar candidatos",
@@ -568,7 +547,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst cfg = $('Config').first().json;\nconst iid = cfg.instance_id && String(cfg.instance_id).indexOf('<<') < 0 ? cfg.instance_id : null;\nlet rid = null;\ntry { rid = $('Abrir run en el registro').first().json.id || null; } catch (e) {}\nconst batch = $input.all().map(i => {\n  const d = i.json;\n  return {\n    instance_id: iid, run_id: rid, platform: d.plataforma || '', external_id: String(d.external_id || ''),\n    url: d.url || '', seguidores: Number(d.seguidores || 0),\n    flag_viral: !!d.viral_por_tamano, idioma: d.idioma_guess || null\n  };\n}).filter(r => r.external_id);\nreturn [{ json: { batch } }];\n"
+        "jsCode": "\nconst cfg = $('Config').first().json;\nconst iid = cfg.instance_id || null;   // ADR-048: viene del payload, ya no es un placeholder\nlet rid = null;\ntry { rid = $('Abrir run en el registro').first().json.id || null; } catch (e) {}\nconst batch = $input.all().map(i => {\n  const d = i.json;\n  return {\n    instance_id: iid, run_id: rid, platform: d.plataforma || '', external_id: String(d.external_id || ''),\n    url: d.url || '', seguidores: Number(d.seguidores || 0),\n    flag_viral: !!d.viral_por_tamano, idioma: d.idioma_guess || null\n  };\n}).filter(r => r.external_id);\nreturn [{ json: { batch } }];\n"
       },
       "id": "preparar-procesados",
       "name": "Preparar procesados",
@@ -582,7 +561,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items?on_conflict=platform,external_id' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/processed_items?on_conflict=instance_id,platform,external_id' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -684,7 +663,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&estado=eq.en_curso&inicio=lt.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&instance_id=eq.' + $('Config').first().json.instance_id + '&estado=eq.en_curso&inicio=lt.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -732,7 +711,7 @@
         620
       ],
       "parameters": {
-        "jsCode": "// Descartes del gate visibles (ADR-021): sube SOLO la banda borderline que el gate marcó con\n// _descarte. El equipo audita y marca 'veredicto'; de ahí sale `falsos_negativos`.\n// ADR-030: los descartes por sin_guion NO van acá (la tabla es para auditar el criterio, no\n// videos mudos).\n// ⚠️ D7/ADR-036: esta tabla YA NO SE BARRE los domingos. Un descarte sin auditar dejó de ser una\n// auditoría perdida para siempre.\n// record id de Airtable → uuid de Postgres, desde `fields.uuid` (el campo de transición que la\n// fachada sirve al lado del `id` viejo, paso 1 del corte). Sin uuid la fila viaja sin proyecto:\n// cae en el grupo `(sin proyecto)` del feed, que es visible y raro a propósito — antes, con\n// `typecast: true`, el mismo caso creaba un proyecto FANTASMA en silencio.\nconst _plan = $('Leer plan (fachada)').first().json || {};\nconst uuidDe = {};\n(_plan.proyectos || []).forEach(x => { const u = (x.fields || {}).uuid; if (u) uuidDe[x.id] = u; });\n(_plan.voces || []).forEach(x => { const u = (x.fields || {}).uuid; if (u) uuidDe[x.id] = u; });\n\nconst items = $('Gate de relevancia').all().map(i => i.json).filter(d => d._descarte && d.descarte_razon !== 'sin_guion');\nconst filas = items.map(d => ({\n  titulo: String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video'),\n  script: String(d.script || '').slice(0, 95000),\n  referente: d.username || '', url_referente: d.url || '',\n  relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n  relevancia_razon: d.relevancia_razon || null,\n  thumbnail_url: d.thumbnail_url || null,\n  proyecto_id: uuidDe[d.proyecto_id] || null\n}));\nconsole.log('[Descartes] ' + filas.length + ' a auditar');\nreturn filas.length ? [{ json: { filas } }] : []; // [] si no hay borderline: el POST no corre"
+        "jsCode": "// Descartes del gate visibles (ADR-021): sube SOLO la banda borderline que el gate marcó con\n// _descarte. El equipo audita y marca 'veredicto'; de ahí sale `falsos_negativos`.\n// ADR-030: los descartes por sin_guion NO van acá (la tabla es para auditar el criterio, no\n// videos mudos).\n// ⚠️ D7/ADR-036: esta tabla YA NO SE BARRE los domingos. Un descarte sin auditar dejó de ser una\n// auditoría perdida para siempre.\n// Los ids del plan YA son los uuid de Postgres, así que el mapa `uuidDe` que traducía desde\n// `fields.uuid` murió con el contrato v2 (ADR-048 §5): era identidad desde el paso 3 del corte.\n// Sin proyecto resoluble la fila viaja sin él y cae en el grupo `(sin proyecto)` del feed, que es\n// visible y raro a propósito — antes, con `typecast: true`, creaba un proyecto FANTASMA en silencio.\n\nconst items = $('Gate de relevancia').all().map(i => i.json).filter(d => d._descarte && d.descarte_razon !== 'sin_guion');\nconst filas = items.map(d => ({\n  titulo: String(d.descripcion || '').replace(/\\s+/g, ' ').trim().slice(0, 80) || (d.username || 'video'),\n  script: String(d.script || '').slice(0, 95000),\n  referente: d.username || '', url_referente: d.url || '',\n  relevancia_score: (d.relevancia_score != null ? d.relevancia_score : null),\n  relevancia_razon: d.relevancia_razon || null,\n  thumbnail_url: d.thumbnail_url || null,\n  proyecto_id: d.proyecto_id || null,\n  instance_id: $('Config').first().json.instance_id\n}));\nconsole.log('[Descartes] ' + filas.length + ' a auditar');\nreturn filas.length ? [{ json: { filas } }] : []; // [] si no hay borderline: el POST no corre"
       }
     },
     {
@@ -818,7 +797,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&estado=eq.en_curso&inicio=gte.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) + '&select=id,inicio,trigger_type&limit=1' }}",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.motor&instance_id=eq.' + $('Config').first().json.instance_id + '&estado=eq.en_curso&inicio=gte.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) + '&select=id,inicio,trigger_type&limit=1' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "options": {
@@ -889,7 +868,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=motor' }}",
+        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=motor&instancia=' + $('Config').first().json.instance_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpHeaderAuth",
         "options": {
@@ -918,17 +897,6 @@
   ],
   "pinData": {},
   "connections": {
-    "Cron — semanal (lunes 8am)": {
-      "main": [
-        [
-          {
-            "node": "Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Ejecutar manual": {
       "main": [
         [

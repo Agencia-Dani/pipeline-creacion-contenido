@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { esVeredicto, ordenarDescartes, type DescarteFeed, type Veredicto } from "@/domain/feed";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { TenantContext } from "@/domain/tenant";
+import { scoped } from "@/lib/supabase/scoped";
 
 // Los descartes del gate (ADR-021): los top-K rechazos por score de cada corrida, o sea los
 // near-miss. El equipo dice si la máquina hizo bien en matarlos, y los "era bueno" son los
@@ -36,9 +37,8 @@ const COLUMNAS =
   "id, titulo, script, thumbnail_url, referente, url_referente, relevancia_score, " +
   "relevancia_razon, veredicto, proyectos(nombre)";
 
-export async function leerDescartes(): Promise<DescarteFeed[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.schema("app").from("descartes").select(COLUMNAS);
+export async function leerDescartes(ctx: TenantContext): Promise<DescarteFeed[]> {
+  const { data, error } = await scoped(ctx).select("app.descartes", COLUMNAS);
   if (error) throw new Error(`Supabase respondió con error leyendo los descartes: ${error.message}`);
 
   return ordenarDescartes(
@@ -57,12 +57,13 @@ export async function leerDescartes(): Promise<DescarteFeed[]> {
   );
 }
 
-export async function marcarVeredicto(id: string, veredicto: Veredicto): Promise<void> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .schema("app")
-    .from("descartes")
-    .update({ veredicto })
+export async function marcarVeredicto(
+  ctx: TenantContext,
+  id: string,
+  veredicto: Veredicto,
+): Promise<void> {
+  const { data, error } = await scoped(ctx)
+    .update("app.descartes", { veredicto })
     .eq("id", id)
     .select("id");
   if (error) throw new Error(`Supabase respondió con error guardando el veredicto: ${error.message}`);

@@ -1,4 +1,5 @@
 import type { Proyecto, Voz } from "@/domain/corrida";
+import type { TenantContext } from "@/domain/tenant";
 import { leerAjustes, leerAjustesComoRegistros } from "@/lib/ajustes";
 import { leerProyectos, leerProyectosComoRegistros, leerVoces, leerVocesComoRegistros } from "@/lib/proyectos";
 import { leerReferentesComoRegistros } from "@/lib/referentes";
@@ -15,12 +16,12 @@ import { leerReferentesComoRegistros } from "@/lib/referentes";
 // Lo que no cambia nunca es la FORMA: la fachada devuelve `{id, fields}` (contrato
 // core/contracts/run-plan.md), así que ningún corte obliga a re-importar workflows.
 
-export async function leerRunPlanCrudo(ambito: "motor" | "completo" = "motor") {
+export async function leerRunPlanCrudo(ctx: TenantContext, ambito: "motor" | "completo" = "motor") {
   const [voces, proyectos, ajustes, referentes] = await Promise.all([
-    leerVocesComoRegistros(ambito), // ← Postgres (D5, corte 3/4)
-    leerProyectosComoRegistros(ambito), // ← Postgres (D5, corte 3/4)
-    leerAjustesComoRegistros(), // ← Postgres (D5, corte 1/4)
-    leerReferentesComoRegistros(ambito), // ← Postgres (D5, corte 2/4)
+    leerVocesComoRegistros(ctx, ambito), // ← Postgres (D5, corte 3/4)
+    leerProyectosComoRegistros(ctx, ambito), // ← Postgres (D5, corte 3/4)
+    leerAjustesComoRegistros(ctx), // ← Postgres (D5, corte 1/4)
+    leerReferentesComoRegistros(ctx, ambito), // ← Postgres (D5, corte 2/4)
   ]);
   return { voces, proyectos, ajustes, referentes };
 }
@@ -33,15 +34,15 @@ export async function leerRunPlanCrudo(ambito: "motor" | "completo" = "motor") {
  */
 export const RESULTADOS_POR_CUENTA_POR_DEFECTO = 20;
 
-export async function leerConfigOperar(): Promise<{
+export async function leerConfigOperar(ctx: TenantContext): Promise<{
   voces: Voz[];
   proyectos: Proyecto[];
   resultadosPorCuenta: number;
 }> {
   const [vocesRaw, proyectosRaw, ajustes] = await Promise.all([
-    leerVoces(),
-    leerProyectos(),
-    leerAjustes(),
+    leerVoces(ctx),
+    leerProyectos(ctx),
+    leerAjustes(ctx),
   ]);
 
   // Los mismos dos filtros que hacía Airtable server-side, y NADA más: el cruce "proyecto activo

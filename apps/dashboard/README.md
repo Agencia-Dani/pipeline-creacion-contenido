@@ -8,9 +8,9 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
 
 ## Mapa del código
 
-- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 4 zonas en `(zonas)/`:
-  `operar` · `curar` · `transcribir` · `entender` (plan-cockpit §2.1 + ADR-031), y
-  `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
+- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 4 zonas en
+  **`[cliente]/[pipeline]/(zonas)/`**: `operar` · `curar` · `transcribir` · `entender`
+  (plan-cockpit §2.1 + ADR-031), y `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
   [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed.
   De qué almacenamiento sale cada dominio lo decide `lib/config.ts` — la costura de los cortes de
   D5. **Desde D7 los cuatro dominios del contrato salen de Postgres y Airtable no participa**;
@@ -23,13 +23,22 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   resuelta, estado legible), `enlace.ts` (de un pegote de texto a `external_id`) y `borrado.ts`
   (**qué se puede borrar**: un registro sale solo si nunca produjo nada —
   [ADR-045](../../docs/adr/ADR-045-se-borra-solo-lo-que-nunca-produjo-nada.md) — y esta función
-  arma *la frase*; la FK sigue siendo *la garantía*). Se testea con `node:test`.
+  arma *la frase*; la FK sigue siendo *la garantía*) y **`tenant.ts`** (**de quién es cada cosa**:
+  la visibilidad por el árbol de `clients.parent_id`, con tope de profundidad porque un ciclo
+  colgaría el request — [ADR-046](../../docs/adr/ADR-046-el-cockpit-es-multi-tenant.md)).
+  Se testea con `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
   `ajustes.ts`, `referentes.ts` y `proyectos.ts` (los dominios de config, todos en Postgres desde
   D7 — `airtable.ts` murió con el corte), `sugeridos.ts` (la bandeja del descubrimiento),
   `runs.ts` (últimas corridas del motor), `transcripciones.ts` + `transcribir.ts` (el transcriptor:
   la cola y las llamadas a Supadata/Haiku), `eventos.ts` (auditoría, sumidero) y `auth.ts`
-  (guardias `usuarioActual`/`exigirZona`).
+  (guardias `usuarioActual`/`exigirZona`/**`exigirTenant`**).
+  **`supabase/scoped.ts` es la pieza a entender antes de tocar cualquier otro archivo de `lib/`**
+  ([ADR-047](../../docs/adr/ADR-047-aislamiento-en-dos-capas.md), Capa 1): envuelve el acceso a
+  Supabase de forma que **no se pueda construir una query sin `TenantContext`**, y el mapa
+  tabla→grano vive ahí y solo ahí — *una tabla nueva sin entrada no compila*. `tenant.ts` es el
+  único archivo que lee `clients`/`instances` sin scopear, y tiene que serlo: scopear la tabla con
+  la que se resuelve el scope sería circular.
 - `components/ui/` — shadcn, código propio editable (C9). Lo propio del cockpit:
   **`modal.tsx`** (el `<dialog>` nativo del estándar de
   [ADR-039](../../docs/adr/ADR-039-la-lista-resume-el-record-se-abre.md) — uno por lista, no uno por
@@ -53,9 +62,41 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   3/4 se borraron en D7 — con Postgres de dueño, un import posterior pisaría en silencio lo que el
   equipo calificó. Están en git si hiciera falta mirarlos.
 - `proxy.ts` — refresh de sesión + redirect a login (en Next 16 middleware se llama proxy).
+  **No cambió con el multi-tenant y no tiene que cambiar:** sigue siendo el chequeo optimista de
+  sesión, y la autoridad sigue en cada página.
+
+### Las URLs llevan el tenant adelante
+
+`/30x/reels/curar/feed`, `/estadox/linkedin/operar`. **En la URL y no en una cookie** a propósito
+(plan-multi-tenant §6): los links se pueden compartir entre compañeros, el caché de Next keyea
+correcto por tenant, y el tenant no se puede perder al navegar — una cookie de tenant es un bug de
+caché esperando.
+
+Las reglas que sostienen eso, y que conviene respetar al agregar una pantalla:
+- **Ningún `href` ni `revalidatePath` se escribe a mano.** Se arman con `domain/rutas.ts`
+  (`rutaDe` / `rutaZona` / `comoRuta`), que es puro y está testeado. Con el prefijo variable, cada
+  string escrito a mano es una chance de mandar a alguien —o de revalidar— el cockpit equivocado.
+- **Los segmentos crudos de la URL solo sirven para RESOLVER.** Todo lo que se renderiza se arma con
+  el cockpit ya validado que devuelve `exigirTenant`. Si no, la pantalla puede mostrar los datos de
+  un cockpit y los links de otro.
+- **Los componentes cliente leen el cockpit de la URL** con `usarCockpit()` (colocado en
+  `(zonas)/`), en vez de recibirlo por props tres niveles abajo solo para armar un `href`.
+- **Fuera del tenant:** `/`, `/login`, `/auth/*`, `/sin-rol` y `/api/*`. La raíz no es una pantalla:
+  resuelve el cockpit del usuario y su zona inicial, y es la salida de emergencia a la que caen
+  todos los `redirect("/")` de las guardias.
 
 La autoridad de permisos está en el servidor: cada página exige su zona con `exigirZona`, y los
 datos los protege RLS. El nav solo *esconde*.
+
+Desde el refactor multi-tenant son **dos preguntas ortogonales, y hay que pasar las dos**: el rol
+dice QUÉ zona ve alguien, el tenant dice DE QUIÉN son los datos que ve. Las páginas que leen datos
+usan **`exigirTenant`** (que compone con `exigirZona`, no la reemplaza) y bajan el `TenantContext`
+hasta `lib/`. Las que solo deciden qué mostrar —el índice de *Curar*, el nav— siguen con
+`exigirZona`, y está bien: pedirles tenant sería ruido.
+⚠️ **La Capa 2 (RLS sobre `app.*`) todavía no existe**: hoy el aislamiento es el de `scoped.ts`.
+El disparador de cuándo entra está escrito en
+[ADR-047](../../docs/adr/ADR-047-aislamiento-en-dos-capas.md) — antes de que un segundo cliente real
+tenga usuarios en producción.
 
 ## Correr local
 
@@ -83,6 +124,14 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    `npm run cortar:feed`. La **011 es obligatoria**: sin ella el BFF recibe
    `42501 permission denied for schema app` en TODO lo que lee de `app.*`. El login no lo delata
    porque va por la anon key.
+
+   > 🚨 **La [`016_multi_tenant.sql`](../../core/schema/016_multi_tenant.sql) va ANTES de deployar
+   > este código, no después.** El BFF pasó a pedir `client_id`/`instance_id` y a nombrar los
+   > uniques nuevos en los `onConflict` de `lib/transcripciones.ts`; contra una base sin la `016`,
+   > eso es columna inexistente y `42P10`. Es la misma trampa que la `014` (que también tenía que ir
+   > antes de su código, por el `not null` de los criterios de la voz).
+   > La [`017`](../../core/schema/017_multi_tenant_cierre.sql) es **otra corrida y va mucho después**:
+   > recién tras el re-import de la Fase 4. Su cabecera explica por qué.
 2. **Bucket `miniaturas` en Supabase Storage** (público), para
    [ADR-037](../../docs/adr/ADR-037-miniaturas-por-proxy-propio.md). Ya creado el 2026-08-01; queda
    escrito para el próximo entorno. Sin él, `/api/miniatura` sigue sirviendo la imagen (baja del CDN
@@ -99,6 +148,8 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 3. **Invitar a los usuarios:** *Authentication → Invite user* con cada mail, e insertar su fila en
    `app.usuarios` con su rol (snippet en el header de la migración). El login usa
    `shouldCreateUser: false`: un mail no invitado no crea cuenta.
+   > Desde la `016` ese `insert` también lleva **`client_id`** — a qué empresa pertenece. Un usuario
+   > sin cliente cae en `/sin-rol`, igual que uno sin rol: las dos son la misma alta a medias.
    > ⚠️ **El email built-in de Supabase (free) tiene rate limit muy bajo** (unos pocos/hora) y no deja
    > editar templates sin custom SMTP. Para un login por mail confiable **conectá un SMTP propio
    > (Resend: gratis, sin IP/host)** en *Authentication → SMTP Settings*. Eso además habilita editar el

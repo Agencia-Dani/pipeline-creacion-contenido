@@ -413,7 +413,7 @@ Workflow n8n nuevo (`Workflows/workflow-dispatcher/`), autorizado por ADR-006 C9
 Es el test de "clonar y configurar" hecho con un pipeline real, que es lo que [PLAN §F5](../../PLAN.md) siempre pidió.
 
 - **`Workflows/workflow-linkedin/`** con su `workflow.yaml` (manifest contra las 8 etapas canónicas de PLAN §2.4; la etapa 4 ENRIQUECER se declara `n/a` — LinkedIn ya es texto, sobra la transcripción) y su `README.md`.
-- **`core/schema/017_pipeline_linkedin.sql`**: `app.candidatos_linkedin`, `app.descartes_linkedin`, `app.referentes_linkedin`, todas con `instance_id`. **No se toca el enum `app.plataforma`.**
+- **`core/schema/018_pipeline_linkedin.sql`** *(era la `017` en la versión original de este plan; la Fase 1 se partió en `016` + `017_multi_tenant_cierre` — ver el log del handoff)*: `app.candidatos_linkedin`, `app.descartes_linkedin`, `app.referentes_linkedin`, todas con `instance_id`. **No se toca el enum `app.plataforma`.**
 - Las zonas de `curar` se parametrizan por pipeline; `domain/feed.ts` se generaliza contra `content_item`.
 - **`core/templates/`** y los runbooks `docs/runbooks/agregar-workflow.md` + `agregar-cliente.md`, que F5 ya listaba y nunca se escribieron.
 

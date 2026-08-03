@@ -33,8 +33,10 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–015; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-02 las 15 están aplicadas en prod.
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–017; se aplican a mano en el SQL Editor,
+  en orden). Al 2026-08-02 hay **15 aplicadas** en prod: la `016` (multi-tenant) y la `017` (su cierre)
+  están escritas y verificadas contra un Postgres real, pero **no aplicadas** — y la `017` no se puede
+  correr hasta después del re-import de la Fase 4 (su cabecera explica por qué).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*

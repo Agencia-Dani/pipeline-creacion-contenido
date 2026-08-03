@@ -1,0 +1,284 @@
+{
+  "name": "Dispatcher — una ejecución por instancia (ADR-050)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "cron-motor",
+      "name": "Cron — motor (lunes 8am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "notes": "Era el cron del propio motor hasta la Fase 4. Se mudó acá porque un cron adentro del motor ya no tiene de dónde sacar la instancia.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "cron-archivado",
+      "name": "Cron — archivado (domingo 6pm)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        380
+      ],
+      "notes": "Mismo horario que tenía el archivado. El orden importa: el archivado del domingo deja la señal fresca para el motor del lunes.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "ejecutar-manual",
+      "name": "Ejecutar manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "dashboard_url",
+              "value": "<<DASHBOARD_URL>>",
+              "type": "string"
+            },
+            {
+              "id": "d2",
+              "name": "pipeline",
+              "value": "short-form-content",
+              "type": "string"
+            },
+            {
+              "id": "d3",
+              "name": "destino",
+              "value": "={{ $('Cron — archivado (domingo 6pm)').isExecuted ? 'archivado' : 'motor' }}",
+              "type": "string"
+            },
+            {
+              "id": "d4",
+              "name": "webhook_url",
+              "value": "={{ $('Cron — archivado (domingo 6pm)').isExecuted ? '<<WEBHOOK_URL_ARCHIVADO>>' : '<<WEBHOOK_URL_MOTOR>>' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        380
+      ],
+      "notes": "`pipeline` es el slug de `workflows`, no el del sub-workflow: motor, archivado y descubrimiento comparten la MISMA instancia de short-form-content y se distinguen por params.workflow en runs.\n`Ejecutar manual` cae en 'motor' — es el caso de prueba, y el archivado se prueba desde su propio Execute.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/instancias?workflow=' + $('Config').first().json.pipeline }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "leer-instancias",
+      "name": "Leer instancias (fachada)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Run Plan Header"
+        }
+      },
+      "notes": "SIN continue-on-fail a propósito: si no sabemos quiénes corren, no se dispara nada. Disparar a ciegas no es una opción — no hay a quién disparar.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Una fila por instancia: es lo que convierte «un cron» en «N ejecuciones» (ADR-050).\n// El loop vive acá y NO adentro del motor, que es la decisión entera de ese ADR: tres tenants en\n// serie dentro del mismo Code node chocan con los 900 s del watchdog y matan la corrida de todos.\nconst r = $input.first().json || {};\nconst instancias = r.instancias || [];\n\n// Lista vacía es un estado legítimo (nadie contrató el pipeline, o se pausaron todas), no un\n// error: se sale sin disparar y sin ensuciar el log de fallos.\nif (!instancias.length) {\n  console.log('[Dispatcher] 0 instancias activas de ' + (r.workflow || '?') + ': no hay nada que disparar');\n  return [];\n}\n\nconsole.log('[Dispatcher] ' + instancias.length + ' instancia(s) de ' + r.workflow + ' → ' + $('Config').first().json.destino + ': ' + instancias.map(i => i.cliente + '/' + i.slug).join(', '));\nreturn instancias.map(i => ({ json: { instancia: i.id, cliente: i.cliente, slug: i.slug } }));"
+      },
+      "id": "desarmar-instancias",
+      "name": "Desarmar instancias",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.webhook_url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { instancia: $json.instancia } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "disparar",
+      "name": "Disparar por instancia",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        380
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Webhook Motor Header"
+        }
+      },
+      "notes": "⚠️ CONTINUE-ON-FAIL POR ITERACIÓN, y es el invariante #1 hecho configuración: un tenant caído no puede cortarle la semana a los otros (ADR-050 §2).\nEl 200 es «señal recibida», no «corrida buena»: el destino tiene su propio guard single-flight, ahora por instancia.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// El dispatcher no sabe qué pasó adentro de las corridas que disparó, y no tiene que saberlo\n// (ADR-050: no tiene estado y no registra nada — el registro es `runs`, y lo escribe cada motor).\n// Esto es solo para que la ejecución del dispatcher se lea de un vistazo en n8n.\nconst items = $input.all();\nconst fallados = items.filter(i => i.json && i.json.error);\nconsole.log('[Dispatcher] disparadas ' + (items.length - fallados.length) + '/' + items.length + ' instancias');\nif (fallados.length) console.log('[Dispatcher] ⚠️ ' + fallados.length + ' no recibieron la señal; sus otros triggers siguen vivos (el botón ▶ del cockpit)');\nreturn [{ json: { disparadas: items.length - fallados.length, fallidas: fallados.length } }];"
+      },
+      "id": "resumen",
+      "name": "Resumen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        380
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron — motor (lunes 8am)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron — archivado (domingo 6pm)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar manual": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Leer instancias (fachada)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer instancias (fachada)": {
+      "main": [
+        [
+          {
+            "node": "Desarmar instancias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Desarmar instancias": {
+      "main": [
+        [
+          {
+            "node": "Disparar por instancia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disparar por instancia": {
+      "main": [
+        [
+          {
+            "node": "Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

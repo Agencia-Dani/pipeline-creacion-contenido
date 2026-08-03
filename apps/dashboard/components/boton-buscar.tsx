@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { buscarAhora, type ResultadoDisparo } from "@/app/(zonas)/operar/actions";
+import { buscarAhora, type ResultadoDisparo } from "@/app/[cliente]/[pipeline]/(zonas)/operar/actions";
 
 // Buscar cuesta créditos (Apify × 3 actores + el vetting con Haiku), así que el click pide
 // confirmación explícita — mismo criterio que el ▶ del motor (plan-cockpit §3.3: lo que no se

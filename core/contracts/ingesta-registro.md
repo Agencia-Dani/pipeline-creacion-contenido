@@ -57,9 +57,17 @@ La service role key bypassa RLS — vive SOLO en n8n (y en el gestor de contrase
 }
 ```
 
-- `instance_id` es una **constante de la instancia**: se obtiene del registro al crear la
-  instancia (insert de F2) y entra como placeholder `<<INSTANCE_ID>>` que resuelve
-  `core/scripts/deploy.mjs` desde la config del cliente (`instance_id` en el yaml).
+- `instance_id` es **un dato de la corrida, no del archivo** — derogado el
+  `<<INSTANCE_ID>>` constante por [ADR-048](../../docs/adr/ADR-048-run-plan-v2-motor-por-instancia.md).
+  Viaja en el payload del webhook (`{ "instancia": "<uuid>" }`) y el nodo `Config` lo levanta de
+  ahí. Hay **una** definición de workflow para N empresas: el que dice de quién es la corrida es
+  quien la dispara (el dispatcher de ADR-050, o el botón ▶ del cockpit).
+  > Hasta la Fase 4 era una constante que `core/scripts/deploy.mjs` resolvía desde el yaml del
+  > cliente. Ese era el último trabajo pendiente del script, que ya estaba deprecado.
+  >
+  > ⚠️ **Sin instancia en el payload la corrida no arranca, y eso es deliberado.** El insert de
+  > `runs` viola la FK y `run-plan` responde 400: los dos frenos muerden **antes** de Apify. Lo que
+  > NO puede pasar es que corra igual y le escriba las filas a otra empresa.
 - `params`: en corridas cron va vacío o con los defaults; en corridas `on_demand` lleva lo que
   el formulario pidió.
 - La respuesta trae el `id` del run → se conserva en el flujo para los pasos 2 y 3.
