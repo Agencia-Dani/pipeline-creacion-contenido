@@ -50,11 +50,18 @@
 >   ('30x',     '30X',     'activo');
 >
 > -- Un cockpit de LinkedIn por marca (ADR-055: un cockpit = una fila en `instances`).
-> -- `active` y no `draft` porque el cockpit solo lista instancias activas — con `draft` la pantalla
-> -- no aparece. Es seguro: el dispatcher no tiene cron de LinkedIn y no existe el workflow en n8n,
-> -- así que activar acá no dispara nada ni gasta un peso.
+> -- El cockpit solo lista instancias `active`, así que el estado decide QUIÉN lo ve, no solo si
+> -- corre. Activar no dispara nada: el dispatcher no tiene cron de LinkedIn y no existe el
+> -- workflow en n8n.
 > insert into instances (client_id, workflow_id, slug, nombre, estado) values
->   ('retia',   'linkedin', 'linkedin', 'LinkedIn', 'active'),
+>   -- 🩸 `draft` a propósito, y esto se descubrió CORRIÉNDOLO. La membresía es por EMPRESA, no por
+>   -- cockpit (ADR-051), así que un `active` acá le habría dado a Jero —y a Alejo, y a Manuel 30X—
+>   -- un cockpit de LinkedIn vacío, sin motor y sin datos, más un selector de pipeline que no
+>   -- pidió nadie. Pasa a `active` cuando LinkedIn tenga algo que mostrarle al equipo de Retia.
+>   ('retia',   'linkedin', 'linkedin', 'LinkedIn', 'draft'),
+>   -- Estas dos sí `active`: en `estadox` y `30x` **no hay ninguna membresía**, así que las ven
+>   -- solo los dos dueños. Son el banco de pruebas del cockpit de LinkedIn sin tocarle la pantalla
+>   -- a nadie del equipo.
 >   ('estadox', 'linkedin', 'linkedin', 'LinkedIn', 'active'),
 >   ('30x',     'linkedin', 'linkedin', 'LinkedIn', 'active');
 >
@@ -67,15 +74,20 @@
 > equipo tiene que garantizar.
 >
 > ### Qué tiene que verse después del paso 7 (la prueba de que funcionó)
-> · Entrando con **tu** cuenta: aparecen **los dos selectores** (equipo con 3 opciones, pipeline con
->   2 en Retia y 1 en las otras) · en el cockpit de LinkedIn **el nav NO dibuja `Transcribir`** y
->   entrar a mano a `/retia/linkedin/transcribir` **redirige** · con la cuenta de **Jero**: ningún
->   selector de equipo, y `/estadox/linkedin` lo rebota a su cockpit de Retia.
+> · Entrando con **tu** cuenta: aparece el **selector de equipo** con 3 opciones (retia, estadox,
+>   30x) y **ningún selector de pipeline** (cada empresa tiene un solo cockpit visible: Retia solo
+>   `reels` porque su LinkedIn queda `draft`) · en `/estadox/linkedin` **el nav NO dibuja
+>   `Transcribir`**, y entrar a mano a `/estadox/linkedin/transcribir` **redirige** · con la cuenta
+>   de **Jero**: ningún selector, y `/estadox/linkedin` lo rebota a su cockpit de Retia.
 >
-> ⚠️ **Lo que NO se verificó de la `020`:** correrla contra un Postgres real. La `018`/`019` se
-> probaron con 001→019 sobre Postgres 16 en Docker; acá **Docker no estaba levantado**. Solo crea
-> tablas nuevas y no toca nada existente, así que el peor caso es un error de sintaxis que el SQL
-> Editor muestra sin romper nada — pero está dicho, no dado por bueno.
+> ✅ **VERIFICADO contra un Postgres 16 real (2026-08-03).** Se corrió `001→020` completo en Docker,
+> con el renombre `piloto`→`retia` en el medio, los gates humanos de la `017`/`019` descomentados y
+> **el mismo seed que prod** (5 usuarios, 2 devs). Resultado: **5 usuarios → 5 membresías** ·
+> `es_dueno` = **Alejandro Dávila y Manuel Mejia**, los correctos · la `019` dejó
+> `app.usuarios` en `id, nombre, creado_en, es_dueno` (murieron `rol` y `client_id`) · las 4 tablas
+> de LinkedIn creadas, `instance_id` **not null y sin default** en las 4 · **`app.plataforma` intacto
+> (`instagram, tiktok`)** · `linkedin` registrado en `workflows`. **El SQL del alta también se corrió
+> ahí mismo** y es de donde salió el hallazgo del `draft` de arriba.
 
 > ## 🔎 LO ÚNICO QUE FALTA VERIFICAR (cierre 90): que `params.execution_id` aparezca en una corrida REAL
 >
