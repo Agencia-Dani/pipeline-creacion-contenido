@@ -541,7 +541,7 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | 6 | **Fase 4** — `run-plan` v2 + motor + dispatcher | el segundo tenant corriendo | sí, **re-import** | ✅ en prod · corrida de verificación `ok` |
 | — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ⛔ **escrito, SIN mergear y SIN aplicar** → **§14.1** |
 | 7 | 🔴 **Paginación del feed** (§10) | el segundo tenant con volumen | no | ⬜ no empezada |
-| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | ⬜ no empezada → **§14.3** |
+| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | 🔧 **`021` escrita y verificada contra PG16, sin aplicar** · falta el flip de `scoped.ts` → **§14.3** |
 | 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | ⬜ no empezada |
 
 > ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
@@ -631,9 +631,35 @@ humana explícita.
 **Hecho cuando.** Un nodo nuevo entra a un workflow **activo** con `npm run n8n:push -- <alias>
 --apply`, `n8n:diff` queda limpio después, y `n8n:restore` lo saca.
 
-### 14.3 🔴 El aislamiento entre empresas hoy es solo TypeScript
+### 14.3 🟡 El aislamiento entre empresas hoy es solo TypeScript — *la red ya está escrita, falta saltar*
 
-**Qué.** La Fase 6 (Capa 2, RLS) no está empezada. El BFF lee **todo** con `service_role`, que
+> **Actualizado 2026-08-03.** La [`021_rls_capa_2.sql`](../../core/schema/021_rls_capa_2.sql) está
+> **escrita y verificada contra un Postgres 16 real**, con dos empresas y sus datos. Falta
+> **aplicarla** y falta el **flip** de `scoped.ts`. Se partió en dos a propósito, con el mismo
+> expand/contract de la `016`/`017` y la `018`/`019`:
+>
+> | | Paso | Riesgo | Estado |
+> |---|---|---|---|
+> | 1 | Aplicar la **`021`**: grants para `authenticated`, las funciones de alcance, 17 policies y `security_invoker` en las 12 vistas | **Ninguno.** El BFF sigue en `service_role`, que bypassa RLS: las policies existen y no se evalúan en ningún camino | ⬜ escrita y verificada, **sin aplicar** |
+> | 2 | El **flip**: `scoped.ts` deja `createAdminClient()` y pasa a la sesión | **Alto, y concentrado en una línea.** Acá es donde el aislamiento se vuelve real | ⬜ no empezado |
+>
+> **La fachada y n8n no se tocan en ninguno de los dos.** `run-plan`, `instancias` y las escrituras
+> por PostgREST siguen con `service_role` por diseño (ADR-028 / ADR-035): no tienen sesión de
+> usuario, así que ahí el único filtro posible es el tipado de la Capa 1.
+>
+> 🩸 **El hallazgo que la fase no tenía escrito, y que la decidía entera.** Las 27 vistas se crearon
+> **sin `security_invoker`**. En Postgres una vista corre con los permisos de *su dueño*: escribir
+> policies y dejar las vistas como estaban habría dejado toda la zona *Entender* sin RLS, y no se
+> habría notado, porque con un tenant devuelven las filas correctas igual. **Medido:** apagando
+> `security_invoker` en `v_metricas_calidad`, un operador de Retia ve **2 filas en vez de 1** — las
+> de EstadoX incluidas.
+>
+> ⚠️ Y dos cosas más que encontró **la corrida y no el diseño**: con `security_invoker`, las vistas
+> necesitan que *el usuario* alcance todo lo que cruzan, así que `clients`/`instances`/`workflows` y
+> las 6 vistas de `public` necesitan sus propios grants. Sin eso la zona Entender devuelve `42501`
+> el día del flip. Los dos ya están en la `021`.
+
+**Qué.** La Fase 6 (Capa 2, RLS) no está aplicada. El BFF lee **todo** con `service_role`, que
 bypassa RLS.
 
 **Evidencia.** RLS está *enabled* en todas las tablas de `public` y de `app`, pero **sin una sola

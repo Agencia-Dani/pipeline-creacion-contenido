@@ -33,14 +33,16 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–020; se aplican a mano en el SQL Editor,
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–021; se aplican a mano en el SQL Editor,
   en orden). Al 2026-08-03, **medido contra prod por PostgREST**, hay **18 aplicadas**: la `016`
   (multi-tenant), la `017` (su cierre) y la **`018` (membresías, ADR-051)** entraron el 02–03/08.
   ⚠️ **Prod está en la ventana del expand:** `app.usuarios_clientes` ya existe y tiene sus 5 filas,
   **y `usuarios.rol`/`usuarios.client_id` siguen vivas** — o sea que la columna vieja es hoy una copia
   congelada que nada mantiene. La **`019` (cierre de membresías) y la `020` (pipeline LinkedIn) están
-  escritas y NO aplicadas**, y el código que consume la `018` vive solo en `refactor/membresias`,
-  **sin mergear**. El orden para cerrar todo eso es el runbook de [handoff §Pendiente vivo](docs/agents/handoff.md).
+  escritas y NO aplicadas**. El código que consume la `018` **ya está en `main`** (mergeado el
+  03/08). El orden para cerrar la ventana es el runbook de [handoff §Pendiente vivo](docs/agents/handoff.md).
+  La **`021` (RLS, Capa 2 de ADR-047)** también está escrita y sin aplicar: es inerte hasta que
+  `scoped.ts` deje el `service_role` — ver [plan-multi-tenant §14.3](docs/agents/plan-multi-tenant.md).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
