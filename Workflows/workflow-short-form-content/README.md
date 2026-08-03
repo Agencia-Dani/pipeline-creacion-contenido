@@ -122,5 +122,11 @@ nodo `Config` al importar (placeholders `<<...>>`), no se commitean.
 Construido por **builder Node**, no a mano: cargá el JSON, mutá `node.parameters.*` por nombre de
 nodo, reescribí con `JSON.stringify`/`json.dump` (UTF-8, 2 espacios). No edites a mano las
 expresiones grandes `={{ ... }}`. Validá con `cd core/scripts && npm run validate` (contrato del
-manifest + escaneo de secretos) y por **re-import + Execute** en n8n (el motor corre en n8n, no
-localmente).
+manifest + escaneo de secretos).
+
+**Llevarlo al live ya no es re-importarlo** ([ADR-053](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)):
+`npm run n8n:push -- motor --nodos "<nodos tocados>"` parchea los `parameters` por la API (dry-run;
+`--apply` escribe, `n8n:restore` revierte), y `npm run n8n:diff` verifica que el live corra lo que dice
+el repo. El re-import completo queda solo para **topología** (nodos o conexiones nuevos). La conducta
+final se valida en n8n con *Execute* — el motor corre ahí, no localmente. Detalle en
+[CLAUDE.md §Operación](./CLAUDE.md).

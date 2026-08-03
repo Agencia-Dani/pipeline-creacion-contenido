@@ -96,27 +96,63 @@ Leer runs de la semana ─► Leer Descartes del gate ─► Computar métricas 
 3. Corre en **la misma instancia de n8n** que el motor (B1) y reusa sus credenciales nativas
    `Airtable PAT` y `Supabase Registro`.
 
-## Placeholders a completar al importar
+## Operación — cómo se cambia este workflow
+
+**Cambiarlo ya no es re-importarlo** ([ADR-053](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)):
+el repo es la **forma**, el live es el **estado**. Un cambio de `parameters` se parchea por la API:
+
+```bash
+cd core/scripts && npm run n8n:push -- archivado --nodos "Config"
+```
+
+Dry-run; `--apply` escribe, snapshotea en `.n8n-snapshots/` y `npm run n8n:restore -- archivado
+<snapshot> --apply` revierte. Nunca toca credenciales, ids, posiciones ni `settings`.
+`npm run n8n:diff` (solo lee) dice si el live corre lo que dice el repo — **corrélo antes de tocar el
+`workflow.json` y después de cualquier cambio en n8n**.
+
+El **re-import completo queda solo para topología** (nodos o conexiones nuevos): el push los detecta y
+se niega. Solo en ese caso aplican los placeholders y las credenciales de abajo.
+
+## Placeholders *(solo al re-importar por topología)*
+
+En el camino normal se resuelven solos: `n8n-sync` los **aprende del propio live**. Verificados contra
+el `workflow.json` el 2026-08-03 — son **7**:
 
 | Placeholder | Dónde | Qué poner |
 |---|---|---|
-| `<<AIRTABLE_BASE_ID>>` | nodo *Config* | `baseId` de la base Reels Cockpit (`app...`) |
 | `<<SUPABASE_URL>>` | nodo *Config* | `https://<proyecto>.supabase.co` |
-| `<<INSTANCE_ID>>` | nodo *Config* | el `instance_id` de la instancia piloto (mismo que el motor) |
+| `<<DASHBOARD_URL>>` | nodo *Config* | base del cockpit (de ahí sale la fachada `run-plan`) |
+| `<<WEBHOOK_PATH_ARCHIVADO>>` | *Disparo por instancia* | el path del webhook que dispara el dispatcher |
 | `<<GOOGLE_SHEET_ID>>` | nodo *Config* | id del Sheet Histórico (de la URL) |
 | `<<NOMBRE_PESTANA_SHEET>>` | nodo *Config* | nombre de la pestaña destino |
-| `<<CREDENCIAL_GOOGLE_SHEETS>>` | nodo *Append al Sheet* | credencial OAuth de Google Sheets en n8n |
+| `<<CREDENCIAL_GOOGLE_SHEETS>>` | *Append al Sheet Histórico* | credencial OAuth de Google Sheets en n8n |
+| `<ANTHROPIC_API_KEY>` | Code de *Destilar criterios* | la key de Anthropic |
 
-> Los IDs no son secretos pero **no se commitean** (van al gestor). Las API keys de Airtable/Supabase
-> NO viven acá: son credenciales nativas de n8n (`Airtable PAT`, `Supabase Registro`).
+**`<<AIRTABLE_BASE_ID>>` murió en D7** (ADR-035) y **`<<INSTANCE_ID>>` en la Fase 4**: la instancia ya
+no es constante del archivo, viaja en el payload del webhook (ADR-048).
+
+> ⚠️ **Un placeholder sin resolver no falla en rojo.** `<<…>>` no es sintaxis de expresión de n8n: se
+> manda literal y el request muere, pero con `onError: continueRegularOutput` la ejecución **termina
+> en verde**. Por eso `npm run n8n:diff` va después de cada import.
+>
+> Los IDs no son secretos pero **no se commitean** (van al gestor).
 
 ## Credenciales en n8n
 
-| Servicio | Credencial | Uso |
+Verificadas contra la instancia el 2026-08-03. **Los nombres del repo son los reales**: si no
+coincidieran, n8n las pide a mano en el re-import y ahí es donde se cuelan los errores (costó dos
+intentos fallidos el 03/08).
+
+| Nodo | Credencial | Uso |
 |---|---|---|
-| Airtable | `Airtable PAT` (`airtableTokenApi`) | leer Proyectos/Voces/Candidatos + borrar |
-| Supabase | `Supabase Registro` (`supabaseApi`, service_role) | runs + outputs |
-| Google Sheets | OAuth (`googleSheetsOAuth2Api`) | append al histórico — **única dependencia de Google del pipeline** |
+| *Disparo por instancia (webhook)* | `Webhook Motor Header` (`httpHeaderAuth`) | **el mismo que el motor, a propósito** |
+| *Leer plan (fachada)* | `Run Plan Header` (`httpHeaderAuth`) | leer la config por la fachada (ADR-028) |
+| los nodos de Supabase | `Supabase account` (`supabaseApi`, service_role) | `runs` + `outputs` por PostgREST (ADR-035) |
+| *Append al Sheet Histórico* | OAuth (`googleSheetsOAuth2Api`) | append al histórico — **única dependencia de Google del pipeline**. Se elige a mano: no es texto |
+
+> 🔴 **El Sheet es uno solo y global.** `sheet_id`/`sheet_tab` son constantes del `Config`, no config
+> por instancia: con una segunda empresa **sus aprobados se appendean al Sheet de Retia**. Pendiente
+> con su fix escrito en [plan-multi-tenant §14.4](../../docs/agents/plan-multi-tenant.md).
 
 > **El OAuth consent screen DEBE estar en Publishing status = "In production"** (no Testing). External +
 > Testing caduca el refresh token a los 7 días → el archivado moría cada domingo. La cuenta dueña del

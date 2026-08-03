@@ -51,7 +51,20 @@ nunca abrió un run). Los cuatro workflows lo tienen en `settings.errorWorkflow`
 > encontró la segunda vez. Ese re-import además creó un workflow con id NUEVO
 > (`gBcKmzxc4EgXMwzv`); el original quedó inactivo y conviene archivarlo.
 
-## Si hay que volver a importarlo
+## Operación — cómo se cambia este workflow
+
+**Cambiarlo ya no es re-importarlo** ([ADR-053](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)):
+un cambio de `parameters` —la URL del PATCH, el filtro— se parchea por la API, sin tocar el editor y
+sin que cambie el id del workflow (que es lo que rompe los bindings):
+
+```bash
+cd core/scripts && npm run n8n:push -- errores --nodos "Marcar run como fallo"
+```
+
+Dry-run; `--apply` escribe, `npm run n8n:restore -- errores <snapshot> --apply` revierte. El
+**re-import completo queda solo para topología**, y ahí aplica todo lo de abajo.
+
+## Si hay que volver a importarlo *(solo por topología)*
 
 ⚠️ **El orden importa.** Busca por `params.execution_id`, así que los tres `Abrir run` tienen que
 estar escribiéndolo antes (ya lo hacen). Placeholder único: `<<SUPABASE_URL>>`. Credencial:

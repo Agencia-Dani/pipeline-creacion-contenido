@@ -36,12 +36,32 @@ funcionando. ADR-006 lo autorizó explícitamente como C9.
    y los tres son el mismo pipeline `short-form-content`; se distinguen por `params.workflow` en
    `runs`. Por eso `?workflow=` lleva el slug del pipeline, no el del sub-workflow.
 
-## Placeholders del re-import
+## Operación — cómo se cambia este workflow
+
+**Cambiarlo ya no es re-importarlo** ([ADR-053](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)):
+un cambio de `parameters` —los crons del `Config`, el `?workflow=` de la fachada— se parchea por la API:
+
+```bash
+cd core/scripts && npm run n8n:push -- dispatcher --nodos "Config"
+```
+
+Dry-run; `--apply` escribe y `npm run n8n:restore -- dispatcher <snapshot> --apply` revierte.
+`npm run n8n:diff` (solo lee) verifica que el live corra lo que dice el repo. El **re-import completo
+queda solo para topología** (nodos o conexiones nuevos) — el push los detecta y se niega.
+
+## Placeholders *(solo al re-importar por topología)*
+
+En el camino normal se resuelven solos: `n8n-sync` los **aprende del propio live**.
 
 `<<DASHBOARD_URL>>` · `<<WEBHOOK_URL_MOTOR>>` · `<<WEBHOOK_URL_ARCHIVADO>>`
 
 Los dos últimos son las **URLs completas** de los webhooks de producción (no los paths). Más las
-dos credenciales `httpHeaderAuth` del runbook del [manifest](./workflow.yaml).
+dos credenciales `httpHeaderAuth` del runbook del [manifest](./workflow.yaml): `Run Plan Header` en
+*Leer instancias (fachada)* y `Webhook Motor Header` en *Disparar por instancia* — **esta última es la
+que falló** en el re-import del 03/08, por elegir mal en el desplegable.
+
+> ⚠️ Un `<<…>>` sin resolver no falla en rojo: no es sintaxis de expresión de n8n, se manda literal y
+> el request muere en verde si el nodo va con `onError: continue`. `n8n:diff` después de cada import.
 
 > ⚠️ **Antes de activarlo, apagar los crons viejos.** El motor y el archivado ya no los tienen en
 > el repo, pero la instancia de n8n conserva lo que se importó: si quedó una copia vieja activa, el

@@ -33,20 +33,29 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–019; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-03 hay **17 aplicadas** en prod: la `016` (multi-tenant) y la `017` (su cierre,
-  después del re-import de la Fase 4) entraron el 02–03/08. La **`018`/`019` (membresías, ADR-051/052)
-  están escritas y NO aplicadas**: viven solo en la rama `refactor/membresias`, sin mergear. ⚠️ La `018`
-  mueve el acceso de `usuarios.client_id` a `usuarios_clientes` — si no backfillea las 5 filas de
-  `app.usuarios`, los 5 usuarios pierden el cockpit el día del deploy (Jero incluido).
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–020; se aplican a mano en el SQL Editor,
+  en orden). Al 2026-08-03, **medido contra prod por PostgREST**, hay **18 aplicadas**: la `016`
+  (multi-tenant), la `017` (su cierre) y la **`018` (membresías, ADR-051)** entraron el 02–03/08.
+  ⚠️ **Prod está en la ventana del expand:** `app.usuarios_clientes` ya existe y tiene sus 5 filas,
+  **y `usuarios.rol`/`usuarios.client_id` siguen vivas** — o sea que la columna vieja es hoy una copia
+  congelada que nada mantiene. La **`019` (cierre de membresías) y la `020` (pipeline LinkedIn) están
+  escritas y NO aplicadas**, y el código que consume la `018` vive solo en `refactor/membresias`,
+  **sin mergear**. El orden para cerrar todo eso es el runbook de [handoff §Pendiente vivo](docs/agents/handoff.md).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
 
-**Por workflow**
+**Por workflow** — los 5 que corren en n8n. Cada doc abre con **§Operación**, y los 5 dicen lo mismo
+porque es una sola regla (ADR-053): **cambiar un workflow es `n8n:push`, no re-importarlo**; el
+re-import queda solo para topología, y solo ahí aplican sus placeholders y credenciales.
 - [Workflows/workflow-short-form-content/CLAUDE.md](Workflows/workflow-short-form-content/CLAUDE.md) — el motor de reels (qué es, orden). Fuente de verdad: su `workflow.json`.
 - [Workflows/workflow-descubrimiento-referentes/README.md](Workflows/workflow-descubrimiento-referentes/README.md) — el descubrimiento de referentes (ADR-020): propone cuentas nuevas cada semana, el equipo aprueba, se siembran solas.
+- [Workflows/workflow-archivado/README.md](Workflows/workflow-archivado/README.md) — el archivado: manda los calificados a `outputs` y al Sheet Histórico, destila criterios (ADR-022) y barre. 🔴 El Sheet es **uno solo y global** (plan-multi-tenant §14.4).
+- [Workflows/workflow-dispatcher/README.md](Workflows/workflow-dispatcher/README.md) — el que convierte **un** workflow parametrizado en **N corridas aisladas**, una por instancia (ADR-050). Los dos crons del sistema viven acá.
 - [Workflows/workflow-registro-fallos/README.md](Workflows/workflow-registro-fallos/README.md) — el error handler global: marca como `fallo` el run de la ejecución que se cayó, encontrado por `params.execution_id` (ADR-054). Activo y verificado end-to-end; lo apuntan los 4 workflows. Se rompió **dos veces** por un `<<SUPABASE_URL>>` sin resolver que `onError: continue` silenciaba: por eso `npm run n8n:diff` va después de cada import.
+
+*(`workflow-linkedin/` y `workflow-substack/` son pipelines del repo que todavía **no** corren en n8n:
+LinkedIn nace con la `020` sin aplicar, ADR-055.)*
 
 ## Agent skills
 
@@ -81,8 +90,8 @@ módulos), `/handoff` (compactar una sesión).
   `npm test` (dominio con `node:test`, corre los `.ts` directo en Node 26). Si tocaste rutas o
   auth, además `npm run build`. Cómo correrlo y sus pasos manuales:
   [apps/dashboard/README.md](apps/dashboard/README.md).
-- **¿el live corre lo que dice el repo?** `cd core/scripts && npm run n8n:diff` — compara los 4
-  workflows contra n8n por la API (ADR-053). Clasifica cada campo, así que solo grita lo accionable:
+- **¿el live corre lo que dice el repo?** `cd core/scripts && npm run n8n:diff` — compara los **5**
+  workflows (los 4 del pipeline + el error handler) contra n8n por la API (ADR-053). Clasifica cada campo, así que solo grita lo accionable:
   **drift** (los dos lados tienen valor y difieren), **topología**, **orden de ramas** y placeholders
   que no pudo aprender. Lo benigno (defaults que n8n borra, campos que agrega, resourceLocators de
   Apify) va a un contador; `-- --todo` los lista. Solo lee. **Corrélo antes de tocar un workflow.json
@@ -116,7 +125,8 @@ módulos), `/handoff` (compactar una sesión).
   nodos caros (`Transcribir`, `Traducir`) fuera de n8n, con `$` y `this.helpers` mockeados: N por
   proyecto, gate por `Voces.activo`, orden dedup→corte, piso, **concurrencia real en vuelo del pool y
   el corte del presupuesto** (ADR-044), y las regresiones que ya nos mordieron. **Corrélo antes de
-  re-importar** si tocaste esos nodos. Sin dependencias: es node pelado.
+  empujar al live** (`n8n:push`, o el re-import si es topología) si tocaste esos nodos. Sin
+  dependencias: es node pelado.
 - **Typecheck / lint:** no hay — los scripts son ESM `.mjs` plano, sin TS ni linter.
 - **Run:** el motor **corre en n8n**, no localmente: se importa el `workflow.json` (una instancia,
   editada a mano en el nodo `Config`) y se dispara con *Execute Workflow* (manual) o el cron semanal.

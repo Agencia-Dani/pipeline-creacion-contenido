@@ -86,12 +86,38 @@ ADR-009); el "link" es la URL del video original.
   el objeto (ahí hay que listarlo explícito).
 - **`pinData` debe quedar `{}`** (data fija mata el scrape real).
 
-## Convención de placeholders
+## Operación — cómo se cambia este workflow
 
-Lo que se completa al importar: API keys `<ANTHROPIC_API_KEY>` / `<SUPADATA_API_KEY>` (en los Code
-nodes), e IDs `<<SUPABASE_URL>>` / `<<DASHBOARD_URL>>` / `<<WEBHOOK_PATH_MOTOR>>` (en el nodo
-`Config`). **`<<AIRTABLE_BASE_ID>>` murió en D7 y `<<INSTANCE_ID>>` en la Fase 4** — la instancia
-ya no es una constante del archivo, viaja en el payload del webhook (ADR-048). Son **5**, no 6.
+**Cambiarlo ya no es re-importarlo** ([ADR-053](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)):
+el repo es la **forma**, el live es el **estado**. Un cambio de `parameters` (un `jsCode`, una URL, un
+valor del `Config`) se parchea por la API de n8n:
+
+```bash
+cd core/scripts && npm run n8n:push -- motor --nodos "Armar plan de corrida,Heat-score v1"
+```
+
+Es **dry-run**; se aplica con `--apply`. Snapshotea antes en `.n8n-snapshots/` y el rollback es
+`npm run n8n:restore -- motor <snapshot> --apply`. Jamás toca credenciales, ids, posiciones ni
+`settings`. Antes y después: `npm run n8n:diff` (solo lee) dice si el live corre lo que dice el repo.
+
+**El re-import completo queda solo para cambios de topología** (nodos o conexiones nuevos) — el push
+los detecta y se niega. Ahí sí hay que rellenar los placeholders y mapear las credenciales a mano, que
+es donde históricamente se rompió todo: ver el aviso de abajo.
+
+## Convención de placeholders *(solo aplican al re-import de topología)*
+
+Los completa una persona en el editor **cuando hay re-import**; en el camino normal (`n8n:push`) se
+resuelven solos porque el script los **aprende del propio live**. API keys `<ANTHROPIC_API_KEY>` /
+`<SUPADATA_API_KEY>` (en los Code nodes), e IDs `<<SUPABASE_URL>>` / `<<DASHBOARD_URL>>` /
+`<<WEBHOOK_PATH_MOTOR>>` (en el nodo `Config`). **`<<AIRTABLE_BASE_ID>>` murió en D7 y
+`<<INSTANCE_ID>>` en la Fase 4** — la instancia ya no es una constante del archivo, viaja en el
+payload del webhook (ADR-048). Son **5**, no 6.
+
+> ⚠️ **Un placeholder sin resolver no falla en rojo.** `<<…>>` no es sintaxis de expresión de n8n:
+> se manda literal, el request muere, y si el nodo va con `onError: continueRegularOutput` la
+> ejecución **termina en verde igual**. Rompió el error handler dos veces y las dos las encontró un
+> diff, nunca una corrida. Por eso `npm run n8n:diff` va **después de cada import**.
+
 Listarlos:
 
 ```sh
@@ -105,11 +131,12 @@ node -e "const s=require('fs').readFileSync('workflow.json','utf8');console.log(
 `Heat-score`, `Gate`, `Preparar procesados` y los dos `Preparar` que escriben el cockpit
 —`candidatos` y `descartes`, donde vive la instancia de cada fila— fuera de n8n con `$` y `this.helpers` mockeados — el
 mock cuenta llamadas **y concurrencia en vuelo**, así que un pool que se serializa sin querer se ve
-acá; corrélo SIEMPRE antes de re-importar si tocaste esos nodos). Si tocaste **conexiones, posiciones o cualquier `$('X')`**, corré
+acá; corrélo SIEMPRE antes de empujar al live si tocaste esos nodos). Si tocaste **conexiones, posiciones o cualquier `$('X')`**, corré
 además `node ../auditar-workflows.mjs`: chequea conexiones rotas, inalcanzables, refs a no-ancestros,
 que los `jsCode` compilen **como AsyncFunction** (un `new Function()` pelado da falsos positivos por
 los `await` de nivel superior) y te lista los placeholders del re-import. La conducta final igual se
-valida por **re-import + Execute** (el motor corre en n8n).
+valida **en n8n** (el motor corre ahí, no localmente): `npm run n8n:push -- motor --nodos "…" --apply`
+y *Execute Workflow*, con `npm run n8n:diff` limpio después.
 
 ## Git
 
