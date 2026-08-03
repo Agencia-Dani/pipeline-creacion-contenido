@@ -99,7 +99,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { instance_id: $('Config').first().json.instance_id, trigger_type: $('Disparo por instancia (webhook)').isExecuted ? 'on_demand' : 'manual', estado: 'en_curso', params: { workflow: 'archivado' } } }}",
+        "jsonBody": "={{ { instance_id: $('Config').first().json.instance_id, trigger_type: $('Disparo por instancia (webhook)').isExecuted ? 'on_demand' : 'manual', estado: 'en_curso', params: { workflow: 'archivado', execution_id: $execution.id } } }}",
         "options": {
           "timeout": 20000
         }
@@ -115,7 +115,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -156,7 +156,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -189,7 +189,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -288,7 +288,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -407,7 +407,7 @@
       "waitBetweenTries": 2000,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -444,7 +444,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "executeOnce": true
@@ -484,7 +484,7 @@
       },
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -542,7 +542,7 @@
       },
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },

@@ -1,0 +1,101 @@
+{
+  "name": "Registro — Error Workflow (fallos → Supabase)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9be0f6ca-476f-431b-9ff1-9222024c6e89",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload del Error Trigger → la llave del run que se cayó (ADR-054).\n// La llave es la EJECUCIÓN, no la instancia: instance_id identifica al tenant, y motor,\n// archivado y descubrimiento comparten instancia, así que no distingue cuál corrida murió.\n// `execution.id` acá es el mismo string que el workflow caído grabó en params.execution_id al\n// abrir su run (verificado contra la instancia, ADR-054 §contexto).\nconst ex = $json.execution || {};\nconst wf = $json.workflow || {};\nconst msg = (ex.error && ex.error.message) ? ex.error.message : 'sin mensaje';\nconst nodo = ex.lastNodeExecuted || '?';\nreturn [{ json: {\n  execution_id: String(ex.id || ''),\n  error_msg: '[' + (wf.name || 'workflow desconocido') + '] ' + msg + ' · nodo: ' + nodo + (ex.url ? ' · ' + ex.url : '')\n}}];\n"
+      },
+      "id": "fa4a4715-f03f-4e13-b54e-1971fa1ad2d4",
+      "name": "Preparar datos del fallo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=<<SUPABASE_URL>>/rest/v1/runs?params->>execution_id=eq.{{ $json.execution_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"estado\": \"fallo\", \"fin\": \"{{ $now.toISO() }}\", \"error\": {{ JSON.stringify($json.error_msg) }} }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "ac800511-38b5-4550-ae88-f406a3424056",
+      "name": "Marcar run como fallo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase account"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Preparar datos del fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar datos del fallo": {
+      "main": [
+        [
+          {
+            "node": "Marcar run como fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "pinData": {},
+  "active": false
+}

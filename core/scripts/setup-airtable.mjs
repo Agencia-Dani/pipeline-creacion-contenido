@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// 🧊 HISTÓRICO — NO CORRE, Y ESTÁ BIEN ASÍ (2026-08-03).
+// Airtable salió del sistema en D7 (ADR-035) y el 2026-08-03 se podaron AIRTABLE_PAT /
+// AIRTABLE_BASE_ID / AIRTABLE_WORKSPACE_ID del `.env` y se revocó el PAT. Este script no tiene
+// credencial: si lo corrés, falla por eso y no porque esté roto. Se conserva como el registro de
+// cómo se construyó el cockpit de D0. El modelo de datos de esa era está congelado en
+// core/contracts/airtable-cockpit.md; lo vivo es core/schema/ + apps/dashboard/.
+//
 // setup-airtable.mjs — crea el cockpit del equipo de redes en Airtable de un solo comando.
 // Modelo: core/contracts/airtable-cockpit.md (ADR-008). Requiere Node 18+ (fetch global).
 //

@@ -25,7 +25,7 @@ en §Agent skills; acá solo se ubican.
   que reemplaza a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–045, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–054, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -33,10 +33,12 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–017; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-02 hay **15 aplicadas** en prod: la `016` (multi-tenant) y la `017` (su cierre)
-  están escritas y verificadas contra un Postgres real, pero **no aplicadas** — y la `017` no se puede
-  correr hasta después del re-import de la Fase 4 (su cabecera explica por qué).
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–019; se aplican a mano en el SQL Editor,
+  en orden). Al 2026-08-03 hay **17 aplicadas** en prod: la `016` (multi-tenant) y la `017` (su cierre,
+  después del re-import de la Fase 4) entraron el 02–03/08. La **`018`/`019` (membresías, ADR-051/052)
+  están escritas y NO aplicadas**: viven solo en la rama `refactor/membresias`, sin mergear. ⚠️ La `018`
+  mueve el acceso de `usuarios.client_id` a `usuarios_clientes` — si no backfillea las 5 filas de
+  `app.usuarios`, los 5 usuarios pierden el cockpit el día del deploy (Jero incluido).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
@@ -44,6 +46,7 @@ en §Agent skills; acá solo se ubican.
 **Por workflow**
 - [Workflows/workflow-short-form-content/CLAUDE.md](Workflows/workflow-short-form-content/CLAUDE.md) — el motor de reels (qué es, orden). Fuente de verdad: su `workflow.json`.
 - [Workflows/workflow-descubrimiento-referentes/README.md](Workflows/workflow-descubrimiento-referentes/README.md) — el descubrimiento de referentes (ADR-020): propone cuentas nuevas cada semana, el equipo aprueba, se siembran solas.
+- [Workflows/workflow-registro-fallos/README.md](Workflows/workflow-registro-fallos/README.md) — el error handler global: marca como `fallo` el run de la ejecución que se cayó, encontrado por `params.execution_id` (ADR-054). Activo y verificado end-to-end; lo apuntan los 4 workflows. Se rompió **dos veces** por un `<<SUPABASE_URL>>` sin resolver que `onError: continue` silenciaba: por eso `npm run n8n:diff` va después de cada import.
 
 ## Agent skills
 
@@ -58,7 +61,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..045).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..054).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del
@@ -78,6 +81,31 @@ módulos), `/handoff` (compactar una sesión).
   `npm test` (dominio con `node:test`, corre los `.ts` directo en Node 26). Si tocaste rutas o
   auth, además `npm run build`. Cómo correrlo y sus pasos manuales:
   [apps/dashboard/README.md](apps/dashboard/README.md).
+- **¿el live corre lo que dice el repo?** `cd core/scripts && npm run n8n:diff` — compara los 4
+  workflows contra n8n por la API (ADR-053). Clasifica cada campo, así que solo grita lo accionable:
+  **drift** (los dos lados tienen valor y difieren), **topología**, **orden de ramas** y placeholders
+  que no pudo aprender. Lo benigno (defaults que n8n borra, campos que agrega, resourceLocators de
+  Apify) va a un contador; `-- --todo` los lista. Solo lee. **Corrélo antes de tocar un workflow.json
+  y después de cualquier cambio en n8n.**
+- **Aplicar un cambio del repo al live:** `npm run n8n:push -- <alias> --nodos "Nodo A,Nodo B"` —
+  dry-run; agregá `--apply` para escribir. Toma el live como base y le pone los `parameters` del repo
+  con los placeholders resueltos; jamás toca credenciales, ids, posiciones ni `settings`. Snapshotea
+  antes (`.n8n-snapshots/`, gitignored) y verifica contra la instancia después; el rollback es
+  `npm run n8n:restore -- <alias> <snapshot> --apply`. Alias: `motor · descubrimiento · dispatcher ·
+  archivado · errores`. **Cambios de topología (nodos o conexiones nuevas) siguen siendo re-import
+  completo: el push los detecta y se niega.** Su test: `npm run n8n:test` (⚠️ crea y borra un
+  workflow desechable e inactivo en n8n; corrélo si tocaste `n8n-sync.mjs`).
+  🟡 *La topología es el **único ritual manual que queda**, y ya no por un límite de la API:
+  `GET /credentials` existe y responde, así que el mapa nombre→id se puede aprender igual que los
+  placeholders. Falta decidir la red de seguridad (`nodes` **reemplaza**: un push que crea nodos
+  también puede borrarlos). Escrito para retomarlo en
+  [plan-multi-tenant §14.2](docs/agents/plan-multi-tenant.md).*
+- **Arreglar el orden de ejecución de las ramas:** `npm run n8n:orden -- <alias> [--apply]`. En n8n
+  v1 las hermanas corren por posición en el canvas (Y menor primero, desempata X — **medido**, no
+  asumido), así que arrastrar un nodo cambia la semántica sin tocar código. El comando permuta las
+  posiciones que los hermanos **ya ocupan** (cada uno se lleva su cadena exclusiva, así no quedan
+  líneas cruzadas) y aborta si alguna otra ramificación cambiaría de orden de rebote. Es lo que
+  reporta `n8n:diff` como `[orden]`.
 - **Audit estructural de los 3 workflows:** `node Workflows/auditar-workflows.mjs` — conexiones rotas,
   nodos inalcanzables, **`$('X')` que apunte a un nodo que no es ancestro suyo** (la clase de bug que
   dejó el dedup de ADR-029 sin efecto durante 3 corridas: en n8n el orden de las ramas lo decide la
@@ -104,11 +132,15 @@ módulos), `/handoff` (compactar una sesión).
   contraseñas compartido; el validador escanea el patrón `pat...` y otros secretos en cada corrida.
 - **Credenciales para trabajar: `.env` en la raíz** (gitignored, local, no versionado). Es el hub
   único: Supabase, Airtable, el webhook del motor (el botón "Ejecutar"), run-plan, Apify, Anthropic,
-  Supadata, Google Sheets. **Usalo proactivamente** — si necesitás pegarle a un componente del
-  pipeline, cargá `set -a && source .env && set +a` y usá `"$VAR"`, no le pidas la key a Mani.
+  Supadata, Google Sheets y la **API pública de n8n** (`N8N_API_KEY`). **Usalo proactivamente** — si
+  necesitás pegarle a un componente del pipeline, cargá `set -a && source .env && set +a` y usá
+  `"$VAR"`, no le pidas la key a Mani.
   Nunca imprimas un valor en el chat. Si una var está vacía, decílo y seguí con lo que sí se pueda.
   El propio archivo está comentado var por var (de dónde sale, quién la consume, qué rompe).
   ⚠️ `POST "$MOTOR_WEBHOOK_URL"` arranca una corrida real y paga: confirmá antes.
+- **Cambiar un workflow ya no es re-importarlo** (ADR-053): `core/scripts/n8n-sync.mjs` parchea el
+  live por la API de n8n. El live es la base y el repo aporta los `parameters`; los placeholders se
+  resuelven solos porque se **aprenden** del propio live. Ver §Feedback loops.
 - **Commits en español, concisos, directo a `main`** (repo de la agencia).
 - **Docs lean:** un hecho, un dueño. Antes de crear un doc nuevo, mirá si encaja en uno existente
   (README, ROADMAP, PLAN, handoff, ADRs). El histórico vive en git, no en prosa duplicada.

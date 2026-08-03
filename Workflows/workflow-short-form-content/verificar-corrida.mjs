@@ -1,3 +1,9 @@
+// ⚠️ MITAD HISTÓRICO (2026-08-03). Sus chequeos contra Supabase siguen valiendo; los que leen el
+// feed por `api.airtable.com` NO corren: Airtable salió del sistema en D7 (ADR-035) y el 2026-08-03
+// se podaron AIRTABLE_PAT / AIRTABLE_BASE_ID del `.env` y se revocó el PAT. El feed vivo es
+// `app.candidatos`, que se mira desde el cockpit (`/curar/feed`) o por PostgREST. Si vas a
+// resucitar este script, esa es la parte a reescribir — no le devuelvas la credencial.
+//
 // Verificación post-corrida del motor: embudo, dedup, sin-guion y el feed. SOLO LEE.
 //
 //   set -a && source .env && set +a && node Workflows/workflow-short-form-content/verificar-corrida.mjs [n]

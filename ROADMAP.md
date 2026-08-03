@@ -165,7 +165,7 @@ campos ADR-009 + vista "🔥 Seleccionados" · Majo y Jero tienen acceso · A10 
   - **ENTREGAR:** candidatos a Airtable `Candidatos` (estado `nuevo`, con `idioma` + `thumbnail` + `relevancia_score`/`relevancia_razon`, batch 10/call) + registro Supabase (`runs`/`outputs`/`processed_items`, patrón [ingesta-registro](./core/contracts/ingesta-registro.md)). En `outputs.metadata`: proyecto, voz, referente, url_referente, idioma, métricas, heat_score.
 - [ ] **B4.** Credenciales en n8n: Apify (community node), Anthropic, Supadata, Airtable (PAT),
       Supabase Registro (service_role). **Sin Google** (el motor no usa credenciales de Google).
-- [ ] **B5.** Importar [`error-workflow-registro.json`](./core/n8n/README.md), fijarlo como Error Workflow.
+- [x] **B5.** Importar el error workflow ([`Workflows/workflow-registro-fallos/`](./Workflows/workflow-registro-fallos/)), fijarlo como Error Workflow. ✅ activo, y los 4 workflows lo apuntan en `settings.errorWorkflow`.
 
 **Hecho cuando:** una corrida manual de backfill (180 días) deja candidatos en Airtable con
 script en español, `idioma`, `thumbnail` y la razón de relevancia, y su rastro completo en Supabase.

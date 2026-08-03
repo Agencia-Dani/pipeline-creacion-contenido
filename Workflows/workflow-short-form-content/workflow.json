@@ -305,7 +305,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "executeOnce": true,
@@ -334,7 +334,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "executeOnce": true,
@@ -372,7 +372,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "onError": "continueRegularOutput",
@@ -503,7 +503,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -540,7 +540,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "executeOnce": true
@@ -595,7 +595,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       },
       "alwaysOutputData": true
@@ -621,7 +621,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Disparo on-demand (webhook)').isExecuted ? 'on_demand' : ($('Ejecutar manual').isExecuted ? 'manual' : 'cron') }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"motor\" } }",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Disparo on-demand (webhook)').isExecuted ? 'on_demand' : ($('Ejecutar manual').isExecuted ? 'manual' : 'cron') }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"motor\", \"execution_id\": \"{{ $execution.id }}\" } }",
         "options": {
           "timeout": 15000
         }
@@ -637,7 +637,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -697,7 +697,7 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -755,7 +755,7 @@
       },
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },
@@ -816,7 +816,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "name": "Supabase Registro"
+          "name": "Supabase account"
         }
       }
     },

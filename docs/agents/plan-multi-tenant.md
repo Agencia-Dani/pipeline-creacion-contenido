@@ -6,7 +6,35 @@
 >
 > **Cómo leerlo.** §1 es el diagnóstico con evidencia (leelo aunque conozcas el repo — hay cuatro cosas que no están documentadas en ningún otro lado). §2 son las decisiones. §3–§9 son las fases, en orden de ejecución. §10 son los casos de escalabilidad, uno por uno. §11 es cómo se verifica. **Si vas a ejecutar, §12 es el checklist.**
 
-**Estado:** propuesto · **Fecha:** 2026-08-02 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
+**Estado:** **en ejecución — Fases 0–4 en producción** · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-03 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
+
+---
+
+## 0. Estado al 2026-08-03 — medido, no recordado
+
+> **Empezá por acá.** Todo lo de abajo se leyó de la base y de la API de n8n el 2026-08-03, no del
+> handoff. Si vas a retomar el refactor: el checklist con marcas está en **§12** y lo que falta,
+> escrito para ejecutarse sin releer nada, en **§14**.
+
+**La base (PostgREST, prod):** `clients` = **1 fila** (`retia`) · `instances` = **1**
+(`retia`/`reels`, `83abbf60-18ae-4072-a7da-48f04bf39f54`, `active`) · `app.usuarios` = **5**, las 5
+con `client_id = retia` (2 dev, 3 operador; Jero adentro) · **`app.usuarios_clientes` NO existe**
+(`PGRST205`) ⇒ la `018` no está aplicada · voces 3 · proyectos 6 · referentes 16 · candidatos 153 ·
+descartes 28 · eventos 38 · transcripciones 2.
+
+**n8n:** **5 workflows activos** (motor 34 nodos · descubrimiento 22 · dispatcher 8 · archivado 20 ·
+errores 3) y `npm run n8n:diff` da **limpio en los 5**, con 11 placeholders aprendidos del live.
+Ningún workflow tiene cron propio: los dos que hay viven en el dispatcher (motor lunes 8am ·
+archivado domingo 18:00). El descubrimiento **no tiene cron a propósito** — se sacó en `270d107` y
+hoy es un botón del cockpit.
+
+**El repo:** 158 tests + `typecheck` + `build` verdes · `validate` 1897 checks · `auditar-workflows`
+sin hallazgos.
+
+**Aislamiento hoy:** RLS está *enabled* en todas las tablas pero **sin policies** (salvo *"usuario lee
+su propia fila"* de la `007`). Probado con la anon key: `app.candidatos` → **401**, `public.runs` →
+**200 con 0 filas**. O sea: no hay fuga hacia afuera, y **el aislamiento entre empresas es solo la
+Capa 1 (TypeScript)** — ver §14.3.
 
 ---
 
@@ -440,7 +468,7 @@ El pedido fue explícito: *"pensar en todos los casos de escalabilidad posibles 
 | Eje de crecimiento | Qué se rompe primero hoy | Qué hace este plan | Qué queda pendiente |
 |---|---|---|---|
 | **+ pipelines** (LinkedIn, y los que vengan) | El enum `app.plataforma` y `candidatos` modelado como video (§1.6) | Tablas propias por pipeline (D) + el manifest como contrato (§8) | Cada pipeline nuevo duplica pantallas de curación. Si llegan 4+, revisar si conviene un componente de feed genérico |
-| **+ empresas** | Los 5 uniques globales (§1.3) y la ausencia de tenant en `app` | `client_id`/`instance_id` + Capa 1 + Capa 2 | — |
+| **+ empresas** | Los 5 uniques globales (§1.3) y la ausencia de tenant en `app` | `client_id`/`instance_id` + Capa 1 + Capa 2 | 🔴 **El Google Sheet del histórico es UNO SOLO** — el archivado lo tiene como constante del nodo `Config`, no por instancia: los aprobados de la empresa B se appendean al Sheet de Retia. **§14.4** |
 | **+ sub-clientes** (los clientes de Retia) | Nada — hoy es imposible | `clients.parent_id`: el segundo nivel es **una fila** | La UI del selector con dos niveles; la visibilidad ya queda resuelta en `domain/tenant.ts` |
 | **+ instancias del mismo pipeline por empresa** | `unique (workflow_id, client_id)` lo prohíbe | Se reemplaza por `(workflow_id, client_id, slug)` (§4.1) | — |
 | **+ usuarios** | El alta es **manual en dos pasos** (invite en Supabase + `insert` a mano en el SQL Editor, documentado en [`007`](../../core/schema/007_app_usuarios.sql)) | Nada. **Sigue manual a propósito** | 🔶 **Con 3 empresas × varias personas esto se vuelve fricción real.** Una pantalla de alta scopeada por tenant es candidata a fase propia — no bloquea, pero se va a sentir |
@@ -503,17 +531,22 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 
 ## 12. Orden de ejecución (el checklist)
 
-| # | Fase | Bloquea a | Toca prod |
-|---|---|---|---|
-| 1 | **Fase 0** — los 5 ADRs | todo lo demás (`core/` solo cambia con ADR) | no |
-| 2 | 🧹 Limpiar el `@casper_smc` duplicado | la `016` (`not null`) | sí, un `delete` |
-| 3 | **Fase 1** — `016_multi_tenant.sql` | Fases 2 y 4 | sí |
-| 4 | **Fase 2** — Capa 1 (tipos + `scoped.ts` + `lib/`) | Fase 3 | no (deploy sin cambio de comportamiento) |
-| 5 | **Fase 3** — rutas `[cliente]/[pipeline]` | el segundo cockpit | sí (URLs cambian) |
-| 6 | **Fase 4** — `run-plan` v2 + motor + dispatcher | el segundo tenant corriendo | sí, **re-import** |
-| 7 | 🔴 **Paginación del feed** (§10) | el segundo tenant con volumen | no |
-| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí |
-| 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) |
+| # | Fase | Bloquea a | Toca prod | **Estado (2026-08-03)** |
+|---|---|---|---|---|
+| 1 | **Fase 0** — los 5 ADRs | todo lo demás (`core/` solo cambia con ADR) | no | ✅ ADR-046..050 escritos (+051/052) |
+| 2 | 🧹 Limpiar el `@casper_smc` duplicado | la `016` (`not null`) | sí, un `delete` | ✅ hecho |
+| 3 | **Fase 1** — `016_multi_tenant.sql` | Fases 2 y 4 | sí | ✅ **`016` y `017` aplicadas y verificadas** |
+| 4 | **Fase 2** — Capa 1 (tipos + `scoped.ts` + `lib/`) | Fase 3 | no (deploy sin cambio de comportamiento) | ✅ en prod |
+| 5 | **Fase 3** — rutas `[cliente]/[pipeline]` | el segundo cockpit | sí (URLs cambian) | ✅ en prod · el 404 de la base y los bookmarks viejos, cerrados (cierre 89) |
+| 6 | **Fase 4** — `run-plan` v2 + motor + dispatcher | el segundo tenant corriendo | sí, **re-import** | ✅ en prod · corrida de verificación `ok` |
+| — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ⛔ **escrito, SIN mergear y SIN aplicar** → **§14.1** |
+| 7 | 🔴 **Paginación del feed** (§10) | el segundo tenant con volumen | no | ⬜ no empezada |
+| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | ⬜ no empezada → **§14.3** |
+| 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | ⬜ no empezada |
+
+> ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
+> que la secuencia real es **`018`/`019` → Capa 2 (RLS) → paginación → LinkedIn**. La fila sin número
+> va donde va porque bloquea a la #8, no porque sea una fase nueva.
 
 **La Fase 5 va al final a propósito:** LinkedIn es el N+1 que *valida* el refactor, no el que lo motiva. Construirlo antes de que la base sea multi-tenant es construir el sexto problema encima de los cinco que ya hay.
 
@@ -527,3 +560,133 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 - **No se migra a VPS** ([ADR-005](../adr/ADR-005-hosting-n8n-managed-fase1.md) fase 2) hasta que haya un disparador **medido**, no anticipado.
 - **No se automatiza el alta de usuarios.** Sigue manual (§10). Se anota como fricción conocida, no como bloqueante.
 - **No se rediseña la UI.** El pedido permite cambiar UI/UX si está fundamentado; acá lo único fundamentado es el **selector de empresa/pipeline** y la **paginación del feed**. Todo lo demás se queda.
+
+---
+
+## 14. Pendientes abiertos — escritos para retomarlos sin releer nada
+
+> **Qué es esta sección.** Con las Fases 0–4 en producción, lo que falta ya no es "las fases que
+> siguen": son cuatro cosas concretas, tres de ellas encontradas midiendo el sistema el 2026-08-03 y
+> **no anotadas en ningún otro lado hasta ahora**. Cada una tiene la misma forma — *qué es · la
+> evidencia · qué lo destraba · hecho cuando* — para que una sesión nueva la tome y la ejecute.
+>
+> **Ninguna bloquea a Retia hoy.** Las tres estructurales muerden recién con la segunda empresa. Eso
+> es exactamente por qué conviene cerrarlas antes de que exista, y no después.
+
+### 14.1 ⛔ La `018`/`019` está escrita y no está en ninguna parte
+
+**Qué.** [ADR-051](../adr/ADR-051-el-acceso-es-membresia-explicita.md) (el acceso pasa de
+`usuarios.client_id` a `app.usuarios_clientes`, con el rol adentro) y
+[ADR-052](../adr/ADR-052-el-sponsor-externo-no-ve-el-costo-del-proveedor.md) (el `sponsor` no ve
+costos) están **implementados**, en un solo commit: `3f2d43f`, en `origin/refactor/membresias`.
+Nunca se mergeó.
+
+**Evidencia.** `app.usuarios_clientes` no existe en prod (PostgREST devuelve `PGRST205`). El
+merge-base de la rama con `main` es `7118171`, **anterior al merge de las Fases 0–4**: le faltan 4
+commits (`b1b8212`, `66bd25e`, `e5c6668`, `ab6f480`). El commit toca `domain/tenant.ts`,
+`lib/auth.ts`, `lib/tenant.ts`, `lib/supabase/scoped.ts`, 4 páginas, y trae
+`core/schema/018_membresias.sql` (133 líneas) + `019_membresias_cierre.sql` (69).
+
+> 🚨 **El riesgo, dicho como riesgo.** La `018` mueve el acceso **de columna a tabla**. Si no
+> backfillea las **5 filas** de `app.usuarios` —las 5 con `client_id = retia`, **Jero incluido**—
+> los cinco pierden el cockpit el día del deploy. El backfill va en la **misma transacción** que el
+> `create table`, no en un paso después.
+
+**Qué lo destraba.** Mergear `main` **hacia la rama** (no al revés: `main` tiene el fix del 404 de la
+Fase 3, y la rama lo borraría si se mergea al revés sin cuidado) → `typecheck` + `npm test` +
+`npm run build` → aplicar `018` y `019` en el SQL Editor → **verificar antes de que Vercel deploye**:
+`select count(*) from app.usuarios_clientes;` tiene que dar **5**.
+
+**Hecho cuando.** Los 5 usuarios entran al cockpit con la `018` aplicada, **probado con la cuenta de
+Jero**, no con una de dev.
+
+### 14.2 🟡 `n8n:push` no cubre topología — y la razón que da ADR-053 para eso ya no es cierta
+
+**Qué.** Desde [ADR-053](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md), cambiar un
+`jsCode` cuesta un comando. Agregar **un nodo** sigue costando el re-import completo, que es donde se
+pierden las credenciales (dos intentos fallidos el 03/08, los dos por elegir mal en un desplegable) y
+donde vuelven los placeholders a mano.
+
+**Evidencia (medida contra la instancia, API pública v1.1.1).** ADR-053 descarta empujar nodos nuevos
+porque *"el repo guarda `<<CREDENCIAL_GOOGLE_SHEETS>>`, un nombre sin id"*. Pero
+**`GET /api/v1/credentials` existe y responde 200**, con las 12 credenciales y su `{id, name, type}`:
+el mapa nombre→id se puede **aprender de la instancia**, igual que se aprenden los placeholders y por
+la misma razón (una tabla a mano sería una segunda verdad). Y los nombres del repo **ya coinciden**
+con los reales desde el arreglo del 03/08: `Supabase account` ×26 · `Run Plan Header` ×4 ·
+`Webhook Motor Header` ×3 · `Webhook Descubrimiento Header` ×1. El único que sigue siendo placeholder
+es `<<CREDENCIAL_GOOGLE_SHEETS>>`, y se aprende del live como cualquier otro.
+
+La instancia además expone, sin usar: `POST /workflows` (crear), `/activate`, `/deactivate`,
+`/archive`, `GET /executions` (diagnosticar una corrida sin abrir el editor),
+`GET /workflows/{id}/{versionId}`. **`/variables` y `/projects` dan 403 por licencia**, así que no son
+opción para config por tenant — vale saberlo antes de diseñar sobre ellos.
+
+**Qué lo destraba.** Es **enmienda de ADR-053, no un ADR nuevo**: un mapa nombre→id aprendido de la
+instancia en `core/scripts/n8n-sync.mjs`, con la misma regla que los placeholders (aprendido, nunca
+mapeado a mano) y fail-closed si un nombre no resuelve. **La pregunta abierta no es técnica sino de
+red de seguridad:** `nodes` **reemplaza**, así que un push que crea nodos también puede borrarlos.
+Hay que decidir si `--nodos` pasa a ser obligatorio y si un delta que **borra** exige confirmación
+humana explícita.
+
+**Hecho cuando.** Un nodo nuevo entra a un workflow **activo** con `npm run n8n:push -- <alias>
+--apply`, `n8n:diff` queda limpio después, y `n8n:restore` lo saca.
+
+### 14.3 🔴 El aislamiento entre empresas hoy es solo TypeScript
+
+**Qué.** La Fase 6 (Capa 2, RLS) no está empezada. El BFF lee **todo** con `service_role`, que
+bypassa RLS.
+
+**Evidencia.** RLS está *enabled* en todas las tablas de `public` y de `app`, pero **sin una sola
+policy** salvo *"usuario lee su propia fila"* de la [`007`](../../core/schema/007_app_usuarios.sql).
+Probado con la anon key contra prod: `app.candidatos` → **401** (`permission denied for schema app`),
+`public.runs` → **200 con 0 filas**. O sea: **no hay fuga hacia afuera hoy**, y por eso esto no es una
+emergencia. Pero adentro del BFF, un `.eq(instance_id)` olvidado no lo atrapa nada más que la Capa 1 —
+que es tipos, o sea disciplina de compilación, no una barrera de la base.
+
+**Qué lo destraba.** §9 de este plan. La parte cara ya está medida y hay que saberla **antes** de
+empezar: la [`011`](../../core/schema/011_grants_app_service_role.sql) existe porque `service_role`
+tiene BYPASSRLS pero eso **no** otorga USAGE sobre el schema — volver a leer con `authenticated`
+sobre `app` necesita sus propios grants **y** sus policies. Es la fase con más riesgo de romper lo
+que funciona.
+
+**Disparador (ya escrito en [ADR-047](../adr/ADR-047-aislamiento-en-dos-capas.md)).** Entra **antes**
+de que un segundo cliente real tenga usuarios en producción. No antes, no después. **Se prueba con la
+cuenta de Jero**, que es la que se puede perder.
+
+### 14.4 🔴 El Google Sheet del histórico es uno solo y global
+
+**Qué.** El archivado appendea los aprobados de la semana a un Google Sheet. `instance_id` **sí**
+viaja por el body del webhook y se usa para todo lo demás — pero `sheet_id` y `sheet_tab` son
+**constantes del nodo `Config`**. Con **un solo** workflow de archivado sirviendo a todas las
+instancias, el día que exista una segunda empresa **sus aprobados se appendean al Sheet de Retia**.
+
+**Evidencia.** Nodo `Append al Sheet Histórico` →
+`documentId = {{ $('Config').first().json.sheet_id }}`, y en `Config` ese valor es el literal
+`1Ngzjjsw2sMU-y6NienN-YHxro6o8BcOzmszZH9C3Av4` con `sheet_tab = Historico`. Comparalo con la línea de
+al lado, `instance_id`, que **sí** es una expresión que lee el body: la parametrización se hizo para
+el tenant y se saltó el Sheet. No está anotado en ningún ADR ni en este plan — el único hit de
+"sheet" en `docs/` está en `dev-doc.md` y es descriptivo.
+
+**Qué lo destraba.** La regla ya está escrita, y es de
+[ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md): *n8n lee su config por la fachada.*
+`sheet_id`/`sheet_tab` son config por instancia, así que van a `run-plan` (`?ambito=archivado`),
+leyéndose de `app.ajustes` o de una columna de `instances`. **Toca
+[`core/contracts/run-plan.md`](../../core/contracts/run-plan.md) ⇒ necesita ADR** (`core/` solo cambia
+con ADR). Después es un `npm run n8n:push -- archivado --nodos "Config"`: son `parameters`, **no** es
+re-import.
+
+**Hecho cuando.** Dos instancias archivan la misma semana y cada una escribe en su propio Sheet,
+verificado abriendo los dos.
+
+### 14.5 🟠 Dos cosas menores, anotadas para que no sorprendan
+
+- **Knobs globales entre tenants.** `presupuesto_transcribir_s`, `concurrencia_transcribir`,
+  `presupuesto_traducir_s`, `concurrencia_traducir`, `piso_referente`, `cap_descartes` y
+  `cap_resultados_referente` viven **solo** en el `Config` del motor y **no están en `AJUSTE_MAP`**,
+  así que `app.ajustes` no los pisa por instancia. Para los de concurrencia y presupuesto está bien:
+  son del pod de n8n, compartido por definición. `piso_referente` y `cap_descartes` son **producto** y
+  deberían ser por instancia.
+- **Una sola cuenta de Apify / Supadata / Anthropic para todas las empresas.** El **costo** por
+  empresa se puede atribuir sin trabajo nuevo (`runs.costo_estimado` ya cuelga de `instance_id`); el
+  **cupo** no. Una empresa le puede quemar la cuota a otra y nada avisa. El techo por instancia sigue
+  en §10 como pendiente.
