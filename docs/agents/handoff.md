@@ -22,21 +22,29 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## 🔴 EL RUNBOOK DE HOY (cierre 92): membresías + LinkedIn. **El orden no es negociable.**
+> ## 🔴 EL RUNBOOK ABIERTO (cierre 92 → para Mani): membresías + LinkedIn. **El orden no es negociable.**
 >
-> La rama `refactor/membresias` ya tiene `main` adentro y está verde, y LinkedIn ya es un pipeline
-> del repo. **Lo que falta es SQL a mano y un merge, en este orden exacto.** Los pasos 1 y 2 son los
-> únicos que pueden lastimar a alguien.
+> **Al cerrar el 2026-08-03 los pasos 1 y 2 están HECHOS y verificados contra la base. El siguiente
+> es el 3, y es un merge que ya está desbloqueado.** La rama `refactor/membresias` tiene `main`
+> adentro, está verde y **pusheada** (`43199f1`); LinkedIn ya es un pipeline del repo.
 >
-> | # | Paso | Quién | Por qué va acá y no antes |
+> > ### ⏳ PROD ESTÁ EN LA VENTANA DEL EXPAND, Y ESO TIENE FECHA DE VENCIMIENTO
+> > Hoy conviven la tabla nueva (`app.usuarios_clientes`, poblada) y las columnas viejas
+> > (`usuarios.rol`, `usuarios.client_id`, todavía vivas), y **Vercel sigue sirviendo el código
+> > viejo, que lee las columnas**. Es estable — es exactamente para lo que el expand/contract
+> > existe — pero **desde ahora `usuarios.rol` es una copia congelada**: si alguien cambia un rol,
+> > lo cambia en la membresía y la columna vieja queda vieja, sin que nada avise. Por eso los pasos
+> > 3→5 no se dejan para dentro de dos semanas.
+>
+> | # | Paso | Quién | Estado / por qué va acá |
 > |---|---|---|---|
-> | 1 | Aplicar **`018_membresias.sql`** en el SQL Editor | Alejandro | 🚨 **Va ANTES del merge.** La `018` no borra `usuarios.rol` ni `usuarios.client_id`, así que el código que Vercel sirve hoy sigue andando con ella puesta. Al revés —merge primero— Vercel deploya código que lee `app.usuarios_clientes`, que **no existe**, y **los 5 pierden el cockpit, Jero incluido** |
-> | 2 | Verificar: `select count(*) from app.usuarios_clientes;` → **5** · `select nombre, rol, es_dueno from app.usuarios order by es_dueno desc;` → los 2 `es_dueno` son **Alejandro Dávila y Manuel Mejia** | Alejandro | ✅ **Confirmado con Alejandro el 03/08: el backfill `es_dueno = (rol = 'dev')` ya da los correctos.** No hay que corregir ningún rol. Alejo Carvajal, Manuel 30X y Jero quedan `operador` de Retia |
-> | 3 | Merge de `refactor/membresias` → `main` + push (deploy de Vercel) | Claude | Recién con la tabla puesta |
-> | 4 | Probar el login **con la cuenta de Jero**, no con una de dev | Alejandro | Es la que se puede perder, y es la única prueba que vale. Un dev es `es_dueno` y entra aunque las membresías estén rotas — probar con la propia cuenta **no prueba nada** |
-> | 5 | Aplicar **`019_membresias_cierre.sql`** | Alejandro | Después del deploy verificado. Tiene gate de confirmación humana. Mientras la `019` no corra, `usuarios.rol` es una **copia congelada**: cambiar un rol lo cambia en la membresía y la columna vieja queda vieja |
-> | 6 | Aplicar **`020_pipeline_linkedin.sql`** | Alejandro | Crea las 4 tablas y **registra `linkedin` en `workflows`**. Sin esa fila el paso 7 falla por FK |
-> | 7 | El alta de las empresas y sus cockpits (SQL abajo) | Alejandro | Necesita la `020` corrida |
+> | 1 | Aplicar **`018_membresias.sql`** | Alejandro | ✅ **HECHO el 03/08.** Iba antes del merge: la `018` no borra las columnas viejas, así que el código desplegado sigue andando con ella puesta. Al revés, Vercel habría deployado código que lee una tabla inexistente y **los 5 perdían el cockpit, Jero incluido** |
+> | 2 | Verificar el backfill | Alejandro | ✅ **HECHO y medido contra la base:** `app.usuarios_clientes` = **5 filas, todas `retia`** (2 `dev` + 3 `operador`) · `es_dueno` = **Alejandro Dávila y Manuel Mejia**, los correctos. No hubo que corregir ningún rol |
+> | 3 | **Merge de `refactor/membresias` → `main` + push** (dispara el deploy de Vercel) | **Mani** | 👈 **ACÁ ARRANCA.** Ya es seguro: la tabla está puesta. **No se hizo en la sesión a propósito** — Alejandro la cerró antes, y un deploy no se dispara de salida sin nadie mirando |
+> | 4 | Probar el login **con la cuenta de Jero**, no con una de dev | Mani | La única prueba que vale. Un dev es `es_dueno` y entra **aunque las membresías estén rotas**: probar con la cuenta propia no prueba nada |
+> | 5 | Aplicar **`019_membresias_cierre.sql`** | Mani | Después del deploy verificado. Tiene gate de confirmación humana (hay que descomentar el `insert into _cierre_membresias`). Es la que cierra la ventana del expand |
+> | 6 | Aplicar **`020_pipeline_linkedin.sql`** | Mani | Crea las 4 tablas de LinkedIn y **registra `linkedin` en `workflows`**. Sin esa fila el paso 7 falla por FK |
+> | 7 | El alta de las empresas y sus cockpits (SQL abajo) | Mani | Necesita la `020` corrida |
 >
 > ### El SQL del paso 7 — las dos empresas nuevas y los tres cockpits de LinkedIn
 >
@@ -1086,9 +1094,13 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 
 **🔴 Lo que sigue bloqueado y NO es técnico** (está en ADR-055 §Consecuencias y en el README del workflow, para que no haya que re-derivarlo): no hay **definición de "funcionó"** —lo que hay es *"impresiones y reacciones"*, volumen puro, y construir sobre eso converge en el post motivacional con máximas reacciones y cero clientes—, **no existe el banco de referentes** (*"no tengo el listado"*), y **faltan los few-shot** (3–4 posts perfectos por cuenta, el pedido más barato del proyecto). Por eso **no hay `workflow.json`, y el manifest lo dice**: lo que se construyó es la detección, la curación y el cockpit, que es lo que sí se puede sin esas respuestas.
 
+**✅ Verificado contra un Postgres 16 real, no de palabra:** se corrió **`001→020` completo** en Docker, con el renombre `piloto`→`retia` en el medio, los gates humanos de la `017`/`019` descomentados y **el mismo seed que prod** (5 usuarios, 2 devs). Las 20 pasaron limpias: 5 usuarios → **5 membresías** · `es_dueno` en los dos correctos · la `019` dejó `app.usuarios` en `id, nombre, creado_en, es_dueno` · las 4 tablas de LinkedIn con `instance_id` **not null y sin default** · **`app.plataforma` intacto** (`instagram, tiktok`) · `linkedin` en `workflows`.
+
+**🩸 Y el hallazgo salió de CORRER el SQL del alta, no de leerlo: la membresía es por EMPRESA, no por cockpit.** Un `retia/linkedin` en `active` le habría dado a Jero —y a Alejo, y a Manuel 30X— un cockpit de LinkedIn **vacío, sin motor y sin datos**, más un selector de pipeline que no pidió nadie. Nace `draft`; `estadox` y `30x` quedan `active` porque ahí **no hay ninguna membresía** y los ven solo los dos dueños, así que sirven de banco de pruebas del cockpit sin tocarle la pantalla al equipo. *Es el mismo tipo de cosa que ADR-051 ya dice —"la membresía decide a qué cockpits entrás"— y que igual no se ve hasta que hay dos pipelines.*
+
 **Verde:** `typecheck` 0 · **165 tests** (157 + 8 de `pipelines.test.ts`) · `build` · `validate` **2019 checks / 7 workflows** · `auditar-workflows` sin hallazgos.
-**⚠️ Lo que NO se verificó, dicho como tal:** la **`020` no se corrió contra un Postgres real** — Docker no levantó en toda la sesión. La `018`/`019` sí se habían probado con 001→019 sobre Postgres 16. Y **nada de esto se vio corriendo**: el cockpit de LinkedIn no existe hasta que se apliquen la `020` y el alta.
-**Qué sigue:** el runbook de 7 pasos de §Pendiente vivo. Después: **Capa 2 (RLS)**, que con la segunda empresa dada de alta deja de ser diferible — su disparador escrito en ADR-047 es justamente *"antes de que un segundo cliente real tenga usuarios en producción"*.
+**⚠️ Lo que NO se vio corriendo, dicho como tal:** **ninguna pantalla**. El cockpit de LinkedIn no existe hasta que se apliquen la `020` y el alta, y los dos selectores nuevos no se pueden ver con un solo cliente y un solo pipeline. Lo verificado es compilación, tests, rutas registradas en el build y las migraciones contra Postgres — **no el navegador**. La prueba de pantalla es el paso 4 del runbook, y va con la cuenta de Jero.
+**Qué sigue:** el runbook de §Pendiente vivo, que arranca en el **paso 3** (el merge). Después: **Capa 2 (RLS)**, que con la segunda empresa dada de alta **deja de ser diferible** — su disparador escrito en ADR-047 es justamente *"antes de que un segundo cliente real tenga usuarios en producción"*, y el paso 7 crea esas empresas.
 
 **2026-08-03 (cierre 91) — Revisión de estado de los dos ejes, y tres huecos que solo aparecen midiendo (Claude, pedido de Mani).**
 **Qué se hizo:** una revisión completa del estado real —qué está hecho, qué está live, qué falta, qué está roto— por los dos ejes que cambiaron juntos (**la API key de n8n** y **el producto pasando de individual a repartido**), y después la alineación de los docs con lo medido. **Cero código, cero cambios en prod.** Todo lo que sigue se leyó de Supabase y de la API de n8n el 03/08, no del handoff — que es el punto: el estado real ya no se podía reconstruir leyendo.
