@@ -1,9 +1,27 @@
 # ADR-057 — El Sheet Histórico: por instancia, o ninguno
 
-- **Estado:** 🔧 **abierta — 2026-08-04.** Es la única de las 57 que se abre sin decisión tomada, y a
-  propósito: las dos salidas son técnicamente baratas y la pregunta que las separa **no es técnica**.
-  La decide Mani con Dani. Cierra [plan multi-tenant §14.4](../agents/plan-multi-tenant.md).
-  **Bloquea prender el segundo cockpit con datos reales**, no antes.
+- **Estado:** **aceptada — 2026-08-04, opción 2 (el Sheet se muere), en dos pasos.** Se abrió sin
+  decisión y se cerró el mismo día con Mani. Cierra
+  [plan multi-tenant §14.4](../agents/plan-multi-tenant.md).
+
+  | Paso | Qué | Estado |
+  |---|---|---|
+  | 1 | **El export CSV** en `/curar/historicos`, con las **15 columnas del Sheet en su orden** | ✅ **hecho y en prod** (`domain/csv.ts` + su test, `leerTodosLosAprobados`, el Server Action y el botón) |
+  | 2 | **Sacar los nodos del Sheet** del archivado | ⬜ **va en el re-import de D8**, que ya está esperando por `fields.uuid`. Borrar nodos es topología ⇒ re-import, y no se gasta uno solo en esto |
+
+  **El orden no es cosmético: es lo único que hace que la opción 2 no sea una pérdida.** Entre el
+  paso 1 y el paso 2 conviven los dos, y eso está bien — el equipo nunca se queda sin el
+  descargable.
+
+  🔴 **Lo que hay que hacer el día del paso 2**, para que no se descubra después:
+  1. Sacar `Preparar filas Sheet` y `Append al Sheet Histórico`, y `sheet_id`/`sheet_tab` del `Config`.
+     Ojo con `Reconvergir tras Sheet` (Merge): con una sola rama entrando, el Merge sobra.
+  2. Borrar los placeholders `<<GOOGLE_SHEET_ID>>`, `<<NOMBRE_PESTANA_SHEET>>` y
+     `<<CREDENCIAL_GOOGLE_SHEETS>>` de la tabla del README del archivado y del `.env`.
+  3. Corregir las dos promesas: el [onboarding](../onboarding-equipo-redes.md) (la fila *Google Sheet
+     "Histórico"* y la pregunta *"Aprobé un video pero desapareció de la lista"*) y el
+     [one-pager](../one-pager-reels-mvp.md) (*"Google Sheets → Excel"* pasa a ser el cockpit).
+  4. Avisarle al equipo **antes**, y no dar de baja el Sheet viejo: queda como archivo muerto.
 
 - **Contexto.** El archivado appendea los aprobados de la semana a un Google Sheet. `instance_id`
   viaja por el body del webhook y gobierna todo lo demás del workflow — pero `sheet_id` y `sheet_tab`
@@ -83,11 +101,29 @@
   las dos opciones toca eso, y por eso ninguna de las dos pone datos en riesgo: lo que se decide es
   si además hay una copia en Sheets y de quién es.
 
-- **Recomendación.** **Opción 2, condicionada a construir el export primero.** El orden importa y es
-  lo único que hace que la opción 2 no sea una pérdida: *export en `/curar/historicos` → confirmar con
-  Dani y el equipo que reemplaza al Sheet → sacar los nodos en el re-import de D8*. Si el export no se
-  construye, la opción 2 es romper una promesa para ahorrar un campo de config, y ahí gana la 1.
+- **Decisión: opción 2**, con el export construido primero. Lo que la inclinó no fue el ahorro sino
+  **de quién es el dato**: con el Sheet, el histórico de cada empresa vive en un archivo de Google que
+  cuelga de una cuenta personal (`Google Sheets - Daniel Tovar`) y que el aislamiento del cockpit no
+  alcanza. Parametrizarlo hubiera hecho eso **tres veces**, no una.
 
-- **Hecho cuando.** O bien dos instancias archivan la misma semana y cada una escribe en **su propio**
-  Sheet, verificado abriendo los dos (opción 1); o bien el nodo no existe, `/curar/historicos` exporta
-  y el equipo obtiene el histórico desde el cockpit (opción 2).
+- **Cómo quedó el export** (paso 1, ya en prod). Las 15 columnas del Sheet, en su orden, para que una
+  planilla armada encima del export viejo siga sirviendo — incluida `ESTADO`, que acá siempre vale
+  `aprobado`: una columna que desaparece rompe a quien lea por posición.
+
+  - **Es un Server Action, no una route.** Devuelve el texto y el navegador lo baja como Blob. Así el
+    export pasa por **la misma guardia de tenant** que la pantalla (`exigirTenant`), sin una segunda
+    copia de esa lógica que se pueda atrasar — que es exactamente el modo de falla que ADR-047 pone
+    en la Capa 1.
+  - **Dos detalles que deciden si se siente igual de bueno que el Sheet, y cuestan poco:** BOM al
+    principio (sin él Excel abre *ComunicaciÃ³n*) y **citar siempre**, no solo cuando hace falta —
+    la columna que importa es `SCRIPT`, que trae transcripciones con saltos de línea y comillas, y
+    un escapado condicional acierta en las 14 fáciles y falla justo en la que corre las columnas.
+  - **Tope de 5.000 filas**, que corta y avisa en vez de tumbar el request. Con ~60 aprobados por
+    semana son ~18 meses; cuando muerda, la respuesta es paginar por fecha, no subir el número.
+  - **Verificado contra prod:** las 31 filas aprobadas reales, releídas con un parser RFC 4180
+    independiente ⇒ 31 registros, **las 15 columnas en todas**, acentos y emoji de calificación
+    intactos.
+
+- **Hecho cuando.** Paso 1: ✅ el equipo puede bajarse el histórico del cockpit. Paso 2: el nodo no
+  existe, `grep -c "Append al Sheet" Workflows/workflow-archivado/workflow.json` da 0, y nadie
+  extraña el Sheet.

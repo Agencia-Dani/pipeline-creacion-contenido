@@ -94,7 +94,8 @@ se archiva y se mide.** Todo lo demás es automático.
 | Herramienta | Para qué | Qué hacen ahí |
 |---|---|---|
 | **Airtable** | El tablero de trabajo | Leen los videos y los califican. Es donde viven el 95% del tiempo. |
-| **Google Sheet "Histórico"** | El archivo de lo ya elegido | Solo lo consultan/descargan. **No escriben ahí.** |
+| **Históricos** (en el cockpit) | El archivo de lo ya elegido | Solo lo consultan. Hay un botón **Descargar CSV** que se abre en Excel o en Sheets. |
+| ~~Google Sheet "Histórico"~~ | *Se está yendo* | Sigue existiendo por ahora, pero lo reemplaza la pantalla de Históricos ([ADR-057](./adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)). No armen nada nuevo encima. |
 
 Todo lo demás (los robots, las bases de datos por detrás) es **sala de máquinas**. No necesitan entrar
 nunca. Si alguien menciona "n8n", "Supabase" o "el cron", es plomería interna, no es asunto del equipo
@@ -715,9 +716,10 @@ llegan menos. La palanca para subir la entrega es agregar Referentes buenos a es
 **Califiqué algo por error, ¿lo puedo cambiar?** Sí, mientras no haya pasado el archivado del domingo. Solo
 cambien la `calificacion` o el `estado`. Después del domingo ya se fue al Histórico.
 
-**Aprobé un video pero desapareció de la lista. ¿Se perdió?** No. Los aprobados se van al **Google Sheet
-"Histórico"** cada domingo. Ahí quedan guardados y exportables. La lista de Candidatos se limpia sola para
-no llenarse.
+**Aprobé un video pero desapareció de la lista. ¿Se perdió?** No. Los aprobados se van a **Históricos**
+cada domingo, con su transcripción entera. Ahí quedan guardados, y el botón **Descargar CSV** te baja
+todo lo aprobado de todas las semanas para abrirlo en Excel o en Sheets. La lista de Candidatos se
+limpia sola para no llenarse.
 
 **¿Tengo que calificar TODO lo que llega?** Idealmente sí, aunque sea para descartar. Lo que no califican no
 se archiva ni le enseña nada a la máquina: queda flotando. Descartar (👎) es tan útil como aprobar.

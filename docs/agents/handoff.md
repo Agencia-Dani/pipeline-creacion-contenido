@@ -38,8 +38,16 @@
 > entra): `/` y `/retia/reels` → **307** al login · `/login` → **200** · `run-plan` → **200** ·
 > `instancias?workflow=short-form-content` → **200** con la instancia de `retia/reels`, y
 > `?workflow=linkedin` con las **2 active** (`retia/linkedin` queda afuera por `draft`, como se
-> diseñó). ⚠️ **Falta el login de verdad con una cuenta operador** — un `select` que da bien y un
-> login que no entra son compatibles.
+> diseñó). ✅ **Y Mani entró con una cuenta operador: se ve bien.** Esa era la verificación que la
+> base no puede dar.
+>
+> ### 🟡 Lo único sin probar en vivo (1 clic, de Mani)
+>
+> El botón **Descargar CSV** de `/curar/historicos` ([ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)).
+> Su parte frágil —el CSV— está verificada contra las 31 filas reales de prod con un parser RFC 4180
+> independiente, pero **nadie hizo clic en el botón**: eso necesita una sesión con login por magic
+> link. Abrí `/retia/reels/curar/historicos`, tocá **Descargar CSV** y abrilo. Tiene que traer
+> **15 columnas** y los acentos derechos.
 >
 > ### 🩸➜✅ El archivado, cerrado con la misma tabla del cierre 93
 >
@@ -1203,7 +1211,12 @@ migraciones** y la ventana del expand cerrada. Se empujaron al live los dos nodo
 `?workflow=linkedin` → las 2 `active` (la `draft` de Retia afuera, como se diseñó). **La lista de
 pendientes quedó vacía; lo que sigue es el flip de `scoped.ts`.**
 
-**📐 ADR-057, la única de las 57 que se abre sin decisión.** El Sheet Histórico es global (§14.4) y hay dos salidas: parametrizarlo por instancia, o matarlo porque `outputs` ya es el histórico canónico y `/curar/historicos` lo muestra. Lo que las separa **no es técnico**: el onboarding le promete al equipo *"el archivo de lo ya elegido"* y el one-pager le promete al jefe un **descargable a Excel**, y el cockpit todavía no exporta. Recomendación escrita: matarlo, **condicionado a construir el export primero**.
+**📐 ADR-057 se abrió y se cerró el mismo día: el Sheet se muere, con el export construido primero.**
+`/curar/historicos` ahora tiene **Descargar CSV** con **las 15 columnas del Sheet en su orden** (incluida `ESTADO`, que acá siempre vale `aprobado`: una columna que desaparece rompe a quien lea por posición). **Lo que inclinó la decisión no fue el ahorro sino de quién es el dato:** el Sheet deja el histórico de cada empresa en un archivo de Google colgado de una cuenta personal, donde el aislamiento del cockpit no llega — parametrizarlo hacía eso 3 veces en vez de 1. **El paso 2 (sacar los nodos) va en el re-import de D8**, que ya espera por `fields.uuid`; hasta entonces conviven los dos y el equipo nunca se queda sin el descargable. Es un **Server Action, no una route**, para que el export pase por la misma `exigirTenant` que la pantalla y no haya una segunda copia de esa guardia. Dos detalles que cuestan poco y deciden si se siente igual de bueno: **BOM** (sin él Excel abre *ComunicaciÃ³n*) y **citar siempre** — la columna que importa es `SCRIPT`, con saltos de línea y comillas, y un escapado condicional acierta en las 14 fáciles y falla justo en la que corre las columnas. Verificado contra prod: las 31 filas aprobadas reales, releídas con un parser RFC 4180 independiente ⇒ 31 registros, 15 columnas en todas, acentos y emoji intactos.
+
+**📄 Y quedó a la vista una deuda que no es de esta sesión: el onboarding del equipo y el one-pager del jefe todavía describen Airtable como el tablero**, tres días después de que saliera del sistema. Se actualizó solo lo del Sheet (es lo que tocaba ADR-057); las **18 menciones a Airtable del onboarding** y las 3 del one-pager quedan como task aparte. *El onboarding además está compartido como Google Doc, así que arreglarlo acá no alcanza.*
+
+<details><summary>El enunciado del ADR-057 cuando se abrió, antes de decidirlo</summary> El Sheet Histórico es global (§14.4) y hay dos salidas: parametrizarlo por instancia, o matarlo porque `outputs` ya es el histórico canónico y `/curar/historicos` lo muestra. Lo que las separa **no es técnico**: el onboarding le promete al equipo *"el archivo de lo ya elegido"* y el one-pager le promete al jefe un **descargable a Excel**, y el cockpit todavía no exporta. Recomendación escrita: matarlo, **condicionado a construir el export primero**. </details>
 
 **2026-08-03 (cierre 93) — El refactor llegó a prod y la Capa 2 quedó escrita; tres cosas rotas aparecieron por medir, no por leer (Claude, pedido de Mani).**
 **Qué se hizo:** el **merge a `main`** (paso 3, `ad2de5b`), los docs de los 5 workflows migrados a la forma nueva de ADR-053, la **`021` de RLS** escrita y verificada contra un Postgres 16 real, y el repo limpiado a una sola rama. Mani aplicó la `020`, la `021` y el alta de EstadoX y 30X.

@@ -28,6 +28,8 @@ export type Historico = {
   calificadoEn: string | null;
   views: number | null;
   likes: number | null;
+  seguidores: number | null;
+  idioma: string | null;
   heat: number | null;
   relevanciaScore: number | null;
   relevanciaRazon: string | null;
@@ -86,6 +88,8 @@ export async function leerAprobados(
       calificadoEn: texto(row.calificado_en),
       views: numero(m.views),
       likes: numero(m.likes),
+      seguidores: numero(m.seguidores),
+      idioma: texto(m.idioma),
       heat: numero(m.heat_score),
       relevanciaScore: numero(m.relevancia_score),
       relevanciaRazon: texto(m.relevancia_razon),
@@ -95,4 +99,28 @@ export async function leerAprobados(
 
   const total = count ?? filas.length;
   return { filas, hayMas: desde + filas.length < total, total };
+}
+
+// El histórico entero, para el CSV que reemplaza al Google Sheet (ADR-057). La pantalla pagina
+// de a 25 porque nadie lee 500 tarjetas; el archivo descargable es justamente lo contrario, así
+// que acá se recorren todas las páginas.
+//
+// El tope existe para que esto no pueda convertirse en una query sin fondo el día que el
+// histórico crezca: **corta y avisa** en vez de tumbar el request en silencio. Con 88 filas hoy
+// y ~60 aprobados por semana, 5.000 son ~18 meses — cuando muerda, la respuesta es paginar el
+// export por fecha, no subir el número.
+const TOPE_EXPORT = 5000;
+
+export async function leerTodosLosAprobados(
+  ctx: TenantContext,
+): Promise<{ filas: Historico[]; truncado: boolean }> {
+  const todas: Historico[] = [];
+
+  for (let pagina = 0; todas.length < TOPE_EXPORT; pagina++) {
+    const { filas, hayMas } = await leerAprobados(ctx, pagina);
+    todas.push(...filas);
+    if (!hayMas || filas.length === 0) return { filas: todas, truncado: false };
+  }
+
+  return { filas: todas.slice(0, TOPE_EXPORT), truncado: true };
 }

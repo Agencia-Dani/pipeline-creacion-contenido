@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { fecha } from "@/lib/fechas";
 import type { Historico } from "@/lib/historicos";
 import { miles } from "@/lib/utils";
-import { cargarMas } from "./actions";
+import { cargarMas, exportarCsv } from "./actions";
 
 // Todo lo aprobado, de todas las semanas, de a 25. Sin miniatura: el thumbnail era un
 // attachment de Airtable que muere con el record y nunca se archivó — el histórico es texto.
@@ -30,6 +30,33 @@ export function Lista({
   const [error, setError] = useState<string | null>(null);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [cargando, startTransition] = useTransition();
+  const [bajando, startBajar] = useTransition();
+
+  // El descargable que reemplaza al Google Sheet (ADR-057). El server devuelve el texto y el
+  // navegador lo baja: sin route nueva, así el export pasa por la misma guardia de tenant que
+  // la pantalla.
+  function bajar() {
+    setError(null);
+    startBajar(async () => {
+      const r = await exportarCsv();
+      if (!r.ok) {
+        setError(r.mensaje);
+        return;
+      }
+      // `text/csv` a secas y no `application/octet-stream`: en el móvil decide si se puede abrir
+      // en vez de solo guardar.
+      const url = URL.createObjectURL(new Blob([r.csv], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = r.nombre;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      if (r.truncado) {
+        setError(`El archivo trae las ${r.filas} más recientes. Hay más histórico del que entra en una descarga.`);
+      }
+    });
+  }
 
   function mas() {
     setError(null);
@@ -49,9 +76,14 @@ export function Lista({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Mostrando {filas.length} de {total}.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          Mostrando {filas.length} de {total}.
+        </p>
+        <Button variant="outline" size="sm" onClick={bajar} disabled={bajando}>
+          {bajando ? "Preparando…" : "Descargar CSV"}
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {filas.map((h) => (

@@ -692,7 +692,18 @@ que funciona.
 de que un segundo cliente real tenga usuarios en producción. No antes, no después. **Se prueba con la
 cuenta de Jero**, que es la que se puede perder.
 
-### 14.4 🔴 El Google Sheet del histórico es uno solo y global
+### 14.4 🔧 El Google Sheet del histórico es uno solo y global — DECIDIDO, medio ejecutado
+
+> **Cerrado como decisión el 2026-08-04:**
+> [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) **acepta la opción 2 (el
+> Sheet se muere)**, en dos pasos. El **paso 1 está en prod**: `/curar/historicos` exporta un CSV con
+> las 15 columnas del Sheet en su orden (verificado contra las 31 filas reales con un parser RFC 4180
+> independiente). El **paso 2 —sacar los nodos— va en el re-import de D8**, porque borrar nodos es
+> topología y D8 ya está esperando por `fields.uuid`.
+>
+> **Hasta el paso 2, el riesgo de abajo sigue vivo**: si se prende un segundo cockpit con datos
+> reales antes de ese re-import, sus aprobados se appendean al Sheet de Retia. El enunciado queda
+> como está por eso.
 
 **Qué.** El archivado appendea los aprobados de la semana a un Google Sheet. `instance_id` **sí**
 viaja por el body del webhook y se usa para todo lo demás — pero `sheet_id` y `sheet_tab` son
@@ -706,8 +717,8 @@ al lado, `instance_id`, que **sí** es una expresión que lee el body: la parame
 el tenant y se saltó el Sheet. No está anotado en ningún ADR ni en este plan — el único hit de
 "sheet" en `docs/` está en `dev-doc.md` y es descriptivo.
 
-**Qué lo destraba.** Hay **dos salidas, y no son la misma decisión** — por eso va a
-[ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md), abierto el 2026-08-04:
+**Qué lo destraba.** Había **dos salidas, y no eran la misma decisión** — las dos y por qué ganó la
+segunda están en [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md):
 
 1. **Parametrizarlo.** La regla ya está escrita, y es de
    [ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md): *n8n lee su config por la
