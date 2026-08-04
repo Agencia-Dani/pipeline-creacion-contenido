@@ -16,18 +16,17 @@
 > handoff. Si vas a retomar el refactor: el checklist con marcas está en **§12** y lo que falta,
 > escrito para ejecutarse sin releer nada, en **§14**.
 
-**Migraciones: 20 de 21 aplicadas.** La única que falta es la **`019`** (§14.1).
+**Migraciones: las 21 de 21 aplicadas.** ✅ **La ventana del expand se cerró el 04/08** con la `019`:
+`app.usuarios` quedó en `id, nombre, creado_en, es_dueno` — murieron `rol` y `client_id`, y el acceso
+vive solo en la membresía.
 
 **La base (PostgREST, prod):** `clients` = **3** (`retia`, `estadox`, `30x`) · `instances` = **4**
 (`retia/reels` **active** · `retia/linkedin` draft · `estadox/linkedin` active · `30x/linkedin`
 active) · `app.usuarios` = **5** · **`app.usuarios_clientes` = 5 filas** (2 dev, 3 operador, todas
-`retia`) ⇒ la `018` **sí** está aplicada · `es_dueno` vive en `app.usuarios` y son los 2 devs · las 4
-tablas `*_linkedin` de la `020` responden ⇒ **aplicada** · `app.clientes_visibles()` y
-`app.instancias_visibles()` existen (dan `42501` con `service_role`, que es *"existe pero no tenés
-EXECUTE"*) ⇒ la **`021` está aplicada** · voces 3 · proyectos 6 · referentes 16 · outputs 88.
-
-⚠️ **La ventana del expand sigue abierta:** `app.usuarios` **todavía tiene `rol` y `client_id`**, hoy
-una copia congelada que nada mantiene. Nada del código las lee.
+`retia`) · `es_dueno` = los 2 devs · las 4 tablas `*_linkedin` de la `020` responden ·
+`app.clientes_visibles()` y `app.instancias_visibles()` existen (dan `42501` con `service_role`, que
+es *"existe pero no tenés EXECUTE"*) ⇒ la **`021` está aplicada** · voces 3 · proyectos 6 ·
+referentes 16 · outputs 88.
 
 **n8n:** **5 workflows activos** (motor 34 nodos · descubrimiento 22 · dispatcher 8 · archivado 20 ·
 errores 3) y `npm run n8n:diff` da **limpio en los 5**, con 11 placeholders aprendidos del live.
@@ -548,7 +547,7 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | 4 | **Fase 2** — Capa 1 (tipos + `scoped.ts` + `lib/`) | Fase 3 | no (deploy sin cambio de comportamiento) | ✅ en prod |
 | 5 | **Fase 3** — rutas `[cliente]/[pipeline]` | el segundo cockpit | sí (URLs cambian) | ✅ en prod · el 404 de la base y los bookmarks viejos, cerrados (cierre 89) |
 | 6 | **Fase 4** — `run-plan` v2 + motor + dispatcher | el segundo tenant corriendo | sí, **re-import** | ✅ en prod · corrida de verificación `ok` |
-| — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | 🔧 **mergeada (`ad2de5b`) y `018` aplicada** (5 membresías) · falta la **`019`** → **§14.1** |
+| — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ✅ **COMPLETO** — mergeada (`ad2de5b`), `018` + `019` aplicadas y verificadas por su efecto (04/08) |
 | 7 | 🔴 **Paginación del feed** (§10) | el segundo tenant con volumen | no | ⬜ no empezada |
 | 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | 🔧 **paso 1 de 2: la `021` está APLICADA** (inerte) · falta el flip de `scoped.ts` → **§14.3** |
 | 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | 🔧 la **`020` está aplicada** y hay 3 cockpits en `instances`; no existe el workflow en n8n |
@@ -582,34 +581,18 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 > **Ninguna bloquea a Retia hoy.** Las tres estructurales muerden recién con la segunda empresa. Eso
 > es exactamente por qué conviene cerrarlas antes de que exista, y no después.
 
-### 14.1 🔧 La `018` está aplicada; falta firmar y correr la `019`
+### 14.1 ✅ CERRADO — la `018` y la `019` están aplicadas
 
-> **Actualizado 2026-08-04.** Todo lo de esta sección se cerró **salvo la `019`**. El código está en
-> `main` (`ad2de5b`), la `018` está aplicada y `app.usuarios_clientes` tiene sus **5 filas** (2 dev,
-> 3 operador, todas `retia`), con `es_dueno` en los dos devs. El enunciado original queda abajo.
+> **Cerrado el 2026-08-04.** El código está en `main` (`ad2de5b`), la `018` dejó sus **5 membresías**
+> (2 dev, 3 operador, todas `retia`, con `es_dueno` en los dos devs) y la **`019` mató `rol` y
+> `client_id`**: `app.usuarios` quedó en `id, nombre, creado_en, es_dueno`. Verificado por su
+> **efecto** contra prod, no por que la migración haya corrido.
 
-**Qué falta.** Solo la [`019`](../../core/schema/019_membresias_cierre.sql): matar
-`app.usuarios.rol` y `app.usuarios.client_id`, que desde la `018` son una **copia congelada que nada
-mantiene**. Mientras las dos formas convivan hay dos respuestas a la misma pregunta (ADR-027).
-
-**Evidencia de que NO se aplicó, aunque se haya corrido.** `app.usuarios` todavía devuelve `rol` y
-`client_id`. La causa es su **gate humano del §0**: el `insert into _cierre_membresias` sigue
-comentado, así que el `raise exception` aborta la transacción entera y no pasa nada — sin error
-visible. *Una migración con gate no se da por aplicada porque se haya corrido; se da por aplicada
-cuando se mide su efecto.*
-
-**Las dos condiciones del gate ya se cumplen**, y la segunda está verificada leyendo el código, no de
-palabra: el refactor está deployado, y **ningún archivo del cockpit lee las dos columnas** —
-`lib/auth.ts` selecciona `nombre, es_dueno` y el rol sale de `leerMembresias` →
-`app.usuarios_clientes`.
-
-**Qué lo destraba.** En el SQL Editor: descomentar la línea 23 de la `019`
-(`insert into _cierre_membresias values (true);`) y correrla entera.
-
-**Hecho cuando.** `select column_name from information_schema.columns where table_schema='app' and
-table_name='usuarios';` devuelve **solo** `id, nombre, creado_en, es_dueno` — **y** alguien entra al
-cockpit después. Un `select` que da bien y un login que no entra son compatibles: la migración toca
-justo la fila que decide si alguien pasa.
+**⚠️ La lección de método, que vale para toda migración con gate humano** (la `017`, la `019`, y las
+que vengan): **la `019` se corrió el 03/08, no dio error visible, y no había entrado.** El
+`insert into _cierre_membresias` del §0 seguía comentado, así que el `raise exception` abortaba la
+transacción entera en silencio. *Una migración con gate no se da por aplicada porque se haya corrido;
+se da por aplicada cuando se mide su efecto.*
 
 <details><summary>El enunciado original (2026-08-03), como registro</summary>
 

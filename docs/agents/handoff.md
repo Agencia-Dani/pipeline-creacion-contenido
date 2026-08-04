@@ -22,17 +22,24 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## 🟢 LO ABIERTO AL CIERRE 94 (2026-08-04). De los tres del cierre 93 quedan DOS COMANDOS.
+> ## ✅ NO QUEDA NADA ABIERTO AL CIERRE 94 (2026-08-04). Los tres del cierre 93, cerrados y medidos.
 >
-> **De los tres pendientes del cierre 93, uno estaba cerrado sin que nadie lo anotara y otro se
-> cerró hoy con números.** Lo que queda:
+> **El próximo paso es del plan, no de la lista de pendientes:** el **flip de `scoped.ts`**
+> (Fase 6, paso 2 de 2) — ver más abajo.
 >
-> | # | Qué | Quién | Estado |
-> |---|---|---|---|
-> | 1 | 🔑 Rotar la API key de Anthropic | Mani | ✅ **HECHO Y VERIFICADO el 04/08.** La key del commit filtrado (`d98d45a`) da **401** contra la API de Anthropic ⇒ está revocada. Los 3 workflows del live traen **una sola** key cada uno y **coincide con el `.env`**. Nadie lo había anotado: se descubrió midiendo |
-> | 2 | ✍️ **Firmar y correr la `019`** | **Mani** | ⛔ **SIGUE ABIERTO — es lo único que falta del refactor de membresías.** Ver el runbook exacto abajo |
-> | 3 | 🩸 El archivado no archiva nada | Claude | ✅ **ARREGLADO, EMPUJADO AL LIVE Y VERIFICADO CON UNA CORRIDA REAL** (ejecución 124). Los números abajo |
-> | + | ⚠️ **Dos bugs nuevos del archivado, del mismo origen** | **Mani (1 comando)** | 🔧 **Arreglados en el repo, NO en el live**: el `--apply` lo bloqueó el clasificador de permisos. Ver abajo |
+> | # | Qué | Estado |
+> |---|---|---|
+> | 1 | 🔑 Rotar la API key de Anthropic | ✅ **HECHO Y VERIFICADO el 04/08.** La key del commit filtrado (`d98d45a`) da **401** contra la API de Anthropic ⇒ está revocada. Los 3 workflows del live traen **una sola** key cada uno y **coincide con el `.env`**. Nadie lo había anotado: se descubrió midiendo |
+> | 2 | ✍️ Firmar y correr la `019` | ✅ **APLICADA por Mani el 04/08, y verificada por su EFECTO:** `app.usuarios` quedó en **`id, nombre, creado_en, es_dueno`** — murieron `rol` y `client_id`. Las 5 membresías intactas (3 operador + 2 dev, todas `retia`), `es_dueno` en los 2 devs. **La ventana del expand está cerrada: van 21 de 21 migraciones** |
+> | 3 | 🩸 El archivado no archiva nada | ✅ **ARREGLADO, EMPUJADO AL LIVE Y VERIFICADO CON UNA CORRIDA REAL** (ejecución 124). Los números abajo |
+> | + | ⚠️ Dos bugs nuevos del archivado, del mismo origen | ✅ **empujados al live el 04/08** (`n8n:diff` limpio en los 5). Se verifican solos en la próxima corrida — ver el hecho-cuando abajo |
+>
+> **Smoke-test después de la `019`** (es la migración que toca justo la fila que decide si alguien
+> entra): `/` y `/retia/reels` → **307** al login · `/login` → **200** · `run-plan` → **200** ·
+> `instancias?workflow=short-form-content` → **200** con la instancia de `retia/reels`, y
+> `?workflow=linkedin` con las **2 active** (`retia/linkedin` queda afuera por `draft`, como se
+> diseñó). ⚠️ **Falta el login de verdad con una cuenta operador** — un `select` que da bien y un
+> login que no entra son compatibles.
 >
 > ### 🩸➜✅ El archivado, cerrado con la misma tabla del cierre 93
 >
@@ -80,35 +87,14 @@
 > Gomez, 0 vacíos restantes). **Las 7 filas del Sheet quedaron con PROYECTO y VOZ vacíos** y eso hay
 > que arreglarlo a mano en el Sheet, o dejarlo — ver [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md).
 >
-> 🔴 **El comando que falta (repo arreglado, live no):**
+> ✅ **Empujados al live el 04/08** (`n8n:push -- archivado --nodos "Armar filas archivado,Destilar
+> criterios" --apply`; `n8n:diff` limpio en los 5). Rollback si hiciera falta:
+> `npm run n8n:restore -- archivado .n8n-snapshots/archivado-2026-08-04T21-31-43-595Z.json --apply`.
 >
-> ```bash
-> cd core/scripts && npm run n8n:push -- archivado --nodos "Armar filas archivado,Destilar criterios" --apply
-> ```
->
-> Dry-run corrido y verde (`jsCode: 3226b → 3274b` y `5362b → 5376b`). Después: `npm run n8n:diff`
-> tiene que dar limpio en los 5. Rollback: `npm run n8n:restore -- archivado <snapshot> --apply`.
->
-> ### ✍️ La `019` — el runbook, en dos líneas
->
-> **No se aplicó aunque se haya corrido**, y la razón es su propio gate: el
-> `insert into _cierre_membresias` de la línea 23 sigue comentado, así que el `raise exception` del §0
-> aborta la transacción entera **sin error visible**. Medido: `app.usuarios` todavía devuelve `rol` y
-> `client_id`.
->
-> **Las dos condiciones del gate se cumplen, y la segunda está verificada leyendo el código:**
-> `lib/auth.ts` selecciona `nombre, es_dueno` y el rol sale de `leerMembresias` →
-> `app.usuarios_clientes` (5 filas correctas). **Nada del cockpit lee las dos columnas.**
->
-> 1. En el SQL Editor: descomentar la **línea 23** de `core/schema/019_membresias_cierre.sql` y
->    correrla entera.
-> 2. Verificar el **efecto**, no el "corrió sin error":
->    ```sql
->    select column_name from information_schema.columns
->    where table_schema='app' and table_name='usuarios' order by ordinal_position;
->    ```
->    Tiene que devolver **solo** `id, nombre, creado_en, es_dueno`. Y después entrá al cockpit una vez:
->    un `select` que da bien y un login que no entra son compatibles.
+> 🎯 **Hecho cuando (lo único que queda de esto, y no se puede apurar):** la próxima corrida del
+> archivado —el **cron del domingo 18:00**, o un disparo a mano— tiene que dejar
+> `outputs.metadata.proyecto` y `.voz` **poblados** y `PATCH Proyectos criterios` **ejecutado** (o
+> saltado por el mínimo de 4 legítimamente). Si vuelve a salir vacío, el fix del uuid no entró.
 >
 > <details><summary>🔑 Cómo se rotó la key de Anthropic (ya hecho — se deja como procedimiento)</summary>
 >
@@ -153,7 +139,7 @@
 > | 1–2 | `018` + backfill | ✅ Alejandro, 03/08. 5 usuarios → 5 membresías, `es_dueno` en los dos correctos |
 > | 3 | Merge `refactor/membresias` → `main` + push | ✅ **HECHO (`ad2de5b`)**, fast-forward limpio |
 > | 4 | Probar el login con una cuenta operador | ✅ Mani: se ve bien |
-> | 5 | `019_membresias_cierre.sql` | ⛔ **NO aplicada** — ver el punto 2 de arriba |
+> | 5 | `019_membresias_cierre.sql` | ✅ **aplicada el 04/08** (al segundo intento: la primera vez su gate humano abortó la transacción entera sin error visible). `app.usuarios` quedó en `id, nombre, creado_en, es_dueno` |
 > | 6 | `020_pipeline_linkedin.sql` | ✅ aplicada: las 4 tablas responden y `linkedin` está en `workflows` |
 > | 7 | El alta de EstadoX y 30X (SQL abajo) | ✅ aplicada: `clients` = **3** · `instances` = **4** (`retia/reels` active · `retia/linkedin` **draft** · `estadox/linkedin` active · `30x/linkedin` active), exactamente como se diseñó |
 > | + | **`021_rls_capa_2.sql`** (Fase 6, paso 1) | ✅ aplicada. Es **inerte** hasta el flip: el BFF sigue en `service_role`, que bypassa RLS |
@@ -1208,6 +1194,14 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **🩸➜✅ El archivado archiva de nuevo, y el diagnóstico salió de la ejecución, no del código.** Se bajó la ejecución 123 con `includeData=true`: `Leer Candidatos calificados` emitió **9 items planos** y el IF mandó **`[0 true, 9 false]`**. Fix + `alwaysOutputData` (la 0-calificados dejaba el run abierto: **segunda regresión de D7**), push, y una corrida real: **9 → 0 calificados · 79 → 88 outputs · IF `[9 true, 0 false]`**.
 
 **🩸🩸 Y ahí aparecieron dos bugs que llevaban tapados desde D7, los dos por `fields.uuid`.** El contrato v2 (ADR-048 §5) lo mató y dice que *"los tres `uuidDe` se fueron juntos"* — el motor ×2 y el descubrimiento ×1 se migraron, **los dos nodos del archivado no**. `Armar filas archivado` dejaba `metadata.proyecto`/`.voz` **vacíos en todos los outputs**; `Destilar criterios` armaba `recs` vacío siempre ⇒ **el loop de ADR-022 estaba muerto**, pagando las llamadas a Haiku y tirando el resultado (los 9 daban 5+4, los dos por encima del mínimo: tenía que destilar 2 proyectos y destiló 0). *La lección: **arreglar el nodo que corta el flujo destapa todo lo que estaba tapado detrás**, y por eso la corrida de verificación importa más que el diff.* Arreglados en el repo; el `--apply` quedó pendiente (lo bloqueó el clasificador de permisos) y es el único comando que falta.
+
+**✅ Y al final de la sesión cerró todo lo que quedaba.** Mani corrió la `019` (esta vez sí: se
+verificó por su **efecto**, `app.usuarios` quedó en `id, nombre, creado_en, es_dueno`) ⇒ **21 de 21
+migraciones** y la ventana del expand cerrada. Se empujaron al live los dos nodos del uuid y
+`n8n:diff` quedó limpio en los 5. Smoke-test post-`019`: `/` y `/retia/reels` → 307, `/login` → 200,
+`run-plan` → 200, `instancias?workflow=short-form-content` → la instancia de `retia/reels` y
+`?workflow=linkedin` → las 2 `active` (la `draft` de Retia afuera, como se diseñó). **La lista de
+pendientes quedó vacía; lo que sigue es el flip de `scoped.ts`.**
 
 **📐 ADR-057, la única de las 57 que se abre sin decisión.** El Sheet Histórico es global (§14.4) y hay dos salidas: parametrizarlo por instancia, o matarlo porque `outputs` ya es el histórico canónico y `/curar/historicos` lo muestra. Lo que las separa **no es técnico**: el onboarding le promete al equipo *"el archivo de lo ya elegido"* y el one-pager le promete al jefe un **descargable a Excel**, y el cockpit todavía no exporta. Recomendación escrita: matarlo, **condicionado a construir el export primero**.
 

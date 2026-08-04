@@ -34,19 +34,15 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
 - [core/schema/](core/schema/) — migraciones SQL de Supabase (001–021; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-04, **medido contra prod por PostgREST**, hay **20 de 21 aplicadas**. La
-  única que falta es la **`019` (cierre de membresías)**.
-  ⚠️ **Prod está en la ventana del expand:** `app.usuarios_clientes` ya existe y tiene sus 5 filas,
-  **y `usuarios.rol`/`usuarios.client_id` siguen vivas** — o sea que la columna vieja es hoy una copia
-  congelada que nada mantiene. La `019` no entró porque **su gate humano (§0) sigue comentado**, y el
-  `raise exception` aborta la transacción entera sin dejar rastro: una migración con gate no se da por
-  aplicada porque se haya corrido, sino cuando se mide su efecto. Las dos condiciones del gate ya se
-  cumplen y **ningún archivo del cockpit lee esas columnas** (`lib/auth.ts` selecciona `nombre,
-  es_dueno`; el rol sale de `usuarios_clientes`) — el runbook está en
-  [handoff §Pendiente vivo](docs/agents/handoff.md).
-  La **`020` (pipeline LinkedIn)** y la **`021` (RLS, Capa 2 de ADR-047)** **sí están aplicadas** (las
-  4 tablas `*_linkedin` responden; `app.clientes_visibles()` existe). La `021` es **inerte** hasta que
-  `scoped.ts` deje el `service_role` — ver [plan-multi-tenant §14.3](docs/agents/plan-multi-tenant.md).
+  en orden). Al 2026-08-04, **medido contra prod por PostgREST**, están las **21 de 21 aplicadas**.
+  ✅ **La ventana del expand se cerró**: la `019` mató `usuarios.rol` y `usuarios.client_id`, y el
+  acceso vive solo en `app.usuarios_clientes` (5 filas) + el flag `es_dueno` (ADR-051).
+  ⚠️ **Una migración con gate humano no se da por aplicada porque se haya corrido, sino cuando se
+  mide su efecto**: la `019` se corrió el 03/08 sin error visible y **no había entrado** — el
+  `raise exception` del §0 abortaba la transacción entera. Se midió, se firmó el gate y entró el 04/08.
+  La **`021` (RLS, Capa 2 de ADR-047)** está aplicada pero es **inerte** hasta que `scoped.ts` deje el
+  `service_role` — ese flip es el próximo paso del plan
+  ([plan-multi-tenant §14.3](docs/agents/plan-multi-tenant.md)).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
