@@ -22,40 +22,95 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## 🔴 LO ABIERTO AL CIERRE 93 (2026-08-03). Tres cosas, y las tres se encontraron MIDIENDO.
+> ## 🟢 LO ABIERTO AL CIERRE 94 (2026-08-04). De los tres del cierre 93 quedan DOS COMANDOS.
 >
-> **El runbook de membresías + LinkedIn está casi cerrado:** el merge entró a `main` (`ad2de5b`),
-> la `020` y la `021` están aplicadas, y el alta de EstadoX y 30X también. Lo que queda no es el
-> runbook, son estos tres, en este orden:
+> **De los tres pendientes del cierre 93, uno estaba cerrado sin que nadie lo anotara y otro se
+> cerró hoy con números.** Lo que queda:
 >
-> | # | Qué | Quién | Por qué es urgente |
+> | # | Qué | Quién | Estado |
 > |---|---|---|---|
-> | 1 | 🔑 **Rotar la API key de Anthropic** | **Mani** | Estuvo **commiteada y pusheada a GitHub** en la rama `refactor/multi-tenant-fase-0-adrs` (commit `d98d45a`, *"n8n snapshots"*): 4 snapshots del live con la key en claro dentro del `jsCode`. La rama ya se borró en local y en `origin`, **pero eso no es el arreglo** — GitHub retiene objetos sin referencia y se piden por SHA. `main` nunca la tuvo. **El procedimiento está abajo y NO es un `n8n:push`** |
-> | 2 | ✍️ **Firmar y correr la `019`** | Mani | **NO se aplicó, aunque parezca que sí.** Su gate humano (línea 23, `-- insert into _cierre_membresias values (true);`) sigue comentado, así que el `raise exception` del §0 aborta la transacción entera y no pasa nada. Medido: `app.usuarios` **todavía devuelve `rol` y `client_id`**. Las dos condiciones del gate ya se cumplen (deploy hecho, login probado con cuenta operador) |
-> | 3 | 🩸 **El archivado no archiva nada desde el 01/08, y cierra en verde** | Mani/Claude | `IF — hay calificados` todavía pregunta `($json.records \|\| []).length > 0`: `records` era el sobre de **Airtable**, y PostgREST devuelve el array pelado ⇒ la condición da `false` **siempre**. Entró en `6e86481` (D7). **REPRODUCIDO A PEDIDO el 03/08** (ver abajo). Se arregla con `n8n:push -- archivado --nodos "IF — hay calificados"`, sin re-import |
+> | 1 | 🔑 Rotar la API key de Anthropic | Mani | ✅ **HECHO Y VERIFICADO el 04/08.** La key del commit filtrado (`d98d45a`) da **401** contra la API de Anthropic ⇒ está revocada. Los 3 workflows del live traen **una sola** key cada uno y **coincide con el `.env`**. Nadie lo había anotado: se descubrió midiendo |
+> | 2 | ✍️ **Firmar y correr la `019`** | **Mani** | ⛔ **SIGUE ABIERTO — es lo único que falta del refactor de membresías.** Ver el runbook exacto abajo |
+> | 3 | 🩸 El archivado no archiva nada | Claude | ✅ **ARREGLADO, EMPUJADO AL LIVE Y VERIFICADO CON UNA CORRIDA REAL** (ejecución 124). Los números abajo |
+> | + | ⚠️ **Dos bugs nuevos del archivado, del mismo origen** | **Mani (1 comando)** | 🔧 **Arreglados en el repo, NO en el live**: el `--apply` lo bloqueó el clasificador de permisos. Ver abajo |
 >
-> #### La reproducción controlada del 03/08 — el task de arreglo arranca con esto medido
-> Se disparó el archivado a mano (`POST` al webhook con `{instancia}` de `retia/reels`). Antes y
-> después, contra la base:
+> ### 🩸➜✅ El archivado, cerrado con la misma tabla del cierre 93
 >
-> | | Antes | Después | Esperado si funcionara |
-> |---|---|---|---|
-> | candidatos calificados | **9** | **9** | 0 |
-> | `outputs` totales | **79** | **79** | 88 |
-> | último `outputs` | 26/07 | **26/07** | 03/08 |
-> | la corrida | — | `estado: ok` en **3,3 s**, `metricas.archivados: 9` | — |
+> Causa raíz confirmada **leyendo la ejecución 123 nodo por nodo**, no deduciéndola: `Leer Candidatos
+> calificados` emitió **9 items planos** (n8n parte el array de PostgREST en items) y el `IF` mandó
+> **0 por true y 9 por false**. El fix pregunta por los items del nodo, con el mismo `_filas` que ya
+> usan los nodos de abajo — así el IF y el code node no pueden volver a discrepar sobre la forma:
 >
-> O sea: **leyó 9, reportó 9 archivados, escribió 0 y borró 0, y cerró verde en 3 segundos.** Los
-> 3,3 s son en sí la señal: una corrida que archiva de verdad escribe a Supabase, appendea al Sheet
-> y borra, y la del 26/07 (61 archivados) no se hace en ese tiempo.
-> *El barrido de higiene no borró nada: se contó antes de disparar y había **0** candidatos `nuevo`
-> más viejos que 20 días.*
+> ```
+> ={{ $('Leer Candidatos calificados').all().map(i => i.json).flat().filter(r => r && r.id).length }}
+> ```
 >
-> ✅ **Y de paso cerró lo que faltaba del cierre 90.** Esa corrida escribió
-> `params.execution_id: "123"`, y se verificó contra la API de n8n que es **real**: mismo
-> `workflowId` que `N8N_WF_ARCHIVADO`, `status: success`, `startedAt` 21:19:56.703 contra un
-> `runs.inicio` de 21:19:57.295. **ADR-054 verificado end-to-end en una corrida de verdad**, que era
-> justamente lo único que quedaba pendiente de comprobar.
+> Y `alwaysOutputData: true` en `Leer Candidatos calificados`: **segunda regresión de D7, misma
+> causa.** Con 0 calificados el nodo emite 0 items, el IF no corre y **`Cerrar run` no se ejecuta por
+> ninguna rama** — el run queda abierto hasta que lo barre el zombie sweeper. Con Airtable no pasaba
+> (`{records:[]}` era 1 item).
+>
+> | | Antes (03/08) | **Después (04/08, ejecución 124)** |
+> |---|---|---|
+> | candidatos calificados | 9 → **9** | 9 → **0** ✅ |
+> | candidatos totales | 174 → 174 | 174 → **165** (9 borrados) ✅ |
+> | `outputs` totales | 79 → **79** | 79 → **88** ✅ |
+> | último `outputs` | 26/07 | **04/08 21:12** ✅ |
+> | el IF | `[0 true, 9 false]` | **`[9 true, 0 false]`** ✅ |
+> | la corrida | `ok` en 3,3 s | `ok`, `archivados: 9`, `execution_id: "124"` real |
+>
+> Al Sheet fueron **7** y no 9, y está bien: `Preparar filas Sheet` filtra `estado === 'aprobado'`, y
+> de los 9 había 7 aprobados y 2 descartados.
+>
+> ### ⚠️ Los dos bugs que el fix DESTAPÓ (y el comando que falta)
+>
+> No los causó el fix: estaban **tapados** detrás del IF: como el archivado no archivaba desde D7,
+> ningún nodo de abajo llegaba a correr. Los dos son la misma causa, y está escrita en el contrato:
+> **`fields.uuid` murió en el run-plan v2** ([ADR-048 §5](../adr/ADR-048-run-plan-v2-motor-por-instancia.md)),
+> el `id` **es** el uuid, y *"los tres `uuidDe` se fueron juntos"* — el motor ×2 y el descubrimiento
+> ×1 se migraron; **los dos nodos del archivado se quedaron atrás**.
+>
+> | Nodo | Qué hacía mal | Consecuencia medida |
+> |---|---|---|
+> | `Armar filas archivado` | `projMap[f.uuid]` / `vozMap[f.uuid]`, y `f.uuid` hoy es `undefined` ⇒ los dos mapas vacíos | **Todo `outputs.metadata.proyecto` y `.voz` vacío**, y PROYECTO/VOZ vacíos en el Sheet. Medido: los 61 outputs del 26/07 tienen proyecto; los 9 de hoy salieron **todos vacíos** |
+> | `Destilar criterios` | `const _uuid = projMeta[pid].uuid` ⇒ `null` siempre ⇒ `recs` vacío | **El loop de aprendizaje de ADR-022 está muerto**: `PATCH Proyectos criterios` nunca corre. Y encima **paga las llamadas a Haiku** y tira el resultado. Los 9 daban 5 (*Comunicación de parejas*) + 4 (*Storytelling*), **los dos ≥ el mínimo de 4**: tenía que destilar 2 proyectos y destiló 0 |
+>
+> ✅ **Los 9 `outputs` con metadata vacía ya se repararon** (backfill por `external_id`, preservando
+> el resto del metadata: 5 *Comunicación de parejas* / Milena Morales + 4 *Storytelling* / Rosario
+> Gomez, 0 vacíos restantes). **Las 7 filas del Sheet quedaron con PROYECTO y VOZ vacíos** y eso hay
+> que arreglarlo a mano en el Sheet, o dejarlo — ver [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md).
+>
+> 🔴 **El comando que falta (repo arreglado, live no):**
+>
+> ```bash
+> cd core/scripts && npm run n8n:push -- archivado --nodos "Armar filas archivado,Destilar criterios" --apply
+> ```
+>
+> Dry-run corrido y verde (`jsCode: 3226b → 3274b` y `5362b → 5376b`). Después: `npm run n8n:diff`
+> tiene que dar limpio en los 5. Rollback: `npm run n8n:restore -- archivado <snapshot> --apply`.
+>
+> ### ✍️ La `019` — el runbook, en dos líneas
+>
+> **No se aplicó aunque se haya corrido**, y la razón es su propio gate: el
+> `insert into _cierre_membresias` de la línea 23 sigue comentado, así que el `raise exception` del §0
+> aborta la transacción entera **sin error visible**. Medido: `app.usuarios` todavía devuelve `rol` y
+> `client_id`.
+>
+> **Las dos condiciones del gate se cumplen, y la segunda está verificada leyendo el código:**
+> `lib/auth.ts` selecciona `nombre, es_dueno` y el rol sale de `leerMembresias` →
+> `app.usuarios_clientes` (5 filas correctas). **Nada del cockpit lee las dos columnas.**
+>
+> 1. En el SQL Editor: descomentar la **línea 23** de `core/schema/019_membresias_cierre.sql` y
+>    correrla entera.
+> 2. Verificar el **efecto**, no el "corrió sin error":
+>    ```sql
+>    select column_name from information_schema.columns
+>    where table_schema='app' and table_name='usuarios' order by ordinal_position;
+>    ```
+>    Tiene que devolver **solo** `id, nombre, creado_en, es_dueno`. Y después entrá al cockpit una vez:
+>    un `select` que da bien y un login que no entra son compatibles.
+>
+> <details><summary>🔑 Cómo se rotó la key de Anthropic (ya hecho — se deja como procedimiento)</summary>
 >
 > ### 🔑 Cómo se rota la key de Anthropic, y por qué `n8n:push` NO sirve acá
 >
@@ -83,8 +138,14 @@
 > El push queda con un placeholder sin resolver y **falla cerrado** en vez de escribir el valor
 > equivocado. Un `n8n:diff` después de rotar te dice si quedó alguno sin cambiar.
 >
-> **Y después, el paso que quedó explícitamente para otra sesión:** el **flip de `scoped.ts`**
-> (Fase 6, paso 2 de 2). Ver §14.3 del [plan multi-tenant](./plan-multi-tenant.md).
+> </details>
+>
+> ### 🎯 Y lo que sigue en el plan, una vez cerrados los dos comandos de arriba
+>
+> El **flip de `scoped.ts`** (Fase 6, **paso 2 de 2**): el BFF deja `createAdminClient()` y pasa a
+> leer con la sesión del usuario. La `021` ya está aplicada e inerte, así que la red está puesta y
+> falta saltar. Es **alto riesgo concentrado en una línea** y se prueba **con la cuenta de Jero**, que
+> es la que se puede perder. Ver §14.3 del [plan multi-tenant](./plan-multi-tenant.md).
 >
 > ### Lo que sí quedó cerrado del runbook viejo
 > | # | Paso | Estado |
@@ -1136,6 +1197,19 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-04 (cierre 94) — Auditoría del refactor contra prod: dos de los tres pendientes cerrados, y el que se arregló destapó dos más (Claude, pedido de Mani).**
+**Qué se hizo:** una auditoría medida (base por PostgREST, n8n por su API, los 4 feedback loops), el **arreglo del archivado empujado al live y verificado con una corrida real**, el backfill de los 9 `outputs` que salieron con metadata vacía, los docs corregidos donde mentían, y [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) abierto.
+
+**🔑 La key de Anthropic ya estaba rotada y nadie lo había anotado.** El commit filtrado sigue vivo en el repo local, así que se pudo comparar: su key **no es** la que corre hoy y da **401** contra la API ⇒ revocada. Los 3 workflows del live traen una sola key y coincide con el `.env`. *El pendiente #1 del cierre 93 llevaba un día cerrado en la realidad y abierto en el handoff.*
+
+**📄 Y tres docs decían cosas falsas sobre las migraciones.** `CLAUDE.md` y el plan multi-tenant (§0, §12, §14.1, §14.3) daban la `020` y la `021` por **no aplicadas**. Medido: las 4 tablas `*_linkedin` responden y `app.clientes_visibles()` existe (el `42501` con `service_role` es *"existe pero no tenés EXECUTE"*, no *"no existe"*). Van **20 de 21**; la única que falta es la `019`. *El mismo modo de falla del cierre 93 con la `019`, al revés: dar por no aplicado lo que sí entró.*
+
+**🩸➜✅ El archivado archiva de nuevo, y el diagnóstico salió de la ejecución, no del código.** Se bajó la ejecución 123 con `includeData=true`: `Leer Candidatos calificados` emitió **9 items planos** y el IF mandó **`[0 true, 9 false]`**. Fix + `alwaysOutputData` (la 0-calificados dejaba el run abierto: **segunda regresión de D7**), push, y una corrida real: **9 → 0 calificados · 79 → 88 outputs · IF `[9 true, 0 false]`**.
+
+**🩸🩸 Y ahí aparecieron dos bugs que llevaban tapados desde D7, los dos por `fields.uuid`.** El contrato v2 (ADR-048 §5) lo mató y dice que *"los tres `uuidDe` se fueron juntos"* — el motor ×2 y el descubrimiento ×1 se migraron, **los dos nodos del archivado no**. `Armar filas archivado` dejaba `metadata.proyecto`/`.voz` **vacíos en todos los outputs**; `Destilar criterios` armaba `recs` vacío siempre ⇒ **el loop de ADR-022 estaba muerto**, pagando las llamadas a Haiku y tirando el resultado (los 9 daban 5+4, los dos por encima del mínimo: tenía que destilar 2 proyectos y destiló 0). *La lección: **arreglar el nodo que corta el flujo destapa todo lo que estaba tapado detrás**, y por eso la corrida de verificación importa más que el diff.* Arreglados en el repo; el `--apply` quedó pendiente (lo bloqueó el clasificador de permisos) y es el único comando que falta.
+
+**📐 ADR-057, la única de las 57 que se abre sin decisión.** El Sheet Histórico es global (§14.4) y hay dos salidas: parametrizarlo por instancia, o matarlo porque `outputs` ya es el histórico canónico y `/curar/historicos` lo muestra. Lo que las separa **no es técnico**: el onboarding le promete al equipo *"el archivo de lo ya elegido"* y el one-pager le promete al jefe un **descargable a Excel**, y el cockpit todavía no exporta. Recomendación escrita: matarlo, **condicionado a construir el export primero**.
 
 **2026-08-03 (cierre 93) — El refactor llegó a prod y la Capa 2 quedó escrita; tres cosas rotas aparecieron por medir, no por leer (Claude, pedido de Mani).**
 **Qué se hizo:** el **merge a `main`** (paso 3, `ad2de5b`), los docs de los 5 workflows migrados a la forma nueva de ADR-053, la **`021` de RLS** escrita y verificada contra un Postgres 16 real, y el repo limpiado a una sola rama. Mani aplicó la `020`, la `021` y el alta de EstadoX y 30X.

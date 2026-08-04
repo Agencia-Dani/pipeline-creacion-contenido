@@ -34,14 +34,18 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
 - [core/schema/](core/schema/) — migraciones SQL de Supabase (001–021; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-03, **medido contra prod por PostgREST**, hay **18 aplicadas**: la `016`
-  (multi-tenant), la `017` (su cierre) y la **`018` (membresías, ADR-051)** entraron el 02–03/08.
+  en orden). Al 2026-08-04, **medido contra prod por PostgREST**, hay **20 de 21 aplicadas**. La
+  única que falta es la **`019` (cierre de membresías)**.
   ⚠️ **Prod está en la ventana del expand:** `app.usuarios_clientes` ya existe y tiene sus 5 filas,
   **y `usuarios.rol`/`usuarios.client_id` siguen vivas** — o sea que la columna vieja es hoy una copia
-  congelada que nada mantiene. La **`019` (cierre de membresías) y la `020` (pipeline LinkedIn) están
-  escritas y NO aplicadas**. El código que consume la `018` **ya está en `main`** (mergeado el
-  03/08). El orden para cerrar la ventana es el runbook de [handoff §Pendiente vivo](docs/agents/handoff.md).
-  La **`021` (RLS, Capa 2 de ADR-047)** también está escrita y sin aplicar: es inerte hasta que
+  congelada que nada mantiene. La `019` no entró porque **su gate humano (§0) sigue comentado**, y el
+  `raise exception` aborta la transacción entera sin dejar rastro: una migración con gate no se da por
+  aplicada porque se haya corrido, sino cuando se mide su efecto. Las dos condiciones del gate ya se
+  cumplen y **ningún archivo del cockpit lee esas columnas** (`lib/auth.ts` selecciona `nombre,
+  es_dueno`; el rol sale de `usuarios_clientes`) — el runbook está en
+  [handoff §Pendiente vivo](docs/agents/handoff.md).
+  La **`020` (pipeline LinkedIn)** y la **`021` (RLS, Capa 2 de ADR-047)** **sí están aplicadas** (las
+  4 tablas `*_linkedin` responden; `app.clientes_visibles()` existe). La `021` es **inerte** hasta que
   `scoped.ts` deje el `service_role` — ver [plan-multi-tenant §14.3](docs/agents/plan-multi-tenant.md).
 
 **Operación / equipo de redes**
@@ -52,12 +56,13 @@ porque es una sola regla (ADR-053): **cambiar un workflow es `n8n:push`, no re-i
 re-import queda solo para topología, y solo ahí aplican sus placeholders y credenciales.
 - [Workflows/workflow-short-form-content/CLAUDE.md](Workflows/workflow-short-form-content/CLAUDE.md) — el motor de reels (qué es, orden). Fuente de verdad: su `workflow.json`.
 - [Workflows/workflow-descubrimiento-referentes/README.md](Workflows/workflow-descubrimiento-referentes/README.md) — el descubrimiento de referentes (ADR-020): propone cuentas nuevas cada semana, el equipo aprueba, se siembran solas.
-- [Workflows/workflow-archivado/README.md](Workflows/workflow-archivado/README.md) — el archivado: manda los calificados a `outputs` y al Sheet Histórico, destila criterios (ADR-022) y barre. 🔴 El Sheet es **uno solo y global** (plan-multi-tenant §14.4).
+- [Workflows/workflow-archivado/README.md](Workflows/workflow-archivado/README.md) — el archivado: manda los calificados a `outputs` y al Sheet Histórico, destila criterios (ADR-022) y barre. 🔴 El Sheet es **uno solo y global**: [ADR-057](docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) (abierta) decide si se parametriza o se mata.
 - [Workflows/workflow-dispatcher/README.md](Workflows/workflow-dispatcher/README.md) — el que convierte **un** workflow parametrizado en **N corridas aisladas**, una por instancia (ADR-050). Los dos crons del sistema viven acá.
 - [Workflows/workflow-registro-fallos/README.md](Workflows/workflow-registro-fallos/README.md) — el error handler global: marca como `fallo` el run de la ejecución que se cayó, encontrado por `params.execution_id` (ADR-054). Activo y verificado end-to-end; lo apuntan los 4 workflows. Se rompió **dos veces** por un `<<SUPABASE_URL>>` sin resolver que `onError: continue` silenciaba: por eso `npm run n8n:diff` va después de cada import.
 
 *(`workflow-linkedin/` y `workflow-substack/` son pipelines del repo que todavía **no** corren en n8n:
-LinkedIn nace con la `020` sin aplicar, ADR-055.)*
+LinkedIn ya tiene su `020` aplicada y sus 3 cockpits en `instances`, pero no existe el workflow en
+n8n ni tiene cron en el dispatcher, ADR-055.)*
 
 ## Agent skills
 

@@ -16,20 +16,28 @@
 >
 > Estado real del MVP: [ROADMAP §3 carril C](../../ROADMAP.md) · [handoff.md](../../docs/agents/handoff.md).
 
-> 🔴 **Hoy no archiva nada, y cierra en verde.** `IF — hay calificados` todavía pregunta
-> `($json.records || []).length > 0`: `records` era el sobre de la respuesta de Airtable, y PostgREST
-> devuelve el array pelado. La condición da `false` **siempre** → toda corrida se va por la rama
-> `no` y salta `Registrar outputs`, el Sheet y `Borrar candidatos`.
-> Entró en `6e86481` (2026-08-01, *D7: el archivado adelgaza*), que migró el nodo de lectura a
-> PostgREST y dejó el IF con la forma vieja. Los nodos de abajo sí se migraron (usan el helper
-> `_filas`), por eso nada explota.
-> **Medido el 2026-08-03:** el run del 02/08 cerró `estado: ok` con `metricas.archivados: 9` — pero
-> el último `outputs` escrito es del **26/07**, y los 9 candidatos calificados el 01/08 **siguen
-> vivos** en `app.candidatos`. `archivados` cuenta lo que `Leer Candidatos calificados` **leyó**, no
-> lo que se archivó, así que el registro tampoco lo delata.
-> Es la misma familia de fallo que el aviso de los placeholders (§Placeholders): muere en silencio y
-> la ejecución termina verde. **Pendiente de arreglar** — un cambio de `parameters` en un nodo, o
-> sea `n8n:push` (§Operación), sin re-import.
+> ✅ **Arreglado el 2026-08-04 y verificado con una corrida real** (ejecución 124: 9 → 0 calificados,
+> `outputs` 79 → 88). Entre el 01/08 y el 04/08 **este workflow no archivó nada y cerró en verde**, y
+> conviene saber por qué antes de tocarlo, porque el mismo modo de falla ya mordió tres veces.
+>
+> <details><summary>Los tres bugs de D7, y qué los delató</summary>
+>
+> Los tres entraron en `6e86481` (*D7: el archivado adelgaza*), que migró la lectura a PostgREST, y
+> los tres **mueren en silencio con la ejecución en verde** — la misma familia que el aviso de los
+> placeholders (§Placeholders). Ninguno lo encontró un diff: los encontró **medir la base y leer la
+> ejecución nodo por nodo** (`GET /executions/{id}?includeData=true`).
+>
+> | Qué | Por qué | Cómo se vio |
+> |---|---|---|
+> | **1. El IF nunca daba true** | Preguntaba `($json.records \|\| []).length > 0`. `records` era el sobre de **Airtable**; PostgREST devuelve el array pelado, que n8n parte en items | La ejecución 123: el IF mandó **`[0 true, 9 false]`**. En la base, `metricas.archivados: 9` y el último `outputs` del **26/07** — el contador cuenta lo **leído**, no lo archivado |
+> | **2. Con 0 calificados el run quedaba abierto** | El nodo de lectura emitía 0 items ⇒ el IF no corría ⇒ **`Cerrar run` no se ejecutaba por ninguna rama**. Con Airtable no pasaba: `{records:[]}` era 1 item | Se arregló con `alwaysOutputData: true` antes de que mordiera |
+> | **3. `fields.uuid` ya no existe** | El contrato v2 lo mató ([ADR-048 §5](../../docs/adr/ADR-048-run-plan-v2-motor-por-instancia.md)): el `id` **es** el uuid. El motor y el descubrimiento se migraron; **estos dos nodos no**. `Armar filas archivado` dejaba `metadata.proyecto`/`.voz` vacíos; `Destilar criterios` armaba `recs` vacío ⇒ el loop de ADR-022 **muerto**, pagando Haiku para tirar el resultado | Estaba **tapado** detrás del bug 1: sin archivado, esos nodos no corrían. Apareció en la primera corrida buena |
+>
+> **La regla que sale de esto:** arreglar el nodo que corta el flujo **destapa todo lo que estaba
+> detrás**. Después de un fix así, la corrida de verificación vale más que el `n8n:diff`, y hay que
+> mirar los **items por nodo**, no solo el `estado: ok`.
+>
+> </details>
 
 ## Qué hace (flujo)
 
@@ -60,7 +68,9 @@ Cerrar run en el registro ─┬─► Barrer candidatos sin calificar   (higien
 
 - **Pide su config a la fachada**, no a una tabla: `GET /api/engine/run-plan?ambito=completo&instancia=…`
   ([ADR-028](../../docs/adr/ADR-028-contrato-motor-run-plan.md)). De ahí salen `proyectos` y `voces`,
-  que son lo que le permite mapear `proyecto_id`/`voz_id` (uuid) → nombre.
+  que son lo que le permite mapear `proyecto_id`/`voz_id` (uuid) → nombre. **El cruce va contra el
+  `id` del plan, que ES el uuid desde el contrato v2** — `fields.uuid` ya no viaja (ADR-048 §5), y
+  cruzar contra él era el bug 3 de arriba.
 - **La instancia viaja en el payload del webhook**, no es constante del archivo: `Config` la saca de
   `$('Disparo por instancia (webhook)').first().json.body.instancia`
   ([ADR-048](../../docs/adr/ADR-048-run-plan-v2-motor-por-instancia.md)). En corrida manual queda
@@ -90,7 +100,8 @@ Cerrar run en el registro ─┬─► Barrer candidatos sin calificar   (higien
   proyecto con ≥ `min_muestra_destilar` (4) calificados, Haiku resume la semana en patrones (lo que
   SÍ / lo que NO) priorizando los 🔥 como ejemplos positivos, y en la misma llamada evalúa los
   criterios manuales y deja una advertencia de forma. `PATCH app.proyectos` escribe
-  `criterios_aprendidos` + `advertencia_criterios` por uuid — **nunca** pisa `criterios_relevancia`,
+  `criterios_aprendidos` + `advertencia_criterios` por el `proyecto_id` del candidato (que ya es el
+  uuid: ver el bug 3) — **nunca** pisa `criterios_relevancia`,
   que es del humano. Fail-soft por proyecto: si Haiku falla, ese proyecto se salta.
 - **Un barrido de higiene**: `Barrer candidatos sin calificar` purga los `nuevo` de más de **20
   días** (los que nadie calificó; no van al histórico, solo despejan la bandeja). Cuelga de

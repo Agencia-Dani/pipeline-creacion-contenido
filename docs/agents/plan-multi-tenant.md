@@ -6,21 +6,28 @@
 >
 > **Cómo leerlo.** §1 es el diagnóstico con evidencia (leelo aunque conozcas el repo — hay cuatro cosas que no están documentadas en ningún otro lado). §2 son las decisiones. §3–§9 son las fases, en orden de ejecución. §10 son los casos de escalabilidad, uno por uno. §11 es cómo se verifica. **Si vas a ejecutar, §12 es el checklist.**
 
-**Estado:** **en ejecución — Fases 0–4 en producción** · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-03 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
+**Estado:** **en ejecución — Fases 0–4 en producción, Fase 6 paso 1 de 2** · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-04 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
 
 ---
 
-## 0. Estado al 2026-08-03 — medido, no recordado
+## 0. Estado al 2026-08-04 — medido, no recordado
 
-> **Empezá por acá.** Todo lo de abajo se leyó de la base y de la API de n8n el 2026-08-03, no del
+> **Empezá por acá.** Todo lo de abajo se leyó de la base y de la API de n8n el 2026-08-04, no del
 > handoff. Si vas a retomar el refactor: el checklist con marcas está en **§12** y lo que falta,
 > escrito para ejecutarse sin releer nada, en **§14**.
 
-**La base (PostgREST, prod):** `clients` = **1 fila** (`retia`) · `instances` = **1**
-(`retia`/`reels`, `83abbf60-18ae-4072-a7da-48f04bf39f54`, `active`) · `app.usuarios` = **5**, las 5
-con `client_id = retia` (2 dev, 3 operador; Jero adentro) · **`app.usuarios_clientes` NO existe**
-(`PGRST205`) ⇒ la `018` no está aplicada · voces 3 · proyectos 6 · referentes 16 · candidatos 153 ·
-descartes 28 · eventos 38 · transcripciones 2.
+**Migraciones: 20 de 21 aplicadas.** La única que falta es la **`019`** (§14.1).
+
+**La base (PostgREST, prod):** `clients` = **3** (`retia`, `estadox`, `30x`) · `instances` = **4**
+(`retia/reels` **active** · `retia/linkedin` draft · `estadox/linkedin` active · `30x/linkedin`
+active) · `app.usuarios` = **5** · **`app.usuarios_clientes` = 5 filas** (2 dev, 3 operador, todas
+`retia`) ⇒ la `018` **sí** está aplicada · `es_dueno` vive en `app.usuarios` y son los 2 devs · las 4
+tablas `*_linkedin` de la `020` responden ⇒ **aplicada** · `app.clientes_visibles()` y
+`app.instancias_visibles()` existen (dan `42501` con `service_role`, que es *"existe pero no tenés
+EXECUTE"*) ⇒ la **`021` está aplicada** · voces 3 · proyectos 6 · referentes 16 · outputs 88.
+
+⚠️ **La ventana del expand sigue abierta:** `app.usuarios` **todavía tiene `rol` y `client_id`**, hoy
+una copia congelada que nada mantiene. Nada del código las lee.
 
 **n8n:** **5 workflows activos** (motor 34 nodos · descubrimiento 22 · dispatcher 8 · archivado 20 ·
 errores 3) y `npm run n8n:diff` da **limpio en los 5**, con 11 placeholders aprendidos del live.
@@ -28,13 +35,15 @@ Ningún workflow tiene cron propio: los dos que hay viven en el dispatcher (moto
 archivado domingo 18:00). El descubrimiento **no tiene cron a propósito** — se sacó en `270d107` y
 hoy es un botón del cockpit.
 
-**El repo:** 158 tests + `typecheck` + `build` verdes · `validate` 1897 checks · `auditar-workflows`
-sin hallazgos.
+**El repo:** 165 tests + `typecheck` verdes · `validate` 2028 checks · `auditar-workflows` sin
+hallazgos.
 
-**Aislamiento hoy:** RLS está *enabled* en todas las tablas pero **sin policies** (salvo *"usuario lee
-su propia fila"* de la `007`). Probado con la anon key: `app.candidatos` → **401**, `public.runs` →
-**200 con 0 filas**. O sea: no hay fuga hacia afuera, y **el aislamiento entre empresas es solo la
-Capa 1 (TypeScript)** — ver §14.3.
+**La key de Anthropic filtrada está ROTADA y revocada** (verificado el 04/08: la del commit `d98d45a`
+da **401** contra la API; los 3 workflows del live traen una sola key y coincide con el `.env`).
+
+**Aislamiento hoy:** con la `021` aplicada las policies **existen y no se evalúan en ningún camino**,
+porque el BFF sigue leyendo con `service_role`, que bypassa RLS. O sea: **el aislamiento entre
+empresas sigue siendo solo la Capa 1 (TypeScript)** hasta el flip de `scoped.ts` — ver §14.3.
 
 ---
 
@@ -531,7 +540,7 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 
 ## 12. Orden de ejecución (el checklist)
 
-| # | Fase | Bloquea a | Toca prod | **Estado (2026-08-03)** |
+| # | Fase | Bloquea a | Toca prod | **Estado (2026-08-04)** |
 |---|---|---|---|---|
 | 1 | **Fase 0** — los 5 ADRs | todo lo demás (`core/` solo cambia con ADR) | no | ✅ ADR-046..050 escritos (+051/052) |
 | 2 | 🧹 Limpiar el `@casper_smc` duplicado | la `016` (`not null`) | sí, un `delete` | ✅ hecho |
@@ -539,10 +548,10 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | 4 | **Fase 2** — Capa 1 (tipos + `scoped.ts` + `lib/`) | Fase 3 | no (deploy sin cambio de comportamiento) | ✅ en prod |
 | 5 | **Fase 3** — rutas `[cliente]/[pipeline]` | el segundo cockpit | sí (URLs cambian) | ✅ en prod · el 404 de la base y los bookmarks viejos, cerrados (cierre 89) |
 | 6 | **Fase 4** — `run-plan` v2 + motor + dispatcher | el segundo tenant corriendo | sí, **re-import** | ✅ en prod · corrida de verificación `ok` |
-| — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ⛔ **escrito, SIN mergear y SIN aplicar** → **§14.1** |
+| — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | 🔧 **mergeada (`ad2de5b`) y `018` aplicada** (5 membresías) · falta la **`019`** → **§14.1** |
 | 7 | 🔴 **Paginación del feed** (§10) | el segundo tenant con volumen | no | ⬜ no empezada |
-| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | 🔧 **`021` escrita y verificada contra PG16, sin aplicar** · falta el flip de `scoped.ts` → **§14.3** |
-| 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | ⬜ no empezada |
+| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | 🔧 **paso 1 de 2: la `021` está APLICADA** (inerte) · falta el flip de `scoped.ts` → **§14.3** |
+| 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | 🔧 la **`020` está aplicada** y hay 3 cockpits en `instances`; no existe el workflow en n8n |
 
 > ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
 > que la secuencia real es **`018`/`019` → Capa 2 (RLS) → paginación → LinkedIn**. La fila sin número
@@ -573,7 +582,36 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 > **Ninguna bloquea a Retia hoy.** Las tres estructurales muerden recién con la segunda empresa. Eso
 > es exactamente por qué conviene cerrarlas antes de que exista, y no después.
 
-### 14.1 ⛔ La `018`/`019` está escrita y no está en ninguna parte
+### 14.1 🔧 La `018` está aplicada; falta firmar y correr la `019`
+
+> **Actualizado 2026-08-04.** Todo lo de esta sección se cerró **salvo la `019`**. El código está en
+> `main` (`ad2de5b`), la `018` está aplicada y `app.usuarios_clientes` tiene sus **5 filas** (2 dev,
+> 3 operador, todas `retia`), con `es_dueno` en los dos devs. El enunciado original queda abajo.
+
+**Qué falta.** Solo la [`019`](../../core/schema/019_membresias_cierre.sql): matar
+`app.usuarios.rol` y `app.usuarios.client_id`, que desde la `018` son una **copia congelada que nada
+mantiene**. Mientras las dos formas convivan hay dos respuestas a la misma pregunta (ADR-027).
+
+**Evidencia de que NO se aplicó, aunque se haya corrido.** `app.usuarios` todavía devuelve `rol` y
+`client_id`. La causa es su **gate humano del §0**: el `insert into _cierre_membresias` sigue
+comentado, así que el `raise exception` aborta la transacción entera y no pasa nada — sin error
+visible. *Una migración con gate no se da por aplicada porque se haya corrido; se da por aplicada
+cuando se mide su efecto.*
+
+**Las dos condiciones del gate ya se cumplen**, y la segunda está verificada leyendo el código, no de
+palabra: el refactor está deployado, y **ningún archivo del cockpit lee las dos columnas** —
+`lib/auth.ts` selecciona `nombre, es_dueno` y el rol sale de `leerMembresias` →
+`app.usuarios_clientes`.
+
+**Qué lo destraba.** En el SQL Editor: descomentar la línea 23 de la `019`
+(`insert into _cierre_membresias values (true);`) y correrla entera.
+
+**Hecho cuando.** `select column_name from information_schema.columns where table_schema='app' and
+table_name='usuarios';` devuelve **solo** `id, nombre, creado_en, es_dueno` — **y** alguien entra al
+cockpit después. Un `select` que da bien y un login que no entra son compatibles: la migración toca
+justo la fila que decide si alguien pasa.
+
+<details><summary>El enunciado original (2026-08-03), como registro</summary>
 
 **Qué.** [ADR-051](../adr/ADR-051-el-acceso-es-membresia-explicita.md) (el acceso pasa de
 `usuarios.client_id` a `app.usuarios_clientes`, con el rol adentro) y
@@ -592,13 +630,7 @@ commits (`b1b8212`, `66bd25e`, `e5c6668`, `ab6f480`). El commit toca `domain/ten
 > los cinco pierden el cockpit el día del deploy. El backfill va en la **misma transacción** que el
 > `create table`, no en un paso después.
 
-**Qué lo destraba.** Mergear `main` **hacia la rama** (no al revés: `main` tiene el fix del 404 de la
-Fase 3, y la rama lo borraría si se mergea al revés sin cuidado) → `typecheck` + `npm test` +
-`npm run build` → aplicar `018` y `019` en el SQL Editor → **verificar antes de que Vercel deploye**:
-`select count(*) from app.usuarios_clientes;` tiene que dar **5**.
-
-**Hecho cuando.** Los 5 usuarios entran al cockpit con la `018` aplicada, **probado con la cuenta de
-Jero**, no con una de dev.
+</details>
 
 ### 14.2 🟡 `n8n:push` no cubre topología — y la razón que da ADR-053 para eso ya no es cierta
 
@@ -633,15 +665,15 @@ humana explícita.
 
 ### 14.3 🟡 El aislamiento entre empresas hoy es solo TypeScript — *la red ya está escrita, falta saltar*
 
-> **Actualizado 2026-08-03.** La [`021_rls_capa_2.sql`](../../core/schema/021_rls_capa_2.sql) está
-> **escrita y verificada contra un Postgres 16 real**, con dos empresas y sus datos. Falta
-> **aplicarla** y falta el **flip** de `scoped.ts`. Se partió en dos a propósito, con el mismo
-> expand/contract de la `016`/`017` y la `018`/`019`:
+> **Actualizado 2026-08-04.** La [`021_rls_capa_2.sql`](../../core/schema/021_rls_capa_2.sql) **ya
+> está aplicada en prod** (medido: `app.clientes_visibles()` y `app.instancias_visibles()` existen).
+> Falta el **flip** de `scoped.ts`, que es donde el aislamiento se vuelve real. Se partió en dos a
+> propósito, con el mismo expand/contract de la `016`/`017` y la `018`/`019`:
 >
 > | | Paso | Riesgo | Estado |
 > |---|---|---|---|
-> | 1 | Aplicar la **`021`**: grants para `authenticated`, las funciones de alcance, 17 policies y `security_invoker` en las 12 vistas | **Ninguno.** El BFF sigue en `service_role`, que bypassa RLS: las policies existen y no se evalúan en ningún camino | ⬜ escrita y verificada, **sin aplicar** |
-> | 2 | El **flip**: `scoped.ts` deja `createAdminClient()` y pasa a la sesión | **Alto, y concentrado en una línea.** Acá es donde el aislamiento se vuelve real | ⬜ no empezado |
+> | 1 | Aplicar la **`021`**: grants para `authenticated`, las funciones de alcance, 17 policies y `security_invoker` en las 12 vistas | **Ninguno.** El BFF sigue en `service_role`, que bypassa RLS: las policies existen y no se evalúan en ningún camino | ✅ **APLICADA** (2026-08-03) e **inerte**, como se diseñó |
+> | 2 | El **flip**: `scoped.ts` deja `createAdminClient()` y pasa a la sesión | **Alto, y concentrado en una línea.** Acá es donde el aislamiento se vuelve real | ⬜ **no empezado — es el próximo paso del plan** |
 >
 > **La fachada y n8n no se tocan en ninguno de los dos.** `run-plan`, `instancias` y las escrituras
 > por PostgREST siguen con `service_role` por diseño (ADR-028 / ADR-035): no tienen sesión de
@@ -659,15 +691,13 @@ humana explícita.
 > las 6 vistas de `public` necesitan sus propios grants. Sin eso la zona Entender devuelve `42501`
 > el día del flip. Los dos ya están en la `021`.
 
-**Qué.** La Fase 6 (Capa 2, RLS) no está aplicada. El BFF lee **todo** con `service_role`, que
-bypassa RLS.
+**Qué.** El BFF lee **todo** con `service_role`, que bypassa RLS. Con la `021` aplicada las policies
+existen, pero **no se evalúan en ningún camino** hasta el flip.
 
-**Evidencia.** RLS está *enabled* en todas las tablas de `public` y de `app`, pero **sin una sola
-policy** salvo *"usuario lee su propia fila"* de la [`007`](../../core/schema/007_app_usuarios.sql).
-Probado con la anon key contra prod: `app.candidatos` → **401** (`permission denied for schema app`),
-`public.runs` → **200 con 0 filas**. O sea: **no hay fuga hacia afuera hoy**, y por eso esto no es una
-emergencia. Pero adentro del BFF, un `.eq(instance_id)` olvidado no lo atrapa nada más que la Capa 1 —
-que es tipos, o sea disciplina de compilación, no una barrera de la base.
+**Evidencia.** **No hay fuga hacia afuera hoy** (con la anon key: `app.candidatos` → **401**,
+`public.runs` → **200 con 0 filas**), y por eso esto no es una emergencia. Pero adentro del BFF, un
+`.eq(instance_id)` olvidado no lo atrapa nada más que la Capa 1 — que es tipos, o sea disciplina de
+compilación, no una barrera de la base.
 
 **Qué lo destraba.** §9 de este plan. La parte cara ya está medida y hay que saberla **antes** de
 empezar: la [`011`](../../core/schema/011_grants_app_service_role.sql) existe porque `service_role`
@@ -693,16 +723,27 @@ al lado, `instance_id`, que **sí** es una expresión que lee el body: la parame
 el tenant y se saltó el Sheet. No está anotado en ningún ADR ni en este plan — el único hit de
 "sheet" en `docs/` está en `dev-doc.md` y es descriptivo.
 
-**Qué lo destraba.** La regla ya está escrita, y es de
-[ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md): *n8n lee su config por la fachada.*
-`sheet_id`/`sheet_tab` son config por instancia, así que van a `run-plan` (`?ambito=archivado`),
-leyéndose de `app.ajustes` o de una columna de `instances`. **Toca
-[`core/contracts/run-plan.md`](../../core/contracts/run-plan.md) ⇒ necesita ADR** (`core/` solo cambia
-con ADR). Después es un `npm run n8n:push -- archivado --nodos "Config"`: son `parameters`, **no** es
-re-import.
+**Qué lo destraba.** Hay **dos salidas, y no son la misma decisión** — por eso va a
+[ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md), abierto el 2026-08-04:
 
-**Hecho cuando.** Dos instancias archivan la misma semana y cada una escribe en su propio Sheet,
-verificado abriendo los dos.
+1. **Parametrizarlo.** La regla ya está escrita, y es de
+   [ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md): *n8n lee su config por la
+   fachada.* `sheet_id`/`sheet_tab` son config por instancia, así que van a `run-plan`
+   (`?ambito=archivado`), leyéndose de `app.ajustes` o de una columna de `instances`. Toca
+   [`core/contracts/run-plan.md`](../../core/contracts/run-plan.md). Después es un
+   `npm run n8n:push -- archivado --nodos "Config"`: son `parameters`, **no** es re-import.
+2. **Matarlo** (propuesto por Mani el 04/08). El histórico canónico es `outputs`
+   ([ADR-014](../adr/ADR-014-outputs-historico-canonico-archivado.md)) y el cockpit ya lo muestra
+   entero en `/curar/historicos` (D6). El Sheet quedó como el afluente descargable de la época de
+   Airtable. Barato de sacar (un nodo, una credencial, dos placeholders menos) y **elimina el
+   problema en vez de escalarlo** — pero el [onboarding](../onboarding-equipo-redes.md) se lo promete
+   al equipo como *"el archivo de lo ya elegido"* y el
+   [one-pager](../one-pager-reels-mvp.md) se lo promete al jefe como descargable a Excel. **La
+   decisión no es técnica: es si el cockpit reemplaza esas dos promesas.**
+
+**Hecho cuando.** O bien dos instancias archivan la misma semana y cada una escribe en su propio
+Sheet (opción 1), o bien el nodo no existe y el equipo obtiene el histórico desde el cockpit
+(opción 2).
 
 ### 14.5 🟠 Dos cosas menores, anotadas para que no sorprendan
 
