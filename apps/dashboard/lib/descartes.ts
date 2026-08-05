@@ -38,7 +38,7 @@ const COLUMNAS =
   "relevancia_razon, veredicto, proyectos(nombre)";
 
 export async function leerDescartes(ctx: TenantContext): Promise<DescarteFeed[]> {
-  const { data, error } = await scoped(ctx).select("app.descartes", COLUMNAS);
+  const { data, error } = await (await scoped(ctx)).select("app.descartes", COLUMNAS);
   if (error) throw new Error(`Supabase respondió con error leyendo los descartes: ${error.message}`);
 
   return ordenarDescartes(
@@ -62,7 +62,7 @@ export async function marcarVeredicto(
   id: string,
   veredicto: Veredicto,
 ): Promise<void> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .update("app.descartes", { veredicto })
     .eq("id", id)
     .select("id");

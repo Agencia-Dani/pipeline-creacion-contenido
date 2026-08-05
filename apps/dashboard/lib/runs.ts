@@ -19,7 +19,7 @@ const filaRun = z.object({
 // El filtro por instancia lo pone `scoped`: con dos empresas, "las últimas corridas" son las de
 // ESTE cockpit. Sin eso, Operar mostraría la corrida de otra empresa como si fuera propia.
 export async function ultimasCorridasMotor(ctx: TenantContext, limite = 5): Promise<Corrida[]> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("public.runs", "id, inicio, fin, estado, trigger_type, metricas, error")
     .eq("params->>workflow", "motor")
     .order("inicio", { ascending: false })

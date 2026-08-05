@@ -34,7 +34,7 @@ export async function leerTranscripciones(
   ctx: TenantContext,
   limite = 50,
 ): Promise<Transcripcion[]> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("app.transcripciones", COLUMNAS)
     .order("creado_en", { ascending: false })
     .limit(limite);
@@ -56,7 +56,7 @@ export async function encolarEnlaces(
   pedidoPor: string,
 ): Promise<ResultadoEncolar> {
   if (enlaces.length === 0) return { nuevos: 0, yaEstaban: 0 };
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .upsert(
       "app.transcripciones",
       enlaces.map((e) => ({
@@ -78,7 +78,7 @@ export async function tomarPendientes(
   ctx: TenantContext,
   limite: number,
 ): Promise<Transcripcion[]> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("app.transcripciones", COLUMNAS)
     .eq("estado", "pendiente")
     .order("creado_en", { ascending: true })
@@ -89,7 +89,7 @@ export async function tomarPendientes(
 }
 
 export async function contarPendientes(ctx: TenantContext): Promise<number> {
-  const { count, error } = await scoped(ctx)
+  const { count, error } = await (await scoped(ctx))
     .select("app.transcripciones", "id", { count: "exact", head: true })
     .eq("estado", "pendiente");
   if (error)
@@ -102,7 +102,7 @@ export async function marcarResultado(
   id: string,
   campos: { estado: Transcripcion["estado"]; script?: string; idioma?: string; error?: string },
 ): Promise<void> {
-  const { error } = await scoped(ctx)
+  const { error } = await (await scoped(ctx))
     .update("app.transcripciones", { ...campos, procesado_en: new Date().toISOString() })
     .eq("id", id);
   if (error)
@@ -117,7 +117,7 @@ export async function marcarResultado(
 // enlace queda libre. No se pierde gran cosa — si el motor lo trae, el gate lo descarta duro por
 // sin_guion (ADR-030).
 export async function registrarEnDedup(ctx: TenantContext, enlace: EnlaceVideo): Promise<void> {
-  const { error } = await scoped(ctx).upsert(
+  const { error } = await (await scoped(ctx)).upsert(
     "public.processed_items",
     [
       {

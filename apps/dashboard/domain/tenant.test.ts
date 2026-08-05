@@ -94,8 +94,34 @@ test("puedeVerInstancia pregunta por la empresa de la instancia, no por la abier
 test("🔒 el contexto lleva la empresa DEL COCKPIT, no la del usuario", () => {
   // Es la línea que impide que una pantalla de EstadoX muestre los proyectos de 30X.
   const abierto = armarContexto(enDos, { id: "i-estadox-reels", clientId: "estadox" });
-  assert.deepEqual(abierto?.ctx, { clientId: "estadox", instanceId: "i-estadox-reels" });
+  assert.deepEqual(abierto?.ctx, {
+    clientId: "estadox",
+    instanceId: "i-estadox-reels",
+    origen: "sesion",
+  });
   assert.equal(abierto?.rol, "sponsor");
+});
+
+test("🔒 todo contexto que sale de armarContexto es de SESIÓN — nunca de fachada", () => {
+  // El `origen` decide con qué credencial se consulta la base (`lib/supabase/scoped.ts`), así que
+  // esto no es un detalle de forma: si un contexto de pantalla naciera `fachada`, esa pantalla
+  // leería con `service_role` y **bypassaría RLS sin que nada avise** — la Capa 2 quedaría
+  // decorativa justo por donde entra la gente. El único constructor que puede decir `fachada` es
+  // `contextoDeFachada` en `lib/tenant.ts`, que es el camino sin usuario de ADR-028.
+  //
+  // Se prueba con los tres perfiles porque el que más riesgo tiene es el dueño: alcanza todo, así
+  // que un `fachada` colado ahí no se notaría ni mirando los datos. Cada uno con un cockpit que sí
+  // alcanza — si no, `armarContexto` devuelve `null` y el test pasaría sin probar nada.
+  const casos = [
+    { usuario: jero, instancia: { id: "i-retia-reels", clientId: "retia" } },
+    { usuario: enDos, instancia: { id: "i-estadox-reels", clientId: "estadox" } },
+    { usuario: mani, instancia: { id: "i-30x-reels", clientId: "30x" } },
+  ];
+  for (const { usuario, instancia } of casos) {
+    const abierto = armarContexto(usuario, instancia);
+    assert.notEqual(abierto, null, `${instancia.clientId} tenía que ser alcanzable`);
+    assert.equal(abierto?.ctx.origen, "sesion");
+  }
 });
 
 test("armarContexto RECHAZA un cockpit ajeno — es el 403 de la fachada y el redirect de las páginas", () => {

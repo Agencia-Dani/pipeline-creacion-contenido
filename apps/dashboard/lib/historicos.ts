@@ -65,7 +65,7 @@ export async function leerAprobados(
 ): Promise<{ filas: Historico[]; hayMas: boolean; total: number }> {
   const desde = pagina * POR_PAGINA;
 
-  const { data, error, count } = await scoped(ctx)
+  const { data, error, count } = await (await scoped(ctx))
     .select("public.outputs", "id, titulo, contenido_o_link, metadata, calificado_en", { count: "exact" })
     .eq("estado", "aprobado")
     .order("calificado_en", { ascending: false })

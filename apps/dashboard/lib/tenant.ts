@@ -152,7 +152,16 @@ export async function contextoDeFachada(instanciaPedida?: string): Promise<Resul
   const instancias = await leerInstancias();
   const elegida = instancias.find((i) => i.id === instanciaPedida);
   if (!elegida) return { ok: false, motivo: "instancia_desconocida" };
-  return { ok: true, ctx: { clientId: elegida.clientId, instanceId: elegida.id } };
+  // 🔑 `origen: "fachada"` es lo que mantiene al motor corriendo después del flip de la Capa 2.
+  // Acá no hay sesión —la autoridad es el header compartido, no un usuario—, así que `auth.uid()`
+  // es null y las policies de la `021` no tendrían contra qué evaluar: con la clave anon esto sería
+  // `42501 permission denied for schema app` y `run-plan` moriría en 500.
+  //
+  // No es una excepción que se cuela: es lo que ADR-028 y ADR-035 ya decían (la fachada y las
+  // escrituras de n8n van con `service_role`), dicho ahora en un lugar donde `scoped()` puede verlo.
+  // El aislamiento de este camino es la Capa 1 —el `.eq()` que `scoped` inyecta— más el 403 de
+  // `contextoDeFachada` cuando la instancia pedida no existe.
+  return { ok: true, ctx: { clientId: elegida.clientId, instanceId: elegida.id, origen: "fachada" } };
 }
 
 /**

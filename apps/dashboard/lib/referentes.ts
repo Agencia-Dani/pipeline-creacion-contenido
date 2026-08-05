@@ -58,7 +58,7 @@ const SIN_SALUD: Salud = {
 // tenants y el cruce lo hace `leerBanco` contra SU banco, que sí viene scopeado — un par de otra
 // empresa no tiene con qué engancharse.
 async function leerPares(ctx: TenantContext): Promise<Map<string, string[]>> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("app.referentes_proyectos", "referente_id, proyecto_id");
   if (error) throw new Error(`Supabase respondió con error leyendo los proyectos de cada referente: ${error.message}`);
 
@@ -71,10 +71,14 @@ async function leerPares(ctx: TenantContext): Promise<Map<string, string[]>> {
 
 /** El banco completo con sus proyectos y su salud: lo que la pantalla necesita, en una pasada. */
 export async function leerBanco(ctx: TenantContext): Promise<ReferenteDelBanco[]> {
+  // El acceso se pide UNA vez y se reusa: dentro del `Promise.all` un `await` por elemento
+  // serializa la construcción del cliente antes de que arranque nada, y de paso hace que el
+  // paralelismo real de las 3 lecturas se vuelva difícil de leer.
+  const acceso = await scoped(ctx);
   const [referentes, pares, salud] = await Promise.all([
-    scoped(ctx).select("app.referentes", "id, handle, plataforma, activo, notas").order("handle"),
+    acceso.select("app.referentes", "id, handle, plataforma, activo, notas").order("handle"),
     leerPares(ctx),
-    scoped(ctx).select("app.v_salud_referentes", "id, videos_evaluados, tasa_gate, tasa_aprobacion, seguidores"),
+    acceso.select("app.v_salud_referentes", "id, videos_evaluados, tasa_gate, tasa_aprobacion, seguidores"),
   ]);
   if (referentes.error) throw new Error(`Supabase respondió con error leyendo referentes: ${referentes.error.message}`);
   if (salud.error) throw new Error(`Supabase respondió con error leyendo la salud: ${salud.error.message}`);
@@ -129,12 +133,13 @@ async function fijarProyectos(
   referenteId: string,
   proyectoIds: string[],
 ): Promise<void> {
-  const { error: errorBorrado } = await scoped(ctx)
+  const acceso = await scoped(ctx);
+  const { error: errorBorrado } = await acceso
     .borrar("app.referentes_proyectos")
     .eq("referente_id", referenteId);
   if (errorBorrado) throw new Error(`No se pudieron limpiar los proyectos: ${errorBorrado.message}`);
 
-  const { error } = await scoped(ctx).insert(
+  const { error } = await acceso.insert(
     "app.referentes_proyectos",
     proyectoIds.map((proyecto_id) => ({ referente_id: referenteId, proyecto_id })),
   );
@@ -146,7 +151,7 @@ export async function actualizarReferente(
   id: string,
   datos: DatosReferente,
 ): Promise<void> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .update("app.referentes", {
       handle: conArroba(datos.handle),
       plataforma: datos.plataforma,
@@ -164,7 +169,7 @@ export async function actualizarReferente(
 
 /** Devuelve el uuid del referente nuevo. Sin `airtable_id`: nació acá (ADR-027 — Postgres es el dueño). */
 export async function crearReferente(ctx: TenantContext, datos: DatosReferente): Promise<string> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .insert("app.referentes", [
       {
         handle: conArroba(datos.handle),
@@ -209,7 +214,7 @@ export async function buscarPorHandle(
  * para la fila que no debería existir: la repetida, la que se cargó con un typo.
  */
 export async function borrarReferente(ctx: TenantContext, id: string): Promise<void> {
-  const { data, error } = await scoped(ctx).borrar("app.referentes").eq("id", id).select("id");
+  const { data, error } = await (await scoped(ctx)).borrar("app.referentes").eq("id", id).select("id");
   if (error) throw new Error(`Supabase respondió con error borrando el referente: ${error.message}`);
   if (!data || data.length === 0) throw new Error("Ese referente ya no existe.");
 }

@@ -51,13 +51,13 @@ const COLUMNAS_PROYECTO =
   "id, nombre, descripcion, criterios_relevancia, criterios_aprendidos, advertencia_criterios, voz_id, activo, n";
 
 export async function leerVoces(ctx: TenantContext): Promise<VozGuardada[]> {
-  const { data, error } = await scoped(ctx).select("app.voces", COLUMNAS_VOZ).order("nombre");
+  const { data, error } = await (await scoped(ctx)).select("app.voces", COLUMNAS_VOZ).order("nombre");
   if (error) throw new Error(`Supabase respondió con error leyendo voces: ${error.message}`);
   return z.array(filaVoz).parse(data);
 }
 
 export async function leerProyectos(ctx: TenantContext): Promise<ProyectoGuardado[]> {
-  const { data, error } = await scoped(ctx).select("app.proyectos", COLUMNAS_PROYECTO).order("nombre");
+  const { data, error } = await (await scoped(ctx)).select("app.proyectos", COLUMNAS_PROYECTO).order("nombre");
   if (error) throw new Error(`Supabase respondió con error leyendo proyectos: ${error.message}`);
   return z.array(filaProyecto).parse(data);
 }
@@ -94,7 +94,7 @@ export async function leerProyectosComoRegistros(
 // ── Escritura ────────────────────────────────────────────────────────────────
 
 export async function actualizarVoz(ctx: TenantContext, id: string, datos: DatosVoz): Promise<void> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .update("app.voces", {
       nombre: datos.nombre,
       descripcion: datos.descripcion,
@@ -113,7 +113,7 @@ export async function actualizarProyecto(
   id: string,
   datos: DatosProyecto,
 ): Promise<void> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .update("app.proyectos", {
       nombre: datos.nombre,
       descripcion: datos.descripcion,
@@ -139,7 +139,7 @@ export async function actualizarProyecto(
  * quiere que pase.
  */
 export async function crearVoz(ctx: TenantContext, datos: DatosVoz): Promise<string> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .insert("app.voces", [
       {
         nombre: datos.nombre,
@@ -155,7 +155,7 @@ export async function crearVoz(ctx: TenantContext, datos: DatosVoz): Promise<str
 }
 
 export async function crearProyecto(ctx: TenantContext, datos: DatosProyecto): Promise<string> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .insert("app.proyectos", [
       {
         nombre: datos.nombre,
@@ -226,13 +226,13 @@ function traducirFk(error: { code?: string; message: string }, que: string): Err
 }
 
 export async function borrarProyecto(ctx: TenantContext, id: string): Promise<void> {
-  const { data, error } = await scoped(ctx).borrar("app.proyectos").eq("id", id).select("id");
+  const { data, error } = await (await scoped(ctx)).borrar("app.proyectos").eq("id", id).select("id");
   if (error) throw traducirFk(error, "el proyecto");
   if (!data || data.length === 0) throw new Error("Ese proyecto ya no existe.");
 }
 
 export async function borrarVoz(ctx: TenantContext, id: string): Promise<void> {
-  const { data, error } = await scoped(ctx).borrar("app.voces").eq("id", id).select("id");
+  const { data, error } = await (await scoped(ctx)).borrar("app.voces").eq("id", id).select("id");
   if (error) throw traducirFk(error, "la voz");
   if (!data || data.length === 0) throw new Error("Esa voz ya no existe.");
 }

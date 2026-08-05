@@ -17,6 +17,30 @@
 import type { Rol } from "./roles";
 
 /**
+ * De dónde salió la autoridad de un contexto. **No es metadata: decide con qué credencial se
+ * consulta la base** (`lib/supabase/scoped.ts`).
+ *
+ *   · `sesion`  → hay un usuario logueado y sus cookies. Se lee con la clave anon ⇒ **RLS manda**
+ *                 (Capa 2 de ADR-047, migración `021`).
+ *   · `fachada` → **no hay usuario**: el motor se autentica con el header compartido y dice qué
+ *                 instancia es (ADR-028 / ADR-048). Sin `auth.uid()` las policies no tienen contra
+ *                 qué evaluar, así que ahí el `service_role` no es un atajo, es el único camino —
+ *                 y el filtro es el tipado de la Capa 1, que es justamente lo que `scoped` aplica.
+ *
+ * 🩸 **Por qué vive acá y no como un parámetro.** El flip de la Capa 2 destapó que la fachada
+ * comparte `scoped()` con el cockpit: `run-plan` → `lib/config.ts` → `leerAjustes`/`leerVoces`/
+ * `leerProyectos`/`leerReferentes`, las mismas funciones que usan las pantallas. Flipear `scoped()`
+ * a secas dejaba al motor con `42501 permission denied for schema app` — sin sesión no hay policy
+ * que pase. Poniendo la autoridad en el contexto, cada función se entera sin que nadie la hile:
+ * **ya reciben `ctx`.**
+ *
+ * 🔒 Y es obligatorio a propósito: un lugar nuevo que arme un contexto **no compila** hasta declarar
+ * de dónde saca la autoridad. La misma disciplina que el mapa de tablas de `scoped.ts` — el modo de
+ * falla que se está evitando es el silencioso, no el ruidoso.
+ */
+export type Origen = "sesion" | "fachada";
+
+/**
  * El contexto que atraviesa todo `lib/`. Sin esto no se puede construir una query (ADR-047).
  *
  * `clientId` es **la empresa del cockpit abierto**, no la del usuario. La diferencia importa desde
@@ -26,6 +50,7 @@ import type { Rol } from "./roles";
 export type TenantContext = {
   clientId: string;
   instanceId: string;
+  origen: Origen;
 };
 
 /** Una fila de `app.usuarios_clientes`. */
@@ -102,6 +127,9 @@ export function instanciasVisibles<T extends InstanciaVisible>(
  *
  * ⚠️ Fijate que el `clientId` que sale es **el de la instancia**, no el del usuario. Es la línea
  * que hace cumplir la regla de ADR-051.
+ *
+ * El `origen` es `sesion` porque acá **hay un usuario**: entra por parámetro. Es el único
+ * constructor de contextos con sesión del sistema; el otro es `contextoDeFachada` en `lib/tenant.ts`.
  */
 export function armarContexto(
   usuario: Alcance,
@@ -109,5 +137,8 @@ export function armarContexto(
 ): { ctx: TenantContext; rol: Rol } | null {
   const rol = rolEn(usuario, instancia.clientId);
   if (rol === null) return null;
-  return { ctx: { clientId: instancia.clientId, instanceId: instancia.id }, rol };
+  return {
+    ctx: { clientId: instancia.clientId, instanceId: instancia.id, origen: "sesion" },
+    rol,
+  };
 }

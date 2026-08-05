@@ -50,7 +50,7 @@ const COLUMNAS =
 
 /** Solo las pendientes: la bandeja muestra lo que hay que decidir, no el archivo. */
 export async function leerPendientes(ctx: TenantContext): Promise<Sugerido[]> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("app.referentes_propuestos", COLUMNAS)
     .eq("estado", "propuesto");
   if (error) throw new Error(`Supabase respondió con error leyendo las propuestas: ${error.message}`);
@@ -76,7 +76,7 @@ export async function marcarResuelto(
   id: string,
   estado: "promovido" | "descartado",
 ): Promise<void> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .update("app.referentes_propuestos", { estado })
     .eq("id", id)
     .select("id");

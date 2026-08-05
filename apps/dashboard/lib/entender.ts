@@ -77,7 +77,7 @@ async function leerVista<T>(
   esquema: z.ZodType<T>,
   limite: number,
 ): Promise<T[]> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select(vista, "*")
     .order("semana", { ascending: false })
     .limit(limite);
@@ -109,7 +109,7 @@ const filaEvento = z.object({
 export type FilaEvento = z.infer<typeof filaEvento>;
 
 export async function leerEventos(ctx: TenantContext, limite = 50): Promise<FilaEvento[]> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("app.eventos", "creado_en, tipo, detalle, usuarios(nombre)")
     .order("creado_en", { ascending: false })
     .limit(limite);

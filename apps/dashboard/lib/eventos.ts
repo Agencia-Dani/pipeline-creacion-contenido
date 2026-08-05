@@ -13,7 +13,7 @@ export async function registrarEvento(
   detalle: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await scoped(ctx).insert("app.eventos", [{ usuario_id: usuarioId, tipo, detalle }]);
+    await (await scoped(ctx)).insert("app.eventos", [{ usuario_id: usuarioId, tipo, detalle }]);
   } catch (e) {
     console.error(`[eventos] no se pudo registrar ${tipo}:`, e);
   }

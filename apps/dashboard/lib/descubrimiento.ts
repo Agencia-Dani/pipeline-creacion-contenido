@@ -26,7 +26,7 @@ const filaRun = z.object({ id: z.string(), inicio: z.string(), estado: z.string(
  */
 export async function hayBusquedaViva(ctx: TenantContext, ventanaMin = 60): Promise<boolean> {
   const desde = new Date(Date.now() - ventanaMin * 60_000).toISOString();
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("public.runs", "id, inicio, estado")
     .eq("params->>workflow", "descubrimiento")
     .eq("estado", "en_curso")

@@ -25,7 +25,7 @@ const filaAjuste = z.object({
 export type Ajuste = z.infer<typeof filaAjuste>;
 
 export async function leerAjustes(ctx: TenantContext): Promise<Ajuste[]> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .select("app.ajustes", "clave, valor, descripcion, visibilidad, actualizado_en")
     .order("clave");
   if (error) throw new Error(`Supabase respondió con error leyendo ajustes: ${error.message}`);
@@ -47,7 +47,7 @@ export async function leerAjustesComoRegistros(ctx: TenantContext): Promise<Regi
 // UPDATE, nunca upsert: las 18 claves ya existen (las trajo el import de sombra) y el check
 // de la migración las fija. Si una clave no está, es un bug de datos y tiene que doler.
 export async function guardarAjuste(ctx: TenantContext, clave: string, valor: number): Promise<void> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .update("app.ajustes", { valor, actualizado_en: new Date().toISOString() })
     .eq("clave", clave)
     .select("clave");

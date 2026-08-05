@@ -59,7 +59,7 @@ const COLUMNAS =
 
 /** Todo lo que hay en el feed de ESTE cockpit, con el proyecto ya resuelto a nombre por la FK. */
 export async function leerFeed(ctx: TenantContext): Promise<CandidatoFeed[]> {
-  const { data, error } = await scoped(ctx).select("app.candidatos", COLUMNAS);
+  const { data, error } = await (await scoped(ctx)).select("app.candidatos", COLUMNAS);
   if (error) throw new Error(`Supabase respondió con error leyendo el feed: ${error.message}`);
 
   return z.array(filaCandidato).parse(data).map((r) => ({
@@ -120,7 +120,7 @@ async function actualizar(
   id: string,
   campos: Record<string, unknown>,
 ): Promise<void> {
-  const { data, error } = await scoped(ctx)
+  const { data, error } = await (await scoped(ctx))
     .update("app.candidatos", campos)
     .eq("id", id)
     .select("id");

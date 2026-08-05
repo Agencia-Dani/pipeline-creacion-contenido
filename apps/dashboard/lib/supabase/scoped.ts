@@ -1,5 +1,6 @@
 import type { TenantContext } from "@/domain/tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 // La Capa 1 de ADR-047, y la pieza que de verdad protege: **no se puede construir una query sin
 // `TenantContext`.** Convierte "acordate de filtrar" en un error de compilación.
@@ -15,6 +16,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // ⚠️ **Esto no reemplaza a RLS, y RLS no reemplaza a esto** (ADR-047). RLS filtra por el usuario de
 // la sesión, y hay dos caminos que no tienen sesión: la fachada de ADR-028 y las escrituras de n8n
 // (ADR-035). Cubren superficies distintas.
+//
+// Y desde el flip de la Capa 2 hay que decirlo con números, porque es la línea que alguien va a
+// querer "simplificar": **RLS acota a TODAS las empresas del usuario** —es lo máximo que puede saber
+// la base, que no tiene forma de enterarse de qué cockpit hay abierto en el browser— mientras que el
+// `.eq()` de acá abajo acota **al cockpit abierto**, que es más angosto. Borrar el filtro porque "ya
+// está RLS" haría que, apenas alguien alcance dos empresas, una pantalla de EstadoX muestre también
+// los proyectos de 30X. Sin error y sin aviso. Está escrito igual en la `021` §3.
 //
 // ⚠️ **Depende de la migración `016`.** Si esto se deploya antes de aplicarla, las queries piden
 // columnas que en prod no existen. El orden está en plan-multi-tenant §11.3: primero la `016`.
@@ -129,15 +137,29 @@ function conTenant<T extends Record<string, unknown>>(tabla: Tabla, filas: T[], 
  * El acceso a Supabase, con el tenant ya puesto.
  *
  * ```ts
- * const { data, error } = await scoped(ctx).select("app.proyectos", COLUMNAS).order("nombre");
+ * const { data, error } = await (await scoped(ctx)).select("app.proyectos", COLUMNAS).order("nombre");
  * ```
  *
  * No devuelve el query builder crudo en ningún camino: se entra por `select`, `insert`, `upsert`,
  * `update` o `borrar`, y los cinco aplican el filtro o inyectan la columna. Lo que sale sí es un
  * builder de supabase-js, así que `.order()`, `.limit()`, `.single()` y el resto siguen igual.
+ *
+ * ⚠️ **Es `async` desde el flip de la Capa 2, y el doble `await` es feo a propósito.** El cliente de
+ * sesión necesita `await cookies()`, así que no hay forma de que esto siga siendo síncrono sin
+ * cachear el cliente entre requests — que es exactamente el bug que no queremos: un cliente cacheado
+ * es la sesión de otra persona. El primer `await` resuelve la credencial, el segundo la query.
  */
-export function scoped(ctx: TenantContext) {
-  const cliente = createAdminClient();
+export async function scoped(ctx: TenantContext) {
+  // 🔒 La bifurcación de ADR-047 Capa 2, y la única línea del sistema que elige credencial.
+  //
+  // `fachada` NO es un escape hatch: es el camino de ADR-028/ADR-035, donde la autoridad es el
+  // header compartido y no hay `auth.uid()` contra el que evaluar una policy. Su aislamiento es el
+  // `.eq()` de `filtrar()` (Capa 1) más el 403 de `contextoDeFachada` — y el contexto solo puede
+  // nacer `fachada` en ESE constructor, así que ninguna pantalla puede pedirlo por accidente.
+  //
+  // `sesion` lee con la clave anon ⇒ las 17 policies de la `021` se evalúan de verdad. Acá es donde
+  // el aislamiento entre empresas deja de ser TypeScript y pasa a ser la base.
+  const cliente = ctx.origen === "fachada" ? createAdminClient() : await createClient();
   // El `as string` no afloja nada real: este proyecto no genera `database.types.ts`, así que los
   // genéricos de supabase-js ya colapsan a `any` y el literal del schema no compra tipado. Lo que
   // sí hace es evitar que tsc arme la unión de (2 schemas × 24 tablas) y se rinda con un
@@ -189,7 +211,7 @@ export async function contarEn(
   columna: string,
   id: string,
 ): Promise<number> {
-  const { count, error } = await scoped(ctx)
+  const { count, error } = await (await scoped(ctx))
     .select(tabla, "id", { count: "exact", head: true })
     .eq(columna, id);
   if (error) throw new Error(`Supabase respondió con error contando ${tabla}: ${error.message}`);
