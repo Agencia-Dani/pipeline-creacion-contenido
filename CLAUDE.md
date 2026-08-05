@@ -25,7 +25,7 @@ en §Agent skills; acá solo se ubican.
   que reemplaza a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–054, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–058, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -48,7 +48,12 @@ en §Agent skills; acá solo se ubican.
   `origen: "sesion" | "fachada"`, estampado en los dos únicos constructores que existen
   (`armarContexto` en `domain/tenant.ts` y `contextoDeFachada` en `lib/tenant.ts`). **No es
   cosmético**: la fachada comparte `scoped()` con el cockpit —`run-plan` llega por `lib/config.ts`—
-  así que sin esa marca el flip dejaba al motor con `42501` y sin plan que leer.
+  así que sin esa marca el flip dejaba al motor con `42501` y sin plan que leer. El porqué completo,
+  y la ventana de ADR-047 que se cerró **sin** suspender cockpits, en
+  [ADR-058](docs/adr/ADR-058-el-flip-de-la-capa-2.md).
+  🟠 **Lo que la `021` NO cubre:** las 4 tablas `*_linkedin` de la `020` tienen RLS enabled y **cero
+  policies** — falla cerrado y hoy nada las lee, pero muerde con la primera pantalla de LinkedIn.
+  Escrito para ejecutarlo ahí en [plan-multi-tenant §14.6](docs/agents/plan-multi-tenant.md).
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
@@ -58,7 +63,7 @@ porque es una sola regla (ADR-053): **cambiar un workflow es `n8n:push`, no re-i
 re-import queda solo para topología, y solo ahí aplican sus placeholders y credenciales.
 - [Workflows/workflow-short-form-content/CLAUDE.md](Workflows/workflow-short-form-content/CLAUDE.md) — el motor de reels (qué es, orden). Fuente de verdad: su `workflow.json`.
 - [Workflows/workflow-descubrimiento-referentes/README.md](Workflows/workflow-descubrimiento-referentes/README.md) — el descubrimiento de referentes (ADR-020): propone cuentas nuevas cada semana, el equipo aprueba, se siembran solas.
-- [Workflows/workflow-archivado/README.md](Workflows/workflow-archivado/README.md) — el archivado: manda los calificados a `outputs` y al Sheet Histórico, destila criterios (ADR-022) y barre. 🔴 El Sheet es **uno solo y global**: [ADR-057](docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) (abierta) decide si se parametriza o se mata.
+- [Workflows/workflow-archivado/README.md](Workflows/workflow-archivado/README.md) — el archivado: manda los calificados a `outputs` y al Sheet Histórico, destila criterios (ADR-022) y barre. 🔴 El Sheet es **uno solo y global**: [ADR-057](docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) lo **sentenció** (el export CSV del cockpit ya está en prod); sacar los nodos va en el re-import de D8.
 - [Workflows/workflow-dispatcher/README.md](Workflows/workflow-dispatcher/README.md) — el que convierte **un** workflow parametrizado en **N corridas aisladas**, una por instancia (ADR-050). Los dos crons del sistema viven acá.
 - [Workflows/workflow-registro-fallos/README.md](Workflows/workflow-registro-fallos/README.md) — el error handler global: marca como `fallo` el run de la ejecución que se cayó, encontrado por `params.execution_id` (ADR-054). Activo y verificado end-to-end; lo apuntan los 4 workflows. Se rompió **dos veces** por un `<<SUPABASE_URL>>` sin resolver que `onError: continue` silenciaba: por eso `npm run n8n:diff` va después de cada import.
 
@@ -79,7 +84,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..054).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..058).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

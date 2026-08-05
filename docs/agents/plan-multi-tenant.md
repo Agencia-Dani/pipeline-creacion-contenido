@@ -6,7 +6,7 @@
 >
 > **Cómo leerlo.** §1 es el diagnóstico con evidencia (leelo aunque conozcas el repo — hay cuatro cosas que no están documentadas en ningún otro lado). §2 son las decisiones. §3–§9 son las fases, en orden de ejecución. §10 son los casos de escalabilidad, uno por uno. §11 es cómo se verifica. **Si vas a ejecutar, §12 es el checklist.**
 
-**Estado:** **en ejecución — Fases 0–4 en producción, Fase 6 paso 1 de 2** · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-04 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
+**Estado:** **en ejecución — Fases 0–4 y 6 en producción** (la Capa 2 quedó viva el 05/08, ADR-058). Faltan la **paginación del feed** (§12 #7) y la **Fase 5, LinkedIn** (§12 #9) · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-05 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
 
 ---
 
@@ -16,33 +16,44 @@
 > handoff. Si vas a retomar el refactor: el checklist con marcas está en **§12** y lo que falta,
 > escrito para ejecutarse sin releer nada, en **§14**.
 
-**Migraciones: las 21 de 21 aplicadas.** ✅ **La ventana del expand se cerró el 04/08** con la `019`:
-`app.usuarios` quedó en `id, nombre, creado_en, es_dueno` — murieron `rol` y `client_id`, y el acceso
-vive solo en la membresía.
+**Migraciones: las 21 de 21 aplicadas**, y desde el 05/08 **ninguna está inerte**: la `021` (RLS)
+se activó con el flip de `scoped.ts` ([ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)).
 
-**La base (PostgREST, prod):** `clients` = **3** (`retia`, `estadox`, `30x`) · `instances` = **4**
-(`retia/reels` **active** · `retia/linkedin` draft · `estadox/linkedin` active · `30x/linkedin`
-active) · `app.usuarios` = **5** · **`app.usuarios_clientes` = 5 filas** (2 dev, 3 operador, todas
-`retia`) · `es_dueno` = los 2 devs · las 4 tablas `*_linkedin` de la `020` responden ·
-`app.clientes_visibles()` y `app.instancias_visibles()` existen (dan `42501` con `service_role`, que
-es *"existe pero no tenés EXECUTE"*) ⇒ la **`021` está aplicada** · voces 3 · proyectos 6 ·
-referentes 16 · outputs 88.
+**La base (PostgREST, prod, 2026-08-05):** `clients` = **3** (`retia`, `estadox`, `30x`) ·
+`instances` = **4** (`retia/reels` **active** · `retia/linkedin` draft · `estadox/linkedin` active ·
+`30x/linkedin` active) · **`app.usuarios` = 6** · **`app.usuarios_clientes` = 7 filas** (retia: 3
+operador + 2 dev · **`30x`: 1 operador** · **`estadox`: 1 operador**) · `es_dueno` = los 2 devs ·
+**`app.voces` = 4, y una es de `30x`** · proyectos 6 · referentes 16 · candidatos 165 · descartes 38 ·
+runs 41 · outputs 88.
+
+> 🩸 **Las dos últimas cifras son la noticia, y hasta el 05/08 no estaban en ningún doc.** Hay una
+> persona **no dueña con membresía en dos empresas** (la primera del sistema) y **dato real de una
+> segunda empresa** en la base. Eso es textual el disparador de la Capa 2 escrito en ADR-047, o sea
+> que **se cruzó sin que nadie lo anotara**: el segundo cockpit no estaba dado de alta, estaba **en
+> uso**. *El estado del sistema no se lee del handoff, se mide.*
+
+**Aislamiento hoy: las dos capas puestas.** La Capa 1 (el `.eq()` que inyecta `scoped()`, acota al
+**cockpit abierto**) y la Capa 2 (las 17 policies de la `021`, acotan a **las empresas del usuario**).
+No son redundantes y ninguna reemplaza a la otra. **Verificado en prod con cuenta no dueña**: una
+lectura sin filtro de tenant devolvió 3 de las 4 voces, y las 4 zonas cargan con datos —
+`Entender` incluida, que era el riesgo concentrado (sus 12 vistas corren `security_invoker`).
+⚠️ Con cuenta **dueña** esa medición no prueba nada: `app.clientes_visibles()` le devuelve todas las
+empresas, así que ve las 4.
+
+**El único camino que sigue en `service_role`, por diseño:** la fachada de ADR-028 y las escrituras
+de n8n (ADR-035) — no tienen sesión —, más `lib/tenant.ts`, que resuelve el tenant y scoparlo sería
+circular (ADR-058 decisión C). El **selector de cockpits** queda entonces con Capa 1 sola.
 
 **n8n:** **5 workflows activos** (motor 34 nodos · descubrimiento 22 · dispatcher 8 · archivado 20 ·
-errores 3) y `npm run n8n:diff` da **limpio en los 5**, con 11 placeholders aprendidos del live.
-Ningún workflow tiene cron propio: los dos que hay viven en el dispatcher (motor lunes 8am ·
-archivado domingo 18:00). El descubrimiento **no tiene cron a propósito** — se sacó en `270d107` y
-hoy es un botón del cockpit.
+errores 3) y `npm run n8n:diff` da **limpio en los 5** (medido el 05/08). Ningún workflow tiene cron
+propio: los dos que hay viven en el dispatcher (motor lunes 8am · archivado domingo 18:00). El
+descubrimiento **no tiene cron a propósito** — se sacó en `270d107` y hoy es un botón del cockpit.
 
-**El repo:** 165 tests + `typecheck` verdes · `validate` 2028 checks · `auditar-workflows` sin
-hallazgos.
+**El repo:** **175 tests** + `typecheck` verdes · `validate` **2046 checks** · `auditar-workflows`
+sin hallazgos.
 
 **La key de Anthropic filtrada está ROTADA y revocada** (verificado el 04/08: la del commit `d98d45a`
 da **401** contra la API; los 3 workflows del live traen una sola key y coincide con el `.env`).
-
-**Aislamiento hoy:** con la `021` aplicada las policies **existen y no se evalúan en ningún camino**,
-porque el BFF sigue leyendo con `service_role`, que bypassa RLS. O sea: **el aislamiento entre
-empresas sigue siendo solo la Capa 1 (TypeScript)** hasta el flip de `scoped.ts` — ver §14.3.
 
 ---
 
@@ -549,9 +560,11 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | 6 | **Fase 4** — `run-plan` v2 + motor + dispatcher | el segundo tenant corriendo | sí, **re-import** | ✅ en prod · corrida de verificación `ok` |
 | — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ✅ **COMPLETO** — mergeada (`ad2de5b`), `018` + `019` aplicadas y verificadas por su efecto (04/08) |
 | 7 | 🔴 **Paginación del feed** (§10) | el segundo tenant con volumen | no | ⬜ no empezada |
-| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | 🔧 **paso 1 de 2: la `021` está APLICADA** (inerte) · falta el flip de `scoped.ts` → **§14.3** |
+| 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | ✅ **COMPLETA el 2026-08-05** — la `021` aplicada **y** el flip de `scoped.ts` en prod (`d8edea2`, [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)). Verificada con cuenta no dueña y con las 4 zonas cargando |
 | 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | 🔧 la **`020` está aplicada** y hay 3 cockpits en `instances`; no existe el workflow en n8n |
 
+> ✅ **Al 2026-08-05 quedan dos: el #7 (paginación) y el #9 (LinkedIn).** Ninguno bloquea a nadie hoy.
+>
 > ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
 > que la secuencia real es **`018`/`019` → Capa 2 (RLS) → paginación → LinkedIn**. La fila sin número
 > va donde va porque bloquea a la #8, no porque sea una fase nueva.

@@ -22,16 +22,19 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## 🎯 AL CIERRE 95 (2026-08-05) QUEDA UNA SOLA COSA, Y NECESITA UN BROWSER
+> ## ✅ AL CIERRE 96 (2026-08-05) EL FLIP ESTÁ CERRADO. QUEDAN DOS CLICS.
 >
-> **El flip de `scoped.ts` está en producción** (`d8edea2`) y verificado con una cuenta no-dueña de
-> dos empresas. Lo único abierto es **la otra mitad de esa verificación**: las pantallas **con
-> datos**.
+> **La Capa 2 está viva y verificada por las dos mitades**: con cuenta no dueña (3 de 4 voces sin
+> filtro de tenant) y con cuenta dueña sobre las pantallas con datos (las 4 zonas, `Entender`
+> incluida). La Fase 6 del plan quedó **completa**.
+>
+> Lo que queda son dos verificaciones de browser que no bloquean nada y se hacen en un login.
 >
 > | # | Qué | Quién | Estado |
 > |---|---|---|---|
 > | 1 | 🔴 **Entrar a `/retia/reels` con una cuenta DUEÑA y recorrer las 4 zonas** | Mani | ✅ **HECHO el 05/08.** Cuenta dueña, ventana aparte: **las 4 zonas cargan con datos, Entender incluida** — que era el riesgo concentrado (sus 12 vistas corren `security_invoker` y necesitan que el usuario alcance `clients`/`instances`/`workflows`). **Con esto el flip queda cerrado** |
-> | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ arrastre del cierre 94; se hace en el mismo login que el #1 |
+> | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ **arrastre del cierre 94**, el más viejo abierto. El CSV está verificado contra las 31 filas reales con un parser RFC 4180 independiente; lo que nadie hizo es **el clic**. 15 columnas, acentos derechos |
+> | 4 | 🟡 Que el tab **Entender** aparezca en el nav de un **operador** (`b8a3832`) | Jero o Alejo | ⬜ se ve solo, en su próximo login. La lógica tiene tests; falta el ojo. *No se probó desde una sesión de agente a propósito: habría requerido generar un magic link de la cuenta de otra persona* |
 > | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
 >
 > ⚠️ **Y el flip se hizo DOS VECES el mismo día, por dos sesiones que no se vieron** (`d8edea2` y una
@@ -41,7 +44,7 @@
 > y escribir el ADR *antes* —como manda el repo— habría ahorrado el día duplicado. Es el costo real de
 > haber dejado el ADR para después, y por eso queda anotado acá y no solo en el ADR.
 >
-> ### 🔴 #1 — Cómo se hace, y qué mirar
+> <details><summary>Registro: cómo se hizo el #1, y los números que tenía que dar</summary>
 >
 > Cuenta **`a.davila0423@gmail.com`** (Alejandro Dávila, `es_dueno: true`). **Ventana de incógnito**,
 > si no el magic link cae sobre otra sesión.
@@ -78,12 +81,15 @@
 > al deployment de `3f2105a` desde Vercel. La `021` puede quedarse aplicada: vuelve a ser inerte sola
 > en cuanto el BFF regrese al `service_role`.
 >
-> ### 📐 #3 — La decisión que quedó implementada y sin ADR
+> </details>
 >
-> **La autoridad viaja en el `TenantContext`** (`origen: "sesion" | "fachada"`). Gobierna cómo se
-> elige credencial en todo el BFF y no está escrita en ningún ADR, así que alguien va a "simplificar"
-> el discriminante por redundante. El porqué completo —incluida la trampa de la fachada compartiendo
-> `scoped()`— está en [plan-multi-tenant §14.3](./plan-multi-tenant.md); falta destilarlo a ADR.
+> ### 📐 #3 — CERRADO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)
+>
+> **La autoridad viaja en el `TenantContext`** (`origen: "sesion" | "fachada"`), y ahora está escrito
+> por qué: gobierna cómo se elige credencial en todo el BFF, así que sin ADR alguien iba a
+> "simplificar" el discriminante por redundante. El ADR cubre las tres cosas que el código no
+> explica — el `origen`, la ventana de ADR-047 que se cerró **sin** suspender cockpits, y por qué
+> `lib/tenant.ts` se queda en `service_role`.
 >
 > <details><summary>Los tres pendientes del cierre 93, cerrados y medidos el 04/08 (registro)</summary>
 >
@@ -1254,6 +1260,28 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-05 (cierre 96) — El mismo flip, hecho dos veces el mismo día: lo que sobró se tiró y lo que faltaba se escribió (Claude, pedido de Mani).**
+**Qué se hizo:** una sesión que arrancó a construir el flip de la Capa 2, lo construyó entero y verificado, y al ir a mergear **descubrió que ya estaba en `main`** hecho por Alejandro. Se descartó el código duplicado y se quedó lo que la otra sesión no tenía: **[ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)**, el hallazgo de LinkedIn sin policies (§14.6 del plan), dos términos de glosario, la enmienda a ADR-047, seis comentarios que el flip volvió falsos, y **el operador entrando a Entender**.
+
+**🩸 El hallazgo que reencuadró la sesión entera, y salió de medir en vez de leer.** El plan §0, el handoff y `CLAUDE.md` daban **5 usuarios y 5 membresías, todas de Retia**. Medido contra prod: **6 usuarios, 7 membresías en 3 empresas**, una persona **no dueña con membresía en dos** (la primera del sistema) y **una voz de `30x`**. O sea que **el disparador de la Capa 2 escrito en ADR-047 —*"antes de que un segundo cliente real tenga usuarios en producción"*— ya se había cruzado y nadie lo había anotado.** El segundo cockpit no estaba dado de alta: estaba **en uso**. *Es la tercera vez este mes que el estado real solo aparece midiendo, y la segunda en que un doc daba por cierto lo contrario.*
+
+**⚠️ Y el flip se hizo DOS VECES, por dos sesiones que no se vieron.** Las dos llegaron al mismo diseño: mismo campo `origen`, mismos dos valores, mismos dos constructores, mismas mediciones de la fachada. **Que converjan no valida el diseño — mide que estaba forzado por la forma del código.** La lección accionable no es "coordinar mejor": es que **el ADR escrito antes de construir habría ahorrado el día**, que es exactamente lo que el repo ya manda (*`core/` solo cambia con ADR*) y lo que las dos sesiones saltearon. Quedó escrito en el propio ADR-058, no solo acá.
+
+**📐 ADR-058 cierra el item #3 que el cierre 95 dejó abierto.** Registra tres cosas que el código no explica: por qué la autoridad va en el `TenantContext` y no en un parámetro (**elegir mal entre dos funciones sueltas es silencioso justo en la dirección peligrosa** — declarar `"fachada"` en una pantalla saltea RLS sin romper nada, ningún test se pone rojo); por qué **no se aplicó** la regla de ADR-047 al cumplirse su disparador (se escribió cuando retrasar el segundo cockpit costaba cero, y para cuando llegó costaba sacarle la herramienta a alguien que la usaba); y por qué `lib/tenant.ts` se queda en `service_role`, con el selector en Capa 1 sola.
+
+**🩸 Las 4 tablas de LinkedIn no tienen policy, y lo interesante es por qué no se vio** (§14.6). La `020` las crea con RLS enabled y cero policies, apoyada en que la Capa 2 las cubriría (*"nacen del lado correcto del disparador y NO hay que acordarse de volver"*); la `021` **no las nombra ni una vez**. El check #1 de la propia `021` es exactamente el que lo caza y dio *"cero filas, sin excepciones"* — porque corrió en Docker sobre `001→018` + `021`, **sin la `020` en el medio**. *El agujero no estaba en la verificación sino en el corpus sobre el que se corrió.* Falla cerrado y hoy nada las lee; muerde en la Fase 5, disfrazado de *"todavía no hay datos"*.
+
+**🧹 Seis comentarios que el flip volvió falsos, y dos eran peores que los otros cuatro.** Cuatro cabeceras de `lib/` seguían diciendo *"con service_role — `app.*` tiene RLS sin policies, el browser no llega solo"*. Los otros dos mentían en la **justificación**, que es lo caro: `admin.ts` decía que `runs`/`outputs` no tienen policies (la `021` se las puso, con grant a `authenticated`) y `tenant.ts` justificaba usar admin con que `usuarios_clientes` no es alcanzable desde el browser (la `021` le puso policy). La razón verdadera para seguir con admin ahí es otra —**es la tabla con la que se decide el scope, y scoparla sería circular**— y ahora está escrita.
+
+**👁️ El operador entró a Entender** (`b8a3832`), a pedido de Mani. De las tres exclusiones de la tabla de zonas era **la única sin motivo escrito**: venía de repartir una zona por verbo y quedó por inercia. Gana precisión de entrega y separación del gate (la salud por referente ya la tenía en Curar). **El filo es el gate de costos:** dice `rol !== "sponsor"`, así que el operador **ve lo que cuestan los proveedores**. Se aceptó por una razón **de hecho y no de diseño** —hoy todos los operadores son gente de adentro, confirmado contra las 7 membresías— y el supuesto quedó escrito en **tres** lugares (el gate, `roles.ts`, ADR-052 enmendado) porque quien toca el gate puede no leer el ADR y viceversa. 🚨 **El día que alguien de una empresa cliente reciba `operador`, ese gate le publica el margen — y falla hacia MOSTRAR, así que no se rompe: filtra.**
+
+**🔬 Y una cosa sobre cómo se verificó el flip, que vale para el próximo cambio de este tipo.** Después del flip **ninguna pantalla puede probar que funcionó**: la Capa 1 filtra por el cockpit abierto *antes* de que RLS opine, así que un operador de Retia ve sus 3 voces con RLS y sin. Hizo falta un instrumento aparte —una sonda temporal que lee sin filtro de tenant por los dos caminos y los pone al lado— y **no vale con cuenta dueña**: `clientes_visibles()` le devuelve todas las empresas, así que sus dos números coinciden por diseño. La sonda vivió solo en la rama descartada; si hace falta volver a medir, son 20 líneas.
+
+**Verde:** `typecheck` 0 · **175 tests** · `build` · `validate` **2046 checks** · `n8n:diff` **limpio en los 5**.
+**Docs alineados con lo medido:** plan §0 reescrito (decía 5 usuarios y *"el aislamiento sigue siendo solo la Capa 1"*), §12 fila 8 a ✅, la cabecera del plan, ADR-047, ADR-052, plan-cockpit §2.1, el glosario (**Cockpit** y **Fachada**, que se usaban en todos los ADRs y no estaban definidos en ninguno).
+**Qué sigue:** los dos clics de §Pendiente vivo (el CSV y el tab del operador) → **D8** (apagado de Airtable + `fields.uuid` + sacar los nodos del Sheet: los tres esperan el mismo re-import) → **paginación del feed** (§12 #7) → **Fase 5, LinkedIn**, que arranca por §14.6 (sus 4 tablas sin policy) y sigue bloqueada por lo no-técnico de ADR-055. Deuda vieja: 18 menciones a Airtable en el onboarding, 3 en el one-pager.
+**Skills sugeridas:** `/grill-with-docs` antes de D8 (borrar nodos es topología y hay tres cosas esperando el mismo re-import: conviene decidir el orden antes) · `/diagnose` si algo del flip aparece raro en una pantalla · `/handoff` al cerrar.
 
 **2026-08-05 (cierre 95) — El flip de la Capa 2 en producción: el aislamiento entre empresas dejó de ser TypeScript (Claude, con Alejandro).**
 **Qué se hizo:** el **paso 2 de 2 de la Fase 6** (ADR-047) escrito, deployado y verificado. La `021` llevaba dos días aplicada e **inerte**; ahora las 17 policies se evalúan de verdad. Commit `d8edea2`, Production en Vercel.
