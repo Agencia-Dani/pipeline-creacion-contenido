@@ -22,10 +22,63 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## ✅ NO QUEDA NADA ABIERTO AL CIERRE 94 (2026-08-04). Los tres del cierre 93, cerrados y medidos.
+> ## 🎯 AL CIERRE 95 (2026-08-05) QUEDA UNA SOLA COSA, Y NECESITA UN BROWSER
 >
-> **El próximo paso es del plan, no de la lista de pendientes:** el **flip de `scoped.ts`**
-> (Fase 6, paso 2 de 2) — ver más abajo.
+> **El flip de `scoped.ts` está en producción** (`d8edea2`) y verificado con una cuenta no-dueña de
+> dos empresas. Lo único abierto es **la otra mitad de esa verificación**: las pantallas **con
+> datos**.
+>
+> | # | Qué | Quién | Estado |
+> |---|---|---|---|
+> | 1 | 🔴 **Entrar a `/retia/reels` con una cuenta DUEÑA y recorrer las 4 zonas** | Mani | ⬜ **abierto — es lo único que bloquea dar el flip por cerrado** |
+> | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ arrastre del cierre 94; se hace en el mismo login que el #1 |
+> | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ⬜ decisión estructural sin escribir (abajo) |
+>
+> ### 🔴 #1 — Cómo se hace, y qué mirar
+>
+> Cuenta **`a.davila0423@gmail.com`** (Alejandro Dávila, `es_dueno: true`). **Ventana de incógnito**,
+> si no el magic link cae sobre otra sesión.
+>
+> ⚠️ **Un dueño NO bypassa RLS**, y es lo que hace que esta prueba valga: `es_dueno` es un predicado
+> *adentro* de `app.clientes_visibles()`, no un `BYPASSRLS`. Solo el `service_role` bypassa, y ese ya
+> no es quien lee las pantallas. Así que esto ejercita grants, policies y `security_invoker` de
+> verdad — sobre las tablas que sí tienen datos.
+>
+> | Pantalla | Tiene que mostrar |
+> |---|---|
+> | **`/entender`** | ⚠️ **empezá por acá**: son las **12 vistas `security_invoker`**, la zona de más riesgo del flip |
+> | `/operar` | **41** corridas |
+> | `/curar/feed` | sobre **165** candidatos |
+> | `/curar/voces` | **3** voces · **6** proyectos |
+> | `/curar/referentes` | **16** |
+> | `/curar/ajustes` | **18** knobs |
+> | `/curar/descartes` | **38** |
+> | `/curar/sugeridos` | **8** |
+> | `/curar/historicos` | **88** — y acá se hace el **#2**, el clic al CSV (15 columnas, acentos derechos) |
+> | `/transcribir` | **2** |
+>
+> Y **una escritura** (calificar en el feed, o mover un knob): prueba el `with check` de las policies
+> y el insert a `app.eventos`, que ninguna lectura toca.
+>
+> 🩸 **Acá la alarma se INVIERTE respecto de la cuenta de prueba del cierre 95.** Con los cockpits de
+> LinkedIn (vacíos) cualquier número era sospechoso; acá el peligro es el **cero**. Una pantalla que
+> carga limpia y muestra 0 donde la tabla dice 165 es **una policy que no matchea**, y es el fallo
+> silencioso — la misma familia que la vista que daba 18 filas para 17 referentes (`015`). Por eso
+> están los números: *"se ve bien"* no distingue los dos casos. Un `42501` en pantalla, en cambio, es
+> el fallo ruidoso: un grant que faltó, se arregla con SQL **sin revertir el deploy**.
+>
+> 🛟 **Rollback si algo se rompe feo:** `git revert d8edea2 && git push`, o el rollback instantáneo
+> al deployment de `3f2105a` desde Vercel. La `021` puede quedarse aplicada: vuelve a ser inerte sola
+> en cuanto el BFF regrese al `service_role`.
+>
+> ### 📐 #3 — La decisión que quedó implementada y sin ADR
+>
+> **La autoridad viaja en el `TenantContext`** (`origen: "sesion" | "fachada"`). Gobierna cómo se
+> elige credencial en todo el BFF y no está escrita en ningún ADR, así que alguien va a "simplificar"
+> el discriminante por redundante. El porqué completo —incluida la trampa de la fachada compartiendo
+> `scoped()`— está en [plan-multi-tenant §14.3](./plan-multi-tenant.md); falta destilarlo a ADR.
+>
+> <details><summary>Los tres pendientes del cierre 93, cerrados y medidos el 04/08 (registro)</summary>
 >
 > | # | Qué | Estado |
 > |---|---|---|
@@ -41,7 +94,7 @@
 > diseñó). ✅ **Y Mani entró con una cuenta operador: se ve bien.** Esa era la verificación que la
 > base no puede dar.
 >
-> ### 🟡 Lo único sin probar en vivo (1 clic, de Mani)
+> ### 🟡 El clic que faltaba *(sigue abierto — es el #2 de la tabla de arriba)*
 >
 > El botón **Descargar CSV** de `/curar/historicos` ([ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)).
 > Su parte frágil —el CSV— está verificada contra las 31 filas reales de prod con un parser RFC 4180
@@ -134,12 +187,15 @@
 >
 > </details>
 >
-> ### 🎯 Y lo que sigue en el plan, una vez cerrados los dos comandos de arriba
+> ### ✅ Y lo que seguía en el plan, hecho al día siguiente
 >
-> El **flip de `scoped.ts`** (Fase 6, **paso 2 de 2**): el BFF deja `createAdminClient()` y pasa a
-> leer con la sesión del usuario. La `021` ya está aplicada e inerte, así que la red está puesta y
-> falta saltar. Es **alto riesgo concentrado en una línea** y se prueba **con la cuenta de Jero**, que
-> es la que se puede perder. Ver §14.3 del [plan multi-tenant](./plan-multi-tenant.md).
+> El **flip de `scoped.ts`** (Fase 6, **paso 2 de 2**) entró el **05/08** (`d8edea2`). Este bloque
+> decía *"alto riesgo concentrado en una línea"* y *"se prueba con la cuenta de Jero"*: **las dos
+> cosas resultaron falsas**. No era una línea (la fachada comparte `scoped()`), y la cuenta que sirve
+> no es la de Jero sino una **no-dueña con membresía en dos empresas**, porque es la única que separa
+> las dos capas. Los dos hallazgos están en [§14.3](./plan-multi-tenant.md) y en el cierre 95.
+>
+> </details>
 >
 > ### Lo que sí quedó cerrado del runbook viejo
 > | # | Paso | Estado |
@@ -1191,6 +1247,23 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-05 (cierre 95) — El flip de la Capa 2 en producción: el aislamiento entre empresas dejó de ser TypeScript (Claude, con Alejandro).**
+**Qué se hizo:** el **paso 2 de 2 de la Fase 6** (ADR-047) escrito, deployado y verificado. La `021` llevaba dos días aplicada e **inerte**; ahora las 17 policies se evalúan de verdad. Commit `d8edea2`, Production en Vercel.
+
+**🩸 El flip no era una línea, y el plan decía que sí.** §14.3 afirmaba *"la fachada y n8n no se tocan"* — cierto como intención, **falso como código**. `run-plan` llega a `scoped()` por dos saltos: `route.ts` → `lib/config.ts` → `leerAjustes`/`leerVoces`/`leerProyectos`/`leerReferentes`, **las mismas funciones que usan las pantallas** (el corte de D5 las hizo compartidas a propósito). Flipear `scoped()` a secas dejaba a la fachada en `42501 permission denied for schema app` —sin sesión no hay `auth.uid()` contra el que evaluar una policy— y **al motor sin plan que leer**. *Nadie lo tenía escrito porque `lib/config.ts` no aparece grepeando consumidores de `scoped`: la dependencia es transitiva.* Habría fallado cerrado y barato (500 en el primer nodo, cero pesos), pero se habría descubierto **el lunes 8:00 con el cron**.
+
+**La forma elegida: la autoridad viaja en el contexto.** `TenantContext` gana `origen: "sesion" | "fachada"`, estampado en los **dos únicos** constructores que existen (`armarContexto` y `contextoDeFachada`). Se prefirió sobre dos puertas separadas (`scoped` + `scopedDeFachada`) porque **no hay nada que hilar** —cada función ya recibe `ctx`— y porque falla en la dirección correcta: **un constructor nuevo no compila** hasta declarar de dónde saca la autoridad, la misma disciplina que el mapa de tablas. Efecto colateral: `scoped()` es **async** (el cliente de sesión necesita `await cookies()`), así que los **36 call sites** pasaron a `(await scoped(ctx))`. No se cachea el cliente entre requests: un cliente cacheado es la sesión de otra persona. 📐 **Falta el ADR** — es estructural y sin él alguien va a borrar el discriminante por redundante.
+
+**🎯 Y la prueba que hasta hoy era imposible de hacer.** El plan pedía probar con **Jero**; la cuenta que sirve es otra. `alejandro.davila@30x.com` es **no-dueña** (⇒ las policies se evalúan, sin bypass) y tiene membresía en **`30x` y `estadox`**, no en `retia`. Es el único perfil que **separa las dos capas**: RLS le habilita las dos empresas —es lo máximo que puede saber la base— y solo el `.eq()` de `scoped.ts` la acota al cockpit abierto. *Ese escenario no existía en producción hasta hoy: era un comentario en la `021` y pasó a ser un hecho.* Verificado en pantalla: **la voz de 30X no apareció en EstadoX** (`30x` tiene 1 voz, `estadox` 0 — esa sola fila es todo el test) · **ni un `42501` navegando**, o sea que los grants de `authenticated` son correctos en prod y no solo en Docker · selector de equipo con **2 opciones, sin Retia** · **ADR-056 en las dos direcciones** (`Transcribir` escondida por el pipeline, `Entender` por el rol) · **las 4 URLs a mano rebotaron**, incluida `/retia/reels/curar/feed`, que es por donde se habrían filtrado los 165 candidatos · todo lo demás en **0**, cero fugas.
+
+**Lo medido sin browser:** fachada contra el live **200 · 403 · 400 · 403 · 200 · 200** (`version: 2`, 3 voces · 5 proyectos · 18 ajustes · 16 referentes) — el cron del lunes tiene su plan. Con la anon key, `app.*` da **42501** y `runs`/`outputs` dan **200 con 0 filas**: fail-closed en las dos formas. `typecheck` 0 · **174 tests** (+1: todo contexto de pantalla nace `sesion`) · `validate` **2037 checks** · `build` limpio.
+
+**⏳ Lo que NO se verificó, y es la otra mitad del riesgo:** todo lo de arriba corrió sobre cockpits **vacíos**. Las pantallas **con datos** (`/retia/reels`) siguen sin abrirse con una sesión, y **`Entender` —las 12 vistas `security_invoker`— es la zona de más riesgo del flip entero**. Está en §Pendiente vivo con los números que tiene que mostrar cada pantalla, porque **acá la alarma se invierte**: en los cockpits vacíos cualquier número era sospechoso; en Retia el peligro es **el cero**, que es el fallo silencioso (una policy que no matchea) y no se distingue mirando si "se ve bien".
+
+**📄 De paso, dos datos que el handoff tenía viejos:** hay **6 usuarios y 7 membresías** (decía 5 y 5 — se sumaron "Alejandro 30X" y "Manuel 30X" después del cierre 94), y **`danieltovartech@gmail.com` está en `auth` pero no en `app.usuarios`**, así que esa cuenta cae en `/sin-rol` si intenta entrar.
+
+**Qué sigue:** el login dueño de §Pendiente vivo (cierra el flip **y** el clic del CSV de una sola vez) → el ADR del `origen` → **D8** (apagado de Airtable + `fields.uuid` + sacar los nodos del Sheet: los tres esperan el mismo re-import) → la deuda de docs (18 menciones a Airtable en el onboarding, 3 en el one-pager).
 
 **2026-08-04 (cierre 94) — Auditoría del refactor contra prod: dos de los tres pendientes cerrados, y el que se arregló destapó dos más (Claude, pedido de Mani).**
 **Qué se hizo:** una auditoría medida (base por PostgREST, n8n por su API, los 4 feedback loops), el **arreglo del archivado empujado al live y verificado con una corrida real**, el backfill de los 9 `outputs` que salieron con metadata vacía, los docs corregidos donde mentían, y [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) abierto.

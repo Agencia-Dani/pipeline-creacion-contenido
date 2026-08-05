@@ -36,13 +36,19 @@ en §Agent skills; acá solo se ubican.
 - [core/schema/](core/schema/) — migraciones SQL de Supabase (001–021; se aplican a mano en el SQL Editor,
   en orden). Al 2026-08-04, **medido contra prod por PostgREST**, están las **21 de 21 aplicadas**.
   ✅ **La ventana del expand se cerró**: la `019` mató `usuarios.rol` y `usuarios.client_id`, y el
-  acceso vive solo en `app.usuarios_clientes` (5 filas) + el flag `es_dueno` (ADR-051).
+  acceso vive solo en `app.usuarios_clientes` (**7 filas** al 05/08) + el flag `es_dueno` (ADR-051).
   ⚠️ **Una migración con gate humano no se da por aplicada porque se haya corrido, sino cuando se
   mide su efecto**: la `019` se corrió el 03/08 sin error visible y **no había entrado** — el
   `raise exception` del §0 abortaba la transacción entera. Se midió, se firmó el gate y entró el 04/08.
-  La **`021` (RLS, Capa 2 de ADR-047)** está aplicada pero es **inerte** hasta que `scoped.ts` deje el
-  `service_role` — ese flip es el próximo paso del plan
-  ([plan-multi-tenant §14.3](docs/agents/plan-multi-tenant.md)).
+  ✅ **La `021` (RLS, Capa 2 de ADR-047) DEJÓ DE SER INERTE el 2026-08-05** (`d8edea2`): el flip de
+  `scoped.ts` está en producción y el cockpit lee con la sesión del usuario, así que las 17 policies
+  se evalúan de verdad. **El `service_role` quedó solo donde no hay sesión**: la fachada de ADR-028 y
+  las escrituras de n8n por PostgREST (ADR-035).
+  🔑 **Cómo sabe `scoped()` bajo qué autoridad corre:** el `TenantContext` lleva
+  `origen: "sesion" | "fachada"`, estampado en los dos únicos constructores que existen
+  (`armarContexto` en `domain/tenant.ts` y `contextoDeFachada` en `lib/tenant.ts`). **No es
+  cosmético**: la fachada comparte `scoped()` con el cockpit —`run-plan` llega por `lib/config.ts`—
+  así que sin esa marca el flip dejaba al motor con `42501` y sin plan que leer.
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*

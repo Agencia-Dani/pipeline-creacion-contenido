@@ -646,21 +646,89 @@ humana explícita.
 **Hecho cuando.** Un nodo nuevo entra a un workflow **activo** con `npm run n8n:push -- <alias>
 --apply`, `n8n:diff` queda limpio después, y `n8n:restore` lo saca.
 
-### 14.3 🟡 El aislamiento entre empresas hoy es solo TypeScript — *la red ya está escrita, falta saltar*
+### 14.3 ✅ CERRADO — el aislamiento ya no es solo TypeScript: la Capa 2 está viva en producción
 
-> **Actualizado 2026-08-04.** La [`021_rls_capa_2.sql`](../../core/schema/021_rls_capa_2.sql) **ya
-> está aplicada en prod** (medido: `app.clientes_visibles()` y `app.instancias_visibles()` existen).
-> Falta el **flip** de `scoped.ts`, que es donde el aislamiento se vuelve real. Se partió en dos a
-> propósito, con el mismo expand/contract de la `016`/`017` y la `018`/`019`:
+> **Cerrado el 2026-08-05 (`d8edea2`).** Los dos pasos están hechos. Se partió en dos a propósito,
+> con el mismo expand/contract de la `016`/`017` y la `018`/`019`:
 >
 > | | Paso | Riesgo | Estado |
 > |---|---|---|---|
-> | 1 | Aplicar la **`021`**: grants para `authenticated`, las funciones de alcance, 17 policies y `security_invoker` en las 12 vistas | **Ninguno.** El BFF sigue en `service_role`, que bypassa RLS: las policies existen y no se evalúan en ningún camino | ✅ **APLICADA** (2026-08-03) e **inerte**, como se diseñó |
-> | 2 | El **flip**: `scoped.ts` deja `createAdminClient()` y pasa a la sesión | **Alto, y concentrado en una línea.** Acá es donde el aislamiento se vuelve real | ⬜ **no empezado — es el próximo paso del plan** |
+> | 1 | Aplicar la **`021`**: grants para `authenticated`, las funciones de alcance, 17 policies y `security_invoker` en las 12 vistas | **Ninguno.** El BFF seguía en `service_role`, que bypassa RLS: las policies existían y no se evaluaban en ningún camino | ✅ **APLICADA** (2026-08-03) e inerte, como se diseñó |
+> | 2 | El **flip**: `scoped.ts` deja `createAdminClient()` y pasa a la sesión | **Alto.** Acá es donde el aislamiento se vuelve real | ✅ **EN PRODUCCIÓN** (2026-08-05) y **verificado con una cuenta no-dueña de dos empresas** |
 >
 > **La fachada y n8n no se tocan en ninguno de los dos.** `run-plan`, `instancias` y las escrituras
 > por PostgREST siguen con `service_role` por diseño (ADR-028 / ADR-035): no tienen sesión de
 > usuario, así que ahí el único filtro posible es el tipado de la Capa 1.
+>
+> 🩸 **PERO ESO ERA CIERTO COMO INTENCIÓN Y FALSO COMO CÓDIGO, y casi cuesta el motor.** Este párrafo
+> —el de arriba, escrito antes del flip— daba por sentado que la fachada no pasaba por `scoped.ts`.
+> **Pasa, por dos saltos:**
+>
+> ```
+> app/api/engine/run-plan/route.ts
+>   → leerRunPlanCrudo(ctx)                    lib/config.ts
+>      → leerAjustesComoRegistros(ctx)         lib/ajustes.ts     ┐
+>      → leerVocesComoRegistros(ctx)           lib/proyectos.ts   │→ scoped(ctx)
+>      → leerProyectosComoRegistros(ctx)       lib/proyectos.ts   │
+>      → leerReferentesComoRegistros(ctx)      lib/referentes.ts  ┘
+> ```
+>
+> Son **las mismas funciones** que usan las pantallas: el corte de D5 las hizo compartidas a
+> propósito (`lib/config.ts` es *"la costura donde se decide de qué almacenamiento sale cada
+> dominio"*). Flipear `scoped()` a secas dejaba a `run-plan` en **`42501 permission denied for schema
+> app`** —sin sesión no hay `auth.uid()` contra el que evaluar una policy— y el motor sin plan que
+> leer. Nadie lo tenía escrito porque `lib/config.ts` no aparece grepeando consumidores de `scoped`.
+>
+> 🟢 *Habría fallado cerrado y barato: 500 en el primer nodo, antes de Apify/Supadata/Haiku. Pero se
+> habría descubierto el **lunes 8:00**, con el cron.*
+>
+> **La forma que resolvió eso: la autoridad viaja en el contexto.** `TenantContext` gana
+> `origen: "sesion" | "fachada"`, estampado en los **dos únicos** constructores del sistema —
+> `armarContexto()` (hay usuario) y `contextoDeFachada()` (no lo hay) — y `scoped()` elige credencial
+> según eso. Se eligió sobre la alternativa (dos puertas, `scoped` + `scopedDeFachada`) porque **no
+> hay nada que hilar**: cada función ya recibe `ctx`. Y falla en la dirección correcta: un
+> constructor nuevo **no compila** hasta declarar de dónde saca la autoridad, la misma disciplina que
+> el mapa de tablas de `scoped.ts`.
+>
+> 📐 **Esto merece un ADR y todavía no lo tiene** — es una decisión estructural que gobierna cómo se
+> elige credencial en todo el BFF, y sin ella escrita alguien va a "simplificar" el discriminante.
+> Queda como task.
+>
+> ⚙️ **Efecto colateral que hay que saber:** `scoped()` es **async** (el cliente de sesión necesita
+> `await cookies()`), así que los 36 call sites son `(await scoped(ctx))`. No se cachea el cliente
+> entre requests a propósito: un cliente cacheado es la sesión de otra persona.
+>
+> ### Lo verificado, y con qué se verificó
+>
+> **El motor, contra el live:** `run-plan` con header **200** (`version: 2`, 3 voces · 5 proyectos ·
+> 18 ajustes · 16 referentes) · sin header **403** · sin instancia **400** · instancia ajena **403** ·
+> `ambito=completo` **200** · `instancias` del dispatcher **200** con `retia/reels`.
+>
+> **La Capa 2 viva en prod, no solo en Docker:** con la anon key, `app.voces`/`candidatos`/`ajustes`/
+> `proyectos` dan **`42501 permission denied for schema app`**, y `runs`/`outputs` dan **200 con 0
+> filas** — las policies evaluando `instancias_visibles()` sin `auth.uid()`. Fail-closed en las dos
+> formas que existen.
+>
+> 🎯 **Y la prueba que hasta hoy era imposible: un no-dueño con membresía en DOS empresas.**
+> `alejandro.davila@30x.com` (`es_dueno: false`, operador en `30x` **y** `estadox`, **no** en
+> `retia`). Es el único perfil que separa las dos capas, porque RLS le habilita las dos empresas y
+> solo el `.eq()` de `scoped.ts` lo acota al cockpit abierto. Verificado en pantalla:
+>
+> · **La voz de 30X no apareció en EstadoX** (`30x` tiene 1 voz, `estadox` 0). Esa sola fila es todo
+>   el test de la distinción entre las dos capas, y hasta este login no existía en producción.
+> · **Ni un `42501` navegando**: los grants de `authenticated` son correctos en prod, que era la
+>   incógnita cara de ADR-047 (*"la fase con más riesgo de romper lo que funciona"*).
+> · **Selector de equipo con 2 opciones**, sin Retia, y sin selector de pipeline.
+> · **ADR-056 en las dos direcciones**: `Transcribir` escondida por el pipeline (el rol la tiene),
+>   `Entender` por el rol (el pipeline la tiene).
+> · **Las 4 URLs a mano rebotaron** (`/retia/reels`, `/retia/reels/curar/feed`, `.../transcribir`,
+>   `.../entender`): la guardia está en el servidor, no en que el nav esconda el link.
+> · Todo lo demás en **0** en los dos cockpits de LinkedIn, o sea **cero fugas de Retia**.
+>
+> ⏳ **Lo que falta, y es la otra mitad del riesgo:** todo eso corrió sobre cockpits **vacíos**. Las
+> pantallas **con datos** (`/retia/reels`) siguen sin verificarse con una sesión — y la zona
+> **`Entender`** es la de más riesgo del flip entero, porque son las 12 vistas `security_invoker`.
+> Ver §Pendiente vivo del [handoff](./handoff.md).
 >
 > 🩸 **El hallazgo que la fase no tenía escrito, y que la decidía entera.** Las 27 vistas se crearon
 > **sin `security_invoker`**. En Postgres una vista corre con los permisos de *su dueño*: escribir
