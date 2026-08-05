@@ -37,9 +37,12 @@ export type Instancia = InstanciaVisible & {
 /**
  * Las membresías de una persona.
  *
- * Con el cliente admin y no con la sesión: `app.usuarios_clientes` tiene RLS sin policies (el
- * patrón del schema `app`), así que el browser no la alcanza ni por accidente. Quien decide qué
- * puede ver alguien no puede ser una tabla que ese alguien pueda leer desde el navegador.
+ * Con el cliente admin y no con la sesión, y desde el flip de la Capa 2 (ADR-058) la razón cambió:
+ * la `021` **sí** le puso policy (`usuario lee sus membresias`, `usuario_id = auth.uid()`), así que
+ * ya no es cierto que el browser no la alcance. Sigue con admin por lo otro, que es lo que de
+ * verdad manda: **es la tabla con la que se decide el scope, y scoparla sería circular** — y leerla
+ * por encima de RLS hace que un bug en esa policy no pueda encoger el acceso de alguien en
+ * silencio, que es el modo de falla caro acá (quedarse afuera del cockpit sin saber por qué).
  */
 export async function leerMembresias(usuarioId: string): Promise<Membresia[]> {
   const supabase = createAdminClient();

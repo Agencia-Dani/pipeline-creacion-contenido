@@ -12,8 +12,9 @@ import {
 import type { TenantContext } from "@/domain/tenant";
 import { contarEn, scoped } from "@/lib/supabase/scoped";
 
-// IO de voces y proyectos. Lee y escribe `app.voces` + `app.proyectos` con service_role: `app.*`
-// tiene RLS sin policies, el browser no llega solo.
+// IO de voces y proyectos. Lee y escribe `app.voces` + `app.proyectos` por `scoped()`, que desde el
+// flip de la Capa 2 (ADR-058) entra con la sesión del usuario. Las dos son de grano EMPRESA: su
+// policy filtra por `client_id`, el mismo eje que aplica `scoped()`.
 //
 // Con D7 este archivo dejó de hablar dos idiomas. Ya no acuña record ids en Airtable al crear
 // (el motor escribe FKs uuid, no links con `typecast`) y ya no va a buscar los criterios

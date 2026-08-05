@@ -3,8 +3,10 @@ import type { TenantContext } from "@/domain/tenant";
 import { scoped, type Tabla } from "@/lib/supabase/scoped";
 
 // Lecturas de la zona Entender: las vistas de las migraciones 008 (D2) y 013 (D7). Read-only
-// por construcción — acá no hay ni un write. El browser nunca toca estas vistas: pasan por el
-// BFF con service_role (RLS sin policies del lado de las tablas).
+// por construcción — acá no hay ni un write. El browser nunca toca estas vistas: pasan por el BFF.
+// ⚠️ Son VISTAS, y desde la `021` corren `security_invoker`: con los permisos de quien pregunta, no
+// de su dueño. Sin eso, poner policies en las tablas base habría dejado toda esta zona sin RLS — y
+// no se habría notado, porque con un tenant devuelve las filas correctas igual (ADR-058).
 //
 // Las dos que suma D7 no son features nuevas: son agujeros que el corte habría abierto. Al matar
 // las tablas de Métricas de Airtable se iban con ellas `falsos_negativos` (que no sale de

@@ -4,7 +4,8 @@ import type { TenantContext } from "@/domain/tenant";
 import { scoped } from "@/lib/supabase/scoped";
 
 // IO de los knobs del equipo (D5, primer corte de config). Lee y escribe `app.ajustes`
-// con service_role — `app.*` tiene RLS sin policies, el browser no llega solo.
+// por `scoped()`, que desde el flip de la Capa 2 (ADR-058) entra con la sesión del usuario en las
+// pantallas y con `service_role` solo por la fachada, que no tiene sesión que ofrecerle a la base.
 //
 // 🔑 Desde ADR-046 los knobs son **por instancia**: la PK pasó a ser `(instance_id, clave)`. Antes
 // `clave` era la PK a secas, o sea UNA fila por knob para todo el sistema — las 18 perillas

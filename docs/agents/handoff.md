@@ -32,7 +32,14 @@
 > |---|---|---|---|
 > | 1 | 🔴 **Entrar a `/retia/reels` con una cuenta DUEÑA y recorrer las 4 zonas** | Mani | ⬜ **abierto — es lo único que bloquea dar el flip por cerrado** |
 > | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ arrastre del cierre 94; se hace en el mismo login que el #1 |
-> | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ⬜ decisión estructural sin escribir (abajo) |
+> | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
+>
+> ⚠️ **Y el flip se hizo DOS VECES el mismo día, por dos sesiones que no se vieron** (`d8edea2` y una
+> rama paralela, `capa-2-flip-scoped`, descartada). Las dos llegaron al mismo diseño: mismo campo
+> `origen`, mismos dos valores, mismos dos constructores, mismas mediciones de la fachada. **Que
+> converjan no valida el diseño, mide otra cosa:** la decisión estaba forzada por la forma del código,
+> y escribir el ADR *antes* —como manda el repo— habría ahorrado el día duplicado. Es el costo real de
+> haber dejado el ADR para después, y por eso queda anotado acá y no solo en el ADR.
 >
 > ### 🔴 #1 — Cómo se hace, y qué mirar
 >

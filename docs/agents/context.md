@@ -189,3 +189,19 @@ El emoji 🔥/👍/👎 que el equipo le pone a un Candidato, y **el único acto
 cambia el Estado respecto del 👍; lo que agrega es prioridad como ejemplo positivo al destilar los
 criterios aprendidos (ADR-022). Un Candidato sin calificar es un Candidato **sin decidir**, y como
 tal se pierde: el archivado nunca lo lleva al histórico.
+
+
+**Cockpit**:
+Un pipeline de una empresa, visto como espacio de trabajo: la unidad que alguien **abre**. No es la
+empresa (que cruza pipelines) ni el pipeline (que cruza empresas), sino el cruce de los dos. La
+distinción ordena de quién es cada dato: Voces, Proyectos y Referentes son de la **empresa**; los
+knobs, el feed y las corridas son del **cockpit**. Y la regla que se sigue de ahí: a qué cockpits
+entra alguien lo decide su membresía, pero **qué filas ve adentro lo decide el cockpit abierto**,
+nunca el conjunto de empresas que alcanza (ADR-051).
+
+**Fachada**:
+El único camino por el que una **máquina** pregunta su config antes de gastar créditos (ADR-028).
+Detrás no hay persona: su autoridad es un header compartido más la instancia que dice ser, no una
+sesión. Es lo que parte al sistema en **dos clases de lector con autoridades distintas** —quien abrió
+un cockpit y quien va a correr un pipeline— y por eso ninguna regla que dependa de "quién está
+logueado" alcanza sola (ADR-058).

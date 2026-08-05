@@ -1,6 +1,13 @@
 # ADR-047 — El aislamiento va en dos capas: el compilador ahora, RLS después (con disparador escrito)
 
-- **Estado:** aceptada — 2026-08-02. Es la segunda mitad de la decisión **A** del
+- **Estado:** aceptada — 2026-08-02 · **Capa 2 ejecutada el 2026-08-05.**
+  ⚠️ **El disparador de más abajo se cumplió, y la regla que lo acompaña NO se aplicó: no se
+  suspendió ningún cockpit.** Qué se hizo en su lugar y por qué está en
+  **[ADR-058](./ADR-058-el-flip-de-la-capa-2.md)**, que además enmienda la descripción del flip como
+  *"un cambio de una línea"* — la fachada comparte `scoped()` con el cockpit por dos saltos
+  transitivos. **Si venís por la regla del disparador, seguí por ahí.**
+
+  Es la segunda mitad de la decisión **A** del
   [plan multi-tenant §2](../agents/plan-multi-tenant.md) (§5 y §9 son las fases).
   Implementa lo que [ADR-046](./ADR-046-el-cockpit-es-multi-tenant.md) deja escrito en el schema, y
   **enmienda la nota de alcance** de la migración [`011`](../../core/schema/011_grants_app_service_role.sql).

@@ -4,7 +4,9 @@ import type { TenantContext } from "@/domain/tenant";
 import { scoped } from "@/lib/supabase/scoped";
 
 // IO del transcriptor (ADR-031): la cola en `app.transcripciones` y la marca en `processed_items`.
-// Todo con service_role — `app.*` tiene RLS sin policies, el browser no llega solo.
+// Todo por `scoped()`: desde el flip de la Capa 2 (ADR-058) las pantallas entran con la sesión del
+// usuario y las policies de la `021` se evalúan. El filtro de tenant sigue haciendo falta igual —
+// RLS acota a las empresas del usuario, `scoped()` al cockpit abierto.
 //
 // 🚨 **Los dos `onConflict` de este archivo cambiaron con la migración `016`, y no es cosmético.**
 // PostgREST exige que el arbiter del upsert coincida con un unique existente: si no, tira `42P10` y

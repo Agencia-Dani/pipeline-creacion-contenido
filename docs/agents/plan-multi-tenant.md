@@ -819,3 +819,36 @@ Sheet (opción 1), o bien el nodo no existe y el equipo obtiene el histórico de
   empresa se puede atribuir sin trabajo nuevo (`runs.costo_estimado` ya cuelga de `instance_id`); el
   **cupo** no. Una empresa le puede quemar la cuota a otra y nada avisa. El techo por instancia sigue
   en §10 como pendiente.
+
+### 14.6 🟠 Las 4 tablas de LinkedIn quedaron sin policy — y el check que lo cazaba corrió sin ellas
+
+**Qué.** La [`020`](../../core/schema/020_linkedin.sql) §6 crea `app.referentes_linkedin`,
+`voces_linkedin`, `candidatos_linkedin` y `descartes_linkedin` con `enable row level security` y
+**cero policies**, apoyada en que la Capa 2 las cubriría: *"estas cuatro tablas nacen del lado
+correcto del disparador y NO hay que acordarse de volver"*. La
+[`021`](../../core/schema/021_rls_capa_2.sql) **no las nombra ni una vez.**
+
+**Evidencia.** `grep -c linkedin core/schema/021_rls_capa_2.sql` da **1**, y es un comentario sobre
+`workflows`. El check #1 de la propia `021` —*"¿queda alguna tabla con tenant, RLS activado y sin
+policy?"*— es exactamente el que lo habría cazado, y dio *"cero filas, sin excepciones"* porque
+corrió en Docker sobre **`001→018` + `021`**, sin la `020` en el medio. *El agujero no está en la
+verificación: está en el corpus sobre el que se corrió.*
+
+**Por qué no es una emergencia.** Falla cerrado por los dos caminos posibles: si la `020` entró antes
+que la `021`, el `grant select on all tables in schema app` las alcanzó y con RLS sin policy dan
+**cero filas**; si entró después, ni siquiera tienen grant y dan **`42501`**. Y hoy nada las lee: el
+mapa `TABLAS` de [`scoped.ts`](../../apps/dashboard/lib/supabase/scoped.ts) no tiene ninguna entrada
+`*_linkedin`, así que ninguna pantalla las toca.
+
+**Cuándo muerde.** En la **Fase 5**, el día que exista la primera pantalla de LinkedIn: devolvería
+vacío sin error y sin aviso — la familia de la `015` otra vez, y encima disfrazada de *"todavía no
+hay datos"*, que es lo que uno espera ver en un pipeline nuevo.
+
+**Qué lo destraba.** Cuatro policies con el mismo molde que sus hermanas de grano cockpit
+(`instance_id in (select app.instancias_visibles())` en `using` y `with check`) más el `grant` si
+falta, en una migración propia. **Va junto con la primera pantalla de LinkedIn, no antes**: es el
+mismo criterio de la `021` (escribir la red donde ya hay algo que la use), y así se verifica con una
+pantalla real en vez de con un `select` a una tabla vacía.
+
+**Hecho cuando.** El check #1 de la `021` corrido **contra prod con la `020` aplicada** da cero
+filas, y una pantalla de LinkedIn con una fila sembrada la muestra a quien corresponde y no a otros.
