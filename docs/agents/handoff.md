@@ -30,7 +30,7 @@
 >
 > | # | Qué | Quién | Estado |
 > |---|---|---|---|
-> | 1 | 🔴 **Entrar a `/retia/reels` con una cuenta DUEÑA y recorrer las 4 zonas** | Mani | ⬜ **abierto — es lo único que bloquea dar el flip por cerrado** |
+> | 1 | 🔴 **Entrar a `/retia/reels` con una cuenta DUEÑA y recorrer las 4 zonas** | Mani | ✅ **HECHO el 05/08.** Cuenta dueña, ventana aparte: **las 4 zonas cargan con datos, Entender incluida** — que era el riesgo concentrado (sus 12 vistas corren `security_invoker` y necesitan que el usuario alcance `clients`/`instances`/`workflows`). **Con esto el flip queda cerrado** |
 > | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ arrastre del cierre 94; se hace en el mismo login que el #1 |
 > | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
 >

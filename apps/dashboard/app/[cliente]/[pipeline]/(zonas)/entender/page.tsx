@@ -31,6 +31,13 @@ export default async function EntenderPage({
   // logueándose, `v_costos_semana` (consumo × `app.tarifas`) es el margen de la agencia, y la
   // única zona que un sponsor ve es justamente esta. El corte va acá, en el servidor: esconder la
   // tarjeta en React dejaría los números viajando igual al browser.
+  //
+  // 🩸 **Desde el 2026-08-05 esta línea apoya un supuesto, y conviene saber cuál.** El `operador`
+  // entró a Entender, así que "todos menos sponsor" ahora **incluye al operador**: ve los costos.
+  // Se decidió así porque **hoy todos los operadores son gente de adentro** — confirmado contra las
+  // 7 membresías vivas. El día que alguien de una empresa cliente reciba `operador`, esta línea le
+  // publica el margen, y **falla hacia MOSTRAR**: no rompe nada, no avisa, filtra. Si eso pasa, el
+  // arreglo es `rol === "dev"`, que es lo que ADR-052 dejó escrito y descartado por innecesario.
   const veCostos = rol !== "sponsor";
 
   // `allSettled` y no `all`: una vista que falle apaga su tarjeta, no la página entera.

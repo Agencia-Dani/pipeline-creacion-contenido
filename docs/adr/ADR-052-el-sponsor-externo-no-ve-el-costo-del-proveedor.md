@@ -4,6 +4,15 @@
   consecuencia directa de que las empresas de [ADR-051](./ADR-051-el-acceso-es-membresia-explicita.md)
   sean **clientes externos**. No toca datos ni el motor.
 
+> ⚠️ **Enmienda 2026-08-05 — el público de Entender creció y este ADR ahora sostiene un supuesto.**
+> El `operador` entró a la zona (plan-cockpit §2.1), así que el corte `rol !== "sponsor"` **ya no
+> significa "solo la agencia ve costos"**: significa "todos menos el sponsor", y hoy eso incluye al
+> equipo. Se aceptó con una razón de hecho, no de diseño: **todos los operadores son gente de
+> adentro** (verificado contra las 7 membresías vivas). **El día que alguien de una empresa cliente
+> reciba `operador`, este ADR queda violado sin que nada falle** — el gate falla hacia mostrar. El
+> arreglo ya está escrito acá abajo y descartado por innecesario: `rol === "dev"`. Deja de ser
+> innecesario ese día.
+
 - **Contexto:** el rol `sponsor` ve **una sola zona: Entender**
   ([`domain/roles.ts`](../../apps/dashboard/domain/roles.ts)). Y Entender muestra
   `app.v_costos_semana`, que cruza `runs.metricas` contra **`app.tarifas`**: la tabla que dice

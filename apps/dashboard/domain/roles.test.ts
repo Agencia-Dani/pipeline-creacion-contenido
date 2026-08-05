@@ -9,11 +9,22 @@ import {
   zonasDe,
 } from "./roles.ts";
 
-test("el operador opera, cura y transcribe, pero no entra a entender (la zona dev/sponsor)", () => {
+test("el operador opera, cura, transcribe Y entiende", () => {
   assert.equal(puedeVerZona("operador", "operar"), true);
   assert.equal(puedeVerZona("operador", "curar"), true);
   assert.equal(puedeVerZona("operador", "transcribir"), true);
-  assert.equal(puedeVerZona("operador", "entender"), false);
+  // Entró el 2026-08-05: Entender le mide su propio trabajo (precisión de entrega, separación del
+  // gate). La exclusión anterior venía de la tabla de zonas de plan-cockpit §2.1 y era la única
+  // sin motivo escrito.
+  assert.equal(puedeVerZona("operador", "entender"), true);
+});
+
+test("🚪 el operador entra por Operar, no por Entender — el orden del array es prioridad", () => {
+  // `entender` va última a propósito: `zonaInicial` devuelve el primer elemento, así que meterla
+  // antes cambiaría a dónde cae el equipo al loguearse. Es el tipo de regresión que no rompe nada
+  // y que se nota como "la app me manda a otro lado".
+  assert.equal(zonaInicial("operador"), "operar");
+  assert.deepEqual(zonasDe("operador"), ["operar", "curar", "transcribir", "entender"]);
 });
 
 test("el sponsor solo entiende", () => {

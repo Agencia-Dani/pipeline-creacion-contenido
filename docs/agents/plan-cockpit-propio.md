@@ -90,12 +90,24 @@ No hay 12 páginas planas como en Airtable. Hay **una zona por verbo**, y cada u
 | **Operar** | operador | Voz → Proyecto → N → ▶ Correr · estado de la corrida en vivo | *(no existe hoy: es el muro de B.2)* |
 | **Curar** | operador | Feed de calificación · Referentes (+ los flojos) · Sugeridos · Descartes · Proyectos y Voces · Configuración | Feed · Referentes ×2 · Sugeridos · Descartes · Proyectos · Voces · Configuración Global |
 | **Transcribir** | operador | Pegar enlaces sueltos → script literal; entran al dedup del motor | *(no existe hoy: pedido nuevo, ADR-031)* |
-| **Entender** | dev + sponsor | Precisión por proyecto · embudo y salud del motor · costos de la semana | Calidad · Salud del Sistema · Costos (las 3 rojas del [mapa](./mapa-campos.md) §5.1) |
+| **Entender** | **operador** + dev + sponsor | Precisión por proyecto · embudo y salud del motor · costos de la semana | Calidad · Salud del Sistema · Costos (las 3 rojas del [mapa](./mapa-campos.md) §5.1) |
 
 > **Enmienda 2026-07-28 ([ADR-031](../adr/ADR-031-transcriptor-a-pedido.md)):** esto decía "tres
 > zonas". Entró una cuarta, *Transcribir*. La regla que importaba no era el número sino que **una
 > zona = un verbo del usuario**, y transcribir un video que trae el equipo no es ni operar la máquina
 > ni curar su salida. El sponsor no la ve.
+
+> **Enmienda 2026-08-05:** *Entender* decía **dev + sponsor**. Ahora la ve también el **operador**.
+> De las tres exclusiones de esta tabla, era la única **sin motivo escrito** — venía de repartir una
+> zona por verbo y quedó por inercia. Lo que gana el operador es feedback sobre su propio trabajo:
+> **precisión de entrega** (de lo que calificó, qué fracción aprobó) y **separación del gate**. La
+> salud por referente no entra en la cuenta: ya la tenía en *Curar*.
+>
+> ⚠️ **Y arrastra un supuesto con fecha.** El bloque de costos se gatea con `rol !== "sponsor"`
+> ([ADR-052](../adr/ADR-052-el-sponsor-externo-no-ve-el-costo-del-proveedor.md)), así que el operador
+> **ve lo que cuestan los proveedores**. Se aceptó porque **hoy todos los operadores son de adentro**,
+> verificado contra las 7 membresías vivas. El día que una persona de una empresa cliente reciba
+> `operador`, ese gate le publica el margen — y **falla hacia mostrar**, o sea que no se va a notar.
 
 Los **105 helper texts** ya escritos en [mapa-campos §6.3](./mapa-campos.md) se reusan tal cual: el
 trabajo de redacción del cockpit no se tira, se porta.

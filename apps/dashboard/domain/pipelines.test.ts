@@ -29,13 +29,20 @@ test("un pipeline que nadie declaró no tiene NINGUNA zona — el default seguro
 test("🔒 la intersección exige las DOS condiciones: el rol alcanza y el pipeline implementa", () => {
   // El operador alcanza transcribir por rol…
   assert.equal(zonasDe("operador").includes("transcribir"), true);
-  // …y aun así no la ve en LinkedIn, porque el pipeline no la tiene.
-  assert.deepEqual(zonasVisibles(zonasDe("operador"), "linkedin"), ["operar", "curar"]);
-  // En reels sí, porque ahí las dos condiciones se cumplen.
+  // …y aun así no la ve en LinkedIn, porque el pipeline no la tiene. `entender` sí sobrevive: la
+  // alcanza por rol (desde el 05/08) y LinkedIn la implementa. Que de las cuatro zonas del operador
+  // caiga exactamente una es lo que prueba que el filtro es la intersección y no el rol solo.
+  assert.deepEqual(zonasVisibles(zonasDe("operador"), "linkedin"), [
+    "operar",
+    "curar",
+    "entender",
+  ]);
+  // En reels no cae ninguna, porque ahí las dos condiciones se cumplen para las cuatro.
   assert.deepEqual(zonasVisibles(zonasDe("operador"), "short-form-content"), [
     "operar",
     "curar",
     "transcribir",
+    "entender",
   ]);
 });
 
