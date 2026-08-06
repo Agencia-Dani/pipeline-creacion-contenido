@@ -1113,7 +1113,26 @@ Es lo que ADR-052 dejó escrito y descartó por innecesario; ahora es necesario.
 > margen igual. **Lo cierra la `025`** (A1) y la decisión está en ADR-060 §5. Medido: n8n nunca lee
 > `tarifas`, así que no rompe nada.
 
-#### A1 · `core/schema/025_accesos.sql`
+#### A1 · `core/schema/025_accesos.sql` — ✍️ **ESCRITA y PROBADA · ⬜ FALTA APLICARLA**
+
+> **Estado al 06/08:** el archivo está en [`core/schema/025_accesos.sql`](../../core/schema/025_accesos.sql)
+> y se probó entero contra un **Postgres 16.13 real**, con un fixture que reproduce la forma exacta
+> de prod (8 usuarios / 2 dueños / 9 membresías / 7 en `retia` con 2 de dueño). **Nadie la aplicó a
+> prod todavía** — eso es el SQL Editor, y es de Mani. La tabla de resultados medidos está al pie
+> del propio archivo, para comparar contra lo que dé prod.
+>
+> 🩸 **La medición cambió una policy.** Los 2 dueños **tienen membresía en `retia` con rol `dev`**
+> (la dejó el backfill de la `018`, que corrió antes de que `es_dueno` existiera). Con la policy
+> obvia —*"las membresías de mis empresas"*— un `sponsor` de Retia veía **dos filas fantasma con
+> `rol = dev`**: sin nombre ni mail, pero delatando a la agencia en una superficie que lista
+> personas, que es justo lo que ADR-051 §3 prohíbe. Por eso la exclusión de dueños va en **las dos**
+> policies. Es un bug que ninguna pantalla habría delatado.
+>
+> ➕ **Una función más de la previsto, y por qué:** `app.emails_visibles()`. `app.usuarios` **no tiene
+> el mail** (sus columnas son `id, nombre, creado_en, es_dueno`): vive en `auth.users`, a la que
+> nunca se le da `select` a `authenticated`. Copiar el mail a una columna sería el error que
+> ADR-041 ya decidió no cometer, así que se lee por función `security definer`, filtrada por
+> `usuarios_visibles()`. **A5 lo necesita** — la lista promete nombre, mail, rol y desde cuándo.
 
 Las policies que la `021` dejó explícitamente sin escribir. Mismo molde que su §1, que es el estándar
 de Supabase y no un atajo:
