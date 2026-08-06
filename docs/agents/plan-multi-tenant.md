@@ -1047,8 +1047,18 @@ Es lo que ADR-052 dejó escrito y descartó por innecesario; ahora es necesario.
 | **A3** | `domain/permisos.ts` + tests | `domain/permisos.ts(.test.ts)` |
 | **A4** | La zona `ajustes` (5ª) | `domain/roles.ts`, `domain/pipelines.ts`, `(zonas)/ajustes/**` |
 | **A5** | La pantalla de equipo y el alta | `lib/equipo.ts`, `ajustes/equipo/**` |
-| **A6** | ADR-060 | `docs/adr/ADR-060-*.md` |
+| **A6** | ADR-060 | ✅ **ESCRITA** — [ADR-060](../adr/ADR-060-el-equipo-se-administra-desde-el-cockpit.md) |
 | **A7** | Concurrencia visible | `operar/actions.ts`, `operar/auto-refresh.tsx` |
+
+> ✅ **Carril 0 cerrado del lado del código el 06/08** (`d89ef04`): el gate de costos es
+> `veCostos(rol)` en `domain/roles.ts`, con dos tests, y `entender/page.tsx` lo importa. Falta el
+> deploy y la verificación de §15.D, que son de Mani.
+>
+> 🔴 **Y el arreglo destapó que el gate era SOLO de UI:** la [`021:280`](../../core/schema/021_rls_capa_2.sql)
+> le da `app.tarifas` a cualquiera logueado (`using (true)`) y `v_costos_semana` es
+> `security_invoker`, así que un `operador` que consulte PostgREST con su propia sesión llega al
+> margen igual. **Lo cierra la `025`** (A1) y la decisión está en ADR-060 §5. Medido: n8n nunca lee
+> `tarifas`, así que no rompe nada.
 
 #### A1 · `core/schema/025_accesos.sql`
 
@@ -1068,6 +1078,10 @@ de Supabase y no un atajo:
 - **Sin grants de escritura.** La `021` §2 dejó `usuarios` y `usuarios_clientes` fuera de los
   `grant insert/update/delete` a propósito, y se mantiene: el alta escribe con `service_role` desde
   la Server Action porque **`auth.admin.inviteUserByEmail` no existe con la clave anon**.
+- **`policy select` en `app.tarifas`, reemplazando el `using (true)` de la `021:280`** por *"solo
+  `dev` en alguna membresía, o dueño"*. **Se suma el 06/08** (ADR-060 §5): sin esto el gate de
+  costos del Carril 0 es solo de UI. No rompe nada — n8n nunca lee `tarifas` (medido) y la fachada
+  bypassa.
 - Gate humano, verificado **por efecto** y no por *"corrió sin error"* — la lección de la `019`
   (§14.1).
 
@@ -1102,12 +1116,24 @@ de React ni en las opciones de un `<select>`.
 
 #### A4 · La zona `ajustes`
 
-- `domain/roles.ts`: `ZONAS` y `ZONAS_POR_ROL` ganan `"ajustes"` para `dev` y `sponsor`, **no** para
-  `operador`. Va **última** en el array de `dev`: el archivo avisa en la línea 22 que *"el orden de
-  este array es prioridad"* y `zonaInicial` devuelve el primero. Para el `sponsor`, `entender` sigue
-  siendo la primera.
+> ⚠️ **CORREGIDO el 06/08 al escribir ADR-060, y por un número medido contra prod.** Este bloque
+> decía *"`ajustes` para `dev` y `sponsor`, **no** para `operador`"*. Pero de los **18 knobs** de
+> `app.ajustes`, **8 son de visibilidad `equipo`** (mínimo de likes, mínimo de vistas, propuestas
+> por corrida, los 4 toggles de IG/TikTok, afinidad mínima). Mudarlos a una zona que el `operador`
+> no ve **le saca a Majo y a Jero ocho perillas que usan**, sin error y sin aviso. Lo que se gatea
+> **no es la zona: son sus pantallas.** El detalle y el porqué, en [ADR-060](../adr/ADR-060-el-equipo-se-administra-desde-el-cockpit.md) §1.
+
+- `domain/roles.ts`: `ZONAS` y `ZONAS_POR_ROL` ganan `"ajustes"` para **los tres roles**. Va
+  **última** en el array de cada uno: el archivo avisa en la línea 22 que *"el orden de este array
+  es prioridad"* y `zonaInicial` devuelve el primero. Para el `sponsor`, `entender` sigue siendo la
+  primera.
 - `domain/pipelines.ts`: `ZONAS_POR_PIPELINE` la suma a los **dos** pipelines (el equipo es de la
   empresa: existe con o sin pipeline). `PANTALLAS_CURAR` **pierde** `"ajustes"`.
+  Y nace **`PANTALLAS_AJUSTES`** con su tabla por pipeline, mismo molde que `PANTALLAS_CURAR`:
+  reels declara `motor` + `equipo`, **LinkedIn solo `equipo`** — `app.ajustes` está vacía para su
+  instancia, así que `motor` cargaría limpia con cero perillas. La familia de la `015` otra vez.
+- El gate de `equipo` es `puedeAdministrarEquipo(rol)` (A3), en la guardia del servidor. `motor`
+  la alcanzan los tres, con el filtro por knob que **ya existe** (`ajustesVisibles`).
 - `(zonas)/ajustes/page.tsx` — índice con tarjetas **derivadas** del dominio, igual que
   `curar/page.tsx`: la lista que se dibuja y la que consulta la guardia tienen que ser una sola.
 - `(zonas)/ajustes/motor/` — los knobs, movidos tal cual desde `curar/ajustes/`.
@@ -1133,16 +1159,19 @@ exhaustivo, así que sacar `ajustes` de `PANTALLAS_CURAR` **no compila** hasta b
 - Quitar acceso y cambiar rol: mismo gate, mismo techo de roles. Zod en todo input, `revalidatePath`
   después de cada mutación.
 
-#### A6 · ADR-060
+#### A6 · ADR-060 — ✅ **ESCRITA el 06/08, antes de construir**
 
-**Se escribe antes de construir**, y esto no es ceremonia: es la lección del cierre 96, donde el
-mismo flip se hizo **dos veces el mismo día** por dos sesiones que no se vieron, y la conclusión fue
-*"escribir el ADR antes —como manda el repo— habría ahorrado el día duplicado"*.
+[**ADR-060 — El equipo se administra desde el cockpit, y la autoridad se parte en dos**](../adr/ADR-060-el-equipo-se-administra-desde-el-cockpit.md).
+Se escribió antes, y esto no es ceremonia: es la lección del cierre 96, donde el mismo flip se hizo
+**dos veces el mismo día** por dos sesiones que no se vieron.
 
-Cubre: la 5ª zona y por qué los knobs se mudan; quién administra el equipo y el techo de roles; y
-**por qué la lectura va por RLS pero la escritura por `service_role`** — la autoridad la pone la
-Server Action y no la base, que es la excepción del sistema y hay que nombrarla, no descubrirla.
-Enmienda ADR-051 (el alta deja de ser manual) y ADR-056 (una zona más).
+**Y ya se cobró sola:** escribirla obligó a mirar los knobs por visibilidad, y ahí apareció el 8-de-18
+que corrige A4. Construir primero habría dejado a dos personas sin sus perillas.
+
+Cubre las tres decisiones previstas —la 5ª zona, el techo de roles, y por qué la lectura va por RLS
+pero la escritura por `service_role`— más una cuarta que apareció en el Carril 0: **`app.tarifas`
+estaba abierta a todo usuario logueado**, así que el gate de costos era solo de UI. Enmienda
+ADR-051, ADR-052 y ADR-056.
 
 #### A7 · Concurrencia visible
 
