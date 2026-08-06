@@ -25,7 +25,7 @@ en §Agent skills; acá solo se ubican.
   que reemplazó a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–059, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–060, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -33,9 +33,9 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–024; se aplican a mano en el SQL Editor,
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–025; se aplican a mano en el SQL Editor,
   en orden). Al 2026-08-06, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
-  **23 de 24 aplicadas**. **La única que falta es la `023`**, y es la de abajo.
+  **24 de 25 aplicadas**. **La única que falta es la `023`**, y es la de abajo.
   🧹 **La `022` (ADR-059) podó la "balde 2"**: 5 vistas sin consumidor, `outputs.publicado_en`,
   `runs.costo_estimado`, `instances.config_ref` y las 6 `airtable_id`. Su hermana, la `023` (las 5
   columnas write-only de `processed_items` + `outputs.source_items` + `transcripciones.pedido_por`),
@@ -64,10 +64,17 @@ en §Agent skills; acá solo se ubican.
   con RLS enabled y **cero policies**; la [`024`](core/schema/024_rls_linkedin.sql) se aplicó el
   2026-08-06 y les puso las suyas, **grano instancia** (`instancias_visibles` en el `qual`, no
   `clientes_`, que era el error fácil porque su hermana de reels es por empresa).
-  📏 **Medido el 06/08 en `pg_policies`: 18 policies sobre 18 tablas de `app` + 6 sobre 6 de `public`**,
-  y el check *"¿queda alguna tabla con tenant, RLS y sin policy?"* corrido **contra prod** por primera
-  vez da **cero filas**. ⏳ Lo que falta es ejercitarlas **con filas** (las 4 están vacías): es la
-  prueba de [plan-multi-tenant §14.6](docs/agents/plan-multi-tenant.md), escrita paso a paso.
+  📏 **Medido el 06/08 en `pg_policies`: 26 policies** (19 de la `021` + 4 de la `024` + 1 del `007`
+  + 2 de la `025`), y el check *"¿queda alguna tabla con tenant, RLS y sin policy?"* corrido **contra
+  prod** por primera vez da **cero filas** — antes y después de la `025`. ⏳ Lo que falta es ejercitar
+  las de LinkedIn **con filas** (las 4 tablas están vacías): es la prueba de
+  [plan-multi-tenant §14.6](docs/agents/plan-multi-tenant.md), escrita paso a paso.
+  🔐 **La `025` (ADR-060) cerró el margen de la agencia en la base**, no solo en la UI: `app.tarifas`
+  dejó de ser `using (true)` y ahora pregunta `app.ve_costos()`. **Medido con sesiones reales contra
+  prod: un `operador` obtiene 0 tarifas, un `dev` las 8.** Y las funciones `usuarios_visibles()` /
+  `emails_visibles()` dejan a la agencia **fuera de toda superficie que liste personas** (ADR-051 §3),
+  por policy y no por un `.filter()` de React — verificado: **cero dueños asoman** en las 3 sesiones
+  probadas.
 
 **Runbooks (el N+1)**
 - [docs/runbooks/agregar-cliente.md](docs/runbooks/agregar-cliente.md) — dar de alta **una empresa**.
@@ -115,7 +122,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..059).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..060).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

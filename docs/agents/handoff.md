@@ -54,6 +54,49 @@
 > `"app.usuarios": { grano: "cliente" }` ⇒ filtra por `client_id`, **columna que la `019` dropeó**.
 > Hoy nadie lo ejerce porque `lib/auth.ts` lee esa tabla con `createClient()` directo. Es la tarea A2.
 
+> ## 🅰️➡️ CARRIL A MERGEADO A `main` (2026-08-06) — 6 de 7. **Falta A7 y nada más.**
+>
+> El carril A se quedó sin usage antes de empezar **A7**. Todo lo demás entró: Carril 0 (`d89ef04`),
+> ADR-060 (`dc9ae59`), la `025` (`0ad70ec`), A2+A3 (`8763333`), A4 (`7e261b7`), A5 (`8218347`).
+>
+> **Rebase sin un solo conflicto**, y eso es §15.C funcionando: los dos carriles editaron
+> `plan-multi-tenant.md` y no se pisaron porque cada uno escribió solo su sub-bloque.
+> Verificado sobre el árbol mergeado: `typecheck` · **222/222** · `build` · `validate` (2143 checks)
+> · `n8n:diff` limpio en los 5.
+>
+> ### ✅ La `025` está aplicada, y **la verifiqué por su efecto contra prod**
+>
+> El commit de A decía *"falta aplicarla en el SQL Editor"* — Mani ya la corrió. No se da por
+> aplicada porque haya corrido (la lección de la `019`): **26 policies** (eran 24), las 3 funciones
+> existen, y `app.tarifas` dejó de ser `using (true)`. Y se corrió su verificación #2 con **sesiones
+> reales** (`set local role authenticated`), que es lo que el fixture de A no podía dar:
+>
+> | sesión | membresías | personas | tarifas | emails | dueños que asoman |
+> |---|---:|---:|---:|---:|---:|
+> | dueño (`retia:dev`) | 8 | 7 | 8 | 6 | **0** |
+> | Retia `operador` | 5 | 5 | **0** | 5 | **0** |
+> | Majo (`30x`+`estadox`) | 2 | 1 | **0** | 1 | **0** |
+>
+> **Un `operador` obtiene 0 tarifas y un `dev` las 8**: el margen de la agencia quedó cerrado *en la
+> base*, que era el hallazgo 4 de ADR-060 (el gate era solo de UI). Y **cero dueños asoman** en las
+> tres sesiones ⇒ el bug que la medición de A cazó está corregido en prod.
+>
+> 📌 **Dos números difieren del fixture y ninguno es la policy:** `tarifas` del dueño da 8 y no 2
+> (prod tiene 8 tarifas, el fixture sembró 2), y Majo da 2/1 y no 6/5 porque **en prod está en
+> `30x`+`estadox`, no en `retia`+`30x`** como supuso el fixture. La suposición estaba mal; el
+> comportamiento está bien.
+>
+> 🩸 **Y una anotación del pie de la `025` que NO hay que creerle** (su punto 4): *"B2 va después de
+> esta migración"*. **Falso, y medido** — corregido en el propio archivo, en §14.6 y en §15.B.
+>
+> ### ⏳ Lo que falta del carril A
+>
+> | | |
+> |---|---|
+> | **A7** · concurrencia visible | 🔧 **lo único sin hacer.** `correrAhora()` no re-chequea del lado del servidor y `auto-refresh` solo se monta si ya había corrida viva |
+> | **Deploy de A5** | ⏳ El código está en `main`; la pantalla de equipo **todavía no está en prod**. Su verificación es la de §15.D |
+> | **B4** | El runbook `agregar-cliente.md` tiene el paso de alta marcado `🚧 VERIFICAR CUANDO A5 ESTÉ EN PROD` |
+
 > ## 🅱️ CARRIL B (2026-08-06, rama `carril-b-cierres`) — B2, B4, B5 y B6 cerradas. B1 y B3 esperan.
 >
 > **4 de 6 hechas.** Todo medido contra prod (PostgREST + SQL) y contra n8n por su API; nada de

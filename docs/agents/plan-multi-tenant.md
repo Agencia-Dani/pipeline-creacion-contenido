@@ -1093,15 +1093,21 @@ Es lo que ADR-052 dejó escrito y descartó por innecesario; ahora es necesario.
 
 **Rama `carril-a-accesos`.** Superficie nueva del cockpit: **no toca n8n ni el motor.**
 
-| # | Qué | Archivos |
+| # | Qué | Estado al mergear a `main` (06/08) |
 |---|---|---|
-| **A1** | La migración `025_accesos.sql` | `core/schema/025_accesos.sql` |
-| **A2** | El landmine de `scoped.ts` | `lib/supabase/scoped.ts` |
-| **A3** | `domain/permisos.ts` + tests | `domain/permisos.ts(.test.ts)` |
-| **A4** | La zona `ajustes` (5ª) | `domain/roles.ts`, `domain/pipelines.ts`, `(zonas)/ajustes/**` |
-| **A5** | La pantalla de equipo y el alta | `lib/equipo.ts`, `ajustes/equipo/**` |
-| **A6** | ADR-060 | ✅ **ESCRITA** — [ADR-060](../adr/ADR-060-el-equipo-se-administra-desde-el-cockpit.md) |
-| **A7** | Concurrencia visible | `operar/actions.ts`, `operar/auto-refresh.tsx` |
+| **A1** | La migración `025_accesos.sql` | ✅ **APLICADA y verificada por su efecto contra prod** — 26 policies, y `tarifas` da 0 a un operador |
+| **A2** | El landmine de `scoped.ts` | ✅ `8763333` |
+| **A3** | `domain/permisos.ts` + tests | ✅ `8763333` |
+| **A4** | La zona `ajustes` (5ª) | ✅ `7e261b7` — y la ven **los tres roles**, no dos: lo cambió una medición (ver ADR-060) |
+| **A5** | La pantalla de equipo y el alta | ✅ `8218347` — ⏳ falta el **deploy** y su verificación de §15.D |
+| **A6** | ADR-060 | ✅ **ESCRITA ANTES de construir** — [ADR-060](../adr/ADR-060-el-equipo-se-administra-desde-el-cockpit.md) |
+| **A7** | Concurrencia visible | 🔧 **LO ÚNICO QUE FALTA.** El carril A se quedó sin usage antes de empezarla. `operar/actions.ts`, `operar/auto-refresh.tsx` |
+
+> 🅰️➡️🅱️ **Mergeado a `main` el 06/08 con rebase, sin un solo conflicto** — y eso es el protocolo de
+> §15.C funcionando, no suerte: los dos carriles tocaron `plan-multi-tenant.md` y no se pisaron
+> porque cada uno escribió **solo su sub-bloque** (A en §15.A, B en §15.0/§15.B/§12/§14).
+> Verificado sobre el árbol mergeado: `typecheck` · **222/222 tests** · `build` · `validate` (2143
+> checks) · `n8n:diff` limpio en los 5.
 
 > ✅ **Carril 0 cerrado del lado del código el 06/08** (`d89ef04`): el gate de costos es
 > `veCostos(rol)` en `domain/roles.ts`, con dos tests, y `entender/page.tsx` lo importa. Falta el
@@ -1113,13 +1119,49 @@ Es lo que ADR-052 dejó escrito y descartó por innecesario; ahora es necesario.
 > margen igual. **Lo cierra la `025`** (A1) y la decisión está en ADR-060 §5. Medido: n8n nunca lee
 > `tarifas`, así que no rompe nada.
 
-#### A1 · `core/schema/025_accesos.sql` — ✍️ **ESCRITA y PROBADA · ⬜ FALTA APLICARLA**
+#### A1 · `core/schema/025_accesos.sql` — ✅ **APLICADA y VERIFICADA POR SU EFECTO CONTRA PROD**
 
-> **Estado al 06/08:** el archivo está en [`core/schema/025_accesos.sql`](../../core/schema/025_accesos.sql)
-> y se probó entero contra un **Postgres 16.13 real**, con un fixture que reproduce la forma exacta
-> de prod (8 usuarios / 2 dueños / 9 membresías / 7 en `retia` con 2 de dueño). **Nadie la aplicó a
-> prod todavía** — eso es el SQL Editor, y es de Mani. La tabla de resultados medidos está al pie
-> del propio archivo, para comparar contra lo que dé prod.
+> ## ✅ **APLICADA el 2026-08-06 por Mani, y medida contra prod el mismo día** *(lo escribe el carril B al mergear)*
+>
+> No se da por aplicada porque haya corrido —la lección de la `019`, §14.1— sino porque se midió:
+> las **3 funciones** existen (`usuarios_visibles`, `emails_visibles`, `ve_costos`), `app.usuarios` y
+> `app.usuarios_clientes` tienen **dos policies cada una** (la vieja + la de la `025`, OR-eadas), y
+> la de `app.tarifas` dejó de ser `using (true)` para ser `app.ve_costos()`. **24 → 26 policies.**
+>
+> **Y se corrió su verificación #2 con sesiones reales contra prod** (`set local role authenticated`
+> + `request.jwt.claim.sub`), que es lo que el fixture no podía dar:
+>
+> | sesión | membresías | personas | tarifas | emails | dueños que asoman |
+> |---|---:|---:|---:|---:|---:|
+> | dueño (`retia:dev`) | **8** | **7** | 8 | **6** | **0** |
+> | Retia `operador` | **5** | **5** | **0** | **5** | **0** |
+> | Majo (`30x` + `estadox`) | **2** | **1** | **0** | **1** | **0** |
+>
+> ✅ **Las tres cosas que esta migración existe para lograr, medidas:**
+> 1. **`tarifas` da 0 a un `operador` y todo a un `dev`.** El margen de la agencia quedó cerrado en
+>    la base, no solo en la UI — que era el hallazgo 4 del contexto de ADR-060.
+> 2. **Cero dueños asoman**, en las tres sesiones. Confirma contra prod el bug que la medición de A
+>    cazó (los 2 dueños tienen `retia:dev` por el backfill de la `018`) y que la corrección entró.
+> 3. **El mismo `count(*)` da distinto según quién pregunta** (5 vs 2 vs 8), que es literal el
+>    *"hecho cuando"* de A1 en §15.D.
+>
+> 📌 **Dos números difieren del fixture, y ninguno es la policy** — vale anotarlo porque el pie del
+> `025` los da como esperados: **`tarifas` del dueño da 8 y no 2** (prod tiene 8 tarifas, el fixture
+> sembró 2; "las ve todas" en los dos casos), y **Majo da 2/1 y no 6/5** porque en prod está en
+> `30x` + `estadox`, no en `retia` + `30x` como supuso el fixture. En esas dos empresas es la única
+> no-dueña ⇒ 2 membresías, 1 persona. **La suposición del fixture sobre a qué empresas pertenece
+> estaba mal; el comportamiento de la policy está bien.**
+>
+> 🩸 **Y una anotación del pie del `025` que NO hay que creerle** (punto 4): *"B2 va después de esta
+> migración: corrido antes, reporta lo que esta migración viene a arreglar"*. **Es falso, y está
+> medido.** El check #1 pregunta por *"RLS y **cero** policies"*, y las tres tablas que la `025` toca
+> ya tenían policy (`app.usuarios` del `007`, `app.usuarios_clientes` de la `021`) o no tienen
+> columna de tenant (`app.usuarios`, `app.tarifas`) ⇒ **el check nunca las mira**. Se corrió
+> **antes** de la `025` y dio cero filas, y **después** también. El detalle en §14.6.
+
+> **Cómo se escribió** *(registro del carril A)*: se probó entero contra un **Postgres 16.13 real**,
+> con un fixture que reproduce la forma de prod (8 usuarios / 2 dueños / 9 membresías). La tabla de
+> resultados medidos está al pie del propio archivo.
 >
 > 🩸 **La medición cambió una policy.** Los 2 dueños **tienen membresía en `retia` con rol `dev`**
 > (la dejó el backfill de la `018`, que corrió antes de que `es_dueno` existiera). Con la policy

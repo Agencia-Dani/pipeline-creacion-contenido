@@ -306,5 +306,15 @@ create policy "solo dev ve el costo del proveedor" on app.tarifas for select to 
 -- 4. 🔴 **El check #1 de la `021`, que sigue teniendo que dar CERO filas.** Corrélo después de esta
 --    migración: es el que caza una tabla con tenant, RLS y sin policy. El SQL está al pie de la
 --    [`024`](./024_rls_linkedin.sql).
---    ⚠️ Es la B2 del carril B, y por eso B2 va **después** de esta migración: corrido antes, reporta
---    lo que esta migración viene a arreglar.
+--    ⚠️ 🩸 **CORRECCIÓN (2026-08-06, medida): esto último es FALSO.** Decía "B2 va después de esta
+--    migración: corrido antes, reporta lo que esta migración viene a arreglar". No lo reporta.
+--    El check pregunta por "RLS activado y **CERO** policies", y las tres tablas que esta migración
+--    toca están fuera de su alcance por construcción:
+--      · `app.usuarios`           → ya tenía policy (la del `007`) Y no tiene columna de tenant
+--                                   desde que la `019` dropeó `client_id`. Falla los dos filtros.
+--      · `app.usuarios_clientes`  → ya tenía policy (la de la `021:307`).
+--      · `app.tarifas`            → ya tenía policy, y tampoco tiene columna de tenant.
+--    Esta migración arregla "la policy existe pero es demasiado angosta", que es otra pregunta.
+--    **Medido:** el check se corrió contra prod ANTES de esta migración y dio cero filas, y DESPUÉS
+--    también. B2 nunca dependió de A1. El detalle en plan-multi-tenant §14.6.
+--    (Correrlo igual después sigue valiendo, como red barata. Como puerta, no.)
