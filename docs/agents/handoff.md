@@ -114,7 +114,14 @@
 > no es quien lee las pantallas. Así que esto ejercita grants, policies y `security_invoker` de
 > verdad — sobre las tablas que sí tienen datos.
 >
-> | Pantalla | Tiene que mostrar |
+> 🩸 **NO USES ESTA TABLA — 5 de sus 9 filas están mal** (medido el 06/08, tarea B5). Pedían el
+> `count(*)` crudo de la tabla donde la pantalla filtra: `/curar/historicos` son **31**, no 88 ·
+> `/operar` son **5** tarjetas, no 41 · `/curar/sugeridos` son **6**, no 8 · `/curar/voces` son
+> **4**, no 3 · `/curar/ajustes` son 18 para un `dev` pero **8** para un `operador`. Se conserva
+> como registro de cómo se hizo el #1. **La tabla buena vive en
+> [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md) §0.**
+>
+> | Pantalla | Tiene que mostrar *(números viejos, ver el aviso de arriba)* |
 > |---|---|
 > | **`/entender`** | ⚠️ **empezá por acá**: son las **12 vistas `security_invoker`**, la zona de más riesgo del flip |
 > | `/operar` | **41** corridas |

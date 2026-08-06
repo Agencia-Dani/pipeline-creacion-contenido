@@ -1196,7 +1196,7 @@ pantallas ahora es superficie para datos que no existen.*
 | **B2** | Check #1 de la `021` contra PROD | ✅ **CERO FILAS el 06/08** — y no dependía de A1 |
 | **B3** | La prueba de §14.6 con filas | ⬜ escrita paso a paso en el handoff |
 | **B4** | `docs/runbooks/` + `core/templates/` | 🔧 se escribe asumiendo A5; su paso de alta se verifica cuando A5 esté en prod |
-| **B5** | Las verificaciones de ojo humano | ⬜ preparar, no ejecutar |
+| **B5** | Las verificaciones de ojo humano | ✅ **HECHO el 06/08** — [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 10 items. Y 5 de los 9 números esperados estaban mal |
 | **B6** | Deuda de docs medida | ✅ **HECHO el 06/08** — 21 links rotos, no 4; y la lista era más larga |
 
 **B1 — el único bloqueante numerado del repo.** Depende del calendario, no del trabajo: archivado
@@ -1232,10 +1232,29 @@ el contrato, no se parchea a mano"*.
 🔗 **Único punto de dependencia entre carriles:** el paso "dar de alta a los usuarios" pasa de 3 pasos
 de SQL a un click cuando A5 esté en prod.
 
-**B5 — de ojo humano, no de agente.** El carril deja el checklist de qué mirar; lo ejecutan Mani y el
-equipo. Arrastres del handoff: el clic al **Descargar CSV** de `/curar/historicos` (el más viejo
-abierto), el **feed paginado**, el tab **Entender** de un operador. Del ROADMAP: **V2** (literalidad),
-**V5** (incremental `dias=1`), **V6** (resiliencia) y **D3** (demo con Majo y Jero).
+**B5 — ✅ HECHO el 2026-08-06: [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md).**
+Los 10 items con quién los hace, cuánto tarda y **qué significa si falla** — los arrastres del handoff
+(el clic al CSV, el feed paginado, el tab Entender de un operador), el gate de costos del Carril 0, y
+del ROADMAP **V2 · V4 · V5 · V6 · D3**. Los ejecutan Mani y el equipo; el carril solo los dejó escritos.
+
+🩸 **Y escribirlo destapó lo que lo hacía peligroso: la tabla de números esperados tenía 5 de 9 filas
+mal**, todas hacia el mismo lado —pedían el `count(*)` crudo de la tabla donde la pantalla filtra.
+`/curar/historicos` decía 88 y son **31** (filtra `aprobado`; los 88 son 31 aprobados + 57 descartados)
+· `/operar` decía 41 y son **5** tarjetas (`limite = 5` sobre los runs del motor) · `/curar/sugeridos`
+decía 8 y son **6** (solo `propuesto`) · `/curar/voces` decía 3 y son **4** (la pantalla no filtra por
+`activo`) · `/curar/ajustes` decía 18 y son **18 para un `dev`, 8 para un `operador`**.
+**Esa tabla existe justamente para distinguir "se ve bien" de una policy que no matchea**, y con esos
+números habría reportado un fallo de RLS inexistente en la mitad de las pantallas. Corregidos contra
+el código y la base.
+
+**Dos que quedaron fuera del checklist a propósito, porque no son de mirar:**
+- **V6 no se puede correr como está escrita.** Pedía romper la credencial de Supabase *"para que el
+  workflow IGUAL escriba a Airtable"*, y post-D7 la **entrega también es Supabase**: romperla tumba
+  las dos mitades, así que ya no separa registro de ejecución. El invariante #1 de PLAN §2.5 sigue
+  vivo; lo que hay que rediseñar es cómo se ejercita. Es una decisión de Mani, no una verificación.
+- **V5 no va antes del gate de la `023`** (B1). Si `processed_items` deja de escribirse, el
+  `PGRST204` se lo traga el `onError: continue` y el motor cierra en verde **sin memoria de dedup** —
+  que es exactamente lo que V5 cree estar midiendo.
 
 **B6 — ✅ HECHO el 2026-08-06.** Lo que decía falso, corregido **contra la base y contra el live**, no
 de memoria: conteos por PostgREST, `pg_policies` por SQL y los 5 `workflow.json` traídos por la API de
