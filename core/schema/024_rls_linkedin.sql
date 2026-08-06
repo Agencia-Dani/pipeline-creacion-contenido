@@ -108,18 +108,32 @@ to authenticated;
 -- una cuenta que alcance EstadoX y 30X —y esa cuenta EXISTE desde el 05/08— sacar el filtro de
 -- `scoped.ts` mezclaría los dos cockpits de LinkedIn en una sola pantalla, sin error y sin aviso.
 
+-- ⚠️ Los `drop ... if exists` son la única desviación del molde de la `021`, y son a propósito:
+-- **Postgres no tiene `create or replace policy`**, así que la `021` tal como está escrita no se
+-- puede volver a correr — el segundo intento muere con `42710 policy already exists`. Eso convierte
+-- "corrila de nuevo por las dudas" en un error, justo en el momento en que uno no está seguro de si
+-- la primera pasó. Y esa duda es exactamente la que dejó la `019`: se corrió, no dio error visible,
+-- y no había entrado.
+--
+-- Con esto, correr esta migración dos veces es inofensivo y deja el mismo estado. Es idempotencia,
+-- no cosmética: es lo que hace que la verificación de abajo se pueda usar para DECIDIR.
+
+drop policy if exists "tenant" on app.referentes_linkedin;
 create policy "tenant" on app.referentes_linkedin for all to authenticated
   using      (instance_id in (select app.instancias_visibles()))
   with check (instance_id in (select app.instancias_visibles()));
 
+drop policy if exists "tenant" on app.voces_linkedin;
 create policy "tenant" on app.voces_linkedin      for all to authenticated
   using      (instance_id in (select app.instancias_visibles()))
   with check (instance_id in (select app.instancias_visibles()));
 
+drop policy if exists "tenant" on app.candidatos_linkedin;
 create policy "tenant" on app.candidatos_linkedin for all to authenticated
   using      (instance_id in (select app.instancias_visibles()))
   with check (instance_id in (select app.instancias_visibles()));
 
+drop policy if exists "tenant" on app.descartes_linkedin;
 create policy "tenant" on app.descartes_linkedin  for all to authenticated
   using      (instance_id in (select app.instancias_visibles()))
   with check (instance_id in (select app.instancias_visibles()));
