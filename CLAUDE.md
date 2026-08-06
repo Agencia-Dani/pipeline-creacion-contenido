@@ -74,7 +74,7 @@ en §Agent skills; acá solo se ubican.
 - [docs/verificaciones-humanas.md](docs/verificaciones-humanas.md) — **lo que falta mirar con los ojos**
   y ningún agente puede cerrar (el clic al CSV, el feed paginado, V2/V4/V5/V6, la demo D3). Cada item
   con quién, cuánto tarda y qué significa si falla. ⚠️ **Trae los números esperados por pantalla,
-  medidos el 06/08 — y corrige 5 que estaban mal**: eran el `count(*)` crudo de la tabla donde la
+  medidos el 06/08 — y corrige 4 que estaban mal**: eran el `count(*)` crudo de la tabla donde la
   pantalla filtra, así que habrían disparado una falsa alarma de RLS.
 
 **Por workflow** — los 5 que corren en n8n. Cada doc abre con **§Operación**, y los 5 dicen lo mismo

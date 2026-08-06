@@ -32,18 +32,26 @@ Las pantallas cargan contra la base con **la sesión del usuario**, no con `serv
 
 ### ⚠️ Y por eso los números tienen que ser los correctos
 
-La tabla de números que traía el handoff tenía **5 filas de 9 equivocadas**, y todas equivocadas
+La tabla de números que traía el handoff tenía **4 filas de 9 equivocadas**, y todas equivocadas
 hacia el mismo lado: pedían el `count(*)` crudo de la tabla cuando la pantalla filtra. Alguien que
-las hubiera usado habría reportado un fallo de RLS que no existe. Corregidas contra el código y la
-base el **2026-08-06**:
+las hubiera usado habría reportado un fallo de RLS que no existe. Corregidas contra el código y
+contra la base, **con la query scopeada al cockpit** (`instance_id` de `retia/reels`, o `client_id
+= 'retia'` según el grano de cada tabla), el **2026-08-06**:
 
 | Pantalla | Decía | **Es** | Por qué |
 |---|---|---|---|
-| `/operar` | 41 corridas | **5 tarjetas** | `ultimasCorridasMotor` tiene `limite = 5` **y** filtra `params->>workflow = 'motor'`. De las 41 corridas totales, 28 son del motor |
+| `/operar` | 41 corridas | **5 tarjetas** | `ultimasCorridasMotor` tiene `limite = 5` **y** filtra `params->>workflow = 'motor'`. La instancia tiene 28 corridas de motor; las 41 son todos los workflows |
 | `/curar/historicos` | 88 | **31** | La pantalla y el CSV filtran `.eq("estado","aprobado")`. Los 88 `outputs` son 31 aprobados **+ 57 descartados** |
 | `/curar/sugeridos` | 8 | **6** | Filtra `.eq("estado","propuesto")`. De los 8, 2 ya están `promovido` |
-| `/curar/voces` | 3 voces | **4 voces** | La pantalla **no** filtra por `activo`: muestra las 3 activas + Alejo, pausada |
 | `/curar/ajustes` | 18 knobs | **18 para un `dev` · 8 para un `operador`** | `ajustesVisibles` deja al operador solo los de `visibilidad = 'equipo'`. Son 10 de dev + 8 de equipo |
+
+> 🔑 **Y la trampa inversa, que casi se cuela en esta misma corrección:** `app.voces` tiene **4**
+> filas en toda la base, pero `/retia/reels/curar/voces` muestra **3**. No es un filtro de la
+> pantalla: **`voces` es de grano empresa (`client_id`)** y la cuarta es de 30X. **El `count(*)`
+> global no sirve ni para confirmar ni para desmentir** — hay que scopear la query igual que scopea
+> la pantalla, y por el grano correcto: `voces`, `proyectos` y `referentes` van por **empresa**;
+> `ajustes`, `candidatos`, `descartes`, `transcripciones`, `runs` y `outputs` van por **cockpit**
+> ([§2.B de plan-multi-tenant](./agents/plan-multi-tenant.md), el doble grano).
 
 ### Los números buenos, medidos el 2026-08-06 (cockpit `/retia/reels`)
 
@@ -52,7 +60,7 @@ base el **2026-08-06**:
 | **`/entender`** | ⚠️ **Empezá por acá si estás verificando RLS**: son las **12 vistas `security_invoker`**, la zona de más riesgo |
 | `/operar` | **5** tarjetas de corrida, la más nueva del **2026-08-03** |
 | `/curar/feed` | **25** tarjetas y los chips diciendo **165** *(pagina de a 25 desde el cierre 98)* |
-| `/curar/voces` | **4** voces (3 activas + 1 pausada) · **6** proyectos (5 activos) |
+| `/curar/voces` | **3** voces (las 3 activas) · **6** proyectos (5 activos) |
 | `/curar/referentes` | **16**, todos de Instagram |
 | `/curar/ajustes` | **18** si sos `dev` · **8** si sos `operador` |
 | `/curar/descartes` | **38** |

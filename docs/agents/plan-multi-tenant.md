@@ -1196,7 +1196,7 @@ pantallas ahora es superficie para datos que no existen.*
 | **B2** | Check #1 de la `021` contra PROD | ✅ **CERO FILAS el 06/08** — y no dependía de A1 |
 | **B3** | La prueba de §14.6 con filas | ⬜ escrita paso a paso en el handoff |
 | **B4** | `docs/runbooks/` + `core/templates/` | 🔧 se escribe asumiendo A5; su paso de alta se verifica cuando A5 esté en prod |
-| **B5** | Las verificaciones de ojo humano | ✅ **HECHO el 06/08** — [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 10 items. Y 5 de los 9 números esperados estaban mal |
+| **B5** | Las verificaciones de ojo humano | ✅ **HECHO el 06/08** — [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 10 items. Y 4 de los 9 números esperados estaban mal |
 | **B6** | Deuda de docs medida | ✅ **HECHO el 06/08** — 21 links rotos, no 4; y la lista era más larga |
 
 **B1 — el único bloqueante numerado del repo.** Depende del calendario, no del trabajo: archivado
@@ -1237,15 +1237,20 @@ Los 10 items con quién los hace, cuánto tarda y **qué significa si falla** �
 (el clic al CSV, el feed paginado, el tab Entender de un operador), el gate de costos del Carril 0, y
 del ROADMAP **V2 · V4 · V5 · V6 · D3**. Los ejecutan Mani y el equipo; el carril solo los dejó escritos.
 
-🩸 **Y escribirlo destapó lo que lo hacía peligroso: la tabla de números esperados tenía 5 de 9 filas
+🩸 **Y escribirlo destapó lo que lo hacía peligroso: la tabla de números esperados tenía 4 de 9 filas
 mal**, todas hacia el mismo lado —pedían el `count(*)` crudo de la tabla donde la pantalla filtra.
 `/curar/historicos` decía 88 y son **31** (filtra `aprobado`; los 88 son 31 aprobados + 57 descartados)
 · `/operar` decía 41 y son **5** tarjetas (`limite = 5` sobre los runs del motor) · `/curar/sugeridos`
-decía 8 y son **6** (solo `propuesto`) · `/curar/voces` decía 3 y son **4** (la pantalla no filtra por
-`activo`) · `/curar/ajustes` decía 18 y son **18 para un `dev`, 8 para un `operador`**.
-**Esa tabla existe justamente para distinguir "se ve bien" de una policy que no matchea**, y con esos
-números habría reportado un fallo de RLS inexistente en la mitad de las pantallas. Corregidos contra
-el código y la base.
+decía 8 y son **6** (solo `propuesto`) · `/curar/ajustes` decía 18 y son **18 para un `dev`, 8 para un
+`operador`**. **Esa tabla existe justamente para distinguir "se ve bien" de una policy que no
+matchea**, y con esos números habría reportado un fallo de RLS inexistente en casi la mitad de las
+pantallas.
+
+🔑 **Y la trampa inversa, que casi se cuela en la corrección misma:** `app.voces` tiene 4 filas en la
+base y `/retia/reels/curar/voces` muestra **3** — la fila que falta es de 30X, porque `voces` es de
+**grano empresa**. Con el doble grano de §2.B, **un `count(*)` global no confirma ni desmiente nada**:
+la query de verificación tiene que scopear por el mismo eje que scopea la pantalla. Los números buenos
+se midieron así, cockpit por cockpit.
 
 **Dos que quedaron fuera del checklist a propósito, porque no son de mirar:**
 - **V6 no se puede correr como está escrita.** Pedía romper la credencial de Supabase *"para que el

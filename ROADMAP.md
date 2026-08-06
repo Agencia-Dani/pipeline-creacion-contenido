@@ -133,7 +133,9 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
       link de Resend es por donde entra el equipo desde el cierre 63.)*
 - [x] **M0.3** Pedir al jefe la voz/proyecto inicial (no bloquea: se siembra una provisional;
       el equipo la cambia cuando quiera desde el cockpit).
-      *(✅ medido 06/08: **4 voces** —3 activas + Alejo en pausa— y **6 proyectos** en `app.`.)*
+      *(✅ medido 06/08: **4 voces** en toda la base —las **3 de Retia**, activas, + una de 30X en
+      pausa— y **6 proyectos**, 5 activos, todos de Retia. ⚠️ `voces` y `proyectos` son de **grano
+      empresa**: el cockpit de Retia muestra 3 y 6, no 4 y 6.)*
 
 ### Carril A — Capa de datos · 👤 Dev 2 · ~1.5 h
 
