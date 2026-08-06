@@ -4,6 +4,7 @@ import {
   esRol,
   puedeVerZona,
   ROLES,
+  veCostos,
   ZONAS,
   zonaInicial,
   zonasDe,
@@ -43,6 +44,20 @@ test("cada rol tiene zona inicial y es una que puede ver", () => {
   for (const rol of ROLES) {
     assert.equal(puedeVerZona(rol, zonaInicial(rol)), true);
   }
+});
+
+test("💰 solo el dev ve los costos de proveedor — ni el operador ni el sponsor", () => {
+  assert.equal(veCostos("dev"), true);
+  // El caso que motivó el cambio (2026-08-06): gente de Retia con rol `operador`. El gate viejo
+  // decía `rol !== "sponsor"` y les publicaba el margen de la agencia sin un solo error.
+  assert.equal(veCostos("operador"), false);
+  assert.equal(veCostos("sponsor"), false);
+});
+
+test("💰 el gate de costos falla hacia ESCONDER: un rol nuevo no ve costos por defecto", () => {
+  // La propiedad, no los tres casos: exactamente un rol de los que existen ve costos. Si mañana
+  // aparece un cuarto rol y alguien lo agrega a ROLES sin pensar en esto, este test lo caza.
+  assert.deepEqual(ROLES.filter(veCostos), ["dev"]);
 });
 
 test("esRol valida strings contra los 3 roles reales", () => {
