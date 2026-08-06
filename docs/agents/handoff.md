@@ -44,12 +44,73 @@
 >
 > ⚠️ **Cuatro dependencias de orden que no se pueden invertir:** Carril 0 antes de las altas ·
 > **A1 (`025`) antes que A5 en prod** (el flip está vivo: pantalla sin policy = cero filas o `42501`)
-> · **B2 después de A1** (si no, el check reporta las tablas nuevas) · **B4 después de A5** (el
-> runbook de alta de cliente cambia de forma cuando el alta deja de ser SQL).
+> · ~~**B2 después de A1**~~ · **B4 después de A5** (el runbook de alta de cliente cambia de forma
+> cuando el alta deja de ser SQL).
+> **📌 Corregido el 06/08: eran tres, no cuatro.** La de B2 partía de que la `025` crea tablas, y no
+> crea ninguna — crea una función y policies. **B2 ya se corrió y dio cero filas** (bloque 🅱️ abajo).
+> La de B4 tampoco bloqueó: el runbook se escribió asumiendo A5, con el paso marcado para verificarlo.
 >
 > 💣 **Landmine que la pantalla de equipo va a tocar primero:** `scoped.ts:51` declara
 > `"app.usuarios": { grano: "cliente" }` ⇒ filtra por `client_id`, **columna que la `019` dropeó**.
 > Hoy nadie lo ejerce porque `lib/auth.ts` lee esa tabla con `createClient()` directo. Es la tarea A2.
+
+> ## 🅱️ CARRIL B (2026-08-06, rama `carril-b-cierres`) — B2, B4, B5 y B6 cerradas. B1 y B3 esperan.
+>
+> **4 de 6 hechas.** Todo medido contra prod (PostgREST + SQL) y contra n8n por su API; nada de
+> memoria. **No se tocó `apps/dashboard/`, ni `domain/pipelines.ts`, ni se creó ninguna migración.**
+>
+> | | Estado |
+> |---|---|
+> | **B2** · check #1 contra prod | ✅ **CERO FILAS.** Y **no dependía de A1** — ver abajo |
+> | **B4** · runbooks + `core/templates/` | ✅ El criterio de F5 da **partido**: empresa 🟢, pipeline 🔴 |
+> | **B5** · checklist de ojo humano | ✅ [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 10 items |
+> | **B6** · deuda de docs | ✅ Eran **21 links rotos**, no 4, y la lista era más larga |
+> | **B1** · gate de la `023` | ⏳ **Sigue bloqueado, confirmado midiendo**: el último run del **motor** es del **2026-08-03** (el del 04/08 21:12 era el archivado). Ninguna corrida ejerció el código nuevo. Archivado domingo 18:00, motor lunes 08:00 |
+> | **B3** · §14.6 con filas | ⬜ Las 4 tablas `*_linkedin` siguen en **0 filas**. La siembra es un solo `insert` (está en el bloque `🔬 #6` de abajo) y **no se corrió**: escribe en prod y el paso 2 necesita un browser con la cuenta de doble membresía |
+>
+> ### 🔴 Tres cosas que cambian lo que otro agente iba a hacer
+>
+> 1. **`B2 después de A1` era falso, y el check es más ciego de lo que se creía.** El argumento era
+>    *"o el check reporta las tablas nuevas"*, y la **`025` no crea tablas** — crea una función y
+>    policies. Peor: el check pregunta por *"RLS y **cero** policies"*, así que **no puede ver** el
+>    agujero que la `025` tapa. `app.usuarios` ya tiene policy (del `007`) y **no tiene columna de
+>    tenant** desde que la `019` dropeó `client_id`; `app.usuarios_clientes` ya tiene la suya (de la
+>    `021`). La `025` arregla *"la policy es demasiado angosta"*, que es otra pregunta. La tabla con
+>    la medición está en [§14.6](./plan-multi-tenant.md).
+> 2. **🩸 La tabla de números esperados del bloque de abajo tiene 4 de 9 filas mal**, y son las que
+>    alguien iba a usar para decidir si RLS anda. Pedían el `count(*)` crudo donde la pantalla filtra:
+>    `/curar/historicos` son **31** (no 88) · `/operar` son **5** tarjetas (no 41) · `/curar/sugeridos`
+>    son **6** (no 8) · `/curar/ajustes` son **8** para un `operador`. **La tabla buena está en
+>    [`verificaciones-humanas.md` §0](../verificaciones-humanas.md).**
+>    🔑 **Y la trampa inversa, que casi se cuela en la corrección:** `app.voces` tiene 4 filas y
+>    `/retia/reels/curar/voces` muestra **3** — la cuarta es de 30X, porque `voces` es de grano
+>    **empresa**. Con el doble grano, **un `count(*)` global no confirma ni desmiente nada.**
+> 3. **Los 4 manifests de los pipelines vivos decían `status: draft`** con comentarios ya falsos
+>    (*"cron sin activar"*, *"sin importar aún en la instancia n8n"*) mientras corrían en producción
+>    hacía meses. Corregidos a `active` contra lo medido; `validate` verde. Es la mitad de **D2** del
+>    ROADMAP. **La otra mitad es de Mani** porque escribe en prod: `workflows.estado` dice `draft`
+>    para `short-form-content`. Nada lo lee (`scoped.ts:43` deja esa tabla fuera del mapa a propósito),
+>    así que es cosmético — `update workflows set estado = 'active' where id = 'short-form-content';`
+>
+> ### 📏 La foto de prod al 2026-08-06, que ningún doc tenía junta
+>
+> **23 de 24 migraciones aplicadas** — la única que falta es la **`023`**, verificada por sus 7
+> columnas todavía vivas. **24 policies** (18 en `app` + 6 en `public`) = 19 de la `021` + 4 de la
+> `024` + 1 del `007`; *la `021` tiene **19**, no 17: los docs venían repitiendo mal ese número.*
+> **3 clientes · 4 instancias · 8 usuarios / 9 membresías · 4 voces (3 de Retia) · 6 proyectos ·
+> 16 referentes · 165 candidatos · 88 outputs (31 aprobados + 57 descartados) · 38 descartes ·
+> 772 `processed_items` · 41 corridas (29 `ok`, 12 `fallo`)**. Los 5 workflows `active`, en
+> `America/Bogota`, con **cero nodos y cero credenciales de Google**.
+>
+> ### ⚠️ Y dos que no se cerraron a propósito, porque el enunciado envejeció
+>
+> - **V6 (resiliencia) no se puede correr como está escrita.** Pedía romper la credencial de Supabase
+>   *"para que el workflow IGUAL escriba a Airtable"*, y post-D7 **la entrega también es Supabase**:
+>   romperla tumba las dos mitades, así que ya no separa registro de ejecución. El invariante #1 de
+>   PLAN §2.5 sigue vivo; **lo que hay que rediseñar es cómo se ejercita**, y es decisión de Mani.
+> - **V5 (incremental `dias=1`) no va antes del gate de la `023`.** Si `processed_items` deja de
+>   escribirse, el `PGRST204` se lo traga el `onError: continue` y el motor cierra en verde **sin
+>   memoria de dedup** — que es justo lo que V5 cree estar midiendo.
 
 > ## ✅ AL CIERRE 98 (2026-08-06): EL FEED PAGINA. ANTES: EL FLIP CERRADO, LA BALDE 2 PODADA, AIRTABLE FUERA.
 >
