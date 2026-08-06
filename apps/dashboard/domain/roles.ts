@@ -22,13 +22,8 @@ export const ZONAS: readonly Zona[] = ["operar", "curar", "transcribir", "entend
 // ⚠️ **Va ÚLTIMA en el array, y no es cosmético:** `zonaInicial` devuelve el primer elemento, así
 // que ponerla antes cambiaría a dónde cae el equipo al entrar. El orden de este array es prioridad.
 //
-// 🩸 **El supuesto que esto apoya, escrito porque el día que deje de ser cierto nada avisa:**
-// Entender muestra costos, y el gate de ese bloque (`entender/page.tsx`) dice `rol !== "sponsor"`,
-// o sea que el operador **ve lo que cuestan los proveedores**. Hoy está bien porque **todos los
-// operadores son gente de adentro** (confirmado 2026-08-05). El día que una persona de una empresa
-// cliente reciba `operador`, ese gate le publica el margen de la agencia — y falla hacia MOSTRAR,
-// así que no va a romperse, va a filtrar. Es el mismo problema que ADR-052 ya resolvió para el
-// `sponsor`; si pasa, la respuesta es la que ahí se descartó por innecesaria: gate `rol === "dev"`.
+// 🩸 **El supuesto que esto apoyaba SE CAYÓ el 2026-08-06**, que era exactamente lo previsto: tres
+// personas de Retia —empresa cliente, no la agencia— reciben `operador`. Ver `veCostos` abajo.
 const ZONAS_POR_ROL: Record<Rol, readonly Zona[]> = {
   operador: ["operar", "curar", "transcribir", "entender"],
   dev: ["operar", "curar", "transcribir", "entender"],
@@ -46,6 +41,21 @@ export function zonasDe(rol: Rol): readonly Zona[] {
 // A dónde cae cada rol al entrar: su primera zona.
 export function zonaInicial(rol: Rol): Zona {
   return ZONAS_POR_ROL[rol][0];
+}
+
+// 💰 Quién ve lo que nos cuestan los proveedores (`v_costos_semana` = consumo × `app.tarifas`, o
+// sea el margen de la agencia). **Solo `dev`**, desde el 2026-08-06.
+//
+// Antes el gate vivía inline en `entender/page.tsx` y decía `rol !== "sponsor"`, apoyado en que
+// todos los operadores eran gente de adentro. Con Retia adentro dejó de serlo, y ese gate **falla
+// hacia MOSTRAR**: no rompe, no avisa, filtra. La respuesta es la que ADR-052 dejó escrita y
+// descartó por innecesaria en su momento (§15.0.bis del plan-multi-tenant).
+//
+// Está acá y no en la página por la misma razón que el resto de este archivo: una regla que decide
+// qué sale al browser se testea, no se lee en un `if` de JSX. Y ahora **falla hacia ESCONDER**: un
+// rol nuevo no ve costos hasta que alguien lo agregue a propósito.
+export function veCostos(rol: Rol): boolean {
+  return rol === "dev";
 }
 
 export function esRol(valor: unknown): valor is Rol {

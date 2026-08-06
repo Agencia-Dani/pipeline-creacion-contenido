@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { veCostos } from "@/domain/roles";
 import { exigirTenant } from "@/lib/auth";
 import { leerProyectos } from "@/lib/proyectos";
 import {
@@ -27,18 +28,13 @@ export default async function EntenderPage({
   const { cliente, pipeline } = await params;
   const { usuario, ctx, rol } = await exigirTenant("entender", cliente, pipeline);
   const esDev = rol === "dev";
-  // ADR-052: el `sponsor` NO ve lo que nos cuestan los proveedores. Con clientes externos
-  // logueándose, `v_costos_semana` (consumo × `app.tarifas`) es el margen de la agencia, y la
-  // única zona que un sponsor ve es justamente esta. El corte va acá, en el servidor: esconder la
-  // tarjeta en React dejaría los números viajando igual al browser.
+  // ADR-052 + ADR-060: los costos de proveedor (`v_costos_semana` = consumo × `app.tarifas`) son
+  // el margen de la agencia, y desde el 2026-08-06 los ve **solo el `dev`**. La regla vive en
+  // `domain/roles.ts` con su test, no acá: es una decisión de quién ve qué, no de esta pantalla.
   //
-  // 🩸 **Desde el 2026-08-05 esta línea apoya un supuesto, y conviene saber cuál.** El `operador`
-  // entró a Entender, así que "todos menos sponsor" ahora **incluye al operador**: ve los costos.
-  // Se decidió así porque **hoy todos los operadores son gente de adentro** — confirmado contra las
-  // 7 membresías vivas. El día que alguien de una empresa cliente reciba `operador`, esta línea le
-  // publica el margen, y **falla hacia MOSTRAR**: no rompe nada, no avisa, filtra. Si eso pasa, el
-  // arreglo es `rol === "dev"`, que es lo que ADR-052 dejó escrito y descartado por innecesario.
-  const veCostos = rol !== "sponsor";
+  // El corte va en el servidor, y eso sí es de esta pantalla: esconder la tarjeta en React dejaría
+  // los números viajando igual al browser. Por eso gobierna también el `leerCostos` de abajo.
+  const puedeVerCostos = veCostos(rol);
 
   // `allSettled` y no `all`: una vista que falle apaga su tarjeta, no la página entera.
   const [calidad, embudo, auditoria, descubrimiento, costos, eventos, proyectos] =
@@ -47,7 +43,7 @@ export default async function EntenderPage({
       leerEmbudo(ctx),
       leerAuditoria(ctx),
       leerDescubrimiento(ctx),
-      veCostos ? leerCostos(ctx) : Promise.resolve([]),
+      puedeVerCostos ? leerCostos(ctx) : Promise.resolve([]),
       esDev ? leerEventos(ctx) : Promise.resolve([]),
       leerProyectos(ctx),
     ]);
@@ -137,7 +133,7 @@ export default async function EntenderPage({
         </CardContent>
       </Card>
 
-      {veCostos && (
+      {puedeVerCostos && (
       <Card>
         <CardHeader>
           <CardTitle>Costos de la semana</CardTitle>
