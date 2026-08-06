@@ -561,11 +561,25 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ✅ **COMPLETO** — mergeada (`ad2de5b`), `018` + `019` aplicadas y verificadas por su efecto (04/08) |
 | 7 | ~~**Paginación del feed**~~ (§10) | el segundo tenant con volumen | no | ✅ **HECHA el 2026-08-06.** Keyset sobre `(heat desc, id asc)`, filtro y contadores en el server, y los 3 textos largos fuera del listado: **405 KB → 16 KB** por carga. Verificada contra prod a nivel query; ⏳ falta el clic |
 | 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | ✅ **COMPLETA el 2026-08-05** — la `021` aplicada **y** el flip de `scoped.ts` en prod (`d8edea2`, [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)). Verificada con cuenta no dueña y con las 4 zonas cargando |
-| 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | 🔧 la **`020` está aplicada** y hay 3 cockpits en `instances`; no existe el workflow en n8n |
+| 9 | **Fase 5** — LinkedIn | — | sí (una migración) | 🔧 **EN CURSO desde el 06/08.** La **`020` aplicada** + 3 cockpits en `instances` · **1ª pantalla construida** (Referentes: `domain/linkedin.ts`, `lib/referentes-linkedin.ts`, ramificado por `workflowId`, las 4 tablas en `scoped.ts`) · **[`024`](../../core/schema/024_rls_linkedin.sql) escrita** y sin aplicar (§14.6) · ⬜ faltan candidatos/voces, el workflow en n8n, su cron, y `core/templates/` + los runbooks |
 
-> ✅ **Al 2026-08-06 queda uno: el #9 (LinkedIn).** El #7 se cerró el 06/08 y no bloqueaba a nadie;
-> se hizo igual porque era lo único numerado que quedaba antes de la Fase 5, y porque su síntoma ya
-> era medible con un solo tenant.
+> ✅ **Al 2026-08-06 queda uno: el #9 (LinkedIn), y arrancó.** El #7 se cerró el 06/08 y no bloqueaba
+> a nadie; se hizo igual porque era lo único numerado que quedaba antes de la Fase 5, y porque su
+> síntoma ya era medible con un solo tenant.
+>
+> 🩸 **Lo que la primera pantalla de LinkedIn destapó, y que ningún doc decía:** los cockpits de
+> LinkedIn **ya eran alcanzables** (2 de 3 `active`, y hay una cuenta con membresía en 30X y EstadoX
+> desde el 05/08) y su zona `curar` dibujaba **las 7 tarjetas de reels**. Seis apuntaban a pantallas
+> que leen las tablas de reels y devuelven vacío para ese `instance_id` — sin fallar, que es lo peor:
+> en un pipeline recién nacido "no hay nada" se lee como *"todavía no cargamos datos"*. ADR-056 había
+> resuelto el nav **por zona** y nadie miró un nivel más abajo. Arreglado: el índice de `curar` es por
+> pipeline y **lista lo que existe, no lo que va a existir**.
+>
+> ⚠️ **Y queda la mitad sin cerrar de eso:** el índice ya no linkea a las 6 pantallas de reels, pero
+> **escribir la URL a mano sigue entrando**. `exigirTenant` guarda por ZONA (ADR-056) y `curar` existe
+> en los dos pipelines, así que no las tapa. No es fuga —`scoped()` filtra por instancia y las tablas
+> de reels no tienen filas de una instancia de LinkedIn— pero es "la UI esconde y el servidor no
+> impide", que es justo al revés de la regla de la casa. Se cierra con una guardia por pantalla.
 >
 > ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
 > que la secuencia real es **`018`/`019` → Capa 2 (RLS) → paginación → LinkedIn**. La fila sin número
@@ -859,11 +873,24 @@ mapa `TABLAS` de [`scoped.ts`](../../apps/dashboard/lib/supabase/scoped.ts) no t
 vacío sin error y sin aviso — la familia de la `015` otra vez, y encima disfrazada de *"todavía no
 hay datos"*, que es lo que uno espera ver en un pipeline nuevo.
 
-**Qué lo destraba.** Cuatro policies con el mismo molde que sus hermanas de grano cockpit
-(`instance_id in (select app.instancias_visibles())` en `using` y `with check`) más el `grant` si
-falta, en una migración propia. **Va junto con la primera pantalla de LinkedIn, no antes**: es el
-mismo criterio de la `021` (escribir la red donde ya hay algo que la use), y así se verifica con una
-pantalla real en vez de con un `select` a una tabla vacía.
+**Qué lo destraba.** ✅ **ESCRITA el 2026-08-06: [`024_rls_linkedin.sql`](../../core/schema/024_rls_linkedin.sql)**
+— las 4 policies con el molde de sus hermanas de grano cockpit
+(`instance_id in (select app.instancias_visibles())` en `using` y `with check`) más los grants.
+Salió junto con la primera pantalla, como decía este párrafo: la de **Referentes** (`curar/referentes`
+ramifica por `cockpit.workflowId`), así se verifica con datos reales y no con un `select` a una tabla
+vacía. Las 4 tablas entraron además al mapa `TABLAS` de `scoped.ts` — la mitad de Capa 1, que sin
+ella la pantalla no compila.
+
+⏳ **Falta aplicarla** (SQL Editor, es de Mani) y correr su §Verificación.
+
+⚠️ **Y un matiz que cambió desde que se escribió §14.6:** la `021` no cambiaba nada al entrar porque
+el BFF leía con `service_role`. **La `024` no tiene esa red** — el flip está en producción desde el
+05/08, así que sus policies se evalúan desde el minuto que entran. Hoy no rompe nada porque ninguna
+pantalla tocaba esas tablas, pero el orden es **migración primero, pantalla en producción después**.
 
 **Hecho cuando.** El check #1 de la `021` corrido **contra prod con la `020` aplicada** da cero
 filas, y una pantalla de LinkedIn con una fila sembrada la muestra a quien corresponde y no a otros.
+🔑 El par que prueba las dos mitades ya se puede armar: sembrar un referente en la instancia de
+**30X** y mirarlo con la cuenta que alcanza **30X y EstadoX** (existe desde el 05/08). Tiene que
+verse en el cockpit de 30X y **no** en el de EstadoX — RLS deja pasar lo propio, `scoped.ts` acota al
+cockpit abierto.

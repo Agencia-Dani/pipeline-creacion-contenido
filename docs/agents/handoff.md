@@ -40,6 +40,15 @@
 > clic** (ver la tabla de abajo, junto al del CSV): está verificada contra prod a nivel query y con
 > tests, pero nadie la abrió en un browser.
 >
+> 🚀 **Y la Fase 5 arrancó el 06/08:** primera pantalla de LinkedIn (Referentes) + la **[`024`](../../core/schema/024_rls_linkedin.sql)**
+> con sus 4 policies. **La `024` está SIN APLICAR y es lo único de esta tanda que necesita el SQL
+> Editor.** ⚠️ Ojo con una diferencia contra la `021`: aquella era inerte al entrar porque el BFF
+> leía con `service_role`; **con el flip en prod, la `024` se evalúa desde el minuto que entra.**
+>
+> 🔴 **Aparte, y es de seguridad:** la `ANTHROPIC_API_KEY` del `.env` local es **la key filtrada en
+> `d98d45a`, revocada, que da 401**. El pipeline no se ve afectado (el live trae otra y responde
+> 200), pero hay que reponer la buena a mano — la línea del `.env` tiene el diagnóstico y el paso.
+>
 > ### Lo del cierre 96, que sigue igual: quedan dos clics
 >
 > **La Capa 2 está viva y verificada por las dos mitades**: con cuenta no dueña (3 de 4 voces sin
@@ -1349,8 +1358,26 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 **🔎 Los contadores de los chips siguen siendo el avance real** (no el tamaño de la página): 4 `head` counts sobre la tabla entera + los deltas de la sesión, cada uno desde la calificación **original** de la fila, así que re-clickear tres emojis vale un solo delta y el ajuste sobrevive a un cambio de filtro.
 
 **Verde:** `typecheck` · **185 tests** (+10) · `build` · `validate` 2053 checks. Contra prod: los 4 contadores dan 165/0/0/165, y los filtros de emoji se verificaron contra `outputs` —donde sí hay datos— porque **en `candidatos` el 0 no distinguía "filtro correcto" de "filtro que no matchea"**: `eq.🔥`→12 y `in.(🔥,👍)`→36 = 12+24, que es el reparto real.
-**Qué quedó a medias:** ⏳ **nadie hizo clic.** Está verificado a nivel query contra prod y de unidad, pero la pantalla no se abrió — hace falta un login por magic link. Mismo hueco que arrastra el botón *Descargar CSV*. Y ⚠️ el `.env` de esta máquina es del 02/08: **sin `N8N_API_KEY` ni los `N8N_WF_*`**, así que `n8n:diff` no corre desde acá (no hizo falta: no se tocó ningún workflow).
-**Qué sigue:** el gate de la **`023`**, que sigue esperando corridas (última en la base: **04/08 21:12**; nada corrió desde entonces, y la mitad de escritura salió el 05/08) → **Fase 5, LinkedIn**, que arranca por §14.6.
+**Qué quedó a medias:** ⏳ **nadie hizo clic.** Está verificado a nivel query contra prod y de unidad, pero la pantalla no se abrió — hace falta un login por magic link. Mismo hueco que arrastra el botón *Descargar CSV*.
+
+---
+
+**Y la misma sesión siguió con dos cosas más: el `.env` y el arranque de la Fase 5.**
+
+**🔴 El `.env` guardaba la API key de Anthropic FILTRADA Y REVOCADA.** Da 401 (*"API key is invalid"*), y comparada por hash contra el commit `d98d45a` es **exactamente la que se filtró** y que el cierre 93 dio por revocada. O sea que este archivo venía guardando la key quemada. **El pipeline NO está roto:** los 3 workflows del live traen otra key, la misma en los tres, verificada con un 200 — lo desactualizado es solo la copia local, así que hoy no se puede probar un prompt de Claude fuera de n8n. *Y esto corrige el cierre 93, que dice que las del live "coinciden con el `.env`": ya no.* 🔒 Copiar la key viva al archivo lo **bloqueó el guard del entorno**, y se dejó así a propósito: la línea quedó marcada con el diagnóstico y el paso para que lo haga un humano.
+
+**✅ Lo que sí se arregló del `.env`:** faltaban las **5 `N8N_WF_*`** (`N8N_API_KEY` **sí estaba** — el error del script engañaba). Se sacaron de la API: la instancia tiene **61 workflows y solo 5 activos**, emparejados **100% por conjunto de nombres de nodo** contra los `workflow.json`, con 5 ids distintos, y después **`n8n:diff` verde en los 5** — que es la segunda vía que descarta un mapeo cruzado (un alias mal apuntado haría que `n8n:push --apply` escriba los parameters de un workflow en otro). *Ahora `n8n:diff` corre desde la máquina de Alejo.* Se podaron además `AIRTABLE_*` y `GOOGLE_SHEET_*` (medido: no los lee nadie) y se corrigieron 4 comentarios que mentían.
+
+**🚀 Fase 5 (§12 #9) ARRANCÓ — la primera pantalla de LinkedIn + sus policies.**
+- **[`024_rls_linkedin.sql`](../../core/schema/024_rls_linkedin.sql) escrita** (⏳ sin aplicar): las 4 policies de §14.6, grano instancia. ⚠️ **No tiene la red que tuvo la `021`**: aquella no cambiaba nada porque el BFF leía con `service_role`; con el flip en prod, estas se evalúan desde que entran.
+- **Pantalla de Referentes**: `domain/linkedin.ts` (+17 tests), `lib/referentes-linkedin.ts`, `actions-linkedin.ts`, `pantalla-linkedin.tsx`, y `curar/referentes/page.tsx` **ramificando por `cockpit.workflowId`**. Las 4 tablas entraron al mapa `TABLAS` de `scoped.ts`.
+- 🔑 **Dónde va el ramificado, que era la decisión de diseño:** en la **página**, no en `lib/`. `TenantContext` **no lleva el pipeline** y se dejó así — es de tenancy, y de quién es un dato no depende de qué pipeline lo produjo; meterlo ahí obligaba a las ~60 funciones de `lib/` a recibirlo para que dos lo usaran. `exigirTenant` ya devuelve el `cockpit` con su `workflowId`.
+- 🩸 **Hallazgo:** los cockpits de LinkedIn **ya eran alcanzables** (2 de 3 `active`, y hay una cuenta con membresía en 30X y EstadoX desde el 05/08) y su zona `curar` dibujaba **las 7 tarjetas de reels**, seis de ellas apuntando a pantallas que devuelven vacío sin fallar. ADR-056 resolvió el nav **por zona** y nadie miró un nivel más abajo. El índice ahora es por pipeline y **lista lo que existe**.
+- ⚠️ **Media deuda nueva:** escribir la URL a mano todavía entra a esas 6 pantallas (la guardia de `exigirTenant` es por ZONA, y `curar` existe en los dos pipelines). No es fuga; es "la UI esconde y el servidor no impide".
+- 🔎 **Y la rama `capa-2-flip-scoped` se revisó: no tiene nada que rescatar.** Su commit de LinkedIn son 33 líneas de doc **idénticas a la §14.6 de `main`** salvo una palabra del título; su `app/sonda/page.tsx` está estampado *"NO MERGEAR"*; y la rama está atrás (sin `022`, `023`, ADR-059, la salida del Sheet ni la paginación). Mergearla sería una regresión.
+
+**Verde al cierre:** `typecheck` · **202 tests** (+27 en el día) · `build` · `validate` **2062 checks** · **`n8n:diff` limpio en los 5**.
+**Qué sigue:** aplicar la **`024`** y correr su §Verificación → el gate de la **`023`**, que sigue esperando corridas (última en la base: **04/08 21:12**; la mitad de escritura salió el 05/08, así que **ninguna corrida ejerció el código nuevo**: archivado el domingo, motor el lunes) → seguir la Fase 5 por candidatos/voces y el workflow en n8n.
 
 **2026-08-05 (cierre 97) — La balde 2 medida y podada, y Airtable fuera del repo hasta la última mención (Claude, con Mani).**
 **Qué se hizo:** el inventario que D7 apartó y nunca listó, la sesión de grilling que lo decidió (**[ADR-059](../adr/ADR-059-lo-que-no-se-usa-no-existe.md)**), la **`022` aplicada y verificada por su efecto**, la **`023` escrita y gateada** con su mitad de escritura ya en el live, y la purga de Airtable del repo entero.

@@ -70,6 +70,16 @@ const TABLAS = {
   "public.outputs": { esquema: "public", grano: "instancia" },
   "public.processed_items": { esquema: "public", grano: "instancia" },
   "public.v_senal_seleccion": { esquema: "public", grano: "instancia" },
+
+  // Las 4 de LinkedIn (`020`, ADR-049/ADR-055). **Grano instancia las cuatro, y ojo con la
+  // asimetría contra reels, que es a propósito**: `app.referentes` es de grano EMPRESA porque el
+  // banco de cuentas es el mismo para toda la empresa, mientras que un filtro de Pinterest es del
+  // PIPELINE. La regla que decide es ADR-049 §5: ¿el dato tiene sentido sin saber de qué pipeline
+  // vino? Sus policies son la `024`, y llegaron tarde: nacieron sin ninguna (§14.6).
+  "app.referentes_linkedin": { esquema: "app", grano: "instancia" },
+  "app.voces_linkedin": { esquema: "app", grano: "instancia" },
+  "app.candidatos_linkedin": { esquema: "app", grano: "instancia" },
+  "app.descartes_linkedin": { esquema: "app", grano: "instancia" },
   // `v_corpus_aprobados` y `v_historico_seleccionados` estaban acá y las dropeó la `022`
   // (ADR-059). Vivían en este mapa sin que nadie las leyera: **estar en la whitelist no es ser
   // consumidor**, y esa confusión las hizo pasar por vivas en el primer inventario de la balde 2.
