@@ -66,11 +66,6 @@ const COPY: Record<PantallaCurar, Copy> = {
     descripcion:
       "Las cuentas nuevas que el buscador propone cada lunes. Aprobar una la suma al banco sola.",
   },
-  ajustes: {
-    titulo: "Ajustes",
-    descripcion:
-      "Las perillas del sistema: qué tan exigente es el filtro y en qué plataformas busca. Cuántos videos trae cada proyecto se decide en Voces y proyectos.",
-  },
 };
 
 export default async function CurarPage({

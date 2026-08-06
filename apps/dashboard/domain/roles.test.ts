@@ -21,15 +21,25 @@ test("el operador opera, cura, transcribe Y entiende", () => {
 });
 
 test("🚪 el operador entra por Operar, no por Entender — el orden del array es prioridad", () => {
-  // `entender` va última a propósito: `zonaInicial` devuelve el primer elemento, así que meterla
-  // antes cambiaría a dónde cae el equipo al loguearse. Es el tipo de regresión que no rompe nada
-  // y que se nota como "la app me manda a otro lado".
+  // `entender` y `ajustes` van últimas a propósito: `zonaInicial` devuelve el primer elemento, así
+  // que meterlas antes cambiaría a dónde cae el equipo al loguearse. Es el tipo de regresión que no
+  // rompe nada y que se nota como "la app me manda a otro lado".
   assert.equal(zonaInicial("operador"), "operar");
-  assert.deepEqual(zonasDe("operador"), ["operar", "curar", "transcribir", "entender"]);
+  assert.deepEqual(zonasDe("operador"), ["operar", "curar", "transcribir", "entender", "ajustes"]);
 });
 
-test("el sponsor solo entiende", () => {
-  assert.deepEqual(zonasDe("sponsor"), ["entender"]);
+test("⚙️ el operador SÍ ve la zona ajustes — ahí viven 8 de los 18 knobs que usa", () => {
+  // El plan la daba como "dev y sponsor". Medido contra prod: 8 de los 18 knobs son de visibilidad
+  // `equipo`, así que excluir al operador le sacaba perillas que usa (ADR-060 §1). Lo que se gatea
+  // son las PANTALLAS de la zona, no la zona: `ajustes/equipo` es dev|sponsor (`domain/permisos.ts`).
+  assert.equal(puedeVerZona("operador", "ajustes"), true);
+  assert.equal(puedeVerZona("dev", "ajustes"), true);
+  assert.equal(puedeVerZona("sponsor", "ajustes"), true);
+});
+
+test("el sponsor entiende y administra su equipo, nada más", () => {
+  assert.deepEqual(zonasDe("sponsor"), ["entender", "ajustes"]);
+  assert.equal(zonaInicial("sponsor"), "entender");
   assert.equal(puedeVerZona("sponsor", "operar"), false);
   assert.equal(puedeVerZona("sponsor", "curar"), false);
   // Transcribir es una herramienta del equipo, no un reporte: el sponsor no la ve (ADR-031).

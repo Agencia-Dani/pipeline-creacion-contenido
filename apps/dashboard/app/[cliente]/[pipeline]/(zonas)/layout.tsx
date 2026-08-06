@@ -19,6 +19,7 @@ const ETIQUETAS: Record<Zona, string> = {
   curar: "Curar",
   transcribir: "Transcribir",
   entender: "Entender",
+  ajustes: "Ajustes",
 };
 
 // El nav muestra solo las zonas del rol (la UI esconde); cada página además exige su zona **y su

@@ -23,10 +23,12 @@ export type Pipeline = string;
 // No se deriva de la existencia de las tablas (que sería automático y sin duplicación) porque eso
 // pone una decisión de producto a merced de una migración: aplicar la `020` cambiaría el nav de
 // todos los cockpits sin que nadie lo decida (ADR-056, alternativas descartadas).
+// `ajustes` va en los DOS: el equipo es de la empresa, no del pipeline — existe con o sin motor
+// (ADR-060 §1). Qué pantallas tiene adentro sí cambia por pipeline: ver `AJUSTES_POR_PIPELINE`.
 const ZONAS_POR_PIPELINE: Record<Pipeline, readonly Zona[]> = {
-  "short-form-content": ["operar", "curar", "transcribir", "entender"],
+  "short-form-content": ["operar", "curar", "transcribir", "entender", "ajustes"],
   // Sin `transcribir`: no hay nada que transcribir cuando la pieza ya nació texto.
-  linkedin: ["operar", "curar", "entender"],
+  linkedin: ["operar", "curar", "entender", "ajustes"],
 };
 
 /**
@@ -98,6 +100,9 @@ export function pipelinesDeclarados(): readonly Pipeline[] {
 // una vez: el índice **deriva** sus tarjetas de esto, y la guardia del servidor pregunta a esto.
 // Agregar una pantalla es una línea acá.
 
+// `ajustes` salió de acá el 2026-08-06: los knobs se mudaron a su propia zona (ADR-060 §1). `curar`
+// es *trabajar sobre el material*, y configurar el motor no es eso — era la única pantalla de curar
+// que no miraba una pieza de contenido.
 export const PANTALLAS_CURAR = [
   "feed",
   "descartes",
@@ -105,7 +110,6 @@ export const PANTALLAS_CURAR = [
   "voces",
   "referentes",
   "sugeridos",
-  "ajustes",
 ] as const;
 
 export type PantallaCurar = (typeof PANTALLAS_CURAR)[number];
@@ -132,6 +136,36 @@ export function implementaPantalla(pipeline: Pipeline, pantalla: PantallaCurar):
   return pantallasDeCurar(pipeline).includes(pantalla);
 }
 
+// ─────────────────────────── Y las de `ajustes`, con el mismo molde ─────────────────────────────
+//
+// 🔑 **La duplicación de forma con `PANTALLAS_CURAR` es a propósito.** Generalizar las dos tablas en
+// una sola («pantallas por zona por pipeline») es la abstracción obvia y no se hace todavía: son dos
+// casos, y el tercero decide si el patrón es real o si son dos cosas que se parecen. Lo que sí se
+// copia es la LECCIÓN — declarar por pipeline lo que existe— porque esa ya se pagó una vez.
+
+export const PANTALLAS_AJUSTES = ["motor", "equipo"] as const;
+
+export type PantallaAjustes = (typeof PANTALLAS_AJUSTES)[number];
+
+// **LinkedIn no declara `motor`, y es el mismo fallo mudo de siempre visto venir:** `app.ajustes`
+// no tiene filas para su instancia, así que la pantalla cargaría limpia mostrando cero perillas —
+// que en un pipeline recién nacido se lee como *"todavía no lo configuramos"* y no como *"esto no
+// es de acá"*. La familia de la `015`. `equipo` sí, porque el equipo es de la empresa.
+const AJUSTES_POR_PIPELINE: Record<Pipeline, readonly PantallaAjustes[]> = {
+  "short-form-content": PANTALLAS_AJUSTES,
+  linkedin: ["equipo"],
+};
+
+/** Las pantallas de `ajustes` que este pipeline implementa. Un pipeline no declarado no tiene ninguna. */
+export function pantallasDeAjustes(pipeline: Pipeline): readonly PantallaAjustes[] {
+  return AJUSTES_POR_PIPELINE[pipeline] ?? [];
+}
+
+/** La pregunta que hace la guardia del servidor, hermana de `implementaPantalla`. */
+export function implementaAjuste(pipeline: Pipeline, pantalla: PantallaAjustes): boolean {
+  return pantallasDeAjustes(pipeline).includes(pantalla);
+}
+
 /**
  * Que ninguna declaración de pantallas invente una que no existe, y que ningún pipeline con la zona
  * `curar` se quede sin pantallas.
@@ -145,6 +179,18 @@ export function declaracionesDeCurarValidas(): boolean {
     const tieneCurar = zonasDePipeline(p).includes("curar");
     return (
       pantallas.every((s) => PANTALLAS_CURAR.includes(s)) && (tieneCurar ? pantallas.length > 0 : true)
+    );
+  });
+}
+
+/** La misma guardia para `ajustes`: una zona declarada sin pantallas es una zona vacía. */
+export function declaracionesDeAjustesValidas(): boolean {
+  return pipelinesDeclarados().every((p) => {
+    const pantallas = pantallasDeAjustes(p);
+    const tieneAjustes = zonasDePipeline(p).includes("ajustes");
+    return (
+      pantallas.every((s) => PANTALLAS_AJUSTES.includes(s)) &&
+      (tieneAjustes ? pantallas.length > 0 : true)
     );
   });
 }
