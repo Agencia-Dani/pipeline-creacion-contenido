@@ -57,6 +57,22 @@ export async function leerDescartes(ctx: TenantContext): Promise<DescarteFeed[]>
   );
 }
 
+/**
+ * Cuántos descartes esperan veredicto. Es lo único que el **feed** necesita de esta tabla, para
+ * su invitación del pie.
+ *
+ * Existe porque esa invitación se estaba pagando con `leerDescartes()` entero: **77 KB** —los 38
+ * descartes con sus scripts y sus razones, medido el 06/08— para terminar en un `.filter().length`.
+ * Un `head` count lo trae sin una sola fila. Misma familia que los tres textos largos del feed.
+ */
+export async function contarDescartesPendientes(ctx: TenantContext): Promise<number> {
+  const { count, error } = await (await scoped(ctx))
+    .select("app.descartes", "id", { count: "exact", head: true })
+    .is("veredicto", null);
+  if (error) throw new Error(`Supabase respondió con error contando los descartes: ${error.message}`);
+  return count ?? 0;
+}
+
 export async function marcarVeredicto(
   ctx: TenantContext,
   id: string,

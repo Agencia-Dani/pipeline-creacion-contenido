@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
-import type { Calificacion, CandidatoFeed } from "@/domain/feed";
-import { guardarNotasCandidato } from "./actions";
+import { cn } from "@/lib/utils";
+import type { Calificacion, CandidatoFeed, TextosCandidato } from "@/domain/feed";
+import { guardarNotasCandidato, textosDeCandidato } from "./actions";
 import { BotonesCalificar } from "./tarjeta";
 
 // La tarjeta ABIERTA: acá sí está todo — el script literal completo, el juicio del gate con su
@@ -16,6 +17,13 @@ import { BotonesCalificar } from "./tarjeta";
 // El <dialog> vive en components/ui/modal.tsx (uno solo para todo el mazo, no uno por tarjeta).
 // El contenido se monta recién al abrir, así que las notas de un candidato nunca arrastran las
 // del anterior sin necesidad de un efecto que las resetee.
+//
+// 🔑 **Los tres textos largos se piden al abrir, no vienen con el listado.** Medido el 06/08
+// sobre las 165 filas de prod: `script` + `relevancia_razon` + `notas_equipo` eran 240 KB de los
+// 337 que viajaban en cada carga, para dibujar tarjetas cerradas que muestran título, referente,
+// vistas y heat. Los escalares (voz, idioma, likes, seguidores, engagement, url) SÍ siguen
+// viniendo con la fila —son ~15 KB entre todos— así que el encabezado y los badges de este modal
+// se pintan enteros al instante y lo único que espera es la prosa.
 
 const miles = (n: number) => new Intl.NumberFormat("es-AR").format(n);
 
@@ -62,17 +70,29 @@ export function Detalle({
         </>
       }
     >
-      {candidato && <Contenido candidato={candidato} />}
+      {candidato && <Contenido key={candidato.id} candidato={candidato} />}
     </Modal>
   );
 }
 
 function Contenido({ candidato }: { candidato: CandidatoFeed }) {
-  const [notas, setNotas] = useState(candidato.notas ?? "");
-  const [aviso, setAviso] = useState<string | null>(null);
-  const [guardando, startTransition] = useTransition();
+  const [textos, setTextos] = useState<TextosCandidato | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const sucias = notas.trim() !== (candidato.notas ?? "").trim();
+  // El `key={candidato.id}` de arriba remonta este componente por candidato, así que este efecto
+  // corre una vez por apertura y no hace falta resetear nada a mano. `vivo` cubre el cierre
+  // rápido: sin él, una respuesta que llega tarde escribiría estado de un modal ya desmontado.
+  useEffect(() => {
+    let vivo = true;
+    textosDeCandidato(candidato.id).then((r) => {
+      if (!vivo) return;
+      if (r.ok) setTextos(r.textos);
+      else setError(r.mensaje);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [candidato.id]);
 
   return (
     <>
@@ -122,10 +142,51 @@ function Contenido({ candidato }: { candidato: CandidatoFeed }) {
         entender qué funciona, no para copiarlo.
       </p>
 
-      {candidato.relevanciaRazon && (
+      {error !== null ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : textos === null ? (
+        <Esqueleto />
+      ) : (
+        <Textos candidato={candidato} textos={textos} />
+      )}
+    </>
+  );
+}
+
+/** Lo que se ve mientras viajan los tres textos. Ocupa el alto que van a ocupar, para que el
+    modal no salte cuando llegan. */
+function Esqueleto() {
+  return (
+    <div className="space-y-2" aria-busy="true" aria-label="Cargando el guion">
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={i}
+          className={cn("h-3 animate-pulse rounded bg-muted", i % 3 === 2 ? "w-2/3" : "w-full")}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Los tres textos largos, ya cargados. Es su propio componente por una razón concreta: monta
+ * recién cuando `textos` llegó, así el `useState` de las notas arranca con el valor real. Si
+ * viviera en `Contenido`, arrancaría en `""` y haría falta un efecto que lo sincronice — el
+ * clásico que pisa lo que el usuario ya empezó a escribir.
+ */
+function Textos({ candidato, textos }: { candidato: CandidatoFeed; textos: TextosCandidato }) {
+  const [notas, setNotas] = useState(textos.notas ?? "");
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [guardando, startTransition] = useTransition();
+
+  const sucias = notas.trim() !== (textos.notas ?? "").trim();
+
+  return (
+    <>
+      {textos.relevanciaRazon && (
         <div className="rounded-md bg-muted/50 p-3">
           <p className="mb-1 text-xs font-medium text-muted-foreground">Por qué pasó el filtro</p>
-          <p className="text-sm">{candidato.relevanciaRazon}</p>
+          <p className="text-sm">{textos.relevanciaRazon}</p>
         </div>
       )}
 
@@ -134,10 +195,10 @@ function Contenido({ candidato }: { candidato: CandidatoFeed }) {
           <p className="text-xs font-medium text-muted-foreground">
             Lo que se dice en el video (transcripción literal, traducida)
           </p>
-          <Copiar texto={candidato.script} etiqueta="Copiar guion" />
+          <Copiar texto={textos.script} etiqueta="Copiar guion" />
         </div>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
-          {candidato.script ?? "Sin transcripción."}
+          {textos.script ?? "Sin transcripción."}
         </p>
       </div>
 

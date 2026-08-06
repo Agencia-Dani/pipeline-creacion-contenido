@@ -8,54 +8,74 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   agrupar,
-  contarPorFiltro,
+  ajustarCuentas,
+  cursorDe,
   ETIQUETA_FILTRO,
+  FILTRO_INICIAL,
   FILTROS,
-  pasaFiltro,
   type Calificacion,
   type CandidatoFeed,
   type Filtro,
 } from "@/domain/feed";
-import { calificarCandidato } from "./actions";
+import { calificarCandidato, cargarMasFeed } from "./actions";
 import { Detalle } from "./detalle";
 import { Tarjeta } from "./tarjeta";
 
-// El mazo: agrupado por proyecto, heat descendente adentro, filtro arriba.
+// El mazo: agrupado por proyecto, heat descendente adentro, filtro arriba, de a 25.
 //
-// 🔑 La regla que explica la forma de este componente: **una tarjeta calificada no se va del
-// mazo hasta que se cambia de filtro o se recarga.** Por eso la lista visible (`visibles`) es
-// un congelado que se recalcula SOLO al cambiar de filtro, y no un `filter()` en cada render.
-// Si se recalculara sola, la tarjeta desaparecería de abajo del cursor al calificarla y un
-// misclick sobre 145 tarjetas sería irrecuperable desde la pantalla (plan-cockpit §D6.4).
+// 🔑 **La regla sigue siendo la misma: una tarjeta calificada NO se va del mazo hasta que se
+// cambia de filtro o se recarga.** Lo que cambió es quién la sostiene. Antes había un congelado
+// (`visibles`) que se recalculaba solo al cambiar de filtro, porque la lista se filtraba en el
+// cliente y un `filter()` vivo habría hecho desaparecer la tarjeta de abajo del cursor —
+// convirtiendo un misclick sobre 145 tarjetas en algo irrecuperable desde la pantalla
+// (plan-cockpit §D6.4).
 //
-// Los contadores de los chips, en cambio, SÍ son vivos: son el avance acumulándose.
+// Desde que el filtro se aplica **en la query**, ese congelado quedó sin trabajo y se borró:
+// `cargados` solo cambia cuando se le pide algo al server (cambiar de filtro, o cargar más), y
+// calificar no le pide nada. O sea que la regla dejó de depender de que alguien mantenga un `Set`
+// sincronizado y pasó a ser **estructural**. Si algún día el filtro volviera al cliente, el
+// congelado tiene que volver con él.
+//
+// Los contadores de los chips, en cambio, SÍ son vivos, y ahora sobre la tabla entera: salen de
+// los cuatro `head` counts del server más los cambios de esta sesión (`ajustarCuentas`).
 
 export function Mazo({
-  candidatos,
+  inicial,
+  hayMasInicial,
+  cuentas,
   descartesPendientes,
 }: {
-  candidatos: CandidatoFeed[];
+  inicial: CandidatoFeed[];
+  hayMasInicial: boolean;
+  cuentas: Record<Filtro, number>;
   descartesPendientes: number;
 }) {
   const cockpit = usarCockpit();
+  const [cargados, setCargados] = useState(inicial);
+  const [hayMas, setHayMas] = useState(hayMasInicial);
+  const [filtro, setFiltro] = useState<Filtro>(FILTRO_INICIAL);
   const [puestas, setPuestas] = useState<Record<string, Calificacion>>({});
-  const [filtro, setFiltro] = useState<Filtro>("sin-calificar");
-  const [visibles, setVisibles] = useState<Set<string>>(
-    () => new Set(candidatos.filter((c) => pasaFiltro(c, "sin-calificar")).map((c) => c.id)),
-  );
-  // ⚠️ `plegados` es un estado SEPARADO de `visibles`, y tiene que quedarse separado. `visibles`
-  // es el congelado del filtro (la regla de arriba); plegar es solo dejar de dibujar un grupo.
-  // Si plegar tocara `visibles`, desplegar re-evaluaría el filtro y las tarjetas que acabás de
-  // calificar desaparecerían — justo el misclick irrecuperable que ese congelado evita.
-  // Arranca vacío: todo desplegado, que es el comportamiento de siempre. Plegar es la acción.
+  // La calificación que la fila tenía EN EL SERVER la primera vez que se la tocó en esta sesión.
+  // Es lo que hace exacto el ajuste de los contadores: re-clickear tres emojis sobre la misma
+  // tarjeta tiene que valer un solo delta, y el delta tiene que sobrevivir a un cambio de filtro
+  // (que recarga las filas, pero no los conteos).
+  const [originales, setOriginales] = useState<Record<string, Calificacion | null>>({});
+  // ⚠️ `plegados` es estado propio y separado: plegar es solo dejar de dibujar un grupo, no tocar
+  // qué está cargado. Arranca vacío — todo desplegado, que es el comportamiento de siempre.
   const [plegados, setPlegados] = useState<Set<string>>(new Set());
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<Set<string>>(new Set());
   const [errores, setErrores] = useState<Record<string, string>>({});
+  const [errorLista, setErrorLista] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const [cargando, startCargar] = useTransition();
 
   const efectiva = (c: CandidatoFeed): Calificacion | null => puestas[c.id] ?? c.calificacion;
-  const cuentas = contarPorFiltro(candidatos.map((c) => ({ calificacion: efectiva(c) })));
+
+  const ajustadas = ajustarCuentas(
+    cuentas,
+    Object.entries(puestas).map(([id, despues]) => ({ antes: originales[id] ?? null, despues })),
+  );
 
   function alternarPlegado(proyecto: string) {
     setPlegados((p) => {
@@ -65,19 +85,52 @@ export function Mazo({
     });
   }
 
+  /**
+   * Cambiar de filtro es pedirle al server la primera página de ESE filtro. No se puede resolver
+   * en el cliente: lo cargado son 25 de N, así que filtrar en memoria mostraría "los 🔥 de estas
+   * 25" en vez de "los primeros 25 🔥".
+   *
+   * El chip se marca recién cuando la página llegó. Si se marcara antes y la carga fallara, la
+   * pantalla quedaría diciendo que el filtro es uno mientras muestra las tarjetas de otro.
+   */
   function cambiarFiltro(nuevo: Filtro) {
-    setFiltro(nuevo);
-    setVisibles(
-      new Set(
-        candidatos.filter((c) => pasaFiltro({ calificacion: efectiva(c) }, nuevo)).map((c) => c.id),
-      ),
-    );
+    if (nuevo === filtro || cargando) return;
+    setErrorLista(null);
+    startCargar(async () => {
+      const r = await cargarMasFeed(nuevo, null);
+      if (!r.ok) {
+        setErrorLista(r.mensaje);
+        return;
+      }
+      setFiltro(nuevo);
+      setCargados(r.candidatos);
+      setHayMas(r.hayMas);
+    });
+  }
+
+  /**
+   * La página siguiente, por cursor y no por offset: con el filtro "Sin calificar" activo, cada
+   * tarjeta que alguien califica sale del conjunto filtrado, y un `offset 25` se saltearía tantos
+   * candidatos como calificaciones se hicieron — sin que nadie los vea nunca (ver `despuesDe`).
+   */
+  function mas() {
+    setErrorLista(null);
+    startCargar(async () => {
+      const r = await cargarMasFeed(filtro, cursorDe(cargados));
+      if (!r.ok) {
+        setErrorLista(r.mensaje);
+        return;
+      }
+      setCargados((c) => [...c, ...r.candidatos]);
+      setHayMas(r.hayMas);
+    });
   }
 
   function calificar(c: CandidatoFeed, calificacion: Calificacion) {
     const anterior = efectiva(c);
-    // Optimista: sobre 145 tarjetas, esperar el ida y vuelta a Airtable en cada click mata el
-    // ritmo. Si falla, se revierte y la tarjeta muestra el error — nunca queda mintiendo.
+    // Optimista: sobre un mazo largo, esperar el ida y vuelta en cada click mata el ritmo. Si
+    // falla, se revierte y la tarjeta muestra el error — nunca queda mintiendo.
+    setOriginales((o) => (c.id in o ? o : { ...o, [c.id]: c.calificacion }));
     setPuestas((p) => ({ ...p, [c.id]: calificacion }));
     setErrores(({ [c.id]: _, ...resto }) => resto);
     setEnviando((e) => new Set(e).add(c.id));
@@ -101,10 +154,10 @@ export function Mazo({
     });
   }
 
-  const enPantalla = candidatos.filter((c) => visibles.has(c.id));
-  const grupos = agrupar(enPantalla);
-  const abierto = candidatos.find((c) => c.id === abiertoId) ?? null;
-  const pendientes = cuentas["sin-calificar"];
+  const grupos = agrupar(cargados);
+  const abierto = cargados.find((c) => c.id === abiertoId) ?? null;
+  const pendientes = ajustadas["sin-calificar"];
+  const total = ajustadas[filtro];
 
   return (
     <div className="space-y-6">
@@ -113,18 +166,19 @@ export function Mazo({
           <button
             key={f}
             type="button"
+            disabled={cargando}
             onClick={() => cambiarFiltro(f)}
             className={cn(
-              "rounded-full border px-3 py-1 text-sm transition-colors",
+              "rounded-full border px-3 py-1 text-sm transition-colors disabled:opacity-50",
               filtro === f ? "border-primary bg-primary/10 font-medium" : "hover:bg-accent",
             )}
           >
-            {ETIQUETA_FILTRO[f]} <span className="text-muted-foreground">{cuentas[f]}</span>
+            {ETIQUETA_FILTRO[f]} <span className="text-muted-foreground">{ajustadas[f]}</span>
           </button>
         ))}
       </div>
 
-      {enPantalla.length === 0 ? (
+      {cargados.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           {filtro === "sin-calificar"
             ? "No queda nada por calificar. El motor deja candidatos nuevos en cada corrida."
@@ -137,7 +191,11 @@ export function Mazo({
             <section key={g.proyecto} className="space-y-3">
               {/* El título ES el control: los criterios son por proyecto, así que se trabaja de a
                   un grupo por vez y los demás estorban. El contador se queda visible plegado —
-                  es justo lo que se quiere saber de un grupo cerrado. */}
+                  es justo lo que se quiere saber de un grupo cerrado.
+
+                  ⚠️ Ese número es "cuántas de este proyecto hay CARGADAS", no cuántas existen: el
+                  mazo pagina global por heat, así que los grupos se llenan a medida que se carga
+                  más. El número que sí es del universo entero es el del chip, arriba. */}
               <h2 className="border-b pb-1.5">
                 <button
                   type="button"
@@ -176,6 +234,21 @@ export function Mazo({
             </section>
           );
         })
+      )}
+
+      {errorLista && <p className="text-sm text-destructive">{errorLista}</p>}
+
+      {cargados.length > 0 && (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {cargados.length} de {total}.
+          </p>
+          {hayMas && (
+            <Button variant="outline" onClick={mas} disabled={cargando}>
+              {cargando ? "Cargando…" : "Cargar más"}
+            </Button>
+          )}
+        </div>
       )}
 
       {/* El encadenamiento con los descartes. Va SIEMPRE al pie del mazo, no solo al terminar

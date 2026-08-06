@@ -22,13 +22,23 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## ✅ AL CIERRE 97 (2026-08-05): EL FLIP CERRADO, LA BALDE 2 PODADA, AIRTABLE FUERA.
+> ## ✅ AL CIERRE 98 (2026-08-06): EL FEED PAGINA. ANTES: EL FLIP CERRADO, LA BALDE 2 PODADA, AIRTABLE FUERA.
 >
 > **Lo único que bloquea algo:** la **`023`** espera **una corrida del motor y un archivado verdes**
 > para firmar su gate — su mitad de escritura ya está en el live (`n8n:diff` limpio). Después de la
 > corrida del lunes, `node Workflows/workflow-short-form-content/verificar-corrida.mjs 2` tiene que
 > decir **`intersección: 0`** y contar por **`run_id`** (si cae a la ventana de `primera_vez`, la
 > memoria no se escribió y hay que mirar por qué antes de dropear nada).
+>
+> ⏳ **Y no hay nada que hacer ahí hasta el fin de semana:** la última corrida en la base es del
+> **04/08 21:12**, y la mitad de escritura salió el **05/08**, así que **ninguna corrida ejerció
+> todavía el código nuevo**. El archivado es domingo 18:00 y el motor lunes 08:00. Dispararlo a mano
+> arranca una corrida real y **paga**.
+>
+> ✅ **La paginación del feed (§12 #7) se cerró el 06/08** y con eso el checklist del multi-tenant
+> queda con **un solo item: LinkedIn**. La pantalla pasó de ~405 KB a ~16 KB por carga. **Falta el
+> clic** (ver la tabla de abajo, junto al del CSV): está verificada contra prod a nivel query y con
+> tests, pero nadie la abrió en un browser.
 >
 > ### Lo del cierre 96, que sigue igual: quedan dos clics
 >
@@ -44,6 +54,7 @@
 > | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ **arrastre del cierre 94**, el más viejo abierto. El CSV está verificado contra las 31 filas reales con un parser RFC 4180 independiente; lo que nadie hizo es **el clic**. 15 columnas, acentos derechos |
 > | 4 | 🟡 Que el tab **Entender** aparezca en el nav de un **operador** (`b8a3832`) | Jero o Alejo | ⬜ se ve solo, en su próximo login. La lógica tiene tests; falta el ojo. *No se probó desde una sesión de agente a propósito: habría requerido generar un magic link de la cuenta de otra persona* |
 > | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
+> | 5 | 🟡 Recorrer el **feed paginado** en `/curar/feed` (cierre 98) | Majo, Jero o Alejo | ⬜ **nuevo del 06/08**, y se despacha en el mismo login que el #2. Mirar tres cosas: que **Cargar más** traiga 25 sin repetir ni saltear, que los **chips digan el total real** (165, no 25) y que **abrir una tarjeta** traiga el guion. Calificar y después cargar más es el caso que el keyset existe para cubrir |
 >
 > ⚠️ **Y el flip se hizo DOS VECES el mismo día, por dos sesiones que no se vieron** (`d8edea2` y una
 > rama paralela, `capa-2-flip-scoped`, descartada). Las dos llegaron al mismo diseño: mismo campo
@@ -1319,6 +1330,27 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-06 (cierre 98) — El feed pagina, y el 71% de su payload eran tres campos que nadie dibujaba (Claude, con Alejo).**
+**Qué se hizo:** el **#7 de [plan-multi-tenant §12](./plan-multi-tenant.md)**, el último item numerado antes de LinkedIn. La pantalla del feed pasó de **~405 KB a ~16 KB** por carga.
+
+**🔬 El diagnóstico del plan estaba a medias, y medirlo antes de escribir código lo partió en dos.** §10 decía *"el feed carga sin paginación"*, o sea un problema de **cuántas filas**. Medido contra las 165 de prod: el payload eran 337 KB y **`script` solo era 207 de esos** — más `relevancia_razon` (30) y `notas_equipo` (3,3) = **240 KB, el 71%, en tres campos que la tarjeta CERRADA no dibuja**. El propio `tarjeta.tsx` ya lo decía en un comentario desde D6 (*"el script se lee solo cuando el título no alcanza"*) y aun así viajaban los 165. *El problema no era solo cuántas filas: era qué traía cada una.*
+
+**⚖️ Dónde se trazó la línea, y por qué no en el lugar obvio.** Se fueron **solo los tres textos largos**; **todos los escalares se quedan** en la fila (voz, idioma, likes, seguidores, engagement, url, relevancia_score). Medido: entre todos suman ~15 KB, así que sacarlos no compraba nada y le habría costado al modal mostrar un spinner para su propio encabezado. Así el detalle pinta badges y subtítulo al instante y lo único que espera es la prosa.
+
+**🩸 Keyset y no `offset`, y no por gusto — probado contra prod sin escribir una fila.** Con el filtro *Sin calificar* activo, **cada tarjeta que alguien califica sale del conjunto filtrado**. Simulando 3 calificaciones (excluyéndolas por id, read-only): `offset 25` devolvió las posiciones 29–31 ⇒ **se salteó exactamente 3 candidatos que nadie habría visto nunca**; el keyset devolvió las 26–28. `historicos` puede usar offset porque ahí no se edita nada. Verificado además que keyset(25+25) es **idéntico** a un `limit 50` corrido: intersección 0, sin huecos.
+
+**🧹 Y el congelado de `visibles` quedó sin trabajo, así que se borró.** Era el `Set` que impedía que una tarjeta desapareciera de abajo del cursor al calificarla (plan-cockpit §D6.4) — la protección contra el misclick irrecuperable. Con el filtro **en la query**, `cargados` solo cambia cuando se le pide algo al server, y calificar no le pide nada: **la regla dejó de depender de mantener un `Set` sincronizado y pasó a ser estructural**. Queda escrito en `mazo.tsx` con su condición: *si el filtro vuelve al cliente, el congelado tiene que volver con él*.
+
+**⚠️ Lo que el cambio creó y hubo que cerrar en el mismo movimiento: el filtro pasó a tener DOS expresiones** — `pasaFiltro` en memoria (la usan los contadores) y la condición de PostgREST. Es la forma exacta del bug que el archivado pagó en el cierre 93 (el `IF` y el code node discrepando sobre la forma del dato). Quedaron declaradas juntas en un `Record<Filtro, …>` exhaustivo: **agregar un filtro no compila** hasta decidir los dos lados.
+
+**➕ De regalo, la misma familia en la misma pantalla:** la página cargaba `leerDescartes()` **entero** —los 38 con sus scripts, **77 KB**— para terminar en un `.filter().length`. Ahora es un `head` count.
+
+**🔎 Los contadores de los chips siguen siendo el avance real** (no el tamaño de la página): 4 `head` counts sobre la tabla entera + los deltas de la sesión, cada uno desde la calificación **original** de la fila, así que re-clickear tres emojis vale un solo delta y el ajuste sobrevive a un cambio de filtro.
+
+**Verde:** `typecheck` · **185 tests** (+10) · `build` · `validate` 2053 checks. Contra prod: los 4 contadores dan 165/0/0/165, y los filtros de emoji se verificaron contra `outputs` —donde sí hay datos— porque **en `candidatos` el 0 no distinguía "filtro correcto" de "filtro que no matchea"**: `eq.🔥`→12 y `in.(🔥,👍)`→36 = 12+24, que es el reparto real.
+**Qué quedó a medias:** ⏳ **nadie hizo clic.** Está verificado a nivel query contra prod y de unidad, pero la pantalla no se abrió — hace falta un login por magic link. Mismo hueco que arrastra el botón *Descargar CSV*. Y ⚠️ el `.env` de esta máquina es del 02/08: **sin `N8N_API_KEY` ni los `N8N_WF_*`**, así que `n8n:diff` no corre desde acá (no hizo falta: no se tocó ningún workflow).
+**Qué sigue:** el gate de la **`023`**, que sigue esperando corridas (última en la base: **04/08 21:12**; nada corrió desde entonces, y la mitad de escritura salió el 05/08) → **Fase 5, LinkedIn**, que arranca por §14.6.
 
 **2026-08-05 (cierre 97) — La balde 2 medida y podada, y Airtable fuera del repo hasta la última mención (Claude, con Mani).**
 **Qué se hizo:** el inventario que D7 apartó y nunca listó, la sesión de grilling que lo decidió (**[ADR-059](../adr/ADR-059-lo-que-no-se-usa-no-existe.md)**), la **`022` aplicada y verificada por su efecto**, la **`023` escrita y gateada** con su mitad de escritura ya en el live, y la purga de Airtable del repo entero.

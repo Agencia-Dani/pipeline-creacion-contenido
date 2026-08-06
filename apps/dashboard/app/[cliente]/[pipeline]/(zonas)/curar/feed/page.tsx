@@ -1,9 +1,10 @@
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FILTRO_INICIAL } from "@/domain/feed";
 import { exigirTenant } from "@/lib/auth";
-import { leerFeed } from "@/lib/candidatos";
-import { leerDescartes } from "@/lib/descartes";
+import { contarFeed, leerFeed } from "@/lib/candidatos";
+import { contarDescartesPendientes } from "@/lib/descartes";
 import { Mazo } from "./mazo";
 
 // El feed de calificación (D6). Desde D7 los candidatos viven en Postgres — acá
@@ -23,8 +24,13 @@ export default async function FeedPage({
   const { ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
   const base = comoRuta(cockpit);
 
-  const [candidatos, descartes] = await Promise.all([leerFeed(ctx), leerDescartes(ctx)]);
-  const descartesPendientes = descartes.filter((d) => d.veredicto === null).length;
+  // Los conteos van aparte de las filas a propósito: son cuatro `head` counts sobre la tabla
+  // entera, y es lo que deja que los chips digan el avance real y no el tamaño de la página.
+  const [primera, cuentas, descartesPendientes] = await Promise.all([
+    leerFeed(ctx, FILTRO_INICIAL),
+    contarFeed(ctx),
+    contarDescartesPendientes(ctx),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -41,7 +47,11 @@ export default async function FeedPage({
         </p>
       </div>
 
-      {candidatos.length === 0 ? (
+      {/* 🔑 El vacío se pregunta por `todos`, no por las filas que vinieron. Desde que el filtro
+          se aplica en la query, la primera página puede venir vacía porque **ya está todo
+          calificado** — que no es lo mismo que no tener candidatos, y merece otro texto. Ese
+          segundo caso lo dice el Mazo, que sabe qué filtro está activo. */}
+      {cuentas.todos === 0 ? (
         <Alert>
           <AlertDescription>
             No hay candidatos. El motor corre los lunes y deja acá lo que encuentra; también podés
@@ -49,7 +59,12 @@ export default async function FeedPage({
           </AlertDescription>
         </Alert>
       ) : (
-        <Mazo candidatos={candidatos} descartesPendientes={descartesPendientes} />
+        <Mazo
+          inicial={primera.candidatos}
+          hayMasInicial={primera.hayMas}
+          cuentas={cuentas}
+          descartesPendientes={descartesPendientes}
+        />
       )}
     </div>
   );

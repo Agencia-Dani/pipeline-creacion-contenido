@@ -6,7 +6,7 @@
 >
 > **Cómo leerlo.** §1 es el diagnóstico con evidencia (leelo aunque conozcas el repo — hay cuatro cosas que no están documentadas en ningún otro lado). §2 son las decisiones. §3–§9 son las fases, en orden de ejecución. §10 son los casos de escalabilidad, uno por uno. §11 es cómo se verifica. **Si vas a ejecutar, §12 es el checklist.**
 
-**Estado:** **en ejecución — Fases 0–4 y 6 en producción** (la Capa 2 quedó viva el 05/08, ADR-058). Faltan la **paginación del feed** (§12 #7) y la **Fase 5, LinkedIn** (§12 #9) · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-05 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
+**Estado:** **en ejecución — Fases 0–4 y 6 en producción** (la Capa 2 quedó viva el 05/08, ADR-058). La **paginación del feed** (§12 #7) se cerró el 06/08; queda la **Fase 5, LinkedIn** (§12 #9) · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-06 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
 
 ---
 
@@ -491,7 +491,7 @@ El pedido fue explícito: *"pensar en todos los casos de escalabilidad posibles 
 | **+ sub-clientes** (los clientes de Retia) | Nada — hoy es imposible | `clients.parent_id`: el segundo nivel es **una fila** | La UI del selector con dos niveles; la visibilidad ya queda resuelta en `domain/tenant.ts` |
 | **+ instancias del mismo pipeline por empresa** | `unique (workflow_id, client_id)` lo prohíbe | Se reemplaza por `(workflow_id, client_id, slug)` (§4.1) | — |
 | **+ usuarios** | El alta es **manual en dos pasos** (invite en Supabase + `insert` a mano en el SQL Editor, documentado en [`007`](../../core/schema/007_app_usuarios.sql)) | Nada. **Sigue manual a propósito** | 🔶 **Con 3 empresas × varias personas esto se vuelve fricción real.** Una pantalla de alta scopeada por tenant es candidata a fase propia — no bloquea, pero se va a sentir |
-| **+ volumen de candidatos** | El feed carga sin paginación; `app.candidatos` crece sin tope desde que se sacó la cuota de Airtable ([`009`](../../core/schema/009_app_config_sombra.sql): *"sin cuota: dejan de borrarse por presión de espacio"*) | Índices por `(instance_id, estado)` (§4.5) | 🔴 **Paginación del feed antes del segundo tenant.** Es lo primero que se va a notar en el frontend |
+| **+ volumen de candidatos** | El feed cargaba **todo**, y `app.candidatos` crece sin tope desde que se sacó la cuota de Airtable ([`009`](../../core/schema/009_app_config_sombra.sql): *"sin cuota: dejan de borrarse por presión de espacio"*) | Índices por `(instance_id, estado)` (§4.5) | ✅ **Cerrado el 06/08.** Y el diagnóstico estaba a medias: el problema no era solo *cuántas* filas, era **qué traía cada una** — 240 KB de los 337 eran 3 campos de texto que la tarjeta cerrada no dibuja |
 | **+ referentes** | Nada estructural — **es la palanca que el sistema pide** | El banco pasa a ser por empresa | El handoff: *"la palanca de verdad es sumar referentes"* |
 | **+ corridas concurrentes** | `N8N_RUNNERS_TASK_TIMEOUT` 900 s mata el Code node; single-flight global por copia de workflow | Una ejecución por instancia (§2-C) preserva el presupuesto por tenant; single-flight por instancia | Cuando N ejecuciones simultáneas saturen el pod → fase 2 de ADR-005 (VPS). **Disparador: medido, no anticipado** |
 | **+ costo** | Ninguna atribución por empresa hoy en `app` | `runs.costo_estimado` **ya** cuelga de `instance_id` ⇒ el costo por empresa es una query, sin trabajo nuevo | Techo de gasto **por instancia** (hoy `cap_top_n` es global — y el handoff midió que además **corta global, no por proyecto**: con el cap en 10, un proyecto se llevó los 10 lugares y cuatro quedaron en `evaluados: 0`) |
@@ -559,11 +559,13 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | 5 | **Fase 3** — rutas `[cliente]/[pipeline]` | el segundo cockpit | sí (URLs cambian) | ✅ en prod · el 404 de la base y los bookmarks viejos, cerrados (cierre 89) |
 | 6 | **Fase 4** — `run-plan` v2 + motor + dispatcher | el segundo tenant corriendo | sí, **re-import** | ✅ en prod · corrida de verificación `ok` |
 | — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ✅ **COMPLETO** — mergeada (`ad2de5b`), `018` + `019` aplicadas y verificadas por su efecto (04/08) |
-| 7 | 🔴 **Paginación del feed** (§10) | el segundo tenant con volumen | no | ⬜ no empezada |
+| 7 | ~~**Paginación del feed**~~ (§10) | el segundo tenant con volumen | no | ✅ **HECHA el 2026-08-06.** Keyset sobre `(heat desc, id asc)`, filtro y contadores en el server, y los 3 textos largos fuera del listado: **405 KB → 16 KB** por carga. Verificada contra prod a nivel query; ⏳ falta el clic |
 | 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | ✅ **COMPLETA el 2026-08-05** — la `021` aplicada **y** el flip de `scoped.ts` en prod (`d8edea2`, [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)). Verificada con cuenta no dueña y con las 4 zonas cargando |
 | 9 | **Fase 5** — LinkedIn | — | no (pipeline nuevo, aislado) | 🔧 la **`020` está aplicada** y hay 3 cockpits en `instances`; no existe el workflow en n8n |
 
-> ✅ **Al 2026-08-05 quedan dos: el #7 (paginación) y el #9 (LinkedIn).** Ninguno bloquea a nadie hoy.
+> ✅ **Al 2026-08-06 queda uno: el #9 (LinkedIn).** El #7 se cerró el 06/08 y no bloqueaba a nadie;
+> se hizo igual porque era lo único numerado que quedaba antes de la Fase 5, y porque su síntoma ya
+> era medible con un solo tenant.
 >
 > ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
 > que la secuencia real es **`018`/`019` → Capa 2 (RLS) → paginación → LinkedIn**. La fila sin número

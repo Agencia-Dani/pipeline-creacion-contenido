@@ -2,15 +2,21 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
   agrupar,
+  ajustarCuentas,
   camposDeCalificacion,
-  contarPorFiltro,
+  condicionDeFiltro,
+  cursorDe,
+  despuesDe,
   esCalificacion,
+  esFiltro,
   esVeredicto,
   estadoDe,
+  FILTROS,
   ordenarDescartes,
   pasaFiltro,
   SIN_PROYECTO,
   type Calificacion,
+  type Filtro,
   type Veredicto,
 } from "./feed.ts";
 
@@ -94,16 +100,108 @@ describe("pasaFiltro", () => {
     assert.ok(pasaFiltro({ calificacion: null }, "todos"));
   });
 
-  it("contarPorFiltro cuenta el 🔥 dos veces: en fuego y en aprobados", () => {
-    const cuenta = contarPorFiltro([
-      { calificacion: null },
-      { calificacion: "🔥" },
-      { calificacion: "👍" },
-      { calificacion: "👎" },
-    ]);
-    assert.deepEqual(cuenta, { "sin-calificar": 1, fuego: 1, aprobados: 2, todos: 4 });
+  it("los dos lados de cada filtro existen y no se contradicen", () => {
+    // El punto del Record exhaustivo: un filtro nuevo tiene que traer sus DOS lados. Sin
+    // condición solo puede quedarse "todos", que es el que a propósito no filtra nada.
+    for (const f of FILTROS) {
+      assert.equal(condicionDeFiltro(f) === null, f === "todos", `${f} sin decidir su condición`);
+    }
+  });
+
+  it("esFiltro rechaza lo que no es un filtro — es la guardia del server action", () => {
+    assert.ok(esFiltro("sin-calificar"));
+    assert.ok(!esFiltro("aprobado"));
+    assert.ok(!esFiltro(null));
   });
 });
+
+describe("ajustarCuentas — los contadores siguen siendo el avance, no la página", () => {
+  const base: Record<Filtro, number> = {
+    "sin-calificar": 165,
+    fuego: 0,
+    aprobados: 0,
+    todos: 165,
+  };
+
+  it("aprobar con 🔥 lo saca de sin-calificar y lo suma a fuego Y a aprobados", () => {
+    assert.deepEqual(ajustarCuentas(base, [{ antes: null, despues: "🔥" }]), {
+      "sin-calificar": 164,
+      fuego: 1,
+      aprobados: 1,
+      todos: 165,
+    });
+  });
+
+  it("`todos` no se mueve nunca: calificar no crea ni borra candidatos", () => {
+    const cambios = [
+      { antes: null, despues: "👎" },
+      { antes: null, despues: "👍" },
+      { antes: "👍", despues: "🔥" },
+    ] as const;
+    assert.equal(ajustarCuentas(base, [...cambios]).todos, 165);
+  });
+
+  it("corregir un misclick 🔥→👎 devuelve las cuentas a donde estaban", () => {
+    // El re-click ES el deshacer (plan-cockpit §D6.4), así que los contadores tienen que
+    // acompañarlo. Un solo cambio por tarjeta, siempre desde la calificación ORIGINAL.
+    assert.deepEqual(ajustarCuentas(base, [{ antes: null, despues: "👎" }]), {
+      "sin-calificar": 164,
+      fuego: 0,
+      aprobados: 0,
+      todos: 165,
+    });
+  });
+
+  it("no muta la base que recibe", () => {
+    const copia = { ...base };
+    ajustarCuentas(base, [{ antes: null, despues: "🔥" }]);
+    assert.deepEqual(base, copia);
+  });
+});
+
+describe("el keyset del mazo", () => {
+  it("cursorDe toma la última fila en pantalla, o null si no hay ninguna", () => {
+    assert.deepEqual(cursorDe([{ heat: 0.9, id: "a" }, { heat: 0.4, id: "b" }]), {
+      heat: 0.4,
+      id: "b",
+    });
+    assert.equal(cursorDe([]), null);
+  });
+
+  it("pide lo que sigue en (heat desc, id asc): menor heat, o mismo heat con id mayor", () => {
+    const c = despuesDe({ heat: 0.4, id: "b" });
+    assert.ok(c.includes("heat_score.lt.0.4"));
+    assert.ok(c.includes("and(heat_score.eq.0.4,id.gt.b)"));
+  });
+
+  it("🩸 los nulos de heat quedan alcanzables: ordenan últimos, así que van SIEMPRE adelante", () => {
+    // Si faltara esta condición, la paginación cortaría antes de tiempo y sin error el día que
+    // aparezca un candidato con heat null (hoy: 0 de 165 en prod, pero la columna es nullable).
+    assert.ok(despuesDe({ heat: 0.4, id: "b" }).includes("heat_score.is.null"));
+  });
+
+  it("desde la cola de los nulos solo quedan nulos con id mayor", () => {
+    const c = despuesDe({ heat: null, id: "b" });
+    assert.equal(c, "and(heat_score.is.null,id.gt.b)");
+    // Y nada de `lt`: contra un null no hay comparación que devuelva true.
+    assert.ok(!c.includes("lt"));
+  });
+
+  it("un candidato calificado no corre el cursor de los que vienen atrás", () => {
+    // La razón de ser del keyset: con `offset`, calificar 3 tarjetas del filtro "sin calificar"
+    // hace que la página siguiente se saltee 3 candidatos que nadie vio. El cursor apunta a una
+    // fila concreta, así que sacar filas de adelante no lo mueve.
+    const pagina = [{ heat: 0.9, id: "a" }, { heat: 0.7, id: "b" }, { heat: 0.5, id: "c" }];
+    const antes = despuesDe(cursorDe(pagina)!);
+    const despues = despuesDe(cursorDe(pagina)!);
+    assert.equal(antes, despues);
+    assert.ok(antes.includes("0.5"));
+  });
+});
+
+// `contarPorFiltro` se borró con la paginación: contaba sobre la lista cargada, que ahora es una
+// página. Su invariante —el 🔥 se cuenta dos veces, en `fuego` y en `aprobados`— no se perdió:
+// lo sostienen `pasaFiltro` y el primer test de `ajustarCuentas`.
 
 describe("agrupar", () => {
   it("agrupa por proyecto y ordena por heat descendente adentro", () => {
