@@ -2,7 +2,14 @@ import { redirect } from "next/navigation";
 import type { Alcance, TenantContext } from "@/domain/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { puedeVerZona, type Rol, type Zona } from "@/domain/roles";
-import { implementaPantalla, zonasDePipeline, type PantallaCurar } from "@/domain/pipelines";
+import {
+  implementaAjuste,
+  implementaPantalla,
+  zonasDePipeline,
+  type PantallaAjustes,
+  type PantallaCurar,
+} from "@/domain/pipelines";
+import { puedeAdministrarEquipo } from "@/domain/permisos";
 import { baseDe, comoRuta, rutaDe } from "@/domain/rutas";
 import { leerMembresias, resolverContexto, type Instancia } from "@/lib/tenant";
 
@@ -123,6 +130,36 @@ export async function exigirPantallaDeCurar(
   if (!implementaPantalla(sesion.cockpit.workflowId, pantalla)) {
     redirect(rutaDe(comoRuta(sesion.cockpit), "curar"));
   }
+
+  return sesion;
+}
+
+/**
+ * La guardia de una pantalla de `ajustes`. Hermana de la de `curar`, con **una pregunta más**.
+ *
+ * Las tres condiciones, y ninguna alcanza sola (ADR-060 §1):
+ *   1. La zona: la tienen los tres roles, así que `exigirTenant` deja pasar a todos.
+ *   2. **El pipeline la implementa.** LinkedIn no tiene `motor`: sus knobs no existen, y sin esto
+ *      la pantalla mostraría cero perillas en vez de decir que no es de acá.
+ *   3. **El rol la alcanza.** `equipo` es `dev | sponsor` — el que califica el feed no da accesos.
+ *
+ * 🔑 **El gate de rol vive acá y no adentro de la página**, aunque solo lo use `equipo` hoy: es la
+ * única costura por la que pasan todas las pantallas de la zona, y una guardia que hay que
+ * acordarse de escribir en cada `page.tsx` es la que un día no se escribe.
+ */
+export async function exigirPantallaDeAjustes(
+  pantalla: PantallaAjustes,
+  cliente?: string,
+  pipeline?: string,
+): Promise<{ usuario: Usuario; ctx: TenantContext; cockpit: Instancia; rol: Rol }> {
+  const sesion = await exigirTenant("ajustes", cliente, pipeline);
+  const aIndice = rutaDe(comoRuta(sesion.cockpit), "ajustes");
+
+  if (!implementaAjuste(sesion.cockpit.workflowId, pantalla)) redirect(aIndice);
+
+  // Al índice y no a la raíz: la persona puede estar en la zona, lo que no puede es esta pantalla.
+  // Mandarla al índice le muestra las que sí — y el índice ya no le dibuja esta tarjeta.
+  if (pantalla === "equipo" && !puedeAdministrarEquipo(sesion.rol)) redirect(aIndice);
 
   return sesion;
 }

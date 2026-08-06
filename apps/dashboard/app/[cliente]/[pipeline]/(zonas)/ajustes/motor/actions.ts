@@ -13,7 +13,7 @@ export type ResultadoGuardar = { ok: boolean; mensaje: string };
 // el rol no puede tocar, pero eso es cosmética. Acá se vuelve a leer la fila real y se vuelve
 // a filtrar por rol — un POST a mano no alcanza para mover un knob de dev.
 export async function guardar(clave: string, valor: string): Promise<ResultadoGuardar> {
-  const { usuario, ctx, cockpit, rol } = await exigirTenant("curar");
+  const { usuario, ctx, cockpit, rol } = await exigirTenant("ajustes");
 
   let filas;
   try {
@@ -45,6 +45,6 @@ export async function guardar(clave: string, valor: string): Promise<ResultadoGu
     nuevo: validacion.valor,
   });
 
-  revalidatePath(rutaDe(comoRuta(cockpit), "curar/ajustes"));
+  revalidatePath(rutaDe(comoRuta(cockpit), "ajustes/motor"));
   return { ok: true, mensaje: "Guardado. Aplica en la próxima corrida." };
 }

@@ -3,10 +3,10 @@
 // "la UI esconde; RLS impide") y para poder testearlas con node:test.
 
 export type Rol = "operador" | "dev" | "sponsor";
-export type Zona = "operar" | "curar" | "transcribir" | "entender";
+export type Zona = "operar" | "curar" | "transcribir" | "entender" | "ajustes";
 
 export const ROLES: readonly Rol[] = ["operador", "dev", "sponsor"];
-export const ZONAS: readonly Zona[] = ["operar", "curar", "transcribir", "entender"];
+export const ZONAS: readonly Zona[] = ["operar", "curar", "transcribir", "entender", "ajustes"];
 
 // Quién ve qué zona (plan-cockpit §2.1): el operador opera, cura, transcribe y entiende; el
 // sponsor solo entiende; el dev ve todo (los knobs avanzados viven detrás de su rol, §3.4).
@@ -24,10 +24,20 @@ export const ZONAS: readonly Zona[] = ["operar", "curar", "transcribir", "entend
 //
 // 🩸 **El supuesto que esto apoyaba SE CAYÓ el 2026-08-06**, que era exactamente lo previsto: tres
 // personas de Retia —empresa cliente, no la agencia— reciben `operador`. Ver `veCostos` abajo.
+// ⚙️ **`ajustes` es la 5ª zona (ADR-060) y la ven LOS TRES roles.** Lo que se gatea no es la zona:
+// son sus pantallas (`ajustes/equipo` la administran `dev` y `sponsor`, ver `domain/permisos.ts`).
+//
+// 🩸 **El plan la daba como "dev y sponsor, no operador", y eso estaba mal por un número:** de los
+// 18 knobs de `app.ajustes`, **8 son de visibilidad `equipo`** (mínimo de likes, mínimo de vistas,
+// propuestas por corrida, los 4 toggles de IG/TikTok, afinidad mínima). Mudar los knobs a una zona
+// que el `operador` no ve le sacaba a Majo y a Jero ocho perillas que usan — sin error y sin aviso.
+// Medido contra prod el 2026-08-06, no razonado.
+//
+// Va **última** en los tres arrays, por lo mismo que `entender`: `zonaInicial` devuelve el primero.
 const ZONAS_POR_ROL: Record<Rol, readonly Zona[]> = {
-  operador: ["operar", "curar", "transcribir", "entender"],
-  dev: ["operar", "curar", "transcribir", "entender"],
-  sponsor: ["entender"],
+  operador: ["operar", "curar", "transcribir", "entender", "ajustes"],
+  dev: ["operar", "curar", "transcribir", "entender", "ajustes"],
+  sponsor: ["entender", "ajustes"],
 };
 
 export function puedeVerZona(rol: Rol, zona: Zona): boolean {
