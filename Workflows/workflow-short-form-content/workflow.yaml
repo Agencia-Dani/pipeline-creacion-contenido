@@ -18,7 +18,7 @@ description: >
   candidatos a la tabla Candidatos de Airtable para que el equipo de redes los califique.
   Registra cada corrida y salida en Supabase (sumidero, no dependencia).
 engine: n8n
-status: draft                     # corrió manual (V1); cron sin activar (D1–D3 del ROADMAP)
+status: active                    # medido 2026-08-06 contra n8n: active, 34 nodos, cron lunes 08:00 (dispatcher), 41 corridas
 owner: mani
 
 triggers:

@@ -536,7 +536,7 @@ borran en lotes de 10 vía un code node de `Preparar barrido`, mismo patrón que
 > ℹ️ **El barrido de métricas cubre solo `Métricas Proyectos`, a propósito** (hardcodeado en `Leer
 > Metricas viejas` **y** en la URL que arma `Preparar barrido Metricas`). `Métricas Global` **no se
 > barre**: crece ~2 filas/semana (GLOBAL + DESCUBRIMIENTO) y conviene guardar más trend de costos/salud
-> — decisión del contrato ([airtable-cockpit.md](../../core/contracts/airtable-cockpit.md) §Reglas para
+> — decisión del contrato (`airtable-cockpit.md` §Reglas para
 > no salir del plan free). **No lo "arregles"**: la asimetría es intencional. Verificado en A.1 (2026-07-16).
 
 *Loop de aprendizaje (ADR-022, M2):* **Destilar criterios → PATCH Proyectos criterios** escribe
@@ -613,7 +613,7 @@ Referentes salud** escribe la salud por referente.
 <summary>El mapa Airtable como era hasta D7 (histórico)</summary>
 
 Base "Reels Cockpit", 9 tablas (contrato completo en
-[`airtable-cockpit.md`](../../core/contracts/airtable-cockpit.md)). La API es REST: el motor pegaba a
+`airtable-cockpit.md`). La API es REST: el motor pegaba a
 `https://api.airtable.com/v0/<base_id>/<Tabla>`. Quién tocaba qué:
 
 > **La superficie del equipo (páginas del interface) tiene su propio spec:**

@@ -19,7 +19,7 @@
 Tres fuentes, cruzadas:
 
 1. **Schema declarado** — `core/scripts/setup-airtable.mjs` (`tables[]` + los links + las fórmulas de
-   costo + `fecha_calificacion`) y [airtable-cockpit.md](../../core/contracts/airtable-cockpit.md).
+   costo + `fecha_calificacion`) y `airtable-cockpit.md`.
 2. **Uso real** — los 3 `workflow.json`, nodo por nodo.
 3. **Base viva** — `list_tables_for_base` por MCP Airtable (base `Reels Cockpit`).
 

@@ -14,7 +14,7 @@ description: >
   la tabla "Referentes propuestos" del cockpit. La rama TikTok idlea gratis sin referentes TT.
   Al inicio de cada corrida promueve a Referentes las propuestas que el equipo marcó aprobado.
 engine: n8n
-status: draft                     # construido (ADR-020); sin importar aún en la instancia n8n
+status: active                    # medido 2026-08-06 contra n8n: active, 22 nodos (el comentario viejo decía "sin importar aún": ya estaba importado)
 owner: mani
 
 triggers:

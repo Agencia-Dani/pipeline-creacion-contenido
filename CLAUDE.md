@@ -33,8 +33,9 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–022; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-05, **medido contra prod por PostgREST**, están las **22 de 22 aplicadas**.
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–024; se aplican a mano en el SQL Editor,
+  en orden). Al 2026-08-06, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
+  **23 de 24 aplicadas**. **La única que falta es la `023`**, y es la de abajo.
   🧹 **La `022` (ADR-059) podó la "balde 2"**: 5 vistas sin consumidor, `outputs.publicado_en`,
   `runs.costo_estimado`, `instances.config_ref` y las 6 `airtable_id`. Su hermana, la `023` (las 5
   columnas write-only de `processed_items` + `outputs.source_items` + `transcripciones.pedido_por`),
@@ -42,13 +43,15 @@ en §Agent skills; acá solo se ubican.
   insert entero con `PGRST204` y esos POST son `onError: continue`, así que el 400 se traga y deja
   al motor cerrando en verde **sin memoria de dedup**.
   ✅ **La ventana del expand se cerró**: la `019` mató `usuarios.rol` y `usuarios.client_id`, y el
-  acceso vive solo en `app.usuarios_clientes` (**7 filas** al 05/08) + el flag `es_dueno` (ADR-051).
+  acceso vive solo en `app.usuarios_clientes` (**9 filas** al 06/08 — `retia` 5 operadores + 2 devs,
+  `30x` y `estadox` 1 operador cada uno, sobre 8 usuarios, 2 de ellos `es_dueno`) + el flag
+  `es_dueno` (ADR-051).
   ⚠️ **Una migración con gate humano no se da por aplicada porque se haya corrido, sino cuando se
   mide su efecto**: la `019` se corrió el 03/08 sin error visible y **no había entrado** — el
   `raise exception` del §0 abortaba la transacción entera. Se midió, se firmó el gate y entró el 04/08.
   ✅ **La `021` (RLS, Capa 2 de ADR-047) DEJÓ DE SER INERTE el 2026-08-05** (`d8edea2`): el flip de
-  `scoped.ts` está en producción y el cockpit lee con la sesión del usuario, así que las 17 policies
-  se evalúan de verdad. **El `service_role` quedó solo donde no hay sesión**: la fachada de ADR-028 y
+  `scoped.ts` está en producción y el cockpit lee con la sesión del usuario, así que sus policies
+  se evalúan de verdad. *(Son **19**, contadas en el SQL el 06/08 — los docs venían diciendo 17.)* **El `service_role` quedó solo donde no hay sesión**: la fachada de ADR-028 y
   las escrituras de n8n por PostgREST (ADR-035).
   🔑 **Cómo sabe `scoped()` bajo qué autoridad corre:** el `TenantContext` lleva
   `origen: "sesion" | "fachada"`, estampado en los dos únicos constructores que existen
@@ -57,9 +60,14 @@ en §Agent skills; acá solo se ubican.
   así que sin esa marca el flip dejaba al motor con `42501` y sin plan que leer. El porqué completo,
   y la ventana de ADR-047 que se cerró **sin** suspender cockpits, en
   [ADR-058](docs/adr/ADR-058-el-flip-de-la-capa-2.md).
-  🟠 **Lo que la `021` NO cubre:** las 4 tablas `*_linkedin` de la `020` tienen RLS enabled y **cero
-  policies** — falla cerrado y hoy nada las lee, pero muerde con la primera pantalla de LinkedIn.
-  Escrito para ejecutarlo ahí en [plan-multi-tenant §14.6](docs/agents/plan-multi-tenant.md).
+  ✅ **El agujero que la `021` NO cubría está tapado:** las 4 tablas `*_linkedin` de la `020` nacieron
+  con RLS enabled y **cero policies**; la [`024`](core/schema/024_rls_linkedin.sql) se aplicó el
+  2026-08-06 y les puso las suyas, **grano instancia** (`instancias_visibles` en el `qual`, no
+  `clientes_`, que era el error fácil porque su hermana de reels es por empresa).
+  📏 **Medido el 06/08 en `pg_policies`: 18 policies sobre 18 tablas de `app` + 6 sobre 6 de `public`**,
+  y el check *"¿queda alguna tabla con tenant, RLS y sin policy?"* corrido **contra prod** por primera
+  vez da **cero filas**. ⏳ Lo que falta es ejercitarlas **con filas** (las 4 están vacías): es la
+  prueba de [plan-multi-tenant §14.6](docs/agents/plan-multi-tenant.md), escrita paso a paso.
 
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*

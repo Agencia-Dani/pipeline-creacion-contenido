@@ -1,6 +1,14 @@
 # ADR-008 — Airtable como cockpit del equipo de redes (revisa ADR-004/D4)
 
-- **Estado:** aceptada — 2026-06-12
+> ☠️ **Superada. Airtable ya no existe en el sistema.** El cockpit es producto propio desde
+> [ADR-025](./ADR-025-cockpit-producto-propio.md) / [ADR-026](./ADR-026-stack-del-cockpit-propio.md),
+> la config se cortó por dominio en [ADR-027](./ADR-027-postgres-fuente-unica-de-config.md) y la
+> escritura en [ADR-035](./ADR-035-contrato-de-escritura-por-postgrest.md). El PAT está revocado y
+> `core/contracts/airtable-cockpit.md` se borró el 2026-08-05 (está en git). **El modelo vivo son
+> las migraciones de [`core/schema/`](../../core/schema/).** Se conserva por el *porqué*: es donde
+> se decidió que el equipo de redes necesita una superficie editable, que sigue siendo cierto.
+
+- **Estado:** aceptada — 2026-06-12 · **superada** por ADR-025/027/035
 - **Contexto:** la conversación con el jefe (2026-06-12) elevó el alcance del workflow de reels.
   Ya no es "una corrida que escribe ~25 guiones a un Sheet": el **equipo de redes** (Majo, Jero)
   debe poder **gestionar referentes, palabras clave y proyectos**, y **calificar** los guiones
@@ -11,7 +19,7 @@
 - **Decisión:** el equipo de redes opera sobre un **cockpit en Airtable** (plan free):
   - **Airtable = superficie editable del equipo** (5 tablas: Proyectos, Voces, Keywords,
     Referentes, Candidatos). No-code, hasta 5 editores, imposible de romper. Ahí se gestiona la
-    búsqueda y se **califican** los candidatos. Modelo: [`core/contracts/airtable-cockpit.md`](../../core/contracts/airtable-cockpit.md).
+    búsqueda y se **califican** los candidatos. Modelo: `core/contracts/airtable-cockpit.md`.
   - **Supabase = almacén pesado** (registro de corridas/outputs + `processed_items` para el dedup
     + corpus de aprobados que realimenta el few-shot). Schema: [`core/schema/002_cockpit_y_dedup.sql`](../../core/schema/002_cockpit_y_dedup.sql).
   - **n8n = motor**: lee la config de Airtable, deduplica contra Supabase, **scorea por "heat"

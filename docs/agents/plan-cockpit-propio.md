@@ -488,7 +488,8 @@ El dedup lee **`external_id, platform` y nada más** (`Leer procesados`), así q
 
 **Las 6 `airtable_id`** (`voces` 3/4 · `proyectos` 6/6 · `referentes` 14/16 · `candidatos` 136/165 ·
 `descartes` 20/38 · `referentes_propuestos` 8/8). Su único lector vivo era
-[`scripts/cortar-feed.ts`](../../apps/dashboard/scripts/cortar-feed.ts), cuyo trabajo terminó en D7.
+`scripts/cortar-feed.ts`, cuyo trabajo terminó en D7 (y con él el archivo: se borró en la purga
+del 2026-08-05; está en git).
 ⚠️ **Orden obligado:** son la clave de join entre el export final de Airtable y las filas vivas.
 **Primero el export, después el drop** — al revés, el export queda sin forma de reconciliarse.
 
@@ -556,7 +557,21 @@ Airtable intacto** — eso es lo que hace que valga la pena empezar.
 - [x] **Estado de corrida: polling vs. Supabase Realtime.** RESUELTO en D1 (cierre 59): polling cada
       5 s **solo** mientras hay una corrida `en_curso` (`operar/auto-refresh.tsx`). Realtime queda
       como optimización futura si molesta.
-- [ ] **Cuándo entra `client_id`** en el schema `app` (multi-cliente, ADR-003). Hoy hay un cliente.
-- [ ] **El Sheet Histórico** (ADR-014): ¿sobrevive como export, o la app lo reemplaza?
+- [x] **Cuándo entra `client_id`** en el schema `app` (multi-cliente, ADR-003). ~~Hoy hay un
+      cliente.~~ **RESUELTO: entró entero, y hace rato.** La respuesta la dio
+      [ADR-046](../adr/ADR-046-el-cockpit-es-multi-tenant.md) (una sola base, scoping
+      por columna, aislamiento en dos capas) y la ejecutó la
+      [`016`](../../core/schema/016_multi_tenant.sql). Medido el 2026-08-06: **3 clientes y 4
+      instancias** en prod. La pregunta se movió dos veces desde que se escribió: el **grano** dejó de
+      ser el árbol de `clients.parent_id` y pasó a ser la **membresía explícita**
+      ([ADR-051](../adr/ADR-051-el-acceso-es-membresia-explicita.md), `018`/`019`), y el aislamiento
+      dejó de ser solo TypeScript cuando la Capa 2 (RLS) entró en producción el 05/08
+      ([ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)).
+- [x] **El Sheet Histórico** (ADR-014): ¿sobrevive como export, o la app lo reemplaza? **RESUELTO:
+      lo reemplaza la app.** [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)
+      lo mató, porque no era un export cualquiera: era **uno solo y global**, y con dos empresas los
+      aprobados de una terminaban en el archivo de la otra. Su reemplazo es **Descargar CSV** en
+      `/curar/historicos`, mismas 15 columnas y **por instancia**. Medido el 06/08: el archivado son
+      17 nodos y no queda **ningún** nodo ni credencial de Google en los 5 workflows.
 - [ ] **Techo de presupuesto** de la superficie nueva: Vercel free alcanza hoy; validar con el jefe
       junto al presupuesto pendiente de [PLAN §3.2](../../PLAN.md).

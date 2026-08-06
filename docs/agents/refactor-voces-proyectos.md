@@ -79,7 +79,7 @@ relevantes, califica, y el sistema aprende de esa elección — todo **sin ayuda
   Fijado en [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md).
 - **Contrato de datos** (schema, componente E): `Voces(activo)` · `Proyectos(voz, activo, criterios)` ·
   `Referentes(proyecto, activo)` · el mecanismo de disparo (`Corridas(proyecto, N, estado)` o equivalente).
-  Fuente: [airtable-cockpit.md](../../core/contracts/airtable-cockpit.md).
+  Fuente: `airtable-cockpit.md`.
 - **Contrato de entrega** (no cambia): candidatos a Airtable (`estado=nuevo`) + registro a Supabase
   (`runs`/`outputs`/`processed_items`). Fuente: [ingesta-registro.md](../../core/contracts/ingesta-registro.md).
 
@@ -110,7 +110,7 @@ Los cambios que salieron de la reunión (el detalle de cada uno vive en su compo
 ## 2. Modelo actual vs. lo pedido (qué ya existe, qué es nuevo)
 
 Buena parte del andamiaje ya está. Verificado contra
-[airtable-cockpit.md](../../core/contracts/airtable-cockpit.md) y el `workflow.json` del motor:
+`airtable-cockpit.md` y el `workflow.json` del motor:
 
 | Pieza del pedido | Estado hoy | Qué falta |
 |---|---|---|
@@ -388,14 +388,14 @@ se computan igual de bien que con el barrido semanal.
       campo nuevo + un filtro nuevo = **siempre poblar el dato antes**.
 - [x] **E.2** ✅ en su mitad-repo (2026-07-16): con la **señal desnuda** de ADR-023 no hay tabla
       `Corridas` ni campos de datos nuevos — el disparo son el botón + la automation, documentados en
-      [airtable-cockpit.md §Disparo on-demand](../../core/contracts/airtable-cockpit.md) (y el checklist
+      `airtable-cockpit.md §Disparo on-demand` (y el checklist
       de `setup-airtable.mjs`). **Lo que queda es manual y de superficie** (la API no crea botones ni
       automations): crear en la base viva el botón "▶ Correr ahora" + la automation con el POST al
       webhook → va con **B.2** (carril de Mani), después del re-import de C.
 - [ ] **E.3** Aplicar la racionalización de campos de B.3 en el contrato + schema.
 
 **Hecho cuando:** el schema soporta Voz toggleable, N por corrida y el mecanismo de disparo, y el
-contrato ([airtable-cockpit.md](../../core/contracts/airtable-cockpit.md)) refleja el estado real.
+contrato (`airtable-cockpit.md`) refleja el estado real.
 
 ### (Descubrimiento de referentes — casi sin tocar)
 

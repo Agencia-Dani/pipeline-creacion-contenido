@@ -4,7 +4,7 @@
   [ADR-025](./ADR-025-cockpit-producto-propio.md): decía "conectado a Supabase", sin definir si
   Airtable seguía siendo el **store** de la config o solo la superficie.
 - **Contexto:** hoy Airtable es las dos cosas a la vez. Las 9 tablas del
-  [cockpit](../../core/contracts/airtable-cockpit.md) son **config que el motor lee nodo por nodo**
+  `cockpit` son **config que el motor lee nodo por nodo**
   (Voces, Proyectos, Referentes, Ajustes) y **espacio de trabajo del equipo** (Candidatos,
   Descartes, Propuestos), más dos tablas de Métricas que ya son proyección de Supabase. Dejar el
   store en Airtable y poner la app encima resuelve la superficie pero deja intactos los tres
@@ -41,9 +41,12 @@
   - (−) **Los `workflow.json` cambian.** La lógica del motor no se toca, pero sus nodos de lectura
     de config sí. Cómo se minimiza ese diff es [ADR-028](./ADR-028-contrato-motor-run-plan.md).
   - (−) Hay migración de datos que hacer bien: idempotente, verificable y repetible por dominio.
-  - El [contrato del cockpit](../../core/contracts/airtable-cockpit.md) queda **congelado como
+  - El `contrato del cockpit` queda **congelado como
     documento histórico** y nace su reemplazo (`core/contracts/cockpit-datos.md`) a medida que cada
     dominio corta. No se mantienen los dos vivos.
+    *(Lo que pasó de verdad: los **dos** se borraron el 2026-08-05 y no hubo reemplazo, a propósito —
+    el modelo vivo son las migraciones de [`core/schema/`](../../core/schema/), no una prosa que las
+    describa. El porqué está en [plan-cockpit-propio §D8](../agents/plan-cockpit-propio.md).)*
 - **Toca:** `core/schema/` (migraciones nuevas, schema `app`) · `core/contracts/` · los 3
   `workflow.json` (solo lectura de config) · `setup-airtable.mjs` (queda deprecado al cortar el
   último dominio). Orden y "hecho cuando" de cada corte:

@@ -38,7 +38,7 @@ runs 41 · outputs 88.
 > uso**. *El estado del sistema no se lee del handoff, se mide.*
 
 **Aislamiento hoy: las dos capas puestas.** La Capa 1 (el `.eq()` que inyecta `scoped()`, acota al
-**cockpit abierto**) y la Capa 2 (las 17 policies de la `021`, acotan a **las empresas del usuario**).
+**cockpit abierto**) y la Capa 2 (las **19** policies de la `021`, acotan a **las empresas del usuario**).
 No son redundantes y ninguna reemplaza a la otra. **Verificado en prod con cuenta no dueña**: una
 lectura sin filtro de tenant devolvió 3 de las 4 voces, y las 4 zonas cargan con datos —
 `Entender` incluida, que era el riesgo concentrado (sus 12 vistas corren `security_invoker`).
@@ -116,7 +116,7 @@ Agregar columnas de tenant a `candidatos` y `descartes` **es exactamente ese cas
 
 ### 1.5 Disparo y config son singulares por diseño
 
-- **`MOTOR_WEBHOOK_URL` es una env var singular** ([`app/(zonas)/operar/actions.ts`](<../../apps/dashboard/app/(zonas)/operar/actions.ts>)). Un webhook = una copia de workflow.
+- **`MOTOR_WEBHOOK_URL` es una env var singular** ([`app/(zonas)/operar/actions.ts`](<../../apps/dashboard/app/[cliente]/[pipeline]/(zonas)/operar/actions.ts>)). Un webhook = una copia de workflow.
 - **`GET /api/engine/run-plan` no recibe tenant.** Sus únicos params son `?ambito=motor|completo` ([`app/api/engine/run-plan/route.ts`](../../apps/dashboard/app/api/engine/run-plan/route.ts)). Devuelve *la* config, en singular.
 - **`<<INSTANCE_ID>>` es, textual de [`core/contracts/ingesta-registro.md`](../../core/contracts/ingesta-registro.md), *"una constante de la instancia"***, resuelta por `core/scripts/deploy.mjs` desde el yaml del cliente.
 
@@ -411,7 +411,7 @@ URL resultante: **`/30x/reels/curar/feed`**, `/estadox/linkedin/operar`, …
 **Por qué en la URL y no en una cookie:** los links se pueden compartir entre compañeros, el caché de Next keyea correcto por tenant, y el tenant **no se puede perder** al navegar. Una cookie de tenant es un bug de caché esperando.
 
 - El `layout.tsx` resuelve `(cliente, pipeline) → instance` **en el servidor** y valida contra los clientes visibles del usuario. Un cliente ajeno en la URL es un `redirect`, exactamente como hoy hace `exigirZona`.
-- El nav (que hoy se arma con `zonasDe(rol)` en [`app/(zonas)/layout.tsx`](<../../apps/dashboard/app/(zonas)/layout.tsx>)) suma el selector de empresa/pipeline, **visible solo si el usuario tiene más de uno** — un operador de EstadoX no ve que existen las otras.
+- El nav (que hoy se arma con `zonasDe(rol)` en [`app/(zonas)/layout.tsx`](<../../apps/dashboard/app/[cliente]/[pipeline]/(zonas)/layout.tsx>)) suma el selector de empresa/pipeline, **visible solo si el usuario tiene más de uno** — un operador de EstadoX no ve que existen las otras.
 - **`proxy.ts` no cambia.** Sigue siendo el chequeo optimista de sesión; la autoridad sigue en cada página. Y su excepción para `/api/engine` sigue siendo necesaria (un redirect a `/login` ahí sería un 200 con HTML para n8n = fail-closed roto).
 
 ---
@@ -456,7 +456,7 @@ Workflow n8n nuevo (`Workflows/workflow-dispatcher/`), autorizado por ADR-006 C9
 
 ### 7.5 El botón ▶ del cockpit
 
-[`app/(zonas)/operar/actions.ts`](<../../apps/dashboard/app/(zonas)/operar/actions.ts>): `MOTOR_WEBHOOK_URL` deja de ser una env var singular por empresa. El botón manda `instancia` en el payload, y el single-flight guard pasa a ser **por instancia** (hoy es global por copia de workflow). Idem `buscarAhora()` y `hayBusquedaViva()`.
+[`app/(zonas)/operar/actions.ts`](<../../apps/dashboard/app/[cliente]/[pipeline]/(zonas)/operar/actions.ts>): `MOTOR_WEBHOOK_URL` deja de ser una env var singular por empresa. El botón manda `instancia` en el payload, y el single-flight guard pasa a ser **por instancia** (hoy es global por copia de workflow). Idem `buscarAhora()` y `hayBusquedaViva()`.
 
 ---
 
@@ -566,7 +566,7 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ✅ **COMPLETO** — mergeada (`ad2de5b`), `018` + `019` aplicadas y verificadas por su efecto (04/08) |
 | 7 | ~~**Paginación del feed**~~ (§10) | el segundo tenant con volumen | no | ✅ **HECHA el 2026-08-06.** Keyset sobre `(heat desc, id asc)`, filtro y contadores en el server, y los 3 textos largos fuera del listado: **405 KB → 16 KB** por carga. Verificada contra prod a nivel query; ⏳ falta el clic |
 | 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | ✅ **COMPLETA el 2026-08-05** — la `021` aplicada **y** el flip de `scoped.ts` en prod (`d8edea2`, [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)). Verificada con cuenta no dueña y con las 4 zonas cargando |
-| 9 | **Fase 5** — LinkedIn | — | sí (una migración) | 🔧 **EN CURSO desde el 06/08.** La **`020` aplicada** + 3 cockpits en `instances` · **1ª pantalla construida** (Referentes: `domain/linkedin.ts`, `lib/referentes-linkedin.ts`, ramificado por `workflowId`, las 4 tablas en `scoped.ts`) · **[`024`](../../core/schema/024_rls_linkedin.sql) escrita** y sin aplicar (§14.6) · ⬜ faltan candidatos/voces, el workflow en n8n, su cron, y `core/templates/` + los runbooks |
+| 9 | **Fase 5** — LinkedIn | — | sí (una migración) | 🔧 **EN CURSO desde el 06/08.** La **`020` aplicada** + 3 cockpits en `instances` (2 `active`, `retia/linkedin` en `draft`) · **1ª pantalla construida** (Referentes: `domain/linkedin.ts`, `lib/referentes-linkedin.ts`, ramificado por `workflowId`, las 4 tablas en `scoped.ts`) · **[`024`](../../core/schema/024_rls_linkedin.sql) APLICADA el 06/08** y re-verificada por su efecto el mismo día (§14.6) · ⬜ faltan candidatos/voces, el workflow en n8n, su cron, y `core/templates/` + los runbooks |
 
 > ✅ **Al 2026-08-06 queda uno: el #9 (LinkedIn), y arrancó.** El #7 se cerró el 06/08 y no bloqueaba
 > a nadie; se hizo igual porque era lo único numerado que quedaba antes de la Fase 5, y porque su
@@ -694,7 +694,7 @@ humana explícita.
 >
 > | | Paso | Riesgo | Estado |
 > |---|---|---|---|
-> | 1 | Aplicar la **`021`**: grants para `authenticated`, las funciones de alcance, 17 policies y `security_invoker` en las 12 vistas | **Ninguno.** El BFF seguía en `service_role`, que bypassa RLS: las policies existían y no se evaluaban en ningún camino | ✅ **APLICADA** (2026-08-03) e inerte, como se diseñó |
+> | 1 | Aplicar la **`021`**: grants para `authenticated`, las funciones de alcance, **19** policies (`grep -c "create policy"` sobre la migración; los docs decían 17 hasta el 06/08) y `security_invoker` en las 12 vistas | **Ninguno.** El BFF seguía en `service_role`, que bypassa RLS: las policies existían y no se evaluaban en ningún camino | ✅ **APLICADA** (2026-08-03) e inerte, como se diseñó |
 > | 2 | El **flip**: `scoped.ts` deja `createAdminClient()` y pasa a la sesión | **Alto.** Acá es donde el aislamiento se vuelve real | ✅ **EN PRODUCCIÓN** (2026-08-05) y **verificado con una cuenta no-dueña de dos empresas** |
 >
 > **La fachada y n8n no se tocan en ninguno de los dos.** `run-plan`, `instancias` y las escrituras
@@ -801,20 +801,29 @@ que funciona.
 de que un segundo cliente real tenga usuarios en producción. No antes, no después. **Se prueba con la
 cuenta de Jero**, que es la que se puede perder.
 
-### 14.4 🔧 El Google Sheet del histórico es uno solo y global — DECIDIDO, medio ejecutado
+### 14.4 ✅ CERRADO — el Google Sheet del histórico ya no existe
 
-> **Cerrado como decisión el 2026-08-04:**
-> [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) **acepta la opción 2 (el
-> Sheet se muere)**, en dos pasos. El **paso 1 está en prod**: `/curar/historicos` exporta un CSV con
-> las 15 columnas del Sheet en su orden (verificado contra las 31 filas reales con un parser RFC 4180
-> independiente). El **paso 2 —sacar los nodos— va en el re-import de D8**, porque borrar nodos es
-> topología y D8 ya está esperando por `fields.uuid`.
+> **✅ CERRADO ENTERO el 2026-08-05, y medido el 06/08.**
+> [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) aceptó la opción 2 (el
+> Sheet se muere) en dos pasos, **y los dos están hechos**:
 >
-> **Hasta el paso 2, el riesgo de abajo sigue vivo**: si se prende un segundo cockpit con datos
-> reales antes de ese re-import, sus aprobados se appendean al Sheet de Retia. El enunciado queda
-> como está por eso.
+> - **Paso 1 (en prod desde el 04/08):** `/curar/historicos` exporta un CSV con las 15 columnas del
+>   Sheet en su orden, verificado contra las 31 filas reales con un parser RFC 4180 independiente.
+>   *(⏳ lo único que queda de esto es **el clic**: nadie apretó el botón en un browser. Está en el
+>   checklist de ojo humano de §15.B.)*
+> - **Paso 2 (05/08):** los **3 nodos del Sheet se borraron a mano en el editor de n8n** — no por
+>   re-import, que crea un workflow con id nuevo. **No hizo falta esperar a D8.**
+>
+> 📏 **Medido el 2026-08-06 por la API de n8n:** el archivado son **17 nodos** y los **5** workflows
+> del sistema tienen **cero nodos de Google** y cero credenciales de Google. Con eso se fue **la
+> última dependencia de Google del pipeline**.
+>
+> 🔑 **El riesgo que esta sección describía está muerto por construcción, no mitigado:** ya no hay
+> un destino global al que appendear. El histórico de cada empresa vive en `outputs`, que cuelga de
+> `instance_id`, y el CSV se arma desde ahí — así que sale scopeado por el mismo camino que todo lo
+> demás. **Lo de abajo queda como registro de por qué se decidió así.**
 
-**Qué.** El archivado appendea los aprobados de la semana a un Google Sheet. `instance_id` **sí**
+**Qué (registro — ya no es cierto).** El archivado appendeaba los aprobados de la semana a un Google Sheet. `instance_id` **sí**
 viaja por el body del webhook y se usa para todo lo demás — pero `sheet_id` y `sheet_tab` son
 **constantes del nodo `Config`**. Con **un solo** workflow de archivado sirviendo a todas las
 instancias, el día que exista una segunda empresa **sus aprobados se appendean al Sheet de Retia**.
@@ -846,7 +855,8 @@ segunda están en [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ni
 
 **Hecho cuando.** O bien dos instancias archivan la misma semana y cada una escribe en su propio
 Sheet (opción 1), o bien el nodo no existe y el equipo obtiene el histórico desde el cockpit
-(opción 2).
+(opción 2). ✅ **Ganó la 2, y se cumplió:** el nodo no existe (archivado = 17 nodos, medido el
+06/08) y el histórico sale de `/curar/historicos`.
 
 ### 14.5 🟠 Dos cosas menores, anotadas para que no sorprendan
 
@@ -863,7 +873,7 @@ Sheet (opción 1), o bien el nodo no existe y el equipo obtiene el histórico de
 
 ### 14.6 🟠 Las 4 tablas de LinkedIn quedaron sin policy — y el check que lo cazaba corrió sin ellas
 
-**Qué.** La [`020`](../../core/schema/020_linkedin.sql) §6 crea `app.referentes_linkedin`,
+**Qué.** La [`020`](../../core/schema/020_pipeline_linkedin.sql) §6 crea `app.referentes_linkedin`,
 `voces_linkedin`, `candidatos_linkedin` y `descartes_linkedin` con `enable row level security` y
 **cero policies**, apoyada en que la Capa 2 las cubriría: *"estas cuatro tablas nacen del lado
 correcto del disparador y NO hay que acordarse de volver"*. La
@@ -900,10 +910,26 @@ hermana de reels es por empresa. Y como en el SQL Editor el script corre como un
 policies existan prueba que **todo lo anterior pasó**: las guardas del `§0` y los `grant` del `§1`
 (si el grant hubiera fallado, la ejecución se cortaba antes y no habría 4 filas).
 
-⏳ Queda el **check #1 contra prod** —*"¿alguna tabla con tenant, RLS y sin policy?"*— que es una
-pregunta distinta: no valida la `024`, valida que no quede **otra** tabla en el mismo estado. Nunca
-se corrió contra prod; la vez que se corrió fue en Docker sin la `020` en el medio, y por eso dio
-limpio con este agujero adentro.
+✅ **Y el check #1 CONTRA PROD se corrió el 2026-08-06: CERO FILAS.** Era una pregunta distinta de
+la `024` —no la valida a ella, valida que no quede **otra** tabla en el mismo estado— y nunca se
+había hecho contra la base real: la única vez fue en Docker sobre `001→018`+`021`, sin la `020` en el
+medio, y por eso dio limpio con este agujero adentro. Ahora se corrió sobre el corpus completo, con
+la `020` y la `024` aplicadas. **No queda ninguna tabla con columna de tenant, RLS activado y cero
+policies.**
+
+🔑 **Lo que el check #1 NO puede ver, y hay que decirlo porque el plan asumía que sí.** Pregunta por
+*"RLS activado y **cero** policies"*, así que es ciego a la clase de agujero que la `025` de §15.A
+existe para tapar, que es *"la policy existe pero es demasiado angosta"*. Medido el 06/08:
+
+| Tabla | RLS | Policies | Columna de tenant | ¿La ve el check #1? |
+|---|:-:|---|---|---|
+| `app.usuarios` | ✅ | `usuario lee su propia fila` | **ninguna** (la `019` dropeó `client_id`) | **No**, por los dos motivos |
+| `app.usuarios_clientes` | ✅ | `usuario lee sus membresias` | `client_id` | **No**: ya tiene policy |
+
+⚠️ **Consecuencia práctica: el check #1 no depende de la `025`, así que B2 no depende de A1.** El
+orden que §15.C daba por duro —*"B2 después de A1, o el check reporta las tablas nuevas"*— partía de
+que la `025` crea tablas, y **no crea ninguna**: crea una función y policies. Vale correrlo igual
+**después** de la `025`, pero como red de seguridad barata, no como precondición.
 
 ⚠️ **Y un matiz que cambió desde que se escribió §14.6:** la `021` no cambiaba nada al entrar porque
 el BFF leía con `service_role`. **La `024` no tiene esa red** — el flip está en producción desde el
@@ -911,7 +937,9 @@ el BFF leía con `service_role`. **La `024` no tiene esa red** — el flip está
 pantalla tocaba esas tablas, pero el orden es **migración primero, pantalla en producción después**.
 
 **Hecho cuando.** El check #1 de la `021` corrido **contra prod con la `020` aplicada** da cero
-filas, y una pantalla de LinkedIn con una fila sembrada la muestra a quien corresponde y no a otros.
+filas ✅ **(06/08)**, y una pantalla de LinkedIn con una fila sembrada la muestra a quien corresponde
+y no a otros ⬜ **(es lo único que falta: la tarea B3; las 4 tablas `*_linkedin` tienen 0 filas
+al 06/08, así que la prueba todavía no se puede leer)**.
 🔑 El par que prueba las dos mitades ya se puede armar: sembrar un referente en la instancia de
 **30X** y mirarlo con la cuenta que alcanza **30X y EstadoX** (existe desde el 05/08). Tiene que
 verse en el cockpit de 30X y **no** en el de EstadoX — RLS deja pasar lo propio, `scoped.ts` acota al
@@ -1165,11 +1193,11 @@ pantallas ahora es superficie para datos que no existen.*
 | # | Qué | Estado |
 |---|---|---|
 | **B1** | El gate de la `023` | ⏳ espera corridas del fin de semana |
-| **B2** | Check #1 de la `021` contra PROD | ⬜ va después de A1 |
+| **B2** | Check #1 de la `021` contra PROD | ✅ **CERO FILAS el 06/08** — y no dependía de A1 |
 | **B3** | La prueba de §14.6 con filas | ⬜ escrita paso a paso en el handoff |
-| **B4** | `docs/runbooks/` + `core/templates/` | ⬜ va después de A5 |
+| **B4** | `docs/runbooks/` + `core/templates/` | 🔧 se escribe asumiendo A5; su paso de alta se verifica cuando A5 esté en prod |
 | **B5** | Las verificaciones de ojo humano | ⬜ preparar, no ejecutar |
-| **B6** | Deuda de docs medida | ⬜ |
+| **B6** | Deuda de docs medida | ✅ **HECHO el 06/08** — 21 links rotos, no 4; y la lista era más larga |
 
 **B1 — el único bloqueante numerado del repo.** Depende del calendario, no del trabajo: archivado
 domingo 18:00, motor lunes 08:00. Con las dos corridas verdes,
@@ -1178,9 +1206,19 @@ domingo 18:00, motor lunes 08:00. Con las dos corridas verdes,
 escribió y hay que mirar por qué **antes de dropear nada**: el modo de falla está medido — `PGRST204`
 que los `onError: continue` se tragan ⇒ motor en verde **sin memoria de dedup**.
 
-**B2 — el check #1 contra prod.** El SQL está al pie de la [`024`](../../core/schema/024_rls_linkedin.sql).
-Cero filas. Nunca corrió contra la base real. ⚠️ Va **después** de que la `025` esté aplicada, o
-reporta las tablas nuevas.
+**B2 — ✅ HECHO el 2026-08-06: el check #1 contra prod da CERO FILAS.** El SQL está al pie de la
+[`024`](../../core/schema/024_rls_linkedin.sql); se corrió sobre el corpus completo, con la `020` y la
+`024` aplicadas, que es lo que la corrida vieja en Docker no tenía. No queda **ninguna** tabla con
+columna de tenant, RLS activado y cero policies.
+
+⚠️ **Y la precondición que este plan le ponía era falsa: B2 no dependía de A1.** El argumento era
+*"o el check reporta las tablas nuevas"*, y la `025` **no crea tablas** — crea una función y policies.
+Peor: el check es **estructuralmente ciego** al agujero que la `025` tapa. Pregunta por *"RLS y **cero**
+policies"*, y las dos tablas de accesos ya tienen policy (`app.usuarios` una del `007`,
+`app.usuarios_clientes` una de la `021`); encima `app.usuarios` **no tiene columna de tenant** desde que
+la `019` dropeó `client_id`. La `025` arregla *"la policy es demasiado angosta"*, que es otra pregunta.
+**La tabla con la medición está en §14.6.** Correrlo otra vez después de la `025` sigue valiendo, como
+red barata; como puerta, no.
 
 **B3 — §14.6 con filas.** Escrita paso a paso en el handoff, con los dos `instance_id`, la cuenta de
 doble membresía y la matriz de interpretación (**1 y 1** anda · **2 y 2** Capa 1 rota · **0 y 0**
@@ -1199,10 +1237,39 @@ equipo. Arrastres del handoff: el clic al **Descargar CSV** de `/curar/historico
 abierto), el **feed paginado**, el tab **Entender** de un operador. Del ROADMAP: **V2** (literalidad),
 **V5** (incremental `dias=1`), **V6** (resiliencia) y **D3** (demo con Majo y Jero).
 
-**B6 — lo que hoy dice falso**, y hace que el próximo agente arranque con datos equivocados:
-ROADMAP §3 (M0/A/B sin marcar y en producción hace meses) · §12 fila 9 (dice que la `024` está sin
-aplicar; entró el 06/08) · §14.4 (no refleja que el Sheet salió, cierre 97) · plan-cockpit §8 (dos
-decisiones abiertas ya resueltas por ADR-046 y ADR-057) · 4 links rotos entre ADRs y migraciones.
+**B6 — ✅ HECHO el 2026-08-06.** Lo que decía falso, corregido **contra la base y contra el live**, no
+de memoria: conteos por PostgREST, `pg_policies` por SQL y los 5 `workflow.json` traídos por la API de
+n8n. Las cinco de la lista original estaban bien vistas; **dos se quedaron cortas y aparecieron tres
+que nadie había nombrado.**
+
+| Lo que decía el plan | Lo que se midió |
+|---|---|
+| ROADMAP §3 (M0/A/B sin marcar) | ✅ Marcado con el número que lo prueba en cada item. **Lo que sigue abierto es V2, V4, V5, V6, D2 y D3** — y **V4 y V6 tenían el enunciado podrido**: V4 pedía "la vista 🔥 Seleccionados", que era de Airtable; V6 pide romper Supabase para que "IGUAL escriba a Airtable", y hoy la entrega **también** es Supabase |
+| §12 fila 9 (la `024` sin aplicar) | ✅ Corregido. **Aplicada**, re-verificada por efecto: 4 policies, todas con `instancias_visibles` |
+| §14.4 (el Sheet) | ✅ Cerrada entera. Medido: archivado = **17 nodos**, **cero nodos y cero credenciales de Google** en los 5 |
+| plan-cockpit §8 (2 decisiones abiertas) | ✅ Las dos cerradas, con su ADR y su medición |
+| "4 links rotos entre ADRs y migraciones" | 🩸 **Eran 21**, y casi ninguno entre ADRs y migraciones: **10** apuntaban al borrado `core/contracts/airtable-cockpit.md`, 3 a la ruta pre-Fase-3 `app/(zonas)/`, 3 a `./ROADMAP.md`/`./PLAN.md` **desde el encabezado del propio handoff**, 3 a archivos borrados en la purga, y 2 eran nombres de archivo equivocados (`020_linkedin.sql`, `ADR-026-cockpit-propio-en-next.md`). Todos arreglados; quedan 0 |
+
+**Las tres que no estaban en la lista:**
+
+1. 🩸 **Los manifests mentían.** Los **4** `workflow.yaml` de los pipelines vivos decían `status: draft`
+   con comentarios ya falsos —*"cron sin activar"*, *"sin importar aún en la instancia n8n"*— mientras
+   corrían en producción hacía meses. Es la mitad de **D2** del ROADMAP, que nadie había marcado.
+   Corregidos a `active` contra lo medido; `npm run validate` verde (2062 checks).
+2. 🩸 **"las 17 policies de la `021`" son 19.** `grep -c "create policy"` sobre la migración da 19, y la
+   cuenta cierra exacta contra prod: 19 (`021`) + 4 (`024`) + 1 (`007`) = **24 policies** medidas
+   (18 en `app` + 6 en `public`). El 17 venía repetido en 5 lugares desde una sesión que lo contó mal.
+3. ☠️ **ADR-008 no decía que estaba superada.** Su asunto —*"Airtable es el cockpit del equipo"*— murió
+   entero, y el índice de ADRs la sigue listando como "Aceptada" sin marca. Se le puso el encabezado de
+   superación (ADR-025/026/027/035). *El problema general —el índice de `docs/adr/` no distingue vigente
+   de superada— queda anotado, no barrido: son 59 ADRs y es otra tarea.*
+
+📏 **Y de yapa, medido de paso** (la foto de prod al 2026-08-06, que es lo que un agente nuevo necesita
+y ningún doc tenía junto): **23 de 24 migraciones aplicadas** (falta solo la `023`, verificada por sus
+7 columnas todavía vivas) · 3 clientes · 4 instancias · 8 usuarios / **9 membresías** · 4 voces (3
+activas) · 6 proyectos · 16 referentes · 165 candidatos · 88 outputs · 38 descartes · 772
+`processed_items` · **41 corridas, 29 `ok` y 12 `fallo`**, la última el **2026-08-04 21:12** — que es
+la medición que confirma que **B1 sigue bloqueado**: ninguna corrida ejerció todavía el código nuevo.
 
 ---
 

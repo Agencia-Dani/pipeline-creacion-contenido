@@ -1,7 +1,7 @@
 # ADR-056 — Las zonas son rol ∩ pipeline, y el selector se parte en equipo y pipeline
 
 - **Estado:** aceptada — 2026-08-03. Enmienda la superficie de
-  [ADR-026](./ADR-026-cockpit-propio-en-next.md) y completa
+  [ADR-026](./ADR-026-stack-del-cockpit-propio.md) y completa
   [ADR-051](./ADR-051-el-acceso-es-membresia-explicita.md) en lo que se **dibuja**.
   La dispara [ADR-055](./ADR-055-linkedin-es-un-pipeline-de-este-repo.md): con un segundo pipeline,
   dos supuestos que nunca habían fallado empiezan a fallar.

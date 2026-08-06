@@ -12,7 +12,7 @@ description: >
   en el histórico permanente (`outputs`, el canónico de ADR-014) y los borra de la cola de
   calificación. Es el complemento del motor de reels.
 engine: n8n
-status: draft                     # validado end-to-end (V3/C1-C3 ✅, cierre 19); cron sin activar (D1 del ROADMAP)
+status: active                    # medido 2026-08-06 contra n8n: active, 17 nodos (sin Sheet, ADR-057), cron domingo 18:00 (dispatcher)
 owner: dev3
 
 triggers:

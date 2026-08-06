@@ -15,7 +15,7 @@ description: >
   tenant caído no corta a los otros (invariante #1). Si el dispatcher se cae no hay pérdida de
   datos — el botón ▶ del cockpit sigue disparando y se vuelve a disparar la semana siguiente.
 engine: n8n
-status: draft                     # construido en la Fase 4; se importa junto con el re-import
+status: active                    # medido 2026-08-06 contra n8n: active, 8 nodos, y es donde viven los 2 crons del sistema
 owner: mani
 
 triggers:

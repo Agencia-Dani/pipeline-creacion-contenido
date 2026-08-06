@@ -113,24 +113,45 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
 
 ## 3. Checklist ejecutable
 
+> ### 📏 Marcado contra la realidad el 2026-08-06, no de memoria
+>
+> Este checklist se escribió antes de construir y se quedó sin marcar mientras el sistema entraba en
+> producción: **M0, el carril A y el B estaban en verde hacía meses con sus casillas vacías**, y eso
+> hace que quien lo lee para orientarse arranque creyendo que no hay nada hecho.
+>
+> Lo de abajo se midió, no se dedujo: conteos por PostgREST y `pg_policies` contra la base de prod,
+> y los 5 `workflow.json` traídos por la API de n8n. **Cada `✅ medido` dice qué número lo prueba.**
+> Lo que sigue sin marcar es lo que sigue sin hacerse — y son **V2, V4, V5, V6, D2 y D3**.
+
 ### M0 — Arranque (½ día) · los 3
 
-- [ ] **M0.1** Leer este doc completo (los 3) — cada dev sabe qué carril tiene y por qué.
-- [ ] **M0.2** Cuentas: Supabase, InstaPods, Vercel, Resend (magic link) — cada
+- [x] **M0.1** Leer este doc completo (los 3) — cada dev sabe qué carril tiene y por qué.
+- [x] **M0.2** Cuentas: Supabase, InstaPods, Vercel, Resend (magic link) — cada
       carril la suya; accesos al gestor de contraseñas.
-- [ ] **M0.3** Pedir al jefe la voz/proyecto inicial (no bloquea: se siembra una provisional;
+      *(✅ medido 06/08: proyecto Supabase `ACTIVE_HEALTHY` desde el 2026-06-13 · n8n responde por su
+      API pública con los 5 workflows · `DASHBOARD_URL/login` da **200** y `/` da **307** · el magic
+      link de Resend es por donde entra el equipo desde el cierre 63.)*
+- [x] **M0.3** Pedir al jefe la voz/proyecto inicial (no bloquea: se siembra una provisional;
       el equipo la cambia cuando quiera desde el cockpit).
+      *(✅ medido 06/08: **4 voces** —3 activas + Alejo en pausa— y **6 proyectos** en `app.`.)*
 
 ### Carril A — Capa de datos · 👤 Dev 2 · ~1.5 h
 
-- [ ] **A1.** Crear proyecto en [supabase.com](https://supabase.com) (free, nombre `pipeline-contenido`).
-- [ ] **A2.** SQL Editor → correr en orden [`001`](./core/schema/001_registro_inicial.sql),
+- [x] **A1.** Crear proyecto en [supabase.com](https://supabase.com) (free, nombre `pipeline-contenido`).
+      *(✅ el proyecto real se llama `pipeline-creacion-contenido`, `us-east-1`, Postgres 17.)*
+- [x] **A2.** SQL Editor → correr en orden [`001`](./core/schema/001_registro_inicial.sql),
       [`002`](./core/schema/002_cockpit_y_dedup.sql) y [`003`](./core/schema/003_seleccion_e_historico.sql).
       Verificar: `select * from workflows;` (2 seeds), `select * from processed_items;` (vacía),
       `select * from outputs;` (existe, vacía). *(Era `v_historico_seleccionados`, dropeada por la
       [`022`](./core/schema/022_poda_balde_2.sql).)*
-- [ ] **A3.** Guardar en el gestor (NUNCA en git): URL del proyecto + `service_role` key (Settings → API).
-- [ ] **A4.** Insertar cliente + instancia (snippet comentado al final del `001`) → anotar `instance_id`.
+      *(✅ medido 06/08, y ya son muchas más que 3: **23 de las 24 migraciones aplicadas**, verificadas
+      por su efecto — la `022` no dejó viva ninguna de sus 5 vistas ni de sus columnas, y la `024` tiene
+      sus 4 policies. **La única sin aplicar es la [`023`](./core/schema/023_poda_write_only.sql)**: sus
+      7 columnas siguen en la base, y su gate espera las corridas del fin de semana.)*
+- [x] **A3.** Guardar en el gestor (NUNCA en git): URL del proyecto + `service_role` key (Settings → API).
+- [x] **A4.** Insertar cliente + instancia (snippet comentado al final del `001`) → anotar `instance_id`.
+      *(✅ medido 06/08: **3 clientes** —`retia`, `30x`, `estadox`— y **4 instancias**: `retia/reels`
+      `active` y las 3 de LinkedIn, 2 `active` + `retia/linkedin` en `draft`.)*
 - [x] ~~**A5–A8.** Crear la cuenta de Airtable, el PAT, la base por `setup-airtable.mjs` y los
       accesos del equipo.~~ ☠️ **MUERTOS.** El cockpit es producto propio desde
       [ADR-025](./docs/adr/ADR-025-cockpit-producto-propio.md) y Airtable salió del sistema en D7
@@ -139,22 +160,32 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
       tablas y vistas) y **deployar `apps/dashboard`** — el alta de personas es una fila en
       `app.usuarios` + su membresía ([ADR-051](./docs/adr/ADR-051-el-acceso-es-membresia-explicita.md)),
       no un "Share". Los pasos vivos están en [apps/dashboard/README.md](./apps/dashboard/README.md).
-- [ ] **A9.** Datos semilla: 1+ proyecto, 1 voz (provisional si el jefe no definió) y referentes del
+- [x] **A9.** Datos semilla: 1+ proyecto, 1 voz (provisional si el jefe no definió) y referentes del
       nicho — **incluyendo referentes en EN/PT/IT/FR**. Se cargan **desde el cockpit**, en *Curar*.
-- [ ] 🔗 **A10.** Pasar por el gestor a B y C: `supabase_url` + `service_role` + `instance_id`.
+      *(✅ medido 06/08: **6 proyectos · 4 voces · 16 referentes**, y el sistema ya produjo **165
+      candidatos · 88 outputs · 38 descartes** encima de eso.)*
+- [x] 🔗 **A10.** Pasar por el gestor a B y C: `supabase_url` + `service_role` + `instance_id`.
 
 **Hecho cuando:** las vistas de Supabase responden · el cockpit levanta y muestra las 4 zonas ·
 Majo y Jero entran por magic link y tienen su membresía · A10 entregado.
+✅ **Cumplido.** Medido el 06/08: **9 membresías** en `app.usuarios_clientes` (`retia` 5 operadores +
+2 devs, `30x` y `estadox` 1 operador cada uno) sobre **8 usuarios**, 2 de ellos `es_dueno`. El alta
+dejó de ser el `rol` de la fila el 2026-08-04: hoy es membresía explícita
+([ADR-051](./docs/adr/ADR-051-el-acceso-es-membresia-explicita.md), migraciones `018`/`019`).
 
 ### Carril B — Motor n8n · 👤 Mani · ~4–5 h
 
-- [ ] **B1.** Levantar n8n online: [InstaPods](https://instapods.com) (~$7/mes, confirmar storage
+- [x] **B1.** Levantar n8n online: [InstaPods](https://instapods.com) (~$7/mes, confirmar storage
       persistente; decisión de hosting: [ADR-005](./docs/adr/ADR-005-hosting-n8n-managed-fase1.md)).
       Envs `GENERIC_TIMEZONE=America/Bogota` y `TZ=America/Bogota` + reiniciar.
-- [ ] **B2.** *(smoke-test opcional)* `node core/scripts/deploy.mjs piloto` → importar
-      `dist/piloto.workflow.json`, pegar keys, Execute Workflow → confirma el espinazo
-      Apify→Claude→entrega antes del rework.
-- [ ] **B3. Rework del workflow** (el build del MVP — ADR-009), sobre el JSON del piloto:
+      *(✅ medido 06/08 por la API de n8n: los **5** workflows `active: true` y los 5 con
+      `settings.timezone = America/Bogota`.)*
+- [x] ~~**B2.** *(smoke-test opcional)* `node core/scripts/deploy.mjs piloto`.~~ ☠️ **MUERTO.**
+      `deploy.mjs` está deprecado (resolvía placeholders por-cliente que el MVP no usa) y el espinazo
+      quedó confirmado por las corridas reales, no por un piloto.
+- [x] **B3. Rework del workflow** (el build del MVP — ADR-009), sobre el JSON del piloto:
+      *(✅ en producción: el motor son **34 nodos** en el live y lleva **41 corridas** registradas
+      —29 `ok`, 12 `fallo`—, la última el 2026-08-04 21:12.)*
   - **Config:** leer de la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028) en vez del `Set` de params.
   - **COLECTAR:** Apify con ventana `dias_recencia` (backfill=180 la 1ª vez, diario=1–2). Cuentas/hashtags desde `Referentes`/`Keywords` (incluidos multiidioma).
   - **DEDUP:** consultar `processed_items` antes de transcribir; insertar lo nuevo con su `idioma` al final (`Prefer: resolution=ignore-duplicates`).
@@ -162,8 +193,14 @@ Majo y Jero entran por magic link y tienen su membresía · A10 entregado.
   - **TRANSCRIBIR + TRADUCIR** *(reemplaza GENERAR)*: Supadata transcribe; Claude detecta idioma y **traduce literal al español solo si hace falta** — sin reescribir, sin embellecer. En español = transcripción tal cual (sin llamada de traducción).
   - **CALIDAD** *(ADR-010)*: gate Haiku estricto contra `criterios_relevancia` (Proyecto ⊕ Voz) → dropea lo irrelevante y compone el `heat_score`. El script vive como **texto** (sin Google Doc — ADR-009); el "link" es la URL del video original.
   - **ENTREGAR:** candidatos a `app.candidatos` por PostgREST (estado `nuevo`, con `idioma` + `thumbnail` + `relevancia_score`/`relevancia_razon`, batch 10/call) + registro Supabase (`runs`/`outputs`/`processed_items`, patrón [ingesta-registro](./core/contracts/ingesta-registro.md)). En `outputs.metadata`: proyecto, voz, referente, url_referente, idioma, métricas, heat_score.
-- [ ] **B4.** Credenciales en n8n: Apify (community node), Anthropic, Supadata,
+- [x] **B4.** Credenciales en n8n: Apify (community node), Anthropic, Supadata,
       Supabase Registro (service_role). **Sin Google** (el motor no usa credenciales de Google).
+      *(✅ medido 06/08, y la lista real es más corta: los 5 workflows usan **4 credenciales de n8n** —
+      `apifyApi`, `supabaseApi` y 3 `httpHeaderAuth` (run-plan, webhook motor, webhook descubrimiento).
+      **Anthropic y Supadata no son credenciales de n8n**: viajan como header en los nodos HTTP, que es
+      por lo que la key filtrada de `d98d45a` se pudo rotar sin tocar credenciales.
+      **Cero credenciales de Google en los 5**, ahora de verdad: la última se fue con los 3 nodos del
+      Sheet el 05/08 ([ADR-057](./docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)).)*
 - [x] **B5.** Importar el error workflow ([`Workflows/workflow-registro-fallos/`](./Workflows/workflow-registro-fallos/)), fijarlo como Error Workflow. ✅ activo, y los 4 workflows lo apuntan en `settings.errorWorkflow`.
 
 **Hecho cuando:** una corrida manual de backfill (180 días) deja candidatos en el Feed con
@@ -171,20 +208,32 @@ script en español, `idioma`, `thumbnail` y la razón de relevancia, y su rastro
 
 ### Carril C — Curación e histórico · 👤 Dev 3 · ~2–3 h *(C1 arranca ya; C2 necesita A10 + B1 — corre en la misma instancia n8n)*
 
-- [x] **C1. Sheet "Histórico":** crear el Google Sheet del histórico de seleccionados (columnas =
-      `v_historico_seleccionados`: `FECHA CALIFICACION · PROYECTO · VOZ · TITULO · URL ORIGINAL ·
-      LINK DOC · IDIOMA · VIEWS · LIKES · SEGUIDORES · HEAT SCORE · CALIFICACION · ESTADO`).
-      Compartirlo con el equipo — es SU base descargable (Excel sale nativo de Sheets).
-- [x] **C2. Workflow de archivado (n8n, cron diario):** lee `Candidatos` decididos (`NOT estado='nuevo'`)
+- [x] ~~**C1. Sheet "Histórico":** crear el Google Sheet del histórico de seleccionados (columnas =
+      `v_historico_seleccionados`).~~ ☠️ **MUERTO el 2026-08-05**
+      ([ADR-057](./docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)). Su reemplazo es
+      **Descargar CSV** en `/curar/historicos`, con las mismas 15 columnas en el mismo orden y
+      **por instancia** — que es lo que el Sheet no podía ser: era uno solo y global, así que la
+      segunda empresa iba a appendear sus aprobados al de Retia.
+      *(✅ medido 06/08: el archivado son **17 nodos** y **cero nodos de Google** en los 5 workflows.)*
+- [x] **C2. Workflow de archivado (n8n, cron semanal):** lee `Candidatos` decididos (`NOT estado='nuevo'`)
       → por cada uno: (1) inserta en Supabase `outputs` (estado según calificación,
-      `calificado_en` = `fecha_calificacion`, metadata completa), (2) append al Sheet Histórico
-      **solo aprobado**, (3) borra el record de Airtable (retención del free). Idempotente:
-      `external_id` = id del record de Airtable. *(✅ validado para producción cierre 19, ver dev-doc §3.)*
+      `calificado_en` = `fecha_calificacion`, metadata completa), (2) ~~append al Sheet Histórico~~
+      destila criterios ([ADR-022](./docs/adr/ADR-022-loop-aprendizaje-criterios.md)),
+      (3) borra el candidato ya archivado. Idempotente por `external_id`.
+      *(✅ validado cierre 19; **cerrado de verdad el 04/08** con la ejecución 124 — 9 archivados,
+      `outputs` 79→88, candidatos 174→165. El cron es **domingo 18:00**, no diario.)*
 - [x] **C3. Tracking:** `v_senal_seleccion`/`v_senal_tema` responden la tasa de selección por
-      referente/tema (los descartados bajan la tasa). *(✅ cierre 19.)*
+      referente/tema (los descartados bajan la tasa). *(✅ cierre 19. ⚠️ **`v_senal_tema` la mató la
+      [`022`](./core/schema/022_poda_balde_2.sql)**: su premisa estaba rota —agrupaba por
+      `metadata->>'tema'`, que dejó de escribirse en la poda D.4— y no tenía ningún consumidor.
+      La que sigue viva y en uso es `v_senal_seleccion`.)*
 
-**Hecho cuando:** calificar un candidato de prueba termina en (1) fila en el Sheet con sus dos
-links, (2) contado en `v_selecciones_por_dia` para su voz, (3) fuera de Airtable.
+**Hecho cuando:** calificar un candidato de prueba termina en (1) fila en `outputs`, visible en
+`/curar/historicos` *(era "en el Sheet"; ADR-057)*, (2) contado para su voz, y (3) fuera de la lista
+de candidatos.
+✅ **Cumplido y medido 06/08:** **88 outputs**, el último del 2026-08-04 21:12, y **165 candidatos**
+vivos. *(El "contado en `v_selecciones_por_dia`" también cambió de dueño: esa vista no tenía pantalla
+y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da `/curar/historicos`.)*
 
 ### Validación — corridas de fuego (los 3 juntos) · ~1.5 h
 
@@ -194,23 +243,48 @@ links, (2) contado en `v_selecciones_por_dia` para su voz, (3) fuera de Airtable
 - [ ] **V2. Literalidad:** muestrear 2–3: uno en español (script == transcripción tal cual) y
       uno en otro idioma (traducción literal, sin reescritura). El link abre y coincide.
 - [x] **V3. Curación + histórico:** Majo/Jero califican (🔥/👍/👎 + estado) → archivado corre →
-      filas en el Sheet con sus dos links · fuera de Airtable · `v_selecciones_por_dia` responde.
-      *(✅ cierre 19: run `687027e2`, archivados:14, Sheet solo aprobados, Candidatos=0, `v_senal_seleccion` ok.)*
-- [ ] **V4. Re-rank:** la vista "🔥 Seleccionados" muestra solo aprobados, caliente→frío.
+      el aprobado queda en `outputs` y se ve en `/curar/historicos` · sale de la lista de candidatos.
+      *(✅ cierre 19 (run `687027e2`, archivados:14) y **re-verificado el 04/08** con la ejecución 124
+      después de arreglar el IF que llevaba desde D7 archivando cero: `outputs` 79→88.)*
+- [ ] **V4. Re-rank:** el filtro *aprobados* de `/curar/feed` muestra solo aprobados, caliente→frío.
+      *(Era "la vista 🔥 Seleccionados", que era de Airtable y murió con él. Lo pedido —punto 5 del
+      norte— sigue igual y hoy lo sirve el Feed, que ya ordena por `heat_score` desc. **Falta el ojo:**
+      está en el checklist de B5, [plan-multi-tenant §15.B](./docs/agents/plan-multi-tenant.md).)*
 - [ ] **V5. Incremental + dedup:** correr con `dias_recencia=1` → no reaparece lo ya procesado.
       *(parcial: el dedup quedó verificado en vivo, falta la corrida incremental `dias=1` completa.)*
-- [ ] **V6. Resiliencia:** romper la credencial Supabase a propósito → el workflow IGUAL escribe
-      a Airtable (el registro es sumidero, no dependencia — invariante #1 de PLAN). Restaurar.
-      Un fallo real queda como `run` estado `fallo`.
+- [ ] **V6. Resiliencia:** romper la credencial Supabase a propósito → el workflow IGUAL entrega
+      (el registro es sumidero, no dependencia — invariante #1 de PLAN). Restaurar. Un fallo real
+      queda como `run` estado `fallo`.
+      *(⚠️ **El enunciado envejeció con D7.** Decía "IGUAL escribe a Airtable", y Airtable ya no
+      existe: hoy la entrega **también** es Supabase, así que romper esa credencial ya no separa
+      entrega de registro — las tumba a las dos. **La prueba sigue teniendo sentido en su mitad
+      medible**: un fallo real deja el `run` en `fallo`, y eso ya pasa solo — **12 de las 41 corridas
+      están en `fallo`** y el error handler de ADR-054 las marca. Lo que hay que decidir antes de
+      correr V6 es qué credencial se rompe ahora que el invariante #1 cambió de forma.)*
 
 ### Activación
 
-- [ ] **D1.** Validación explícita de timezone (`America/Bogota`) → activar cron diario/cada-2-días
-      (motor) + cron diario (archivado).
+- [x] **D1.** Validación explícita de timezone (`America/Bogota`) → activar los crons.
+      *(✅ medido 06/08: los **5** workflows con `settings.timezone = America/Bogota`, y los **dos**
+      crons del sistema viven en el dispatcher ([ADR-050](./docs/adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md)).
+      ⚠️ **La cadencia no es la que decía este item:** no son diarios. Son **semanales** —
+      `Cron — motor (lunes 8am)` y `Cron — archivado (domingo 6pm)`.)*
 - [ ] **D2.** `status: active` en el manifest + tabla `workflows` · actualizar el manifest al
       estado real del motor (stages/outputs post-rework) · commit.
+      *(🔧 **La mitad del manifest se hizo el 06/08**: los 4 `workflow.yaml` de los pipelines vivos
+      decían `status: draft` con comentarios ya falsos —"cron sin activar", "sin importar aún en la
+      instancia n8n"— mientras corrían en producción hacía meses. Corregidos a `active` contra lo
+      medido.
+      ⬜ **Falta la otra mitad, y es de Mani porque escribe en prod:** la tabla `workflows` de la base
+      dice `short-form-content: draft`, `linkedin: draft`, `substack: inactive`. Nada la lee —
+      [`scoped.ts:43`](./apps/dashboard/lib/supabase/scoped.ts) deja `clients`/`instances`/`workflows`
+      fuera del mapa a propósito— así que es cosmético, no un bug. Es un UPDATE:
+      `update workflows set estado = 'active' where id = 'short-form-content';`
+      **`linkedin` se queda en `draft` a propósito**: su workflow no existe en n8n (ADR-055).)*
 - [ ] **D3.** Demo de 10 min con Majo y Jero: calificar, ver el re-rank, bajar el histórico.
       El sistema solo sirve si lo usan.
+      *(Sigue abierto y es de las cosas más viejas sin cerrar. Está en el checklist de ojo humano de
+      B5, [plan-multi-tenant §15.B](./docs/agents/plan-multi-tenant.md).)*
 
 ## 4. MVP declarado cuando
 
