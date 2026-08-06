@@ -1,8 +1,8 @@
 # Archivado de curación — carril C (C2)
 
-> Workflow de **n8n** (20 nodos, en la instancia: `Workflow - Archivado`) que cierra el loop de
+> Workflow de **n8n** (17 nodos, en la instancia: `Workflow - Archivado`) que cierra el loop de
 > curación del MVP de reels: toma los candidatos que el equipo (Majo/Jero) ya calificó en el
-> cockpit, los manda al histórico permanente (`outputs` en Supabase + el Google Sheet) y **borra el
+> cockpit, los manda al histórico permanente (`outputs` en Supabase) y **borra el
 > candidato** — es cola de trabajo, y su historia ya quedó entera en `outputs`
 > ([ADR-014](../../docs/adr/ADR-014-outputs-historico-canonico-archivado.md)). Es el complemento del
 > motor B3 (`../workflow-short-form-content/`).
@@ -50,21 +50,23 @@ Ejecutar manual ────────────────┴─► Config
           ├─ no ───────────────────────────────────────────────► Cerrar run en el registro
           └─ sí ─► Armar filas archivado ─► Preparar outputs Supabase
                      └─► Registrar outputs (Supabase)      ← TODOS, continue-on-fail
-                            ├─► Preparar filas Sheet ─► Append al Sheet Histórico ─┐
-                            │      (SOLO aprobado)                                 │
-                            └──────────────► Reconvergir tras Sheet (Merge) ◄──────┘
-                                   └─► Preparar borrado candidatos ─► Borrar candidatos (TODOS)
-                                          └─► Cerrar run en el registro
+                            └─► Preparar borrado candidatos ─► Borrar candidatos (TODOS)
+                                   └─► Cerrar run en el registro
 
 Cerrar run en el registro ─┬─► Barrer candidatos sin calificar   (higiene, onError:continue)
                            └─► Destilar criterios ─► PATCH Proyectos criterios   (ADR-022/M2)
 ```
 
-> Las dos ramificaciones (tras `Registrar outputs` y tras `Cerrar run`) corren **por posición en el
-> canvas**, no por el array de conexiones: n8n v1 ejecuta las hermanas de Y menor a Y mayor. Por eso
-> `Preparar filas Sheet` (Y 200) va antes que `Reconvergir` (Y 360), y `Barrer candidatos sin
-> calificar` (Y 200) antes que `Destilar criterios` (Y 600). `npm run n8n:orden -- archivado` es
-> quien arregla esto si alguien arrastra un nodo; `node Workflows/auditar-workflows.mjs` lo audita.
+> 🔻 **Quedó UNA sola ramificación** (tras `Cerrar run`), y corre **por posición en el canvas**, no
+> por el array de conexiones: n8n v1 ejecuta las hermanas de Y menor a Y mayor. Por eso `Barrer
+> candidatos sin calificar` (Y 200) va antes que `Destilar criterios` (Y 600).
+> `npm run n8n:orden -- archivado` es quien arregla esto si alguien arrastra un nodo;
+> `node Workflows/auditar-workflows.mjs` lo audita.
+>
+> *La otra ramificación —la del Sheet, con su `Merge` de reconvergencia— murió el 2026-08-05 con
+> [ADR-057](../../docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) paso 2. Fueron 3
+> nodos borrados **a mano en el editor de n8n**, no un re-import: importar crea un workflow con id
+> NUEVO y se lleva puestos el webhook, el target del dispatcher y la activación.*
 
 - **Pide su config a la fachada**, no a una tabla: `GET /api/engine/run-plan?ambito=completo&instancia=…`
   ([ADR-028](../../docs/adr/ADR-028-contrato-motor-run-plan.md)). De ahí salen `proyectos` y `voces`,
@@ -78,21 +80,21 @@ Cerrar run en el registro ─┬─► Barrer candidatos sin calificar   (higien
 - **Lee** `app.candidatos` por PostgREST: `estado=neq.nuevo`, scoped por `instance_id`, `limit=5000`.
   Los estados vivos son tres (`nuevo` · `aprobado` · `descartado`): **`publicado` ya no existe**, y
   `Armar filas archivado` colapsa a `descartado` todo lo que no sea literalmente `aprobado`.
-- **Split (qué va a dónde):** el **Sheet histórico** recibe **solo `aprobado`** (los scripts que se
-  producen). **`outputs`** y el **borrado del candidato** toman **todos** los calificados — los
-  `descartado` se registran (alimentan el aprendizaje, `v_senal_seleccion`) y se limpian de la cola,
-  pero **no ensucian** el histórico visible.
+- **Sin split: `outputs` y el borrado toman TODOS los calificados.** Los `descartado` se registran
+  (alimentan el aprendizaje, `v_senal_seleccion`) y se limpian de la cola. *El split existía por el
+  Sheet, que recibía solo los `aprobado`; con el Sheet muerto, el filtro «solo lo visible» lo hace
+  `/curar/historicos`, que consulta `estado = 'aprobado'` sobre `outputs`.*
 - **Registra en `outputs`** (tipo `guion_reel`) con un solo POST: `contenido_o_link` = **texto del
   script**, `calificado_en` = `fecha_calificacion`, `external_id` = **el id del candidato en
   Postgres**, `run_id` = el run abierto, `source_items[].platform` derivado de la url (tiktok /
   instagram), y `metadata` completa (proyecto, voz, referente, idioma, métricas, heat_score,
   `calificacion`, `notas_equipo`, `viral_por_tamano`, `relevancia_score`/`relevancia_razon`).
   `instance_id` **no lo manda el workflow**: lo deriva el trigger `outputs_hereda_instancia` desde
-  `run_id` (016 §2), que es el dato exacto en vez de un default. Estas filas alimentan
-  `v_historico_seleccionados`, `v_selecciones_por_dia` y `v_senal_seleccion`.
-- **Append al Google Sheet "Histórico"** — el código emite 15 claves: las 13 de la vista más
-  `RELEVANCIA SCORE`/`RELEVANCIA RAZON` (vacías si el candidato no las trae). Cuántas aterrizan
-  depende de los encabezados que tenga el Sheet: ver §Requisitos previos.
+  `run_id` (016 §2), que es el dato exacto en vez de un default. Estas filas son las que lee
+  `/curar/historicos` (y su export CSV) y las que alimentan `v_senal_seleccion`.
+  *`source_items` salió del POST el 2026-08-05: se escribía y no la leía nadie, y la dropea la
+  [`023`](../../core/schema/023_poda_write_only.sql) (ADR-059). La traza del origen vive en
+  `metadata.referente`/`.url_referente`, que es lo que la pantalla muestra.*
 - **Borra los candidatos archivados** con `DELETE …/candidatos?id=in.(…)`. PostgREST borra por
   filtro, así que se acabaron los lotes de 10: se trocea de a **200** y solo para no armar una URL
   gigante. Si no hay ids, `Preparar borrado candidatos` devuelve `[]` y el DELETE no corre.
@@ -118,19 +120,22 @@ Cerrar run en el registro ─┬─► Barrer candidatos sin calificar   (higien
 
 - **El registro es sumidero** (invariante #1): `Abrir run`, `Barrer runs zombie`, `Registrar
   outputs`, `Cerrar run`, `Barrer candidatos sin calificar` y `PATCH Proyectos criterios` van con
-  *Continue On Fail*. Si el registro no responde, el Sheet igual se escribe y la cola igual se limpia.
-- **Runs sin zombies (B5)**: si una corrida falla a mitad (ej. el Append rebota OAuth/503), el run queda
+  *Continue On Fail*. Si el registro no responde, la cola igual se limpia.
+- **Runs sin zombies (B5)**: si una corrida falla a mitad, el run queda
   `en_curso`. `Barrer runs zombie` (justo tras `Abrir run`) marca `fallo` los runs de archivado anteriores
   colgados (scoped `params->>workflow=archivado` **+ `instance_id`**, excluye el actual) → la próxima
   corrida los limpia sola. Desde [ADR-054](../../docs/adr/ADR-054-cada-run-lleva-su-execution-id.md)
   el run además lleva `params.execution_id`, que es por donde lo encuentra el error handler global.
   Además `Cerrar run` corre en **ambas** ramas del IF → **cierra `ok` aun con 0 calificados**, sin
   generar un zombie cada domingo que no haya nada que archivar.
-- **El Sheet NO es continue-on-fail a propósito**: si el append falla, el workflow **corta antes de
-  borrar los candidatos** → no se pierde la curación del equipo; reintenta al otro domingo. Reintenta
-  3 veces con 30 s de espera antes de darse por vencido. El `Merge` *Reconvergir tras Sheet* espera a
-  ambas ramas antes del borrado, así que mantiene este orden **y** deja correr el borrado cuando el
-  lote no trae aprobados (todos `descartado` → rama Sheet vacía).
+- 🩸 **La red que protegía la curación se fue con el Sheet, y hay que saberlo.** El append **no** era
+  continue-on-fail a propósito: si fallaba, el workflow cortaba **antes** de borrar los candidatos, o
+  sea que la curación del equipo no se perdía. Hoy el único escritor del histórico es
+  `Registrar outputs`, que **sí** es continue-on-fail (invariante #1) y tiene `Borrar candidatos`
+  aguas abajo. *Eso es exactamente el modo de falla que gatea la [`023`](../../core/schema/023_poda_write_only.sql):
+  un 400 tragado ahí borra calificados sin haberlos archivado.* La protección real pasó a ser el
+  upsert idempotente + que ese POST no puede fallar por forma (ADR-059 §0 lo verifica antes de
+  dropear nada).
 - **Idempotencia por upsert + borrado**: en operación normal un candidato se procesa una vez porque
   se borra al final. Si el delete falla (transitorio), `Borrar candidatos` **reintenta** (3 intentos,
   2 s) antes de dar error; si igual queda atrás, la corrida siguiente lo re-toma **sin duplicar** en
@@ -157,13 +162,7 @@ Cerrar run en el registro ─┬─► Barrer candidatos sin calificar   (higien
    filtran nada.
 3. **La fachada del cockpit en pie** (`/api/engine/run-plan`): si `Leer plan (fachada)` no responde
    tras sus 3 reintentos, la corrida se cae ahí — no tiene `onError:continue`, y sin `proyectos`/
-   `voces` los nombres del Sheet saldrían vacíos.
-4. **Sheet "Histórico" creado** (C1) con la pestaña y los encabezados en la fila 1 — el append mapea
-   por nombre (`autoMapInputData`), así que deben coincidir **exactos**. Las 13 de la vista:
-   `FECHA CALIFICACION · PROYECTO · VOZ · TITULO · URL ORIGINAL · SCRIPT · IDIOMA · VIEWS · LIKES ·
-   SEGUIDORES · HEAT SCORE · CALIFICACION · ESTADO`. El código emite además `RELEVANCIA SCORE` y
-   `RELEVANCIA RAZON`, que **solo aterrizan si se agregan esos dos encabezados**; si no están, n8n
-   descarta esas claves en silencio.
+   `voces` los nombres de `metadata` saldrían vacíos.
 5. Corre en **la misma instancia de n8n** que el motor (B1) y reusa sus credenciales — ver
    §Credenciales.
 
@@ -194,13 +193,11 @@ el `workflow.json` el 2026-08-03 — son **7**:
 | `<<SUPABASE_URL>>` | nodo *Config* | `https://<proyecto>.supabase.co` |
 | `<<DASHBOARD_URL>>` | nodo *Config* | base del cockpit (de ahí sale la fachada `run-plan`) |
 | `<<WEBHOOK_PATH_ARCHIVADO>>` | *Disparo por instancia* | el path del webhook que dispara el dispatcher |
-| `<<GOOGLE_SHEET_ID>>` | nodo *Config* | id del Sheet Histórico (de la URL) |
-| `<<NOMBRE_PESTANA_SHEET>>` | nodo *Config* | nombre de la pestaña destino |
-| `<<CREDENCIAL_GOOGLE_SHEETS>>` | *Append al Sheet Histórico* | credencial OAuth de Google Sheets en n8n |
 | `<ANTHROPIC_API_KEY>` | Code de *Destilar criterios* | la key de Anthropic |
 
-**`<<AIRTABLE_BASE_ID>>` murió en D7** (ADR-035) y **`<<INSTANCE_ID>>` en la Fase 4**: la instancia ya
-no es constante del archivo, viaja en el payload del webhook (ADR-048).
+**`<<AIRTABLE_BASE_ID>>` murió en D7** (ADR-035), **`<<INSTANCE_ID>>` en la Fase 4** (la instancia
+viaja en el payload del webhook, ADR-048) y **los 3 de Google el 2026-08-05** (ADR-057 paso 2). Son
+**4**, y ninguno es de Google: este workflow ya no tiene ninguna dependencia de Google.
 
 > ⚠️ **Un placeholder sin resolver no falla en rojo.** `<<…>>` no es sintaxis de expresión de n8n: se
 > manda literal y el request muere, pero con `onError: continueRegularOutput` la ejecución **termina
@@ -219,20 +216,8 @@ intentos fallidos el 03/08).
 | *Disparo por instancia (webhook)* | `Webhook Motor Header` (`httpHeaderAuth`) | **el mismo que el motor, a propósito** |
 | *Leer plan (fachada)* | `Run Plan Header` (`httpHeaderAuth`) | leer la config por la fachada (ADR-028) |
 | los nodos de Supabase | `Supabase account` (`supabaseApi`, service_role) | `runs` + `outputs` por PostgREST (ADR-035) |
-| *Append al Sheet Histórico* | OAuth (`googleSheetsOAuth2Api`) | append al histórico — **única dependencia de Google del pipeline**. Se elige a mano: no es texto |
 
-> 🔴 **El Sheet es uno solo y global.** `sheet_id`/`sheet_tab` son constantes del `Config`, no config
-> por instancia: con una segunda empresa **sus aprobados se appendean al Sheet de Retia**. Pendiente
-> con su fix escrito en [plan-multi-tenant §14.4](../../docs/agents/plan-multi-tenant.md).
-
-> **El OAuth consent screen DEBE estar en Publishing status = "In production"** (no Testing). External +
-> Testing caduca el refresh token a los 7 días → el archivado moría cada domingo. La cuenta dueña del
-> Sheet es un **Gmail personal** (no Workspace), así que "Internal" no está disponible y Service Account
-> tampoco (la política de org `iam.disableServiceAccountKeyCreation` bloquea crear su key). El fix es
-> **publicar la app a Producción** (Google Auth Platform → Audience → Publish app): para uso personal
-> (<100 usuarios) NO requiere verificación, solo un warning de "app no verificada" al autorizar (se
-> salta con Advanced → proceed). Tras publicar hay que **re-autorizar la credencial una vez** en n8n
-> para emitir un token nuevo que ya no expira. (2026-07-12)
+> ✅ **La dependencia de Google se fue entera el 2026-08-05** ([ADR-057](../../docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) paso 2). Era el último pendiente de [plan-multi-tenant §14.4](../../docs/agents/plan-multi-tenant.md): el Sheet era **uno solo y global** (`sheet_id`/`sheet_tab` eran constantes del `Config`, no config por instancia), así que con una segunda empresa sus aprobados se appendeaban al Sheet de Retia. Con él se fueron el consent screen de OAuth, su refresh token y el runbook entero de publicar la app a Producción.
 
 ## Limitaciones conocidas (MVP)
 
@@ -267,12 +252,13 @@ from outputs where calificado_en is not null order by creado_en desc limit 10;
 select estado, count(*) from app.candidatos where estado <> 'nuevo' group by estado;
 
 -- 4. el histórico como lo lee el cockpit
-select * from v_historico_seleccionados limit 30;   -- fila con su script (texto), por voz
-select * from v_selecciones_por_dia;                -- "el lunes X seleccionaron N para tal voz"
+select titulo, estado, calificado_en, metadata->>'proyecto' as proyecto
+  from outputs where tipo = 'guion_reel'
+ order by creado_en desc limit 30;     -- las filas que acaba de archivar, con su script en metadata
 ```
 
-Y verificar: fila nueva en el Sheet con su script · los candidatos archivados desaparecieron de la
-bandeja del cockpit.
+Y verificar: la fila nueva aparece en `/curar/historicos` con su script · los candidatos archivados
+desaparecieron de la bandeja del cockpit.
 
 > ⚠️ **`metricas.archivados` no prueba nada por sí solo.** Lo calcula `Cerrar run` contando lo que
 > `Leer Candidatos calificados` **leyó**, y ese nodo corre en las dos ramas del IF: un run puede

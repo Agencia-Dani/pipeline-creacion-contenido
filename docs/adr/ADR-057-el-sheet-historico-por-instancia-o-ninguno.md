@@ -7,7 +7,7 @@
   | Paso | Qué | Estado |
   |---|---|---|
   | 1 | **El export CSV** en `/curar/historicos`, con las **15 columnas del Sheet en su orden** | ✅ **hecho y en prod** (`domain/csv.ts` + su test, `leerTodosLosAprobados`, el Server Action y el botón) |
-  | 2 | **Sacar los nodos del Sheet** del archivado | ⬜ **va en el re-import de D8**, que ya está esperando por `fields.uuid`. Borrar nodos es topología ⇒ re-import, y no se gasta uno solo en esto |
+  | 2 | **Sacar los nodos del Sheet** del archivado | ✅ **HECHO el 2026-08-05.** 3 nodos borrados **a mano en el editor de n8n** (`Preparar filas Sheet`, `Append al Sheet Histórico`, `Reconvergir tras Sheet`), reconectando `Registrar outputs` → `Preparar borrado candidatos`; el resto (`Config` sin `sheet_id`/`sheet_tab`, `Armar filas archivado` sin la fila del Sheet) por `n8n:push`. **No fue un re-import**: importar crea un workflow con id NUEVO y se lleva el webhook, el target del dispatcher y la activación. El archivado quedó en **17 nodos** y `n8n:diff` limpio en los 5 |
 
   **El orden no es cosmético: es lo único que hace que la opción 2 no sea una pérdida.** Entre el
   paso 1 y el paso 2 conviven los dos, y eso está bien — el equipo nunca se queda sin el

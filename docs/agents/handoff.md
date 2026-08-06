@@ -1249,14 +1249,20 @@ producción**. El orden de acá en adelante:
      son `onError: continue` ⇒ el 400 se traga, el motor cierra en verde **sin memoria de dedup**
      (⇒ duplicados re-pagados) y el archivado **borra calificados sin archivarlos**. Hay un guard
      nuevo en `test-nodos.mjs` que se pone rojo si alguien devuelve una columna al batch del dedup.
-   ☠️ **`fields.uuid` y los tres `uuidDe` ya murieron** con el contrato v2 (ADR-048 §5): este doc
-   los daba como pendientes de re-import y no lo están. **La cola del re-import tiene un solo
-   item: sacar los 3 nodos del Sheet** del archivado (ADR-057 paso 2).
-   🟡 **Y ese re-import ya NO es un límite técnico, es una decisión pendiente.** `PUT` reemplaza el
-   array `nodes` entero, así que borrar los 3 nodos por API se puede: el que se niega es **nuestro**
-   `n8n:push`, porque *"un push que crea nodos también puede borrarlos"* y falta la red de seguridad.
-   Escrito para retomarlo en [plan-multi-tenant §14.2](./plan-multi-tenant.md). **Destrabar eso
-   destraba el Sheet**, que es lo último de la superficie vieja que sigue vivo.
+   ✅ **LA COLA DEL RE-IMPORT QUEDÓ VACÍA.** `fields.uuid` y los tres `uuidDe` ya habían muerto con el
+   contrato v2 (ADR-048 §5) y **el Sheet salió el 05/08**: [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)
+   cerrada entera. El archivado quedó en **17 nodos** y con ella se fue **la última dependencia de
+   Google del pipeline** (credencial OAuth, consent screen y su runbook).
+   🔑 **Cómo se hizo, porque es el patrón para la próxima topología:** los 3 nodos se borraron **a
+   mano en el editor de n8n** y se reconectó `Registrar outputs` → `Preparar borrado candidatos`;
+   los dos cambios de `parameters` (`Config` sin `sheet_id`/`sheet_tab`, `Armar filas archivado` sin
+   la fila del Sheet) fueron por `n8n:push`. **NO fue un re-import**: importar crea un workflow con
+   id NUEVO y se lleva el webhook, el target del dispatcher, el `errorWorkflow` y la activación.
+   Total: 3 clics + un push, con `n8n:diff` limpio en los 5 después.
+   🟡 **Y quedó claro que el re-import ya no es un límite técnico.** `PUT` reemplaza el array `nodes`
+   entero, así que borrar nodos por API se puede: el que se niega es **nuestro** `n8n:push`, porque
+   *"un push que crea nodos también puede borrarlos"* y falta la red de seguridad. Escrito para
+   retomarlo en [plan-multi-tenant §14.2](./plan-multi-tenant.md) — ahora sin nada esperándolo.
    ✅ **"Nada de Airtable" — HECHO en el repo el 05/08** (pedido de Mani). Borrados
    `core/scripts/setup-airtable.mjs`, `core/contracts/airtable-cockpit.md` (sin reemplazo a
    propósito: **el modelo vivo son las migraciones**) y `apps/dashboard/scripts/cortar-feed.ts` con
@@ -1331,8 +1337,10 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 
 **🎯 Y el export final —el último bloqueante para apagar Airtable— no hacía falta.** `Métricas Proyectos` y `Métricas Global` eran *"proyección derivada y regenerable"* según el propio contrato congelado: las 4 vistas de `app.` las reconstruyen desde `runs.metricas` + `outputs` **y cubren desde el 2026-06-29**, más historia que la que esas tablas tuvieron. *Lo que parecía el único dato irrecuperable era una caché de algo que el sistema ya sabe calcular.* La cuenta queda **desconectada, no cancelada** (decisión de Mani).
 
-**Verde:** `typecheck` 0 · **175 tests** (+1: el guard de la `023`) · `build` · `validate` **2055 checks** · `auditar-workflows` sin hallazgos · `test-nodos` verde · **`n8n:diff` limpio en los 5** después del push.
-**Qué sigue:** ver correr un motor y un archivado → firmar el gate de la **`023`** → **la red de seguridad de topología** en `n8n-sync` ([§14.2](./plan-multi-tenant.md)), que es lo que destraba los **3 nodos del Sheet** (ya no es un límite de la API, es una decisión) → paginación del feed (§12 #7) → **Fase 5, LinkedIn**, que arranca por §14.6 (sus 4 tablas sin policy).
+**🔻 Y al final de la sesión salió el Sheet, con lo que ADR-057 quedó cerrada entera.** Los 3 nodos se borraron **a mano en el editor** (Mani) y los 2 cambios de `parameters` por `n8n:push`. El archivado quedó en **17 nodos**, sin una sola dependencia de Google, y **la cola del re-import quedó vacía**. 🩸 *Lo que se fue con el Sheet y hay que tener presente: el append NO era continue-on-fail a propósito —si fallaba, cortaba antes de borrar los candidatos—, así que era la red que protegía la curación. Hoy el único escritor del histórico sí es continue-on-fail y tiene el borrado aguas abajo: es exactamente el modo de falla que gatea la `023`.*
+
+**Verde:** `typecheck` 0 · **175 tests** (+1: el guard de la `023`) · `build` · `validate` **2053 checks** · `auditar-workflows` sin hallazgos · `test-nodos` verde · **`n8n:diff` limpio en los 5**.
+**Qué sigue:** ver correr un motor y un archivado → firmar el gate de la **`023`** → paginación del feed (§12 #7) → **Fase 5, LinkedIn**, que arranca por §14.6 (sus 4 tablas sin policy). Sin apuro: la red de seguridad de topología en `n8n-sync` ([§14.2](./plan-multi-tenant.md)) — ya no hay nada esperándola.
 **Skills sugeridas:** `/diagnose` si la corrida del lunes cierra verde pero `verificar-corrida.mjs` cae a la ventana de `primera_vez` · `/grill-with-docs` antes de tocar la topología por API.
 
 

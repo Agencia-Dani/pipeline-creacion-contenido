@@ -34,18 +34,6 @@
               "type": "string"
             },
             {
-              "id": "a4",
-              "name": "sheet_id",
-              "value": "<<GOOGLE_SHEET_ID>>",
-              "type": "string"
-            },
-            {
-              "id": "a5",
-              "name": "sheet_tab",
-              "value": "<<NOMBRE_PESTANA_SHEET>>",
-              "type": "string"
-            },
-            {
               "id": "a6",
               "name": "min_muestra_referente",
               "value": "10",
@@ -228,7 +216,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Armar filas archivado — lo calificado de la semana → `outputs` (el histórico canónico, ADR-014)\n// + la fila del Sheet. Desde D7 lee filas PLANAS de Postgres: se acabaron `fields`, los links y el\n// cruce por record id — `proyecto_id`/`voz_id` son uuid y se cruzan contra el `id` del plan, que\n// ES el uuid desde el paso 3 de D7 (contrato run-plan v2, ADR-048 §5: `fields.uuid` ya no viaja).\nconst _filas = (n) => { try { const a = $(n).all().map(i => i.json); return (a.length === 1 && Array.isArray(a[0])) ? a[0] : a; } catch (e) { return []; } };\nconst recs = _filas('Leer Candidatos calificados');\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst _plan = $('Leer plan (fachada)').first().json || {};\nconst projMap = {}; (_plan.proyectos || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || ''; });\nconst vozMap = {};  (_plan.voces || []).forEach(r => { vozMap[r.id] = (r.fields || {}).nombre || ''; });\n\nconst ESTADOS = { aprobado: 'aprobado', descartado: 'descartado' };\n// (murió `_plataforma`: derivaba el `platform` de `source_items`, y esa columna se va en la `023`)\n\nreturn recs.map(r => {\n  const estado = ESTADOS[String(r.estado || '').toLowerCase()] || 'descartado';\n  const proyecto = projMap[r.proyecto_id] || '';\n  const voz = vozMap[r.voz_id] || '';\n  const calificado_en = r.fecha_calificacion || new Date().toISOString();\n  const output = {\n    run_id,\n    tipo: 'guion_reel',\n    titulo: r.titulo || '(sin titulo)',\n    contenido_o_link: r.script || '',\n    estado,\n    calificado_en,\n    // El id del candidato en Postgres. Sigue siendo la clave de idempotencia de `outputs`\n    // (UNIQUE(external_id), migración 005): un re-run no duplica el histórico.\n    external_id: r.id,\n    metadata: {\n      proyecto, voz, referente: r.referente || '', url_referente: r.url_referente || '',\n      idioma: r.idioma || '', views: r.views || 0, likes: r.likes || 0,\n      seguidores: r.seguidores || 0, engagement: r.engagement || 0,\n      heat_score: r.heat_score || 0, calificacion: r.calificacion || '',\n      notas_equipo: r.notas_equipo || '', viral_por_tamano: !!r.viral_por_tamano,\n      relevancia_score: (r.relevancia_score != null ? r.relevancia_score : null), relevancia_razon: r.relevancia_razon || ''\n    }\n  };\n  const sheet = {\n    'FECHA CALIFICACION': calificado_en, 'PROYECTO': proyecto, 'VOZ': voz,\n    'TITULO': r.titulo || '', 'URL ORIGINAL': r.url_referente || '', 'SCRIPT': r.script || '',\n    'IDIOMA': r.idioma || '', 'VIEWS': r.views || 0, 'LIKES': r.likes || 0,\n    'SEGUIDORES': r.seguidores || 0, 'HEAT SCORE': r.heat_score || 0,\n    'CALIFICACION': r.calificacion || '', 'ESTADO': estado,\n    'RELEVANCIA SCORE': (r.relevancia_score != null ? r.relevancia_score : ''), 'RELEVANCIA RAZON': r.relevancia_razon || ''\n  };\n  return { json: { record_id: r.id, output, sheet } };\n});"
+        "jsCode": "// Armar filas archivado — lo calificado de la semana → `outputs` (el histórico canónico, ADR-014).\n// El Sheet murió en ADR-057: su reemplazo es el botón «Descargar CSV» de `/curar/historicos`. Desde D7 lee filas PLANAS de Postgres: se acabaron `fields`, los links y el\n// cruce por record id — `proyecto_id`/`voz_id` son uuid y se cruzan contra el `id` del plan, que\n// ES el uuid desde el paso 3 de D7 (contrato run-plan v2, ADR-048 §5: `fields.uuid` ya no viaja).\nconst _filas = (n) => { try { const a = $(n).all().map(i => i.json); return (a.length === 1 && Array.isArray(a[0])) ? a[0] : a; } catch (e) { return []; } };\nconst recs = _filas('Leer Candidatos calificados');\nconst run = $('Abrir run en el registro').first().json || {};\nconst run_id = run.id || null;\n\nconst _plan = $('Leer plan (fachada)').first().json || {};\nconst projMap = {}; (_plan.proyectos || []).forEach(r => { projMap[r.id] = (r.fields || {}).nombre || ''; });\nconst vozMap = {};  (_plan.voces || []).forEach(r => { vozMap[r.id] = (r.fields || {}).nombre || ''; });\n\nconst ESTADOS = { aprobado: 'aprobado', descartado: 'descartado' };\n// (murió `_plataforma`: derivaba el `platform` de `source_items`, y esa columna se va en la `023`)\n\nreturn recs.map(r => {\n  const estado = ESTADOS[String(r.estado || '').toLowerCase()] || 'descartado';\n  const proyecto = projMap[r.proyecto_id] || '';\n  const voz = vozMap[r.voz_id] || '';\n  const calificado_en = r.fecha_calificacion || new Date().toISOString();\n  const output = {\n    run_id,\n    tipo: 'guion_reel',\n    titulo: r.titulo || '(sin titulo)',\n    contenido_o_link: r.script || '',\n    estado,\n    calificado_en,\n    // El id del candidato en Postgres. Sigue siendo la clave de idempotencia de `outputs`\n    // (UNIQUE(external_id), migración 005): un re-run no duplica el histórico.\n    external_id: r.id,\n    metadata: {\n      proyecto, voz, referente: r.referente || '', url_referente: r.url_referente || '',\n      idioma: r.idioma || '', views: r.views || 0, likes: r.likes || 0,\n      seguidores: r.seguidores || 0, engagement: r.engagement || 0,\n      heat_score: r.heat_score || 0, calificacion: r.calificacion || '',\n      notas_equipo: r.notas_equipo || '', viral_por_tamano: !!r.viral_por_tamano,\n      relevancia_score: (r.relevancia_score != null ? r.relevancia_score : null), relevancia_razon: r.relevancia_razon || ''\n    }\n  };\n  return { json: { record_id: r.id, output } };\n});"
       },
       "id": "armar-filas",
       "name": "Armar filas archivado",
@@ -292,72 +280,6 @@
           "name": "Supabase account"
         }
       }
-    },
-    {
-      "parameters": {
-        "jsCode": "\nconst POS = ['aprobado'];\nreturn $('Armar filas archivado').all().filter(i => POS.includes((i.json.output || {}).estado)).map(i => ({ json: i.json.sheet }));\n"
-      },
-      "id": "preparar-sheet",
-      "name": "Preparar filas Sheet",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2400,
-        200
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "={{ $('Config').first().json.sheet_id }}",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "={{ $('Config').first().json.sheet_tab }}",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "autoMapInputData",
-          "value": {},
-          "matchingColumns": [],
-          "schema": []
-        },
-        "options": {}
-      },
-      "id": "append-sheet",
-      "name": "Append al Sheet Histórico",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        2640,
-        200
-      ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 30000,
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "name": "<<CREDENCIAL_GOOGLE_SHEETS>>"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "mode": "append",
-        "numberInputs": 2,
-        "options": {}
-      },
-      "id": "reconvergir-sheet",
-      "name": "Reconvergir tras Sheet",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        2760,
-        360
-      ]
     },
     {
       "parameters": {
@@ -699,44 +621,6 @@
       ]
     },
     "Registrar outputs (Supabase)": {
-      "main": [
-        [
-          {
-            "node": "Preparar filas Sheet",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Reconvergir tras Sheet",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Preparar filas Sheet": {
-      "main": [
-        [
-          {
-            "node": "Append al Sheet Histórico",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Append al Sheet Histórico": {
-      "main": [
-        [
-          {
-            "node": "Reconvergir tras Sheet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Reconvergir tras Sheet": {
       "main": [
         [
           {

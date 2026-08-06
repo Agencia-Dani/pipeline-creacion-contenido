@@ -1,16 +1,16 @@
 # Manifest — cumple core/contracts/workflow-manifest.md (v1)
 #
-# Carril C (C2). Cierra el loop de curación: toma los Candidatos ya calificados por el equipo en
-# Airtable, los manda al histórico permanente (Supabase + Google Sheet) y los borra de Airtable
-# para no reventar el plan free. Detalle y decisiones de diseño en README.md.
+# Carril C (C2). Cierra el loop de curación: toma los candidatos ya calificados por el equipo en el
+# cockpit, los manda al histórico permanente (`outputs`) y los borra de la cola. Detalle y
+# decisiones de diseño en README.md.
 contract_version: 1
 
 id: archivado
 name: "Archivado de curación — calificados → histórico"
 description: >
-  Corre diario por cron: lee los Candidatos que Majo/Jero ya calificaron en Airtable, los registra
-  en el histórico permanente (Supabase outputs + Google Sheet "Histórico") y los borra de Airtable
-  para respetar el límite del plan free. Es el complemento del motor de reels.
+  Corre semanal por cron: lee los candidatos que Majo/Jero ya calificaron en el cockpit, los registra
+  en el histórico permanente (`outputs`, el canónico de ADR-014) y los borra de la cola de
+  calificación. Es el complemento del motor de reels.
 engine: n8n
 status: draft                     # validado end-to-end (V3/C1-C3 ✅, cierre 19); cron sin activar (D1 del ROADMAP)
 owner: dev3
@@ -27,36 +27,36 @@ triggers:
                                   # instancia en la expresión de Config.instance_id (anotado ahí).
 
 inputs:
-  client_config: "clients/{cliente}/archivado.yaml"   # MVP: 1 instancia editada en el nodo Config
-  config_node: "Nodo 'Config': airtable_base_id, supabase_url, instance_id, google_sheet_id, nombre_pestana_sheet."
+  client_config: "clients/{cliente}/archivado.yaml"   # MVP: 1 instancia editada en el nodo Config"
+  config_node: "Nodo 'Config': supabase_url, dashboard_url + los mínimos de muestra. La instancia viaja en el payload (ADR-048)."
   filters: []                     # no scorea ni parametriza por corrida: es mantenimiento
   credentials:
-    - airtable_token              # credencial n8n 'Airtable PAT' (airtableTokenApi)
-    - supabase_service_role       # credencial n8n 'Supabase Registro' (supabaseApi)
-    - google_sheets_oauth         # credencial n8n Google Sheets OAuth2 (única dependencia de Google)
+    - supabase_service_role       # credencial n8n 'Supabase account' (httpHeaderAuth por PostgREST)
+    # `airtable_token` murió en D7 (ADR-035) y `google_sheets_oauth` en ADR-057: este workflow
+    # NO tiene ninguna dependencia de Google.
 
 stages:                           # las 8 etapas canónicas; este es un wf de mantenimiento → casi todo n/a
-  colectar: "Lee de Airtable los Candidatos con calificacion puesta (filterByFormula NOT calificacion vacío) — la cola de archivado."
-  normalizar: "Resuelve los links proyecto/voz (id→nombre) leyendo Proyectos/Voces; arma las filas del histórico."
+  colectar: "Lee por PostgREST los `app.candidatos` con estado != 'nuevo' de su instancia — la cola de archivado."
+  normalizar: "Resuelve proyecto/voz (uuid→nombre) contra el plan de la fachada; arma las filas del histórico."
   filtrar_scorear: n/a
   enriquecer: n/a
   generar: n/a
   calidad: n/a
-  entregar: "Inserta en Supabase outputs (histórico + señal de aprendizaje, schema 003/004; metadata incluye relevancia_score/razon — ADR-021) + append al Sheet Histórico + borra el record de Airtable + computa las filas semanales de Métricas — routea por _tabla a 'Métricas Proyectos' (calidad por proyecto) y 'Métricas Global' (salud global + costos, filas GLOBAL/DESCUBRIMIENTO), split 2026-07-15, fail-soft y limpia 'Descartes del gate'. Supabase es sumidero (continue-on-fail); el Sheet NO es continue-on-fail (si falla, corta antes de borrar → no se pierde curación)."
+  entregar: "Inserta en `outputs` (histórico + señal de aprendizaje; metadata incluye relevancia_score/razon — ADR-021) y borra el candidato de la cola. Destila criterios por proyecto (ADR-022) y barre los `nuevo` viejos. Las métricas ya no se materializan: son las vistas de *Entender* (D2). Los descartes NO se barren (ADR-036). La escritura del registro es sumidero (continue-on-fail)."
   notificar: n/a
 
 outputs:
   - type: guion_reel              # el script ya calificado, materializado en el histórico
-    destination_native: google_sheets   # Sheet "Histórico" (la base descargable del equipo)
-    registered: yes               # registro central = Supabase outputs (alimenta v_historico/v_selecciones/v_senal)
+    destination_native: cockpit   # /curar/historicos + su export CSV (ADR-057 mató el Google Sheet)
+    registered: yes               # registro central = Supabase `outputs` (alimenta v_senal_seleccion)
 
 runbook:
-  setup: "Importar workflow.json en n8n → completar nodo Config (supabase_url, dashboard_url, google_sheet_id, pestaña 'Historico'); instance_id YA NO se completa, sale del payload → reemplazar <<WEBHOOK_PATH_ARCHIVADO>> por un path aleatorio (la URL de Producción resultante va al Config del dispatcher y al gestor, JAMÁS a git) → mapear credenciales (Supabase Registro, Google Sheets OAuth2, y la httpHeaderAuth del webhook) → ACTIVAR (el webhook de Producción solo escucha activo). Requiere 004_historico_script_texto.sql y la 016 aplicadas."
+  setup: "Solo para re-import de topología (ADR-053: lo normal es `npm run n8n:push`). Completar el nodo Config (supabase_url, dashboard_url); instance_id NO se completa, sale del payload → reemplazar <<WEBHOOK_PATH_ARCHIVADO>> por un path aleatorio (la URL de Producción va al Config del dispatcher y al gestor, JAMÁS a git) → mapear credenciales (Supabase account y la httpHeaderAuth del webhook) → ACTIVAR (el webhook de Producción solo escucha activo)."
   start: "Lo dispara el dispatcher (workflow-dispatcher), domingo 18:00. Acá solo hay que dejar el workflow ACTIVO para que el webhook escuche."
   stop: "Desactivar el workflow en n8n."
-  test: "Calificar 1 Candidato en Airtable → Execute Workflow → verificar fila en el Sheet con su script, candidato borrado de Airtable, y v_selecciones_por_dia responde."
+  test: "Calificar 1 candidato en /curar/feed → Execute Workflow → verificar fila nueva en `outputs` con su script y su metadata, el candidato fuera de la cola, y que aparezca en /curar/historicos."
   docs:
     - README.md
     - ../../docs/agents/handoff.md
 
-cost_per_run: "~$0 — Airtable + Supabase + Google Sheets API en cuota free del MVP."
+cost_per_run: "~$0 en infra (Supabase free) + las llamadas a Haiku de `Destilar criterios` (ADR-022)."
