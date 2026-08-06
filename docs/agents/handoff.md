@@ -64,6 +64,8 @@
 > | 4 | 🟡 Que el tab **Entender** aparezca en el nav de un **operador** (`b8a3832`) | Jero o Alejo | ⬜ se ve solo, en su próximo login. La lógica tiene tests; falta el ojo. *No se probó desde una sesión de agente a propósito: habría requerido generar un magic link de la cuenta de otra persona* |
 > | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
 > | 5 | 🟡 Recorrer el **feed paginado** en `/curar/feed` (cierre 98) | Majo, Jero o Alejo | ⬜ **nuevo del 06/08**, y se despacha en el mismo login que el #2. Mirar tres cosas: que **Cargar más** traiga 25 sin repetir ni saltear, que los **chips digan el total real** (165, no 25) y que **abrir una tarjeta** traiga el guion. Calificar y después cargar más es el caso que el keyset existe para cubrir |
+> | 6 | 🔬 **La prueba que cierra §14.6**: RLS de LinkedIn con datos reales | quien tenga la cuenta de 2 empresas | ⬜ **nuevo del 06/08.** La `024` ya está aplicada y verificada; falta ejercitarla con filas. **El detalle completo está abajo, en su propio bloque** |
+> | 7 | 🔴 El **check #1 de la `021` contra PROD** | Mani o Alejo | ⬜ *"¿queda alguna tabla con tenant, RLS y sin policy?"* — **nunca se corrió contra la base real.** La única vez fue en Docker sobre `001→018`+`021`, **sin la `020` en el medio**, y por eso dio limpio con el agujero de LinkedIn adentro. El SQL está al pie de [`024`](../../core/schema/024_rls_linkedin.sql). Tiene que dar **cero filas** |
 >
 > ⚠️ **Y el flip se hizo DOS VECES el mismo día, por dos sesiones que no se vieron** (`d8edea2` y una
 > rama paralela, `capa-2-flip-scoped`, descartada). Las dos llegaron al mismo diseño: mismo campo
@@ -110,6 +112,51 @@
 > en cuanto el BFF regrese al `service_role`.
 >
 > </details>
+>
+> ### 🔬 #6 — La prueba que cierra §14.6 (escrita para ejecutarla sin releer nada)
+>
+> La [`024`](../../core/schema/024_rls_linkedin.sql) **ya está aplicada y verificada por su efecto**
+> (4 policies, grano instancia). Lo que falta es ejercitarla **con filas**, que es lo que §14.6 pone
+> como *hecho cuando*: hasta que una fila real pase por ahí, lo único probado es que las policies
+> existen — no que filtran.
+>
+> **Paso 1 — sembrar UNA fila en CADA empresa.** No alcanza con una sola: con una fila en la tabla,
+> ver 1 en 30X **no distingue** *"RLS funciona"* de *"hay una sola fila y punto"*. Con una de cada
+> lado el resultado correcto es **1 y 1**, y el incorrecto (**2 y 2**) salta a la vista.
+>
+> ```sql
+> insert into app.referentes_linkedin (instance_id, fuente, consulta, idioma, notas) values
+>   ('f35d0282-2511-4905-b407-2ab338bc2336', 'pinterest', 'prueba rls 30x',     'en', 'sembrado 06/08 para §14.6 — borrable'),
+>   ('f7baff77-8211-43f7-a64c-aed9e7a3e860', 'pinterest', 'prueba rls estadox', 'en', 'sembrado 06/08 para §14.6 — borrable');
+> ```
+>
+> | empresa | `instance_id` de su cockpit de LinkedIn |
+> |---|---|
+> | **30X** | `f35d0282-2511-4905-b407-2ab338bc2336` |
+> | **EstadoX** | `f7baff77-8211-43f7-a64c-aed9e7a3e860` |
+>
+> **Paso 2 — mirarlas con la cuenta que alcanza las DOS empresas** (`a6464e1d-…`, la membresía doble
+> del 05/08; en ventana de incógnito, si no el magic link cae sobre otra sesión):
+> `/30x/linkedin/curar/referentes` y `/estadox/linkedin/curar/referentes`.
+> **Cada cockpit tiene que mostrar SOLO el suyo.**
+>
+> 🔑 **Qué prueba cada resultado**, que es el punto de hacerlo así:
+>
+> | Lo que ves | Qué significa |
+> |---|---|
+> | **1 y 1** | ✅ Las dos mitades andan: RLS deja pasar lo del usuario **y** `scoped.ts` lo acota al cockpit abierto |
+> | **2 y 2** | 🩸 RLS anda (alcanza sus dos empresas) pero **el filtro de Capa 1 se rompió** — es el escenario que ADR-047 §Capa 1 existe para evitar |
+> | **0 y 0** | 🩸 Al revés: una policy que no matchea, o un `grant` que falta. Fallo silencioso, la familia de la `015` |
+> | **`42501` en pantalla** | El fallo *ruidoso*: falta un grant. Se arregla con SQL, **sin revertir el deploy** |
+>
+> ⚠️ **No sirve con una cuenta `es_dueno`**: `app.clientes_visibles()` le devuelve todas las empresas,
+> así que su resultado es indistinguible del de RLS apagado. **Por diseño.**
+>
+> **Paso 3 — agregar uno desde el botón.** Es lo **único** que ejercita los `grant insert/update/delete`
+> del `§1` de la `024`; ninguna lectura los toca. Esos grants son nuevos: la `021` había dado el
+> `select` a todo el schema, pero su lista de escritura no incluía las `*_linkedin`.
+>
+> **Limpieza:** `delete from app.referentes_linkedin where consulta like 'prueba rls%';`
 >
 > ### 📐 #3 — CERRADO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)
 >
@@ -1377,7 +1424,7 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 - 🔎 **Y la rama `capa-2-flip-scoped` se revisó: no tiene nada que rescatar.** Su commit de LinkedIn son 33 líneas de doc **idénticas a la §14.6 de `main`** salvo una palabra del título; su `app/sonda/page.tsx` está estampado *"NO MERGEAR"*; y la rama está atrás (sin `022`, `023`, ADR-059, la salida del Sheet ni la paginación). Mergearla sería una regresión.
 
 **Verde al cierre:** `typecheck` · **207 tests** (+32 en el día) · `build` · `validate` **2062 checks** · **`n8n:diff` limpio en los 5**.
-**Qué sigue:** aplicar la **`024`** y correr su §Verificación → el gate de la **`023`**, que sigue esperando corridas (última en la base: **04/08 21:12**; la mitad de escritura salió el 05/08, así que **ninguna corrida ejerció el código nuevo**: archivado el domingo, motor el lunes) → seguir la Fase 5 por candidatos/voces y el workflow en n8n.
+**Qué sigue:** la **prueba de §14.6 con filas** (#6 del Pendiente vivo, escrita entera ahí) + el **check #1 contra prod** (#7) → el gate de la **`023`**, que sigue esperando corridas (última en la base: **04/08 21:12**; la mitad de escritura salió el 05/08, así que **ninguna corrida ejerció el código nuevo**: archivado el domingo, motor el lunes) → seguir la Fase 5 por candidatos/voces, el workflow en n8n y su cron → `core/templates/` + los runbooks `agregar-workflow.md`/`agregar-cliente.md`, que F5 pidió siempre y nunca se escribieron (y son la auditoría honesta de todo esto: *"si algún paso de la guía exige modificar el núcleo, el diseño no está listo"*).
 
 **2026-08-05 (cierre 97) — La balde 2 medida y podada, y Airtable fuera del repo hasta la última mención (Claude, con Mani).**
 **Qué se hizo:** el inventario que D7 apartó y nunca listó, la sesión de grilling que lo decidió (**[ADR-059](../adr/ADR-059-lo-que-no-se-usa-no-existe.md)**), la **`022` aplicada y verificada por su efecto**, la **`023` escrita y gateada** con su mitad de escritura ya en el live, y la purga de Airtable del repo entero.
