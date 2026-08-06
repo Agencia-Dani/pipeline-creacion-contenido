@@ -97,7 +97,18 @@ if (runs.length >= 2 && runs.every((r) => r.estado === "ok")) {
     console.log(`   ${r.inicio.slice(0, 16)}: ${filas.length} processed_items · por ${via}`);
   }
   const inter = [...ids[0]].filter((x) => ids[1].has(x));
-  console.log(`   intersección: ${inter.length} ${inter.length === 0 ? "✓ (∅, el dedup funciona)" : "✖ HAY SOLAPE: " + inter.slice(0, 5)}`);
+  // 🩸 Una corrida SIN memoria da intersección ∅ igual que un dedup perfecto, y ese ∅ es justo el
+  // que firma el gate de la `023`. El modo de falla está medido: si el `n8n:push` deja de escribir
+  // `processed_items`, PostgREST rechaza el insert entero con `PGRST204`, el `onError: continue`
+  // se lo traga y el motor cierra en VERDE — sin memoria. Sin esta guarda, el ∅ de un dedup que
+  // funciona y el ∅ de una tabla vacía se leen igual, y son la conclusión opuesta.
+  const vacia = ids.findIndex((s) => s.size === 0);
+  if (vacia !== -1) {
+    console.log(`   intersección: 0 — ⛔ NO CUENTA: la corrida ${vacia === 0 ? "más nueva" : "anterior"} no dejó NINGUNA fila en processed_items.`);
+    console.log("      ∅ por vacío, no por dedup. Mirá por qué antes de firmar nada (la `023` depende de esto).");
+  } else {
+    console.log(`   intersección: ${inter.length} ${inter.length === 0 ? "✓ (∅, el dedup funciona)" : "✖ HAY SOLAPE: " + inter.slice(0, 5)}`);
+  }
 }
 
 // ── El feed: ni un solo ⚠️ SIN GUION (ADR-030) ──────────────────────────────────

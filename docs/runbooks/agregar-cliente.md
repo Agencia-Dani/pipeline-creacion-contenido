@@ -64,26 +64,53 @@ nada y **igual pagaría** las llamadas de la corrida. Prenderla es el **paso 5**
 
 ## 2. Dar de alta a las personas
 
-**Desde el cockpit: `/<empresa>/<pipeline>/ajustes/equipo` → Invitar.** El mail, el rol, y listo.
+**Desde el cockpit: `/<empresa>/<pipeline>/ajustes/equipo` → Invitar.** El formulario pide **tres**
+cosas —**nombre, mail y rol**— y el nombre es obligatorio (mínimo 2 caracteres): sin él la Server
+Action rechaza el alta.
 
 🔑 **La empresa no se elige en el formulario: sale del cockpit abierto.** Es lo que mata el modo de
 falla mudo que nombraba [ADR-051](../adr/ADR-051-el-acceso-es-membresia-explicita.md) — una membresía
 con la empresa equivocada metía a alguien en el cockpit de otro cliente **sin un solo error**. Acá no
 hay dónde equivocarse.
 
-**Roles:** `operador` (opera y califica) · `sponsor` (solo Entender, sin costos) · `dev` (todo,
-**incluidos los costos de proveedor**). Nadie otorga un rol que no tiene, y eso lo hace la Server
-Action, no el `<select>`.
+⚠️ **Y el corolario que sí se puede leer mal: la membresía es por EMPRESA, no por pipeline.** Invitar
+desde `/retia/reels/ajustes/equipo` da acceso a **todos** los cockpits de Retia, LinkedIn incluido. No
+hay forma de dar acceso a un pipeline y no a otro — y eso es ADR-051, no un olvido.
+
+**Roles:** `operador` (opera, califica, transcribe, y ve Entender **sin costos**) · `sponsor`
+(**Entender + Ajustes**, sin costos, **y es el único rol del cliente que puede administrar su propio
+equipo**) · `dev` (todo, **incluidos los costos de proveedor**).
+
+🩸 **`sponsor` NO es "solo Entender", y esa línea vieja escondía la decisión más importante del paso:**
+desde ADR-060 la zona `ajustes` la ven los tres roles y lo que se gatea son sus pantallas —
+`ajustes/equipo` la administran **`dev` y `sponsor`** (`domain/permisos.ts`). **El `sponsor` es el rol
+que se le da al jefe del cliente** si querés que se dé de alta a su gente solo.
 
 ⚠️ **`dev` no se le da a nadie de la empresa cliente:** ese rol ve lo que cuestan los proveedores, o
-sea el margen de la agencia.
+sea el margen de la agencia. **Y no depende de tu disciplina:** `rolesQuePuedeOtorgar` solo ofrece
+`dev` a quien tenga `es_dueno`, así que un `sponsor` del cliente **no puede** otorgarlo ni forzando el
+POST. Nadie otorga un rol que no tiene, y eso lo decide la Server Action, no el `<select>`.
 
-> 🚧 **VERIFICAR CUANDO A5 ESTÉ EN PROD.** Este paso está escrito asumiendo la pantalla de equipo del
-> **Carril A (tareas A1–A6)**, que al 2026-08-06 **todavía no está deployada**. Hasta que lo esté, el
-> alta son los **3 pasos manuales de ADR-051**: `auth.admin.inviteUserByEmail` → `insert app.usuarios`
-> → `insert app.usuarios_clientes`. **Cuando A5 entre, hay que hacer un alta real por la pantalla y
-> corregir acá lo que no coincida** — que es justamente lo que F5 pide de una guía: que se arregle con
-> lo aprendido.
+📬 **Si la persona YA tiene cuenta, no le llega ningún mail.** `darDeAlta` detecta el mail existente,
+le suma la membresía nueva y la pantalla lo dice (*"ya tenía cuenta: se le dio acceso a esta empresa,
+sin mail nuevo"*). Al agregar una empresa esto es el caso **normal**, no el borde: la gente que ya
+trabaja en otra empresa del sistema entra directo, y esperar un mail que no va a llegar es la forma
+más fácil de creer que el alta falló.
+
+> 🚧 **LO VERIFICADO Y LO QUE FALTA (2026-08-06).** Todo lo de arriba está contrastado contra el código
+> de A5 en `main` (`lib/equipo.ts`, `ajustes/equipo/actions.ts`, `domain/permisos.ts`) y contra prod.
+> **Lo que NADIE hizo todavía es el alta real por la pantalla**: eso pide una sesión con magic link y
+> es de [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md). Hasta ese clic, lo único sin
+> confirmar de este paso es **que el mail de invitación llegue**.
+>
+> 🩸 **Y una cosa que este runbook daba por sentada y prod desmiente: hoy ninguna empresa cliente puede
+> darse de alta a sí misma.** Medido el 06/08 sobre `app.usuarios_clientes`: **cero `sponsor` en las
+> tres empresas**, y los únicos 2 que administran equipo son los devs de la agencia (los dos
+> `es_dueno`, en `retia`). `30x` y `estadox` tienen **una sola persona cada una, `operador`** — un
+> `operador` que entre a `/…/ajustes/equipo` a mano sale rebotado al índice de Ajustes.
+> **Consecuencia práctica: este paso lo hace la agencia**, entrando a cualquier cockpit por
+> `es_dueno` (que `rolEn` resuelve como `dev`). Si querés que el cliente se administre solo, el alta
+> tiene que incluir **un `sponsor`**, y hoy eso es una decisión que nadie tomó.
 
 ## 3. Cargar la config, desde el cockpit
 

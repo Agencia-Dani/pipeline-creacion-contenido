@@ -963,12 +963,58 @@ pantalla tocaba esas tablas, pero el orden es **migración primero, pantalla en 
 
 **Hecho cuando.** El check #1 de la `021` corrido **contra prod con la `020` aplicada** da cero
 filas ✅ **(06/08)**, y una pantalla de LinkedIn con una fila sembrada la muestra a quien corresponde
-y no a otros ⬜ **(es lo único que falta: la tarea B3; las 4 tablas `*_linkedin` tienen 0 filas
-al 06/08, así que la prueba todavía no se puede leer)**.
-🔑 El par que prueba las dos mitades ya se puede armar: sembrar un referente en la instancia de
-**30X** y mirarlo con la cuenta que alcanza **30X y EstadoX** (existe desde el 05/08). Tiene que
-verse en el cockpit de 30X y **no** en el de EstadoX — RLS deja pasar lo propio, `scoped.ts` acota al
-cockpit abierto.
+y no a otros ✅ **a nivel query (06/08)** · ⬜ **falta el clic**.
+
+### ✅ B3 — la prueba con filas, corrida el 2026-08-06
+
+**Se sembraron las dos filas** (una por empresa, que es lo que distingue *"RLS filtra"* de *"hay una
+sola fila y punto"*) y se corrieron las dos capas con **sesiones reales** (`set local role
+authenticated` + `request.jwt.claim.sub`), que es lo único que las ejercita de verdad:
+
+| Sesión | `instancias_visibles()` | Ve en `referentes_linkedin` | Qué prueba |
+|---|:-:|:-:|---|
+| `service_role` (total) | — | **2** | El denominador: hay una fila de cada lado |
+| **Alejandro 30X** (`30x`+`estadox`, **no** dueño) | 2 | **2** | RLS deja pasar **lo suyo**, las dos empresas |
+| **Majo Duarte** (`retia`, operador) | 2 | **0** | 🔴 **El discriminante.** Mismas 2 filas en la tabla, y no ve ninguna ⇒ la policy **filtra**, no está inerte |
+| **Manuel Mejía** (`es_dueno`) | 4 | **2** | El control: indistinguible de RLS apagado, **por diseño** |
+
+**Y las dos capas compuestas, tal como las corre la pantalla** (la sesión de Alejandro + el
+`.eq("instance_id", …)` que agrega `scoped()`):
+
+| | Filas |
+|---|:-:|
+| solo Capa 2 (RLS, sin filtro de cockpit) | **2** |
+| cockpit **`/30x/linkedin`** | **1** |
+| cockpit **`/estadox/linkedin`** | **1** |
+| cockpit **`/retia/linkedin`** (empresa ajena) | **0** |
+
+**Es el `1 y 1` de la matriz**, y el `2` de la primera fila es lo que lo hace legible: sin el filtro
+de Capa 1 son dos, así que el 1 **no** es "hay una sola fila". Las dos mitades andan.
+
+✅ **Y la escritura, que ninguna lectura ejercita** (los `grant insert/update/delete` del `§1` de la
+`024`, nuevos: la `021` había dado el `select` a todo el schema pero su lista de escritura no incluía
+las `*_linkedin`). Con la sesión de Alejandro, en transacciones revertidas:
+
+- `insert` en **su** instancia (`30x`) → **pasa**.
+- `insert` en la instancia de **otra empresa** (`retia/linkedin`) → **`42501 new row violates
+  row-level security policy`**. El `with check` cierra.
+
+🩸 **Un modo de falla que esto destapó, y que no es de LinkedIn sino de RLS en general:** el `update`
+y el `delete` cruzados **no dan `42501`, dan cero filas en silencio.** Majo corriendo
+`update … where consulta like 'prueba rls%'` sobre las dos filas afecta **0**, sin un solo error.
+La asimetría es de Postgres —`with check` valida la fila que *entra*, y `using` simplemente no ve las
+que no son tuyas— y significa que **una pantalla que no mire el conteo de afectadas dice "guardado"
+sobre algo que no se guardó.** Acá está cubierto y a propósito: `lib/referentes-linkedin.ts` hace
+`.select("id")` en el `update` y en el `delete` y tira si vuelven 0 filas
+(*"Ese referente ya no existe"*). **Es un invariante que cada tabla nueva tiene que repetir**, y el
+único lugar donde está escrito hasta ahora es ese archivo.
+
+⬜ **Lo que queda es el clic**, y es de [`verificaciones-humanas.md`](../verificaciones-humanas.md):
+abrir `/30x/linkedin/curar/referentes` y `/estadox/linkedin/curar/referentes` con la cuenta de doble
+membresía (incógnito) y ver **1 y 1** en la pantalla, más un alta desde el botón. La query ya está
+probada; lo que el clic agrega es que la pantalla dibuje lo que la query devuelve.
+🚮 **Las dos filas quedaron sembradas a propósito, para que ese clic se pueda hacer.** Se limpian con
+`delete from app.referentes_linkedin where consulta like 'prueba rls%';`
 
 ---
 
@@ -1355,11 +1401,11 @@ pantallas ahora es superficie para datos que no existen.*
 
 | # | Qué | Estado |
 |---|---|---|
-| **B1** | El gate de la `023` | ⏳ espera corridas del fin de semana |
+| **B1** | El gate de la `023` | ⏳ espera corridas del fin de semana — **remedido el 06/08: sigue igual** |
 | **B2** | Check #1 de la `021` contra PROD | ✅ **CERO FILAS el 06/08** — y no dependía de A1 |
-| **B3** | La prueba de §14.6 con filas | ⬜ escrita paso a paso en el handoff |
+| **B3** | La prueba de §14.6 con filas | ✅ **CORRIDA el 06/08: `1 y 1`**, y la escritura cruzada da `42501`. Falta el clic |
 | **B4** | `docs/runbooks/` + `core/templates/` | ✅ **ESCRITO el 06/08.** F5 da **partido**: empresa 🟢 pasa · pipeline 🔴 no. El paso de alta se verifica cuando A5 esté en prod |
-| **B5** | Las verificaciones de ojo humano | ✅ **HECHO el 06/08** — [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 10 items. Y 4 de los 9 números esperados estaban mal |
+| **B5** | Las verificaciones de ojo humano | ✅ **HECHO el 06/08** — [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 11 items. Y 4 de los 9 números esperados estaban mal |
 | **B6** | Deuda de docs medida | ✅ **HECHO el 06/08** — 21 links rotos, no 4; y la lista era más larga |
 
 **B1 — el único bloqueante numerado del repo.** Depende del calendario, no del trabajo: archivado
@@ -1383,10 +1429,20 @@ la `019` dropeó `client_id`. La `025` arregla *"la policy es demasiado angosta"
 **La tabla con la medición está en §14.6.** Correrlo otra vez después de la `025` sigue valiendo, como
 red barata; como puerta, no.
 
-**B3 — §14.6 con filas.** Escrita paso a paso en el handoff, con los dos `instance_id`, la cuenta de
-doble membresía y la matriz de interpretación (**1 y 1** anda · **2 y 2** Capa 1 rota · **0 y 0**
-policy que no matchea o grant que falta · **`42501`** falta un grant). No sirve con una cuenta
-`es_dueno`. Termina con un alta desde el botón: lo único que ejercita los `grant insert/update/delete`.
+**B3 — ✅ CORRIDA el 2026-08-06, y da `1 y 1`.** Las dos filas están sembradas y las dos capas se
+ejercitaron con **sesiones reales** contra prod: Alejandro (2 empresas, no dueño) ve **2** sin el
+filtro de cockpit y **1 en cada uno**; Majo (retia) ve **0** de las mismas 2 filas, que es el
+discriminante que prueba que la policy no está inerte; el dueño ve 2, indistinguible, por diseño. La
+escritura cruzada muere con **`42501`**. **La tabla completa está en §14.6.**
+
+🩸 **Y destapó un modo de falla que no es de LinkedIn:** `update`/`delete` cruzados **no dan `42501`,
+dan 0 filas en silencio** — una pantalla que no mire el conteo de afectadas dice *"guardado"* sobre
+algo que no se guardó. Está cubierto en `lib/referentes-linkedin.ts` (`.select("id")` + tirar si
+vuelve vacío) y es un invariante que cada tabla nueva tiene que repetir.
+
+⬜ **Lo único que falta es el clic** (la pantalla dibujando lo que la query ya devuelve) y el alta
+desde el botón. Necesita la cuenta de doble membresía, que es de una persona real: es de
+`verificaciones-humanas.md`, no de un agente.
 
 **B4 — ✅ ESCRITO el 2026-08-06, y el criterio de F5 dio partido.** Están
 [`agregar-cliente.md`](../runbooks/agregar-cliente.md), [`agregar-workflow.md`](../runbooks/agregar-workflow.md)
@@ -1413,14 +1469,31 @@ por pipeline que rinda la tabla, el formulario y la entrada de `scoped.ts` desde
 escriben tres veces por pantalla). **Es un proyecto, no un refactor**, y se decide con dos pipelines
 reales encima, no con uno.
 
-🔗 **La dependencia con el Carril A quedó marcada, no resuelta:** el paso *"dar de alta a las
-personas"* está escrito **asumiendo la pantalla de A5** (`ajustes/equipo`), con un bloque
-`🚧 VERIFICAR CUANDO A5 ESTÉ EN PROD` que dice qué hacer mientras tanto (los 3 pasos manuales de
-ADR-051). **Cuando A5 entre hay que dar un alta real por la pantalla y corregir lo que no coincida** —
-que es exactamente lo que F5 pide de una guía.
+🔗 **La dependencia con el Carril A se resolvió el 2026-08-06, y el paso 2 cambió en cinco cosas.**
+Con A5 en producción, el bloque `🚧 VERIFICAR CUANDO A5 ESTÉ EN PROD` se reemplazó por lo contrastado
+contra el código de A5 en `main` y contra prod. Lo que decía mal:
+
+| Decía | Es |
+|---|---|
+| *"El mail, el rol, y listo"* | El formulario pide **tres** campos: **nombre** (obligatorio, mín. 2), mail y rol |
+| *"`sponsor` (solo Entender, sin costos)"* | 🩸 `sponsor` ve **Entender + Ajustes**, y es **el único rol del cliente que administra su propio equipo** (ADR-060). Es el rol del jefe del cliente, y la línea vieja escondía la decisión más importante del paso |
+| *"`dev` no se le da a nadie de la empresa cliente"* (regla de disciplina) | Además **está impuesto**: `rolesQuePuedeOtorgar` solo ofrece `dev` a un `es_dueno`, así que un `sponsor` del cliente no puede otorgarlo **ni forzando el POST** |
+| *(nada sobre el mail)* | 📬 **Si la persona ya tiene cuenta, NO le llega mail.** Al agregar una empresa ese es el caso **normal** — esperar un mail que no llega es la forma fácil de creer que el alta falló |
+| *(nada sobre el alcance)* | ⚠️ La membresía es **por empresa, no por pipeline**: invitar desde `/retia/reels/…` da acceso también a `/retia/linkedin`. No hay forma de dar uno y no el otro |
+
+🩸 **Y lo que el runbook daba por sentado y prod desmiente: hoy ninguna empresa cliente puede darse de
+alta a sí misma.** Medido sobre `app.usuarios_clientes`: **cero `sponsor` en las tres empresas**, y
+los únicos 2 que administran equipo son los devs de la agencia (ambos `es_dueno`, en `retia`). `30x` y
+`estadox` tienen **una persona cada una, `operador`** — y un `operador` que entre a `/…/ajustes/equipo`
+sale rebotado. **El paso 2 lo hace la agencia**, entrando por `es_dueno` (que `rolEn` resuelve como
+`dev`). *Que el cliente se administre solo no está roto: está sin usar, porque nadie nombró un
+`sponsor`.*
+
+⬜ **Lo único que queda del paso 2 es el alta real**, que necesita que llegue un mail: es el
+[item 11](../verificaciones-humanas.md) del checklist humano.
 
 **B5 — ✅ HECHO el 2026-08-06: [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md).**
-Los 10 items con quién los hace, cuánto tarda y **qué significa si falla** — los arrastres del handoff
+Los 11 items con quién los hace, cuánto tarda y **qué significa si falla** — los arrastres del handoff
 (el clic al CSV, el feed paginado, el tab Entender de un operador), el gate de costos del Carril 0, y
 del ROADMAP **V2 · V4 · V5 · V6 · D3**. Los ejecutan Mani y el equipo; el carril solo los dejó escritos.
 

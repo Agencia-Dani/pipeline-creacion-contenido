@@ -117,3 +117,9 @@ alter table app.transcripciones drop column pedido_por;
 -- Tiene que decir **`intersección: 0 ✓ (∅, el dedup funciona)`** y contar los `processed_items`
 -- **por `run_id`**, no por la ventana de `primera_vez`. Si cae a la ventana, la memoria de esa
 -- corrida no se escribió y hay que mirar por qué antes de dejar pasar otro lunes.
+--
+-- ✅ **Desde el 2026-08-06 esto ya no depende de que quien firme se acuerde de mirarlo.** El script
+-- distingue el ∅ del dedup del ∅ de una tabla vacía: si alguna de las dos corridas no dejó ninguna
+-- fila, imprime **`⛔ NO CUENTA`** en vez del ✓. Era el agujero exacto de este gate — el modo de
+-- falla es `PGRST204` tragado por `onError: continue`, o sea motor en verde y sin memoria, que es
+-- indistinguible de un dedup perfecto si solo se lee el número.

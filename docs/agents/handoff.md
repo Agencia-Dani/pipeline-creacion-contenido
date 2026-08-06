@@ -116,19 +116,80 @@
 > ⚠️ **La `025` ya está aplicada, así que el orden que no se podía invertir está respetado**: la
 > pantalla se puede deployar cuando quieras, no va a caer en `42501` ni en cero filas.
 
-> ## 🅱️ CARRIL B (2026-08-06, rama `carril-b-cierres`) — B2, B4, B5 y B6 cerradas. B1 y B3 esperan.
+> ## 🅱️ CARRIL B (2026-08-06, rama `carril-b-cierres`) — **5 de 6. Solo B1 sigue abierta, y es calendario.**
 >
-> **4 de 6 hechas.** Todo medido contra prod (PostgREST + SQL) y contra n8n por su API; nada de
+> Todo medido contra prod (PostgREST + SQL con sesiones reales) y contra n8n por su API; nada de
 > memoria. **No se tocó `apps/dashboard/`, ni `domain/pipelines.ts`, ni se creó ninguna migración.**
 >
 > | | Estado |
 > |---|---|
 > | **B2** · check #1 contra prod | ✅ **CERO FILAS.** Y **no dependía de A1** — ver abajo |
-> | **B4** · runbooks + `core/templates/` | ✅ El criterio de F5 da **partido**: empresa 🟢, pipeline 🔴 |
-> | **B5** · checklist de ojo humano | ✅ [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 10 items |
+> | **B3** · §14.6 con filas | ✅ **CORRIDA el 06/08: `1 y 1`**, con el `2` al lado que la hace legible. La escritura cruzada muere con `42501`. **Falta el clic** (item 10 del checklist humano) |
+> | **B4** · runbooks + `core/templates/` | ✅ El criterio de F5 da **partido**: empresa 🟢, pipeline 🔴. **Y el paso 2 se corrigió contra A5 en prod: decía 5 cosas mal** |
+> | **B5** · checklist de ojo humano | ✅ [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), **11 items** |
 > | **B6** · deuda de docs | ✅ Eran **21 links rotos**, no 4, y la lista era más larga |
-> | **B1** · gate de la `023` | ⏳ **Sigue bloqueado, confirmado midiendo**: el último run del **motor** es del **2026-08-03** (el del 04/08 21:12 era el archivado). Ninguna corrida ejerció el código nuevo. Archivado domingo 18:00, motor lunes 08:00 |
-> | **B3** · §14.6 con filas | ⬜ Las 4 tablas `*_linkedin` siguen en **0 filas**. La siembra es un solo `insert` (está en el bloque `🔬 #6` de abajo) y **no se corrió**: escribe en prod y el paso 2 necesita un browser con la cuenta de doble membresía |
+> | **B1** · gate de la `023` | ⏳ **Bloqueado por calendario, remedido el 06/08 a las 15:39**: el último run del **motor** sigue siendo el del **2026-08-03** (el del 04/08 21:12 era el archivado). Archivado domingo 18:00, motor lunes 08:00. **Lo que sí se hizo: que la verificación del lunes no pueda mentir** — ver abajo |
+>
+> ### ✅ B3 cerrada sin browser, y el discriminante es lo que la hace valer
+>
+> Se sembraron las 2 filas (una por empresa) y se corrieron **las dos capas con sesiones reales**
+> (`set local role authenticated` + `request.jwt.claim.sub`), que es lo único que las ejercita:
+>
+> | Sesión | ve en `referentes_linkedin` | |
+> |---|:-:|---|
+> | `service_role` | **2** | el denominador |
+> | **Alejandro 30X** (`30x`+`estadox`, no dueño) | **2** | RLS deja pasar lo suyo |
+> | **Majo** (`retia`) | **0** | 🔴 **el discriminante**: mismas 2 filas, no ve ninguna ⇒ la policy **filtra** |
+> | **Manuel** (`es_dueno`) | **2** | control: indistinguible de RLS apagado, por diseño |
+>
+> Y las dos capas compuestas como las corre la pantalla (sesión de Alejandro + el `.eq("instance_id")`
+> de `scoped()`): **`/30x/linkedin` → 1 · `/estadox/linkedin` → 1 · `/retia/linkedin` → 0**, contra
+> **2** sin el filtro de cockpit. **Es el `1 y 1`**, y el 2 de al lado prueba que el 1 no es *"hay una
+> sola fila"*. El `insert` en instancia ajena muere con **`42501`**.
+>
+> 🩸 **Y destapó un modo de falla que no es de LinkedIn: `update`/`delete` cruzados no dan `42501`,
+> dan 0 filas en silencio.** `with check` valida la fila que entra; `using` simplemente no ve las
+> ajenas. Una pantalla que no mire el conteo de afectadas dice *"guardado"* sobre algo que no se
+> guardó. `lib/referentes-linkedin.ts` ya lo cubre (`.select("id")` y tira si vuelve vacío) y **es un
+> invariante que cada tabla nueva tiene que repetir** — hoy está escrito en un solo archivo.
+>
+> ⚠️ **Las 2 filas quedaron sembradas a propósito**, para que el clic se pueda hacer. Limpieza:
+> `delete from app.referentes_linkedin where consulta like 'prueba rls%';`
+>
+> 🚫 **Por qué no hice el clic yo:** la cuenta de doble membresía es `alejandro.davila@30x.com`, una
+> persona real. Generarle un magic link y entrar como él es suplantarlo, y eso no lo hace un agente
+> aunque tenga la `service_role` para hacerlo.
+>
+> ### ✅ B1 no se puede cerrar, pero su verificación ya no puede mentir
+>
+> `verificar-corrida.mjs` imprimía **`intersección: 0 ✓ (∅, el dedup funciona)`** también cuando las
+> dos corridas no habían escrito **ninguna** fila — o sea que el ∅ de un dedup perfecto y el ∅ de una
+> tabla vacía se leían igual. **Y ese es exactamente el modo de falla que este gate existe para
+> cazar**: `PGRST204` tragado por el `onError: continue`, motor cerrando en verde sin memoria. Ahora,
+> si alguna de las dos corridas viene vacía, dice **`⛔ NO CUENTA`**. Probado por los dos lados: no
+> dispara contra los datos reales (121 y 10 filas, por `run_id`, ✓) y dispara con una corrida forzada
+> a vacío.
+>
+> ✅ **Y el live no se movió**: `n8n:diff` verde en los 5, así que la mitad de escritura de la `023`
+> sigue puesta y la corrida del lunes vale.
+>
+> ### 🩸 B4 — el paso 2 del runbook decía 5 cosas mal, y una escondía una decisión
+>
+> Con A5 en prod se contrastó *"dar de alta a las personas"* contra el código y contra la base:
+>
+> | Decía | Es |
+> |---|---|
+> | *"El mail, el rol, y listo"* | Son **tres** campos: **nombre** (obligatorio), mail y rol |
+> | *"`sponsor` (solo Entender)"* | 🩸 Ve **Entender + Ajustes**, y es **el único rol del cliente que administra su propio equipo**. Es el rol del jefe del cliente, y la línea vieja escondía eso |
+> | *"a `dev` no se le da…"* (disciplina) | Además **está impuesto**: solo un `es_dueno` puede otorgarlo, ni forzando el POST |
+> | *(nada)* | 📬 **Si ya tiene cuenta, NO llega mail.** Al agregar una empresa ese es el caso normal |
+> | *(nada)* | La membresía es **por empresa, no por pipeline** |
+>
+> 🩸 **Y el hallazgo que ningún doc tenía: hoy ninguna empresa cliente puede darse de alta a sí misma.**
+> **Cero `sponsor`** en las 3 empresas; los únicos 2 que administran equipo son los devs de la agencia
+> (ambos `es_dueno`, en `retia`). `30x` y `estadox` tienen **una persona cada una, `operador`**, y un
+> `operador` que entre a `/…/ajustes/equipo` sale rebotado. **El alta la hace la agencia.** Que el
+> cliente se administre solo no está roto: está **sin usar**, porque nadie nombró un `sponsor`.
 >
 > ### 🛑 Decisión de Mani (06/08): el `workflow.json` de LinkedIn NO se construye todavía
 >
@@ -227,8 +288,9 @@
 > | 4 | 🟡 Que el tab **Entender** aparezca en el nav de un **operador** (`b8a3832`) | Jero o Alejo | ⬜ se ve solo, en su próximo login. La lógica tiene tests; falta el ojo. *No se probó desde una sesión de agente a propósito: habría requerido generar un magic link de la cuenta de otra persona* |
 > | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
 > | 5 | 🟡 Recorrer el **feed paginado** en `/curar/feed` (cierre 98) | Majo, Jero o Alejo | ⬜ **nuevo del 06/08**, y se despacha en el mismo login que el #2. Mirar tres cosas: que **Cargar más** traiga 25 sin repetir ni saltear, que los **chips digan el total real** (165, no 25) y que **abrir una tarjeta** traiga el guion. Calificar y después cargar más es el caso que el keyset existe para cubrir |
-> | 6 | 🔬 **La prueba que cierra §14.6**: RLS de LinkedIn con datos reales | quien tenga la cuenta de 2 empresas | ⬜ **nuevo del 06/08.** La `024` ya está aplicada y verificada; falta ejercitarla con filas. **El detalle completo está abajo, en su propio bloque** |
-> | 7 | 🔴 El **check #1 de la `021` contra PROD** | Mani o Alejo | ⬜ *"¿queda alguna tabla con tenant, RLS y sin policy?"* — **nunca se corrió contra la base real.** La única vez fue en Docker sobre `001→018`+`021`, **sin la `020` en el medio**, y por eso dio limpio con el agujero de LinkedIn adentro. El SQL está al pie de [`024`](../../core/schema/024_rls_linkedin.sql). Tiene que dar **cero filas** |
+> | 6 | 🔬 **La prueba que cierra §14.6**: RLS de LinkedIn con datos reales | quien tenga la cuenta de 2 empresas | 🟡 **La mitad de query está CERRADA el 06/08: `1 y 1`, y `42501` en la escritura cruzada** (tabla completa en el bloque 🅱️ y en §14.6). **Queda el clic, y las 2 filas ya están sembradas esperándolo** |
+> | 7 | 🔴 El **check #1 de la `021` contra PROD** | Mani o Alejo | ✅ **HECHO el 06/08: CERO FILAS**, sobre el corpus completo (con la `020` y la `024` aplicadas). No queda ninguna tabla con columna de tenant, RLS activado y cero policies |
+> | 8 | 🔴 **Un alta real por `ajustes/equipo`** | Mani (o cualquier `es_dueno`) | ⬜ **nuevo del 06/08**, y es lo único que le falta a B4. Todo el resto del runbook está contrastado contra el código y contra prod; **lo que ningún agente puede confirmar es que salga el mail.** Necesita un mail que no esté en el sistema (un alias sirve). Pasos en [`verificaciones-humanas.md` §11](../verificaciones-humanas.md) |
 >
 > ⚠️ **Y el flip se hizo DOS VECES el mismo día, por dos sesiones que no se vieron** (`d8edea2` y una
 > rama paralela, `capa-2-flip-scoped`, descartada). Las dos llegaron al mismo diseño: mismo campo
@@ -284,50 +346,24 @@
 >
 > </details>
 >
-> ### 🔬 #6 — La prueba que cierra §14.6 (escrita para ejecutarla sin releer nada)
+> ### ✅ 🔬 #6 — CORRIDA el 2026-08-06. Las dos filas están sembradas; queda el clic.
 >
-> La [`024`](../../core/schema/024_rls_linkedin.sql) **ya está aplicada y verificada por su efecto**
-> (4 policies, grano instancia). Lo que falta es ejercitarla **con filas**, que es lo que §14.6 pone
-> como *hecho cuando*: hasta que una fila real pase por ahí, lo único probado es que las policies
-> existen — no que filtran.
+> **Los pasos 1 y 2 se hicieron** (siembra + las dos capas medidas con sesiones reales) y dan
+> **`1 y 1`**. La tabla con las 4 sesiones y el resultado de la escritura cruzada está arriba, en el
+> bloque **🅱️ CARRIL B**, y completa en
+> [plan-multi-tenant §14.6](./plan-multi-tenant.md) — **no se duplica acá: un hecho, un dueño.**
 >
-> **Paso 1 — sembrar UNA fila en CADA empresa.** No alcanza con una sola: con una fila en la tabla,
-> ver 1 en 30X **no distingue** *"RLS funciona"* de *"hay una sola fila y punto"*. Con una de cada
-> lado el resultado correcto es **1 y 1**, y el incorrecto (**2 y 2**) salta a la vista.
+> | empresa | `instance_id` de su cockpit de LinkedIn | fila sembrada |
+> |---|---|---|
+> | **30X** | `f35d0282-2511-4905-b407-2ab338bc2336` | `prueba rls 30x` |
+> | **EstadoX** | `f7baff77-8211-43f7-a64c-aed9e7a3e860` | `prueba rls estadox` |
 >
-> ```sql
-> insert into app.referentes_linkedin (instance_id, fuente, consulta, idioma, notas) values
->   ('f35d0282-2511-4905-b407-2ab338bc2336', 'pinterest', 'prueba rls 30x',     'en', 'sembrado 06/08 para §14.6 — borrable'),
->   ('f7baff77-8211-43f7-a64c-aed9e7a3e860', 'pinterest', 'prueba rls estadox', 'en', 'sembrado 06/08 para §14.6 — borrable');
-> ```
+> ⬜ **Lo único que falta es mirarlo en la pantalla** (`/30x/linkedin/curar/referentes` y
+> `/estadox/linkedin/curar/referentes`, incógnito, con `a6464e1d-…`) y **agregar uno desde el botón**,
+> que es lo único que ejercita los `grant insert` *por el camino de la app*. Los pasos exactos y qué
+> significa cada resultado están en [`verificaciones-humanas.md` §10](../verificaciones-humanas.md).
 >
-> | empresa | `instance_id` de su cockpit de LinkedIn |
-> |---|---|
-> | **30X** | `f35d0282-2511-4905-b407-2ab338bc2336` |
-> | **EstadoX** | `f7baff77-8211-43f7-a64c-aed9e7a3e860` |
->
-> **Paso 2 — mirarlas con la cuenta que alcanza las DOS empresas** (`a6464e1d-…`, la membresía doble
-> del 05/08; en ventana de incógnito, si no el magic link cae sobre otra sesión):
-> `/30x/linkedin/curar/referentes` y `/estadox/linkedin/curar/referentes`.
-> **Cada cockpit tiene que mostrar SOLO el suyo.**
->
-> 🔑 **Qué prueba cada resultado**, que es el punto de hacerlo así:
->
-> | Lo que ves | Qué significa |
-> |---|---|
-> | **1 y 1** | ✅ Las dos mitades andan: RLS deja pasar lo del usuario **y** `scoped.ts` lo acota al cockpit abierto |
-> | **2 y 2** | 🩸 RLS anda (alcanza sus dos empresas) pero **el filtro de Capa 1 se rompió** — es el escenario que ADR-047 §Capa 1 existe para evitar |
-> | **0 y 0** | 🩸 Al revés: una policy que no matchea, o un `grant` que falta. Fallo silencioso, la familia de la `015` |
-> | **`42501` en pantalla** | El fallo *ruidoso*: falta un grant. Se arregla con SQL, **sin revertir el deploy** |
->
-> ⚠️ **No sirve con una cuenta `es_dueno`**: `app.clientes_visibles()` le devuelve todas las empresas,
-> así que su resultado es indistinguible del de RLS apagado. **Por diseño.**
->
-> **Paso 3 — agregar uno desde el botón.** Es lo **único** que ejercita los `grant insert/update/delete`
-> del `§1` de la `024`; ninguna lectura los toca. Esos grants son nuevos: la `021` había dado el
-> `select` a todo el schema, pero su lista de escritura no incluía las `*_linkedin`.
->
-> **Limpieza:** `delete from app.referentes_linkedin where consulta like 'prueba rls%';`
+> **Limpieza, después del clic:** `delete from app.referentes_linkedin where consulta like 'prueba rls%';`
 >
 > ### 📐 #3 — CERRADO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)
 >

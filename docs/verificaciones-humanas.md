@@ -212,17 +212,56 @@ Calificar · ver el re-rank · bajar el histórico. **El sistema solo sirve si l
 único item de la lista que mide eso. Es también la última condición del *"MVP declarado cuando"* del
 ROADMAP §4: *el equipo de redes usa el sistema un día completo sin ayuda de un dev.*
 
-## 10. 🔬 **La prueba de §14.6 — RLS de LinkedIn con filas**
+## 10. 🔬 **La prueba de §14.6 — RLS de LinkedIn con filas** *(la mitad de query ya está cerrada)*
 
-**Quién:** quien tenga la cuenta con membresía en **30X y EstadoX**.
+**Quién:** quien tenga la cuenta con membresía en **30X y EstadoX** (`alejandro.davila@30x.com`).
+**Cuánto:** 3 minutos. **Las dos filas ya están sembradas en prod**, esperando este clic.
 
-Es la tarea **B3** y está escrita paso a paso, con los dos `instance_id`, el SQL de siembra y la
-matriz de interpretación (**1 y 1** anda · **2 y 2** Capa 1 rota · **0 y 0** policy que no matchea ·
-**`42501`** falta un grant), en el bloque `🔬 #6` del
-[handoff](./agents/handoff.md). **No se duplica acá:** un hecho, un dueño.
+✅ **Lo que ya NO hay que hacer, porque se midió el 06/08 con sesiones reales contra prod** (la tabla
+completa en [plan-multi-tenant §14.6](./agents/plan-multi-tenant.md)): la query de las dos capas
+compuestas devuelve **1 y 1**, y **2** sin el filtro de cockpit — o sea que el 1 no es *"hay una sola
+fila"*. Una cuenta de Retia ve **0** de esas mismas 2 filas, y el `insert` cruzado muere con `42501`.
+
+⬜ **Lo que falta es exactamente esto, y nada más:**
+
+1. En **incógnito** (si no, el magic link cae sobre otra sesión), abrí
+   `/30x/linkedin/curar/referentes` → tiene que verse **`prueba rls 30x`, y sola**.
+2. `/estadox/linkedin/curar/referentes` → **`prueba rls estadox`, y sola**.
+3. **Agregá uno desde el botón.** Es lo único que ejercita los `grant insert` de la `024` *por el
+   camino de la app*; la lectura no los toca.
+
+**Si ves 2 en cada pantalla**, la Capa 1 se rompió entre la query y el render (la query ya se probó y
+da 1). **Si ves 0**, mirá la consola: la query anda, así que el problema está en la pantalla.
+
+🚮 **Limpieza, cuando termines:** `delete from app.referentes_linkedin where consulta like 'prueba rls%';`
 
 ⚠️ **No sirve con una cuenta `es_dueno`**: `app.clientes_visibles()` le devuelve todas las empresas,
 así que su resultado es indistinguible del de RLS apagado. Por diseño.
+
+---
+
+## 11. 🔴 **Un alta real por la pantalla de equipo** *(nuevo del 06/08 — cierra B4)*
+
+**Quién:** Mani (o cualquier `es_dueno`). **Cuánto:** 5 minutos, y **hace falta un mail que no esté
+en el sistema** (un alias tuyo sirve: `manuel.mejia+prueba@30x.com`).
+
+Es el único paso de [`agregar-cliente.md`](./runbooks/agregar-cliente.md) que quedó sin ejercitar. Lo
+demás del runbook está contrastado contra el código y contra prod; **lo que ningún agente puede
+confirmar es que el mail salga.**
+
+1. `/retia/reels/ajustes/equipo` → **Invitar**. Pedí **nombre, mail y rol** (los tres; el nombre es
+   obligatorio). Rol: `operador`.
+2. **Que llegue el mail** con el magic link, y que al entrar caiga en el cockpit de Retia.
+3. Que aparezca **en la lista de Retia y no en la de 30X**.
+4. **El techo:** que el `<select>` te ofrezca `dev` (sos `es_dueno`). Si algún día lo prueba un
+   `sponsor` del cliente, **no** tiene que ofrecérselo — y tampoco debe pasar forzando el POST.
+5. 🚮 Después: quitale el acceso desde la misma pantalla.
+
+🩸 **Y el hallazgo que este item viene a resolver, medido el 06/08:** hoy **ninguna empresa cliente
+puede darse de alta a sí misma**. Hay **cero `sponsor`** en las tres empresas, y los únicos 2 que
+administran equipo son los devs de la agencia. `30x` y `estadox` tienen **una persona cada una,
+`operador`** — y un `operador` que entre a `/…/ajustes/equipo` sale rebotado. **Si querés que un
+cliente se administre solo, hay que nombrarle un `sponsor`**, y eso es una decisión que nadie tomó.
 
 ---
 
