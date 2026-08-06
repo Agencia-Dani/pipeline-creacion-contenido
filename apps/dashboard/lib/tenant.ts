@@ -12,7 +12,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 // De dónde sale el `TenantContext`. Es el ÚNICO archivo que lee el registro de tenants
 // (`clients`, `instances`, `usuarios_clientes`) sin scopear, y tiene que serlo: scopear la tabla
-// con la que se resuelve el scope sería circular. Por eso no están en el mapa de `scoped.ts`.
+// con la que se resuelve el scope sería circular. Por eso `clients` y `instances` no están en el
+// mapa de `scoped.ts`.
+//
+// ⚠️ **`usuarios_clientes` SÍ entró al mapa el 2026-08-06** (ADR-060), y esta línea decía lo
+// contrario. No se contradicen: la tabla contesta dos preguntas distintas. Acá es el **registro**
+// —*"¿qué empresas alcanzo?"*, la que decide el scope— y va con admin. En `lib/equipo.ts` es un
+// **dato** —*"¿quiénes entran a esta empresa?"*— y va scopeada, con la sesión y con las policies de
+// la `025` evaluándose. Que la misma tabla aparezca en los dos lados es la forma del problema, no
+// un descuido.
 //
 // Desde ADR-051 el acceso son **membresías**, no un recorrido del árbol: `clients.parent_id` se
 // quedó como linaje (de quién es este cliente) y no lo lee nadie desde acá. Si algún día hace falta

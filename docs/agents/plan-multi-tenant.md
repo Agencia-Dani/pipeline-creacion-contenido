@@ -1108,7 +1108,19 @@ de Supabase y no un atajo:
 está vivo desde el 05/08, así que una pantalla sin policy devuelve cero filas o `42501`. Es la misma
 nota que abre la `024`.
 
-#### A2 · El landmine de `scoped.ts`
+#### A2 · El landmine de `scoped.ts` — ✅ **HECHO el 06/08**
+
+> La entrada de `app.usuarios` **se sacó, no se corrigió**: una persona no pertenece a una empresa,
+> pertenece a una membresía (ADR-051), así que la tabla no tiene ni puede tener columna de tenant.
+> `scoped().select("app.usuarios")` ahora **no compila**. Entró `app.usuarios_clientes` con grano
+> `"cliente"`.
+>
+> 🔎 **Y apareció una contradicción que había que resolver, no ignorar:** `lib/tenant.ts` decía que
+> `usuarios_clientes` **no** está en el mapa *"porque scopear la tabla con la que se decide el scope
+> sería circular"*. Las dos cosas son ciertas — la tabla contesta dos preguntas: como **registro**
+> (*"¿qué empresas alcanzo?"*) va con admin y sin scopear; como **dato** (*"¿quiénes entran a esta
+> empresa?"*) va scopeada y con la sesión. Quedó escrito en los dos archivos, porque el que lea uno
+> solo va a pensar que el otro está mal.
 
 [`scoped.ts:51`](../../apps/dashboard/lib/supabase/scoped.ts) declara
 `"app.usuarios": { grano: "cliente" }` ⇒ filtraría por `client_id`, **columna que la `019` dropeó**
@@ -1121,7 +1133,11 @@ al cockpit abierto— y la entrada mentirosa de `app.usuarios` se corrige. El eq
 `usuarios_clientes` con embedding a `usuarios`: la Capa 1 sigue siendo el `.eq("client_id")` de
 siempre y la Capa 2 filtra el embed.
 
-#### A3 · `domain/permisos.ts`
+#### A3 · `domain/permisos.ts` — ✅ **HECHO el 06/08** (8 tests)
+
+> Un ajuste sobre lo escrito abajo: el corte de `dev` es **`esDueno`**, no `rol === "dev"`. O sea
+> que un `dev` que no sea de la agencia —hoy no existe, mañana puede— **tampoco acuña devs**: el
+> techo no se hereda otorgándoselo a otro. Es una línea y cierra el caso antes de que exista.
 
 Dominio puro, misma disciplina que `roles.ts` y `tenant.ts`: sin IO, `.test.ts` al lado, corre en
 Node sin build.

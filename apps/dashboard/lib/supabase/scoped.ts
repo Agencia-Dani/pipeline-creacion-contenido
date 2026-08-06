@@ -43,12 +43,32 @@ import { createClient } from "@/lib/supabase/server";
 // 🚫 `clients`, `instances` y `workflows` NO están, a propósito: son el registro con el que se
 // RESUELVE el tenant, así que scoparlas sería circular. Las lee `lib/tenant.ts` con el cliente
 // admin, y es el único lugar del código que puede.
+//
+// 🚫 **`app.usuarios` tampoco está, y hasta el 2026-08-06 estaba MINTIENDO.** Declaraba grano
+// `"cliente"` ⇒ `filtrar()` le habría puesto `.eq("client_id", …)`, **una columna que la `019`
+// dropeó** (`019:59`). Nadie lo ejercía porque el único lector es `lib/auth.ts`, que lee la fila
+// propia con `createClient()` directo; la pantalla de equipo habría sido la primera en tocarlo, y
+// el síntoma habría sido un error de PostgREST sobre una columna inexistente.
+//
+// No se corrige el grano: se saca. **Una persona no pertenece a una empresa, pertenece a una
+// membresía** (ADR-051), así que la tabla no tiene ni puede tener columna de tenant. El equipo se
+// lee entrando por `app.usuarios_clientes` —que sí la tiene— con embedding a `usuarios`: la Capa 1
+// filtra el `client_id` de siempre y la Capa 2 (policy de la `025`) filtra el embed. Pedir
+// `scoped().select("app.usuarios")` ahora **no compila**, que es la respuesta correcta.
 
 type Grano = "cliente" | "instancia" | "heredado" | "global";
 
 const TABLAS = {
   // Grano empresa
-  "app.usuarios": { esquema: "app", grano: "cliente" },
+  // `app.usuarios_clientes` es el equipo: quién trabaja en esta empresa y con qué rol (ADR-051).
+  // Entra con grano empresa porque **tiene `client_id`** y filtra exacto al cockpit abierto.
+  //
+  // 🔑 **La misma tabla se lee de dos formas distintas, y no es una inconsistencia.** Acá es un
+  // DATO ("¿quiénes entran a mi empresa?", la pantalla de ADR-060) y se lee scopeada, con la sesión.
+  // En `lib/tenant.ts` es el REGISTRO ("¿qué empresas alcanzo yo?") y se lee con el admin y sin
+  // scopear, porque scopear la tabla con la que se decide el scope es circular. Dos preguntas, dos
+  // autoridades; el que se confunda que lea la nota de allá.
+  "app.usuarios_clientes": { esquema: "app", grano: "cliente" },
   "app.voces": { esquema: "app", grano: "cliente" },
   "app.proyectos": { esquema: "app", grano: "cliente" },
   "app.referentes": { esquema: "app", grano: "cliente" },
