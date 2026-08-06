@@ -1,0 +1,79 @@
+# Manifest — esqueleto de un pipeline nuevo. Cumple core/contracts/workflow-manifest.md (v1).
+#
+# CÓMO SE USA
+#   cp -r core/templates/workflow-nuevo Workflows/workflow-<id>
+#   Reemplazá cada <...>, borrá los comentarios que no apliquen, y corré:
+#   cd core/scripts && npm run validate      ← verde ANTES de escribir una línea de código
+#
+# ⚠️ `id` tiene que ser EXACTAMENTE el sufijo de la carpeta (`Workflows/workflow-<id>`). Lo valida
+#    el contrato, y es lo que ata este archivo con la fila de `workflows` y con `domain/pipelines.ts`.
+#
+# 🔑 Las 8 etapas de `stages` son fijas (PLAN §2.4) y van TODAS: las que tu pipeline no implementa
+#    llevan `n/a`. No es burocracia — es lo que hace comparables dos workflows que no se parecen.
+contract_version: 1
+
+id: <id>                          # kebab-case. Ej: short-form-content, linkedin, substack
+name: "<Nombre visible>"
+description: >
+  <Qué hace de punta a punta, en lenguaje de negocio. Qué entra, qué sale, y quién decide
+  en el medio.>
+engine: n8n                       # n8n | openclaw | script
+status: draft                     # draft | active | paused | inactive | retired
+                                  # 🔑 Pasa a `active` cuando CORRE en n8n, no cuando está escrito.
+                                  #    Cuatro manifests vivieron meses mintiendo en este campo.
+owner: <mani | alejo | dev3>
+
+triggers:
+  # ⚠️ SIN cron acá. Los crons del sistema viven en el dispatcher desde la Fase 4 (ADR-050): un cron
+  #    local no tendría de dónde sacar la instancia y solo produciría corridas que abortan después
+  #    de `Abrir run`, dejando la fila en `en_curso` para siempre.
+  - type: webhook                 # POST con { instancia } en el body, del dispatcher o del botón ▶.
+                                  # Guard single-flight POR INSTANCIA + header auth + path aleatorio.
+  - type: manual                  # "Execute Workflow" para probar.
+
+inputs:
+  client_config: "clients/{cliente}/<id>.yaml"
+  # La config NO se edita en el nodo: se lee por la fachada (ADR-035 — n8n lee su config por la
+  # fachada, escribe sus resultados por PostgREST).
+  config_node: "Nodo 'Config': supabase_url, dashboard_url. instance_id sale del payload (ADR-048)."
+  run_plan: "GET /api/engine/run-plan?instancia=<uuid>&ambito=<ambito> — <qué devuelve>"
+  filters:
+    - key: dias_recencia
+      type: number
+      scope: client
+      default: 30
+      desc: "Ventana de fetch"
+    - key: ventana_corrida_min
+      type: number
+      scope: client
+      default: 60
+      desc: "Single-flight por instancia (ADR-023). Tiene que quedar POR ENCIMA de la corrida más larga posible"
+  credentials:                    # SOLO NOMBRES. Los valores viven en n8n y en el gestor, JAMÁS en git
+    - supabase_service_role       # credencial n8n 'Supabase account'
+    - run_plan_header             # credencial n8n 'Run Plan Header'
+
+stages:                           # las 8 canónicas de PLAN §2.4. `n/a` lo que no aplique
+  colectar: "<de dónde trae el material crudo>"
+  normalizar: "<cómo lo lleva a una forma común>"
+  filtrar_scorear: "<cómo ordena y qué corta>"
+  enriquecer: n/a
+  generar: n/a
+  calidad: n/a
+  entregar: "<a qué tabla escribe>"
+  notificar: n/a
+
+outputs:
+  - type: <candidato>
+    destination_native: "app.<tabla>"
+    registered: pending           # pending | yes — si ya reporta a runs/outputs
+                                  # (patrón core/contracts/ingesta-registro.md)
+
+runbook:
+  setup: "docs/runbooks/agregar-workflow.md"
+  start: "Activar el workflow en n8n + darle su cron en el dispatcher"
+  stop: "Desactivar el workflow en n8n (el cron del dispatcher deja de tener destino)"
+  test: "Execute Workflow manual con una instancia de prueba; verificar la tabla + la fila en runs"
+  docs:
+    - README.md
+
+cost_per_run: "<estimado, o 'por medir' — pero decí cuál es el paso que se paga>"

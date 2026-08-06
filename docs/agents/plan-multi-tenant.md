@@ -1195,7 +1195,7 @@ pantallas ahora es superficie para datos que no existen.*
 | **B1** | El gate de la `023` | ⏳ espera corridas del fin de semana |
 | **B2** | Check #1 de la `021` contra PROD | ✅ **CERO FILAS el 06/08** — y no dependía de A1 |
 | **B3** | La prueba de §14.6 con filas | ⬜ escrita paso a paso en el handoff |
-| **B4** | `docs/runbooks/` + `core/templates/` | 🔧 se escribe asumiendo A5; su paso de alta se verifica cuando A5 esté en prod |
+| **B4** | `docs/runbooks/` + `core/templates/` | ✅ **ESCRITO el 06/08.** F5 da **partido**: empresa 🟢 pasa · pipeline 🔴 no. El paso de alta se verifica cuando A5 esté en prod |
 | **B5** | Las verificaciones de ojo humano | ✅ **HECHO el 06/08** — [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), 10 items. Y 4 de los 9 números esperados estaban mal |
 | **B6** | Deuda de docs medida | ✅ **HECHO el 06/08** — 21 links rotos, no 4; y la lista era más larga |
 
@@ -1225,12 +1225,36 @@ doble membresía y la matriz de interpretación (**1 y 1** anda · **2 y 2** Cap
 policy que no matchea o grant que falta · **`42501`** falta un grant). No sirve con una cuenta
 `es_dueno`. Termina con un alta desde el botón: lo único que ejercita los `grant insert/update/delete`.
 
-**B4 — los runbooks que F5 pidió siempre y nunca se escribieron.** `agregar-cliente.md` y
-`agregar-workflow.md`. El criterio de hecho de PLAN §F5 es la auditoría honesta del refactor entero:
-*"si algún paso de la guía exige modificar el núcleo, el diseño no está listo — se corrige la guía o
-el contrato, no se parchea a mano"*.
-🔗 **Único punto de dependencia entre carriles:** el paso "dar de alta a los usuarios" pasa de 3 pasos
-de SQL a un click cuando A5 esté en prod.
+**B4 — ✅ ESCRITO el 2026-08-06, y el criterio de F5 dio partido.** Están
+[`agregar-cliente.md`](../runbooks/agregar-cliente.md), [`agregar-workflow.md`](../runbooks/agregar-workflow.md)
+y [`core/templates/`](../../core/templates/) (el `cliente-nuevo.sql`, el esqueleto de manifest y su
+checklist). El criterio era la auditoría honesta del refactor entero: *"si algún paso de la guía exige
+modificar el núcleo, el diseño no está listo"*.
+
+| | Veredicto | Medido contra |
+|---|---|---|
+| **Agregar una empresa** | 🟢 **PASA.** SQL de datos + clics en el cockpit. **Cero código, cero n8n, cero migraciones** | El `cliente-nuevo.sql` se corrió **contra prod en una transacción revertida**: dejó 1 empresa, 1 cockpit en `draft` y **18 perillas, las 18 con su descripción**. Prod quedó en 3 clientes / 4 instancias, sin fugas |
+| **Agregar un pipeline** | 🔴 **NO PASA** | LinkedIn, los dos commits reales: `0bc0678` (+1.082) y `b7249f5` (+1.427). **~2.500 líneas, 2 migraciones en `core/schema/`, 2 ADRs y ~15 archivos de `apps/dashboard/`** — para un pipeline que todavía no corre en n8n |
+
+🔑 **Y el contraste tiene una explicación, no es azar: una empresa es un parámetro; un pipeline es un
+dominio.** El eje *+empresas* se templatizó y salió barato (el motor es un workflow parametrizado y el
+dispatcher lo multiplica, ADR-050). El eje *+pipelines* nunca se templatizó **porque cada pipeline
+tiene entidades propias** (§2.D). Lo que sí se pudo templatizar, y es donde se pierde el tiempo de
+verdad, es **el checklist de lo que no hay que olvidarse**: los agujeros que costaron sesiones enteras
+(una tabla con RLS y sin policy, un placeholder que `onError: continue` se traga, un cron local en vez
+del dispatcher) son todos **de olvido**, no de diseño.
+
+📌 **Lo que haría falta para que el segundo también pase**, escrito en el runbook y **sin proponerlo
+acá porque es un ADR**: que una pantalla de curación sea **configuración y no código** — un descriptor
+por pipeline que rinda la tabla, el formulario y la entrada de `scoped.ts` desde un solo lugar (hoy se
+escriben tres veces por pantalla). **Es un proyecto, no un refactor**, y se decide con dos pipelines
+reales encima, no con uno.
+
+🔗 **La dependencia con el Carril A quedó marcada, no resuelta:** el paso *"dar de alta a las
+personas"* está escrito **asumiendo la pantalla de A5** (`ajustes/equipo`), con un bloque
+`🚧 VERIFICAR CUANDO A5 ESTÉ EN PROD` que dice qué hacer mientras tanto (los 3 pasos manuales de
+ADR-051). **Cuando A5 entre hay que dar un alta real por la pantalla y corregir lo que no coincida** —
+que es exactamente lo que F5 pide de una guía.
 
 **B5 — ✅ HECHO el 2026-08-06: [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md).**
 Los 10 items con quién los hace, cuánto tarda y **qué significa si falla** — los arrastres del handoff

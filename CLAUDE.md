@@ -69,6 +69,18 @@ en §Agent skills; acá solo se ubican.
   vez da **cero filas**. ⏳ Lo que falta es ejercitarlas **con filas** (las 4 están vacías): es la
   prueba de [plan-multi-tenant §14.6](docs/agents/plan-multi-tenant.md), escrita paso a paso.
 
+**Runbooks (el N+1)**
+- [docs/runbooks/agregar-cliente.md](docs/runbooks/agregar-cliente.md) — dar de alta **una empresa**.
+  ✅ **Pasa el criterio de PLAN §F5**: SQL de datos + clics, **cero código, cero n8n, cero migraciones**.
+  Su plantilla es [core/templates/cliente-nuevo.sql](core/templates/cliente-nuevo.sql), probada contra
+  prod en una transacción revertida.
+- [docs/runbooks/agregar-workflow.md](docs/runbooks/agregar-workflow.md) — agregar **un pipeline**.
+  🔴 **NO pasa F5, y el runbook lo dice con el número**: LinkedIn costó ~2.500 líneas, 2 migraciones
+  en `core/schema/`, 2 ADRs y ~15 archivos de la app, para un pipeline que todavía no corre.
+  *Una empresa es un parámetro; un pipeline es un dominio.*
+- [core/templates/](core/templates/) — los esqueletos. Crearlo **es ejecutar F5**, que ya lo nombra
+  por su ruta; cambiar lo de adentro sí pide ADR si cambia el contrato.
+
 **Operación / equipo de redes**
 - [docs/onboarding-equipo-redes.md](docs/onboarding-equipo-redes.md) — guía no-code para Majo y Jero (qué cargar + cómo calificar). *(También compartido como Google Doc.)*
 - [docs/verificaciones-humanas.md](docs/verificaciones-humanas.md) — **lo que falta mirar con los ojos**
