@@ -2,9 +2,11 @@
 
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
+import { hayCorridaViva } from "@/domain/corrida";
 import { exigirTenant } from "@/lib/auth";
 import { hayBusquedaViva } from "@/lib/descubrimiento";
 import { registrarEvento } from "@/lib/eventos";
+import { ultimasCorridasMotor } from "@/lib/runs";
 
 // Las DOS señales que disparan una máquina viven acá, juntas y guardadas por la misma zona.
 // Antes `buscarAhora` estaba en `curar/sugeridos/actions.ts`, al lado de aprobar y descartar —
@@ -34,6 +36,31 @@ export async function correrAhora(): Promise<ResultadoDisparo> {
       mensaje:
         "Falta configurar el webhook del motor (las 3 env vars del gestor). Avisale a un dev.",
     };
+  }
+
+  // Preguntar antes de disparar, igual que `buscarAhora` sesenta líneas más abajo (A7).
+  //
+  // 🩸 Por qué faltaba y por qué importa: el botón deshabilitado de `page.tsx` es **cosmético** —
+  // se decide al renderizar, así que dos personas con la pantalla abierta lo ven habilitado las
+  // dos. El guard single-flight del motor sí bloquea la segunda, pero responde **200** (ADR-023
+  // C.3), y esta acción lo leía como éxito: devolvía *"Señal enviada, aparece abajo como
+  // Corriendo"* cuando no iba a aparecer nada. **El mensaje mentía, y era el único feedback.**
+  //
+  // ⚠️ Esto NO cierra la race de 1-2 s de ADR-023 C.3.3, que está aceptada y argumentada: dos
+  // clicks simultáneos siguen pasando los dos por acá. Cierra el caso real y frecuente —alguien
+  // dispara mientras otro ya tenía una corrida andando— y deja al guard de n8n como lo que siempre
+  // fue: la autoridad, no el primer filtro.
+  try {
+    if (hayCorridaViva(await ultimasCorridasMotor(ctx), new Date())) {
+      return {
+        ok: false,
+        mensaje: "Ya hay una corrida corriendo. Esperá a que termine — la vas a ver abajo.",
+      };
+    }
+  } catch {
+    // Fail-OPEN, y al revés que su gemela a propósito: si no se pueden leer las corridas, el guard
+    // de n8n sigue estando y es el que manda. Bloquear acá por un error de lectura dejaría a Operar
+    // sin su botón por una razón que no tiene nada que ver con si hay o no una corrida.
   }
 
   try {

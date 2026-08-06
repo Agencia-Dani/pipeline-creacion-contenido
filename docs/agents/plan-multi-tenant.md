@@ -1101,7 +1101,7 @@ Es lo que ADR-052 dejó escrito y descartó por innecesario; ahora es necesario.
 | **A4** | La zona `ajustes` (5ª) | ✅ `7e261b7` — y la ven **los tres roles**, no dos: lo cambió una medición (ver ADR-060) |
 | **A5** | La pantalla de equipo y el alta | ✅ `8218347` — ⏳ falta el **deploy** y su verificación de §15.D |
 | **A6** | ADR-060 | ✅ **ESCRITA ANTES de construir** — [ADR-060](../adr/ADR-060-el-equipo-se-administra-desde-el-cockpit.md) |
-| **A7** | Concurrencia visible | 🔧 **LO ÚNICO QUE FALTA.** El carril A se quedó sin usage antes de empezarla. `operar/actions.ts`, `operar/auto-refresh.tsx` |
+| **A7** | Concurrencia visible | ✅ **HECHA el 06/08 por el carril B**, después del merge — A se quedó sin usage antes de empezarla |
 
 > 🅰️➡️🅱️ **Mergeado a `main` el 06/08 con rebase, sin un solo conflicto** — y eso es el protocolo de
 > §15.C funcionando, no suerte: los dos carriles tocaron `plan-multi-tenant.md` y no se pisaron
@@ -1321,13 +1321,27 @@ pero la escritura por `service_role`— más una cuarta que apareció en el Carr
 estaba abierta a todo usuario logueado**, así que el gate de costos era solo de UI. Enmienda
 ADR-051, ADR-052 y ADR-056.
 
-#### A7 · Concurrencia visible
+#### A7 · Concurrencia visible — ✅ **HECHA el 2026-08-06** *(la terminó el carril B; A se quedó sin usage)*
 
-- `correrAhora()` gana el chequeo server-side **que su gemela ya tiene en el mismo archivo**. Reusa
-  `hayCorridaViva` de `domain/corrida.ts` y `ultimasCorridasMotor` de `lib/runs.ts`, que ya existen y
-  que ya usa `operar/page.tsx`. El mensaje deja de mentir.
-- `auto-refresh.tsx` se monta **siempre** en Operar, con dos cadencias: 5 s con corrida viva, 30 s
-  sin ella.
+- ✅ `correrAhora()` ganó el chequeo server-side **que su gemela ya tenía en el mismo archivo**.
+  Reusa `hayCorridaViva` de `domain/corrida.ts` y `ultimasCorridasMotor` de `lib/runs.ts`: cero
+  dominio nuevo, cero query nueva — es la misma que ya hace `operar/page.tsx`.
+  **El mensaje dejó de mentir:** ahora devuelve *"Ya hay una corrida corriendo"* en vez de
+  *"Señal enviada… aparece abajo como Corriendo"*.
+- ✅ `auto-refresh.tsx` se monta **siempre**, con dos cadencias: **5 s** con corrida viva
+  (*"¿ya terminó?"*), **30 s** sin ella (*"¿alguien más disparó?"*).
+
+🔑 **Una decisión que el plan no había tomado y hay que nombrar: el chequeo nuevo es fail-OPEN, al
+revés que el de `buscarAhora`.** Si la lectura de `runs` falla, **se dispara igual**. La razón es que
+las dos acciones no tienen la misma red debajo: el motor **tiene** guard single-flight por instancia
+en n8n (ADR-023 C.3) y es la autoridad real, así que este chequeo es una mejora de UX y bloquear por
+un error de lectura dejaría a Operar sin botón por algo que no tiene nada que ver con si hay o no una
+corrida. `buscarAhora` es fail-closed porque **no tiene guard del otro lado**: ahí el chequeo *es* la
+única defensa, y dos clicks son dos corridas de Apify pagas.
+
+⚠️ **No cierra la race de 1-2 s de ADR-023 C.3.3**, que está aceptada y argumentada: dos clicks
+simultáneos siguen pasando los dos. Cierra el caso real y frecuente —alguien dispara mientras otro ya
+tenía una corrida andando— que con tres personas de Retia adentro pasa tres veces por semana.
 
 ---
 

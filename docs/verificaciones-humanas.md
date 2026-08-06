@@ -124,6 +124,28 @@ Con gente de Retia adentro, eso es el margen de la agencia, y el gate **falla ha
 
 **Es la única de esta lista que bloquea dar de alta a alguien de Retia.**
 
+## 4-bis. 🟡 **A7 — que dos personas en Operar se vean** *(nuevo del 06/08)*
+
+**Quién:** Mani, o dos personas del equipo · **1 minuto** · *Necesita **dos** sesiones, y por eso no
+la puede cerrar un agente.*
+
+Antes, `auto-refresh` solo se montaba si ya había una corrida viva **al renderizar**: quien tenía
+Operar abierta cuando otro disparó no se enteraba nunca. Y `correrAhora()` no preguntaba del lado del
+servidor, así que el segundo click contestaba *"Señal enviada"* aunque el guard de n8n lo hubiera
+bloqueado. **Las dos mitades se arreglaron; falta el ojo.**
+
+Dos ventanas en `/retia/reels/operar` (una en incógnito), y mirar **dos cosas**:
+
+1. **Disparar ▶ en la ventana A.** La ventana B, sin tocarla, tiene que enterarse sola **en ≤30 s**
+   (esa es la cadencia ociosa; con corrida viva pasa a 5 s).
+2. **Apretar ▶ en la ventana B mientras la corrida sigue.** Tiene que decir
+   **"Ya hay una corrida corriendo"** — no *"Señal enviada"*.
+
+⚠️ **Esto gasta una corrida real.** Conviene hacerlo aprovechando una corrida que ya ibas a disparar,
+no una a propósito.
+🔑 **Lo que NO prueba:** dos clicks **simultáneos** siguen pasando los dos. Es la race de 1-2 s de
+ADR-023 C.3.3, aceptada y argumentada — la corta el guard de n8n, no la pantalla.
+
 ## 5. ⬜ **V4 — el re-rank** *(ROADMAP §3)*
 
 **Quién:** Majo o Jero · **2 minutos.**

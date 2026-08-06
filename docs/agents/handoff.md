@@ -89,13 +89,32 @@
 > 🩸 **Y una anotación del pie de la `025` que NO hay que creerle** (su punto 4): *"B2 va después de
 > esta migración"*. **Falso, y medido** — corregido en el propio archivo, en §14.6 y en §15.B.
 >
-> ### ⏳ Lo que falta del carril A
+> ### ✅ A7 hecha después del merge — el carril A queda **completo, 7 de 7**
 >
-> | | |
-> |---|---|
-> | **A7** · concurrencia visible | 🔧 **lo único sin hacer.** `correrAhora()` no re-chequea del lado del servidor y `auto-refresh` solo se monta si ya había corrida viva |
-> | **Deploy de A5** | ⏳ El código está en `main`; la pantalla de equipo **todavía no está en prod**. Su verificación es la de §15.D |
-> | **B4** | El runbook `agregar-cliente.md` tiene el paso de alta marcado `🚧 VERIFICAR CUANDO A5 ESTÉ EN PROD` |
+> - `correrAhora()` gana el chequeo server-side **que su gemela ya tenía sesenta líneas más abajo**.
+>   Reusa `hayCorridaViva` + `ultimasCorridasMotor`: cero dominio nuevo, cero query nueva.
+>   **El mensaje dejó de mentir** — ahora dice *"Ya hay una corrida corriendo"* y no *"Señal enviada"*.
+> - `auto-refresh.tsx` se monta **siempre**, 5 s con corrida viva y 30 s sin ella. Antes solo
+>   polleaba si ya había corrida viva **al renderizar**, o sea que quien tenía Operar abierta cuando
+>   otro disparó no se enteraba nunca.
+>
+> 🔑 **Una decisión que el plan no había tomado: el chequeo nuevo es fail-OPEN**, al revés que el de
+> `buscarAhora`. Si la lectura de `runs` falla, dispara igual — el motor **tiene** guard
+> single-flight en n8n y es la autoridad real, así que esto es UX. `buscarAhora` es fail-closed
+> porque **no tiene guard del otro lado**: ahí el chequeo es la única defensa y dos clicks son dos
+> corridas de Apify pagas. El porqué está en §15.A.
+>
+> ⏳ **Su verificación es de dos ventanas** y está escrita en
+> [`verificaciones-humanas.md` §4-bis](../verificaciones-humanas.md).
+>
+> ### ⏳ Lo único que queda del carril A: el deploy
+>
+> El código está todo en `main`. **La pantalla de equipo (A5) y el gate de costos (Carril 0) no
+> están en producción todavía** — hasta que se deployen, sus verificaciones de §15.D no se pueden
+> hacer, y el runbook `agregar-cliente.md` tiene su paso de alta marcado
+> `🚧 VERIFICAR CUANDO A5 ESTÉ EN PROD`.
+> ⚠️ **La `025` ya está aplicada, así que el orden que no se podía invertir está respetado**: la
+> pantalla se puede deployar cuando quieras, no va a caer en `42501` ni en cero filas.
 
 > ## 🅱️ CARRIL B (2026-08-06, rama `carril-b-cierres`) — B2, B4, B5 y B6 cerradas. B1 y B3 esperan.
 >

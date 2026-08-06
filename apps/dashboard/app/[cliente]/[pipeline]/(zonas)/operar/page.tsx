@@ -180,7 +180,7 @@ export default async function OperarPage({
 
   return (
     <div className="space-y-6">
-      <AutoRefresh activo={corridaViva} />
+      <AutoRefresh corridaViva={corridaViva} />
       <div>
         <h1 className="text-2xl font-semibold">Operar</h1>
         <p className="text-muted-foreground">
