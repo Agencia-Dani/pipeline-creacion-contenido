@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CATALOGO, ajustesVisibles } from "@/domain/ajustes";
 import { leerAjustes } from "@/lib/ajustes";
-import { exigirTenant } from "@/lib/auth";
+import { exigirPantallaDeCurar } from "@/lib/auth";
 import { Knob } from "./knob";
 
 // La pantalla de Ajustes: el primer dominio que se corta de Airtable (D5). Postgres es el
@@ -44,7 +44,7 @@ export default async function AjustesPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { usuario, ctx, cockpit, rol } = await exigirTenant("curar", cliente, pipeline);
+  const { usuario, ctx, cockpit, rol } = await exigirPantallaDeCurar("ajustes", cliente, pipeline);
   const base = comoRuta(cockpit);
   const filas = ajustesVisibles(await leerAjustes(ctx), rol);
 

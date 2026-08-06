@@ -575,11 +575,18 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 > resuelto el nav **por zona** y nadie miró un nivel más abajo. Arreglado: el índice de `curar` es por
 > pipeline y **lista lo que existe, no lo que va a existir**.
 >
-> ⚠️ **Y queda la mitad sin cerrar de eso:** el índice ya no linkea a las 6 pantallas de reels, pero
-> **escribir la URL a mano sigue entrando**. `exigirTenant` guarda por ZONA (ADR-056) y `curar` existe
-> en los dos pipelines, así que no las tapa. No es fuga —`scoped()` filtra por instancia y las tablas
-> de reels no tienen filas de una instancia de LinkedIn— pero es "la UI esconde y el servidor no
-> impide", que es justo al revés de la regla de la casa. Se cierra con una guardia por pantalla.
+> ✅ **Y la otra mitad se cerró el mismo día:** `exigirPantallaDeCurar` en `lib/auth.ts`. `exigirTenant`
+> guarda por ZONA (ADR-056) y `curar` existe en los dos pipelines, así que escribir la URL a mano
+> entraba igual. Ahora las 7 páginas preguntan por su pantalla y el que no corresponde cae al índice
+> de `curar` —no a la raíz: el problema no es de permisos, es que esa pantalla no existe en este
+> pipeline, así que se lo manda a ver las que sí.
+>
+> 🔑 **Y la lista quedó UNA.** El primer arreglo puso las tarjetas por pipeline en la página y dejó
+> la guardia sin escribir: dos expresiones de la misma verdad —lo que se dibuja y lo que existe—
+> libres de divergir, con el peor síntoma posible (una tarjeta que lleva a un redirect). Hoy
+> `PANTALLAS_CURAR` + `CURAR_POR_PIPELINE` viven en `domain/pipelines.ts`, el índice **deriva** sus
+> tarjetas de ahí y la guardia pregunta a lo mismo. El `Record<PantallaCurar, Copy>` del índice es
+> exhaustivo: sumar una pantalla al dominio **no compila** hasta escribirle su texto.
 >
 > ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
 > que la secuencia real es **`018`/`019` → Capa 2 (RLS) → paginación → LinkedIn**. La fila sin número

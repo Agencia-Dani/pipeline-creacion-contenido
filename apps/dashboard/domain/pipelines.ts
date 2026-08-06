@@ -81,6 +81,74 @@ export function pipelinesDeclarados(): readonly Pipeline[] {
   return Object.keys(ZONAS_POR_PIPELINE);
 }
 
+// ─────────────────────────── Un nivel más abajo: las pantallas de `curar` ───────────────────────
+//
+// 🩸 **ADR-056 resolvió el nav POR ZONA y nadie miró un nivel más abajo.** El agujero se vio el
+// 2026-08-06, con la primera pantalla de LinkedIn: `curar` existe en los dos pipelines, así que la
+// guardia de zona la dejaba pasar entera — y adentro había **siete** links a pantallas de reels.
+// Seis de ellas leen `app.candidatos`/`app.descartes`/`app.ajustes`… filtradas por el `instance_id`
+// de LinkedIn, o sea que devuelven vacío **sin fallar**. En un pipeline recién nacido eso se lee
+// como *"todavía no cargamos datos"* y no como *"esta pantalla no es de este pipeline"*: la familia
+// de la `015` otra vez.
+//
+// 🔑 **Y por qué esta lista es UNA y no dos.** El primer arreglo puso las tarjetas por pipeline en
+// la página y dejó la guardia sin escribir — o sea la UI escondiendo y el servidor no impidiendo,
+// que es al revés de la regla de la casa, y además dos expresiones de la misma verdad (las tarjetas
+// que se dibujan y el conjunto de rutas que de verdad existe) libres de divergir. Acá se declara
+// una vez: el índice **deriva** sus tarjetas de esto, y la guardia del servidor pregunta a esto.
+// Agregar una pantalla es una línea acá.
+
+export const PANTALLAS_CURAR = [
+  "feed",
+  "descartes",
+  "historicos",
+  "voces",
+  "referentes",
+  "sugeridos",
+  "ajustes",
+] as const;
+
+export type PantallaCurar = (typeof PANTALLAS_CURAR)[number];
+
+const CURAR_POR_PIPELINE: Record<Pipeline, readonly PantallaCurar[]> = {
+  "short-form-content": PANTALLAS_CURAR,
+  // Hoy LinkedIn tiene UNA. No es una limitación temporal disfrazada de diseño: es que hay una
+  // pantalla construida. Las demás entran cuando existan, no antes (ADR-055 §3 deja además fuera a
+  // `historicos` en su forma actual — el histórico de LinkedIn es `outputs`, pero su pantalla lee
+  // columnas de video).
+  linkedin: ["referentes"],
+};
+
+/** Las pantallas de `curar` que este pipeline implementa. Un pipeline no declarado no tiene ninguna. */
+export function pantallasDeCurar(pipeline: Pipeline): readonly PantallaCurar[] {
+  return CURAR_POR_PIPELINE[pipeline] ?? [];
+}
+
+/**
+ * ¿Este pipeline implementa esta pantalla de `curar`? Es la pregunta que hace la guardia del
+ * servidor, y la que faltaba: `exigirTenant` autoriza la ZONA, y `curar` la tienen los dos.
+ */
+export function implementaPantalla(pipeline: Pipeline, pantalla: PantallaCurar): boolean {
+  return pantallasDeCurar(pipeline).includes(pantalla);
+}
+
+/**
+ * Que ninguna declaración de pantallas invente una que no existe, y que ningún pipeline con la zona
+ * `curar` se quede sin pantallas.
+ *
+ * Lo segundo importa tanto como lo primero: un pipeline que declara `curar` en sus zonas y no
+ * declara ninguna pantalla acá dibuja una zona vacía — que es el mismo fallo mudo, movido de lugar.
+ */
+export function declaracionesDeCurarValidas(): boolean {
+  return pipelinesDeclarados().every((p) => {
+    const pantallas = pantallasDeCurar(p);
+    const tieneCurar = zonasDePipeline(p).includes("curar");
+    return (
+      pantallas.every((s) => PANTALLAS_CURAR.includes(s)) && (tieneCurar ? pantallas.length > 0 : true)
+    );
+  });
+}
+
 /**
  * Que ninguna declaración invente una zona que no existe.
  *

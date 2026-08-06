@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { pantallasDeCurar, type PantallaCurar } from "@/domain/pipelines";
 import { exigirTenant } from "@/lib/auth";
 
 // El índice de la zona Curar. **Las tarjetas son por pipeline**, no fijas.
@@ -22,65 +23,54 @@ import { exigirTenant } from "@/lib/auth";
 // nivel más abajo: un pipeline no declarado no tiene ninguna zona; una pantalla no construida no
 // tiene tarjeta. Sumar la de candidatos es agregar una línea acá el día que la pantalla exista.
 
-type Tarjeta = { ruta: string; titulo: string; descripcion: string };
+// 🔑 **Acá va solo el TEXTO. Cuáles existen lo decide `domain/pipelines.ts`.**
+//
+// El primer intento tenía la lista de tarjetas escrita acá por pipeline, y eso dejaba dos
+// expresiones de la misma verdad —lo que se dibuja y lo que de verdad existe— libres de divergir.
+// Ahora el índice **deriva** de `pantallasDeCurar()`, que es la misma fuente que consulta la guardia
+// del servidor (`exigirPantallaDeCurar`). Si las dos no coincidieran, el síntoma sería el peor de
+// todos: una tarjeta que lleva a un redirect.
+//
+// El `Record<PantallaCurar, …>` es exhaustivo: agregar una pantalla al dominio **no compila** hasta
+// escribirle su copy.
+type Copy = { titulo: string; descripcion: string };
 
-const REELS: Tarjeta[] = [
-  {
-    ruta: "curar/feed",
+const COPY: Record<PantallaCurar, Copy> = {
+  feed: {
     titulo: "Feed",
     descripcion:
       "Los videos que el motor trajo, para calificar. 🔥 y 👍 lo aprueban, 👎 lo descarta: con un click alcanza.",
   },
-  {
-    ruta: "curar/descartes",
+  descartes: {
     titulo: "Descartes",
     descripcion:
       "Los que el filtro mató por poco. Marcar cuáles eran buenos es lo que corrige los criterios. Lo que no marques sigue esperando: la lista ya no se borra.",
   },
-  {
-    ruta: "curar/historicos",
+  historicos: {
     titulo: "Históricos",
     descripcion:
       "Todo lo aprobado, de todas las semanas, con su transcripción. El feed se vacía; esto no.",
   },
-  {
-    ruta: "curar/voces",
+  voces: {
     titulo: "Voces y proyectos",
     descripcion:
       "Los clientes y sus temas: qué busca cada uno, con qué criterios y cuántos videos pide por corrida — ese número es el único que manda. Apagar una voz apaga sus proyectos.",
   },
-  {
-    ruta: "curar/referentes",
+  referentes: {
     titulo: "Referentes",
     descripcion:
-      "El banco de cuentas de las que el motor trae videos: agregar, apagar las que rinden poco y elegir a qué proyectos alimenta cada una.",
+      "El banco de donde sale el material: agregar, apagar lo que rinde poco y elegir a qué proyecto alimenta cada uno.",
   },
-  {
-    ruta: "curar/sugeridos",
+  sugeridos: {
     titulo: "Sugeridos",
     descripcion:
       "Las cuentas nuevas que el buscador propone cada lunes. Aprobar una la suma al banco sola.",
   },
-  {
-    ruta: "curar/ajustes",
+  ajustes: {
     titulo: "Ajustes",
     descripcion:
       "Las perillas del sistema: qué tan exigente es el filtro y en qué plataformas busca. Cuántos videos trae cada proyecto se decide en Voces y proyectos.",
   },
-];
-
-const LINKEDIN: Tarjeta[] = [
-  {
-    ruta: "curar/referentes",
-    titulo: "Referentes",
-    descripcion:
-      "De dónde sale el material: filtros de Pinterest, cuentas de LinkedIn, páginas sueltas y el archivo propio de cada voz. Solo los prendidos entran en la próxima corrida.",
-  },
-];
-
-const POR_PIPELINE: Record<string, Tarjeta[]> = {
-  "short-form-content": REELS,
-  linkedin: LINKEDIN,
 };
 
 export default async function CurarPage({
@@ -92,8 +82,8 @@ export default async function CurarPage({
   const { cockpit } = await exigirTenant("curar", cliente, pipeline);
   const base = comoRuta(cockpit);
 
-  // Un pipeline no declarado no tiene tarjetas, igual que no tiene zonas (ADR-056). Falla visible.
-  const tarjetas = POR_PIPELINE[cockpit.workflowId] ?? [];
+  // Un pipeline no declarado no tiene pantallas, igual que no tiene zonas (ADR-056). Falla visible.
+  const tarjetas = pantallasDeCurar(cockpit.workflowId);
 
   return (
     <div className="space-y-6">
@@ -111,12 +101,12 @@ export default async function CurarPage({
           Este pipeline todavía no tiene pantallas de curación.
         </p>
       ) : (
-        tarjetas.map((t) => (
-          <Link key={t.ruta} href={rutaDe(base, t.ruta)} className="block">
+        tarjetas.map((pantalla) => (
+          <Link key={pantalla} href={rutaDe(base, `curar/${pantalla}`)} className="block">
             <Card className="transition-colors hover:bg-accent/40">
               <CardHeader>
-                <CardTitle>{t.titulo}</CardTitle>
-                <CardDescription>{t.descripcion}</CardDescription>
+                <CardTitle>{COPY[pantalla].titulo}</CardTitle>
+                <CardDescription>{COPY[pantalla].descripcion}</CardDescription>
               </CardHeader>
             </Card>
           </Link>

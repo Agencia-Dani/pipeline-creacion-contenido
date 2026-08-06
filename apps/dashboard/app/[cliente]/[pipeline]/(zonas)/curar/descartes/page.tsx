@@ -1,7 +1,7 @@
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { exigirTenant } from "@/lib/auth";
+import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerDescartes } from "@/lib/descartes";
 import { Lista } from "./lista";
 
@@ -18,7 +18,7 @@ export default async function DescartesPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const { ctx, cockpit } = await exigirPantallaDeCurar("descartes", cliente, pipeline);
   const base = comoRuta(cockpit);
 
   const descartes = await leerDescartes(ctx);

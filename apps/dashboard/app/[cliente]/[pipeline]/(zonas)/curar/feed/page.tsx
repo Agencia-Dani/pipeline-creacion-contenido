@@ -2,7 +2,7 @@ import { comoRuta, rutaDe } from "@/domain/rutas";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FILTRO_INICIAL } from "@/domain/feed";
-import { exigirTenant } from "@/lib/auth";
+import { exigirPantallaDeCurar } from "@/lib/auth";
 import { contarFeed, leerFeed } from "@/lib/candidatos";
 import { contarDescartesPendientes } from "@/lib/descartes";
 import { Mazo } from "./mazo";
@@ -21,7 +21,7 @@ export default async function FeedPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const { ctx, cockpit } = await exigirPantallaDeCurar("feed", cliente, pipeline);
   const base = comoRuta(cockpit);
 
   // Los conteos van aparte de las filas a propósito: son cuatro `head` counts sobre la tabla

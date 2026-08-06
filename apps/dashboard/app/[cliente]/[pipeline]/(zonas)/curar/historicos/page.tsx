@@ -1,6 +1,6 @@
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import Link from "next/link";
-import { exigirTenant } from "@/lib/auth";
+import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerAprobados } from "@/lib/historicos";
 import { Lista } from "./lista";
 
@@ -18,7 +18,7 @@ export default async function HistoricosPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const { ctx, cockpit } = await exigirPantallaDeCurar("historicos", cliente, pipeline);
   const base = comoRuta(cockpit);
 
   const { filas, hayMas, total } = await leerAprobados(ctx, 0);

@@ -1,6 +1,6 @@
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import Link from "next/link";
-import { exigirTenant } from "@/lib/auth";
+import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerBanco, leerProyectos } from "@/lib/referentes";
 import { leerBancoLinkedin } from "@/lib/referentes-linkedin";
 import { Pantalla } from "./pantalla";
@@ -31,7 +31,7 @@ export default async function ReferentesPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const { ctx, cockpit } = await exigirPantallaDeCurar("referentes", cliente, pipeline);
   const base = comoRuta(cockpit);
 
   const volver = (

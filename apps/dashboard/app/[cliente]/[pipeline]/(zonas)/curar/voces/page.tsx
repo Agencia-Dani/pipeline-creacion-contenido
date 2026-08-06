@@ -1,7 +1,7 @@
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import Link from "next/link";
 import { leerAjustes } from "@/lib/ajustes";
-import { exigirTenant } from "@/lib/auth";
+import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerResultadosPorCuenta } from "@/lib/config";
 import { leerVocesConProyectos } from "@/lib/proyectos";
 import { cuentasPorProyecto } from "@/lib/referentes";
@@ -30,7 +30,7 @@ export default async function VocesPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const { ctx, cockpit } = await exigirPantallaDeCurar("voces", cliente, pipeline);
   const base = comoRuta(cockpit);
 
   const [voces, ajustes, cuentas, propuestas] = await Promise.all([

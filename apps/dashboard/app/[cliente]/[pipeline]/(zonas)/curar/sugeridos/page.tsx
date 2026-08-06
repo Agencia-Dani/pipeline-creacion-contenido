@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BotonBuscar } from "@/components/boton-buscar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { exigirTenant } from "@/lib/auth";
+import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerProyectos } from "@/lib/referentes";
 import { leerPendientes } from "@/lib/sugeridos";
 import { Tarjeta } from "./tarjeta";
@@ -19,7 +19,7 @@ export default async function SugeridosPage({
   params: Promise<{ cliente: string; pipeline: string }>;
 }) {
   const { cliente, pipeline } = await params;
-  const { ctx, cockpit } = await exigirTenant("curar", cliente, pipeline);
+  const { ctx, cockpit } = await exigirPantallaDeCurar("sugeridos", cliente, pipeline);
   const base = comoRuta(cockpit);
 
   const [proyectos, pendientes] = await Promise.all([leerProyectos(ctx), leerPendientes(ctx)]);

@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  declaracionesDeCurarValidas,
   declaracionesValidas,
+  implementaPantalla,
+  PANTALLAS_CURAR,
+  pantallasDeCurar,
   pipelineConocido,
   pipelinesDeclarados,
   zonaInicialEn,
@@ -76,4 +80,47 @@ test("ninguna declaración inventa una zona que no existe", () => {
   // Un typo (`transcibir`) no lo atraparía nada y su síntoma sería una zona que no aparece: mudo.
   assert.equal(declaracionesValidas(), true);
   assert.ok(pipelinesDeclarados().includes("linkedin"));
+});
+
+// ─────────────────────── Las pantallas de `curar`, un nivel más abajo ───────────────────────
+
+test("🩸 compartir la ZONA no es compartir las pantallas: es el agujero del 06/08", () => {
+  // Los dos pipelines tienen `curar`, así que la guardia de zona (ADR-056) los deja pasar a los dos.
+  assert.ok(zonasDePipeline("short-form-content").includes("curar"));
+  assert.ok(zonasDePipeline("linkedin").includes("curar"));
+  // Y adentro NO implementan lo mismo. Sin esta segunda pregunta, un cockpit de LinkedIn entraba a
+  // /curar/feed y leía `app.candidatos` —la tabla de REELS— filtrada por su instance_id: cero filas,
+  // sin error, indistinguible de "todavía no cargamos datos".
+  assert.deepEqual(pantallasDeCurar("short-form-content"), PANTALLAS_CURAR);
+  assert.deepEqual(pantallasDeCurar("linkedin"), ["referentes"]);
+});
+
+test("la guardia del servidor contesta por pantalla, no por zona", () => {
+  assert.equal(implementaPantalla("linkedin", "referentes"), true);
+  for (const p of PANTALLAS_CURAR.filter((p) => p !== "referentes")) {
+    assert.equal(implementaPantalla("linkedin", p), false, `linkedin no implementa ${p}`);
+  }
+  for (const p of PANTALLAS_CURAR) {
+    assert.equal(implementaPantalla("short-form-content", p), true);
+  }
+});
+
+test("un pipeline no declarado no tiene NINGUNA pantalla — mismo default seguro", () => {
+  assert.deepEqual(pantallasDeCurar("substack"), []);
+  assert.equal(implementaPantalla("substack", "feed"), false);
+});
+
+test("referentes es la única pantalla compartida hoy, y por eso su página ramifica", () => {
+  // Si alguna vez fueran dos, el `page.tsx` de cada una tiene que ramificar igual. Este test es el
+  // que avisa: su lista es la que hay que mirar cuando alguien suma una pantalla a LinkedIn.
+  const compartidas = PANTALLAS_CURAR.filter(
+    (p) => implementaPantalla("linkedin", p) && implementaPantalla("short-form-content", p),
+  );
+  assert.deepEqual(compartidas, ["referentes"]);
+});
+
+test("ninguna declaración de pantallas inventa una, ni deja una zona `curar` vacía", () => {
+  // Lo segundo importa tanto como lo primero: declarar la zona `curar` y ninguna pantalla dibuja
+  // una zona vacía, que es el mismo fallo mudo movido de lugar.
+  assert.equal(declaracionesDeCurarValidas(), true);
 });

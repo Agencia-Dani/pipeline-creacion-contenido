@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import type { Alcance, TenantContext } from "@/domain/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { puedeVerZona, type Rol, type Zona } from "@/domain/roles";
-import { zonasDePipeline } from "@/domain/pipelines";
-import { baseDe, comoRuta } from "@/domain/rutas";
+import { implementaPantalla, zonasDePipeline, type PantallaCurar } from "@/domain/pipelines";
+import { baseDe, comoRuta, rutaDe } from "@/domain/rutas";
 import { leerMembresias, resolverContexto, type Instancia } from "@/lib/tenant";
 
 /**
@@ -94,4 +94,35 @@ export async function exigirTenant(
   if (!permitida) redirect(baseDe(comoRuta(sesion.cockpit)));
 
   return { usuario, ...sesion };
+}
+
+/**
+ * La guardia de una pantalla concreta de `curar`. Es `exigirTenant("curar")` **más la pregunta que
+ * la zona no puede contestar**: ¿este pipeline implementa ESTA pantalla?
+ *
+ * 🩸 Por qué hace falta una función aparte y no alcanzaba con ADR-056: la zona `curar` la tienen
+ * los dos pipelines, así que `exigirTenant` la autoriza entera. Adentro, `/curar/feed` lee
+ * `app.candidatos` — la tabla de reels — filtrada por el `instance_id` del cockpit abierto. Desde un
+ * cockpit de LinkedIn eso **no falla**: devuelve cero filas y dibuja "no hay candidatos", que en un
+ * pipeline nuevo se lee como *"todavía no cargamos datos"*. El fallo mudo, otra vez.
+ *
+ * Esconder los links del índice no alcanza, y por eso esto existe: **la UI esconde, el servidor
+ * impide**, y hasta acá solo estaba la primera mitad.
+ *
+ * El redirect va al índice de `curar` del cockpit resuelto —no a la raíz— porque el problema no es
+ * de permisos: la persona puede estar acá, lo que no existe es esa pantalla. Mandarla al índice le
+ * muestra las que sí.
+ */
+export async function exigirPantallaDeCurar(
+  pantalla: PantallaCurar,
+  cliente?: string,
+  pipeline?: string,
+): Promise<{ usuario: Usuario; ctx: TenantContext; cockpit: Instancia; rol: Rol }> {
+  const sesion = await exigirTenant("curar", cliente, pipeline);
+
+  if (!implementaPantalla(sesion.cockpit.workflowId, pantalla)) {
+    redirect(rutaDe(comoRuta(sesion.cockpit), "curar"));
+  }
+
+  return sesion;
 }
