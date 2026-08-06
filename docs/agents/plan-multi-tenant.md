@@ -566,7 +566,7 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 | — | **ADR-051/052** — `018_membresias` + `019` | Capa 2, y el alta de usuarios externos | sí | ✅ **COMPLETO** — mergeada (`ad2de5b`), `018` + `019` aplicadas y verificadas por su efecto (04/08) |
 | 7 | ~~**Paginación del feed**~~ (§10) | el segundo tenant con volumen | no | ✅ **HECHA el 2026-08-06.** Keyset sobre `(heat desc, id asc)`, filtro y contadores en el server, y los 3 textos largos fuera del listado: **405 KB → 16 KB** por carga. Verificada contra prod a nivel query; ⏳ falta el clic |
 | 8 | **Fase 6** — Capa 2 (RLS) | **prender el segundo cockpit en producción** | sí | ✅ **COMPLETA el 2026-08-05** — la `021` aplicada **y** el flip de `scoped.ts` en prod (`d8edea2`, [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)). Verificada con cuenta no dueña y con las 4 zonas cargando |
-| 9 | **Fase 5** — LinkedIn | — | sí (una migración) | 🔧 **EN CURSO desde el 06/08.** La **`020` aplicada** + 3 cockpits en `instances` (2 `active`, `retia/linkedin` en `draft`) · **1ª pantalla construida** (Referentes: `domain/linkedin.ts`, `lib/referentes-linkedin.ts`, ramificado por `workflowId`, las 4 tablas en `scoped.ts`) · **[`024`](../../core/schema/024_rls_linkedin.sql) APLICADA el 06/08** y re-verificada por su efecto el mismo día (§14.6) · ⬜ faltan candidatos/voces, el workflow en n8n, su cron, y `core/templates/` + los runbooks |
+| 9 | **Fase 5** — LinkedIn | — | sí (una migración) | 🔧 **EN CURSO desde el 06/08.** La **`020` aplicada** + 3 cockpits en `instances` (2 `active`, `retia/linkedin` en `draft`) · **1ª pantalla construida** (Referentes: `domain/linkedin.ts`, `lib/referentes-linkedin.ts`, ramificado por `workflowId`, las 4 tablas en `scoped.ts`) · **[`024`](../../core/schema/024_rls_linkedin.sql) APLICADA el 06/08** y re-verificada por su efecto el mismo día (§14.6) · ✅ `core/templates/` + los runbooks salieron el 06/08 (B4) · 🛑 **el workflow en n8n y su cron NO se construyen todavía — decisión de Mani, 2026-08-06.** Ver abajo |
 
 > ✅ **Al 2026-08-06 queda uno: el #9 (LinkedIn), y arrancó.** El #7 se cerró el 06/08 y no bloqueaba
 > a nadie; se hizo igual porque era lo único numerado que quedaba antes de la Fase 5, y porque su
@@ -596,6 +596,31 @@ En `domain/tenant.test.ts` (puras) + una suite de integración contra la base:
 > ⚠️ **El orden cambió respecto de lo escrito arriba.** ADR-051 activó el disparador de la Capa 2, así
 > que la secuencia real es **`018`/`019` → Capa 2 (RLS) → paginación → LinkedIn**. La fila sin número
 > va donde va porque bloquea a la #8, no porque sea una fase nueva.
+
+> ## 🛑 El `workflow.json` de LinkedIn NO se construye todavía — decisión de Mani, 2026-08-06
+>
+> **Es la parte de la Fase 5 que queda explícitamente parada.** Lo que ya existe se queda como está y
+> no molesta: la [`020`](../../core/schema/020_pipeline_linkedin.sql) y la
+> [`024`](../../core/schema/024_rls_linkedin.sql) aplicadas, los 3 cockpits en `instances`, la pantalla
+> de Referentes, y el manifest en `Workflows/workflow-linkedin/` con `status: draft` — que ya dice, en
+> su propio encabezado, que describe el diseño y no algo que corra.
+>
+> **Por qué, y no es una postergación arbitraria:** lo que bloquea a LinkedIn no es técnico, y está
+> escrito desde el cierre 92 y en ADR-055 §Consecuencias — **no hay definición de "funcionó", no
+> existe el banco de referentes y faltan los few-shot**. Construir el workflow ahora es construir la
+> máquina antes de saber qué tiene que salir de ella, y encima con datos que no existen: las 4 tablas
+> `*_linkedin` tienen **0 filas** al 06/08.
+>
+> **Qué significa en la práctica:**
+> - ❌ **No** se crea el workflow en n8n, **no** se le da cron en el dispatcher, **no** se re-importa nada.
+> - ✅ Sí sigue viva la prueba de [§14.6](#146) (**B3**): siembra dos filas a mano, mirá que cada
+>   cockpit vea solo la suya, borralas. **Eso no necesita el workflow** — ejercita RLS, no el pipeline.
+> - ✅ Sí se puede seguir la pantalla de Referentes si hace falta, porque es superficie de curación
+>   para carga manual, no para lo que produciría el motor.
+>
+> 🔑 **El disparador para retomarlo es el mismo de siempre y sigue sin cumplirse:** que alguien
+> escriba qué es un post de LinkedIn que funcionó. Hasta entonces esto queda acá y no en el backlog de
+> nadie.
 
 **La Fase 5 va al final a propósito:** LinkedIn es el N+1 que *valida* el refactor, no el que lo motiva. Construirlo antes de que la base sea multi-tenant es construir el sexto problema encima de los cinco que ya hay.
 

@@ -68,6 +68,16 @@
 > | **B1** · gate de la `023` | ⏳ **Sigue bloqueado, confirmado midiendo**: el último run del **motor** es del **2026-08-03** (el del 04/08 21:12 era el archivado). Ninguna corrida ejerció el código nuevo. Archivado domingo 18:00, motor lunes 08:00 |
 > | **B3** · §14.6 con filas | ⬜ Las 4 tablas `*_linkedin` siguen en **0 filas**. La siembra es un solo `insert` (está en el bloque `🔬 #6` de abajo) y **no se corrió**: escribe en prod y el paso 2 necesita un browser con la cuenta de doble membresía |
 >
+> ### 🛑 Decisión de Mani (06/08): el `workflow.json` de LinkedIn NO se construye todavía
+>
+> **No se crea en n8n, no se le da cron en el dispatcher, no se re-importa nada.** Lo que ya existe
+> —la `020` y la `024` aplicadas, los 3 cockpits, la pantalla de Referentes, el manifest en `draft`—
+> se queda como está y no molesta a nadie. El bloqueo sigue siendo **no técnico** (no hay definición
+> de *"funcionó"*, no existe el banco de referentes, faltan los few-shot), y encima las 4 tablas
+> tienen **0 filas**. El porqué completo, y qué **sí** se puede seguir haciendo mientras tanto, en
+> [plan-multi-tenant §12](./plan-multi-tenant.md).
+> ⚠️ **B3 no depende de esto**: ejercita RLS con dos filas sembradas a mano, no el pipeline.
+>
 > ### 🔴 Tres cosas que cambian lo que otro agente iba a hacer
 >
 > 1. **`B2 después de A1` era falso, y el check es más ciego de lo que se creía.** El argumento era

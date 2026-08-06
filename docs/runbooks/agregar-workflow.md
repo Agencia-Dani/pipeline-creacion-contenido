@@ -151,8 +151,13 @@ decía. PLAN §F5 lo pide literal — *"las guías quedaron corregidas con lo ap
 | Pipeline | Manifest | Tablas | Cockpit | En n8n | Cron |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `short-form-content` (reels) | ✅ | ✅ | ✅ 4 zonas | ✅ 34 nodos | ✅ lunes 08:00 |
-| `linkedin` | ✅ | ✅ `020` + `024` | 🔧 1 pantalla de 7 | ❌ | ❌ |
+| `linkedin` | ✅ | ✅ `020` + `024` | 🔧 1 pantalla de 7 | 🛑 **parado a propósito** | 🛑 |
 | `substack` | ✅ | ❌ | ❌ | ❌ (corrió mar–abr 2026, se re-monta en F3) | ❌ |
 
 **Un solo pipeline llegó a la meta**, y es el que se construyó antes de que existiera la plantilla.
 Eso es lo que este runbook mide.
+
+🛑 **Y el `workflow.json` de LinkedIn está parado por decisión de Mani (2026-08-06), no por falta de
+tiempo.** No se crea en n8n ni se le da cron hasta que exista una definición de *"funcionó"*. El
+porqué completo y qué sí se puede seguir haciendo mientras tanto están en
+[plan-multi-tenant §12](../agents/plan-multi-tenant.md). **Si venís a construirlo, leé eso primero.**
