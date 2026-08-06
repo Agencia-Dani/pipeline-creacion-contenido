@@ -888,7 +888,17 @@ ramifica por `cockpit.workflowId`), así se verifica con datos reales y no con u
 vacía. Las 4 tablas entraron además al mapa `TABLAS` de `scoped.ts` — la mitad de Capa 1, que sin
 ella la pantalla no compila.
 
-⏳ **Falta aplicarla** (SQL Editor, es de Mani) y correr su §Verificación.
+✅ **APLICADA el 2026-08-06 y verificada por su EFECTO** (la lección de la `019`, no por haber
+corrido): `pg_policies` devuelve las **4 filas**, las cuatro `policyname = tenant` y las cuatro con
+**`instancias_visibles`** en el `qual` — o sea grano instancia, que era el error fácil porque su
+hermana de reels es por empresa. Y como en el SQL Editor el script corre como una unidad, que las
+policies existan prueba que **todo lo anterior pasó**: las guardas del `§0` y los `grant` del `§1`
+(si el grant hubiera fallado, la ejecución se cortaba antes y no habría 4 filas).
+
+⏳ Queda el **check #1 contra prod** —*"¿alguna tabla con tenant, RLS y sin policy?"*— que es una
+pregunta distinta: no valida la `024`, valida que no quede **otra** tabla en el mismo estado. Nunca
+se corrió contra prod; la vez que se corrió fue en Docker sin la `020` en el medio, y por eso dio
+limpio con este agujero adentro.
 
 ⚠️ **Y un matiz que cambió desde que se escribió §14.6:** la `021` no cambiaba nada al entrar porque
 el BFF leía con `service_role`. **La `024` no tiene esa red** — el flip está en producción desde el
