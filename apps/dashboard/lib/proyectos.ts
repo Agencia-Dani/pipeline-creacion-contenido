@@ -24,8 +24,8 @@ import { contarEn, scoped } from "@/lib/supabase/scoped";
 //
 // Y con el paso 3 del corte dejó de hablar el idioma viejo del todo: la fachada sirve el uuid
 // como `id` (ver `domain/proyectos.ts::aRegistrosDeVoces`), así que estas lecturas ya no traen
-// `airtable_id`. La columna sigue en la tabla —es la traza al export de Airtable y la usa
-// `scripts/cortar-feed.ts`, la evidencia del corte— y se cae con la limpieza de D8.
+// `airtable_id`. La columna ya no existe: la dropeó la `022` (ADR-059) junto con las otras cinco,
+// medido que su único lector —`scripts/cortar-feed.ts`— había terminado su trabajo en D7.
 
 const filaVoz = z.object({
   id: z.string(),

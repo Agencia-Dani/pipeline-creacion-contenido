@@ -19,10 +19,10 @@ registrado y mejora solo**.
 
 ## Cómo funciona, en pasos
 
-1. **El equipo arma su tablero** *(Airtable, gratis, imposible de romper)*: los **proyectos**
-   (comunicación, ventas, liderazgo…), las **palabras clave**, los **perfiles referentes** y las
-   **voces** (a cuál va dirigido cada contenido). Majo y Jero lo manejan solos, y pueden crear o
-   cambiar voces cuando quieran — sin depender de un técnico.
+1. **El equipo arma su tablero** *(un cockpit propio, hecho para esto)*: los **proyectos**
+   (comunicación, ventas, liderazgo…), los **perfiles referentes** y las **voces** (a cuál va
+   dirigido cada contenido). Majo y Jero lo manejan solos, y pueden crear o cambiar voces cuando
+   quieran — sin depender de un técnico.
 2. **La máquina busca sola** *(n8n en un servidor)*: la primera vez trae lo de los **últimos 6
    meses**; después corre cada día y trae **solo lo nuevo, sin repetir lo ya analizado**.
    **Prioriza creadores en inglés, portugués, italiano y francés** — lo que todavía no circula
@@ -31,12 +31,12 @@ registrado y mejora solo**.
    el idioma, y **lo que el equipo ha venido eligiendo**. *(Los videos de cuentas gigantes —más
    de ~700K seguidores— se marcan aparte: son virales por tamaño y distorsionan el análisis.)*
 4. **Entrega cada video transcrito al español, tal cual** *(traducción literal si está en otro
-   idioma — **no** reescribe ni inventa)*: cada script queda en un **documento con su link**,
-   junto al link del video original y sus métricas.
+   idioma — **no** reescribe ni inventa)*: cada script queda **como texto en el tablero**, con un
+   botón para copiarlo, junto al link del video original y sus métricas.
 5. **El equipo elige los que sirven** *(Majo y Jero califican en el tablero)*. El mapa de calor
    **se rehace solo con los elegidos**, y el sistema **aprende qué priorizar** la próxima vez.
-6. **Todo queda en un histórico descargable** *(Google Sheets → Excel)*: qué se seleccionó,
-   cuándo, para qué voz — con sus links y métricas. Se puede medir efectividad de verdad.
+6. **Todo queda en un histórico descargable** *(un botón «Descargar CSV» que abre en Excel)*: qué se
+   seleccionó, cuándo, para qué voz — con sus links y métricas. Se puede medir efectividad de verdad.
 
 ## Qué te da a ti
 
@@ -47,8 +47,8 @@ registrado y mejora solo**.
 
 ## Qué cuesta
 
-- **Fijo: ~$7 USD/mes** *(el servidor del automatizador)*. El tablero *(Airtable)*, la base de
-  datos *(Supabase)* y el histórico *(Sheets)* van en **plan gratis**.
+- **Fijo: ~$7 USD/mes** *(el servidor del automatizador)*. El tablero, la base de datos y el
+  histórico van en **plan gratis**.
 - **Variable por uso** *(scraping, transcripción, traducción)*: ya existe hoy; ahora se **mide
   por proyecto** — y bajó, porque ya no se generan guiones con IA, solo se traduce cuando hace falta.
 

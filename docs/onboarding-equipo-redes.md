@@ -4,7 +4,8 @@
 > dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
 > falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
 >
-> *Actualizado: 2026-07-20. Refleja el sistema ya estabilizado: el motor busca **solo por
+> *Actualizado: 2026-08-05 — Airtable y el Google Sheet salieron del sistema; todo vive en el
+> cockpit. Refleja el sistema ya estabilizado: el motor busca **solo por
 > referentes** (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron porque no
 > traían calidad —, el **buscador de cuentas nuevas** les propone referentes (§8.1), y hay
 > **páginas de métricas** que muestran cómo viene funcionando (§6.2), con la columna
@@ -36,8 +37,9 @@
   trabajar de a un tema por vez. Y al abrir un video hay un botón **«Copiar guion»**.
 - ✅ Armar la corrida a su medida: elegir **Voz → Proyectos → cuántos videos pide cada uno** y
   **pedir una corrida a demanda** cuando la necesiten (§3.1) — ya no dependen del lunes.
-- ✅ Poner en cada candidato dos cosas: la **calificación** (🔥/👍/👎) y el **estado** (aprobado/descartado).
-- ✅ Calificar **también lo que descartan** (👎 + descartado): así la máquina aprende y mejora.
+- ✅ Poner en cada candidato **una** cosa: la **calificación** (🔥/👍/👎). El estado se deduce solo — 👎 es
+  descartado, 🔥 y 👍 son aprobado.
+- ✅ Calificar **también lo que descartan** (👎): así la máquina aprende y mejora.
 - ✅ Mantener sana la lista de **Referentes** (agregar cuentas buenas de Instagram **y TikTok**, y
   **sacar** las que no sirven), en el cockpit, `Curar → Referentes`. Esa lista es de dónde sale
   **todo** el contenido: cuentas buenas = candidatos buenos.
@@ -46,7 +48,8 @@
 - ✅ Escribir buenos `criterios_relevancia` en cada Proyecto (es lo que decide la calidad de lo que llega).
 
 **Lo que NO hacen (nunca):**
-- ❌ **No** llenan la tabla **Candidatos** a mano — esa la llena sola la máquina.
+- ❌ **No** cargan videos al Feed a mano — eso lo llena sola la máquina (para un link suelto está
+  *Transcribir*, §8.2).
 - ❌ **No** entran a n8n, Supabase, ni nada que suene "técnico". Eso es sala de máquinas, no es su trabajo.
 - ❌ **No** dejan un Proyecto activo **sin fuentes**. Un proyecto activo sin ningún Referente **no trae
   nada**: es un proyecto muerto (ver §5.2). Todo proyecto activo necesita al menos una cuenta en
@@ -79,23 +82,30 @@ saber que existen para entender de dónde sale cada cosa que ven:
 
 | Robot | Cuándo corre | Qué hace | Qué ven ustedes después |
 |---|---|---|---|
-| **El motor** | Lunes 8:00 am **y a demanda** (§3.1) | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Feed de Calificación** + los dudosos en **Descartes**. |
+| **El motor** | Lunes 8:00 am **y a demanda** (§3.1) | Sale a Instagram y TikTok, baja videos de sus Referentes, los transcribe, traduce al español y ordena. | Videos nuevos en **Curar → Feed** + los dudosos en **Curar → Descartes**. |
 | **El buscador de cuentas** | Lunes 9:00 am | Mira sus mejores Referentes y busca cuentas **parecidas** para sumar. | Sugerencias en el cockpit, **Curar → Sugeridos**. |
-| **El archivador** | Domingo 6:00 pm | Se lleva al Histórico todo lo que ya calificaron, limpia la lista y cuenta el desempeño de la semana. | La lista queda limpia + se actualizan las **Métricas**. |
-| **El transcriptor** | Cuando ustedes le pegan links (§8.2) | Le saca el script en español a videos que traen ustedes, no la máquina. | Los scripts en la pestaña **Transcribir**, y esos videos dejan de aparecer en el Feed. |
+| **El archivador** | Domingo 6:00 pm | Se lleva a Históricos todo lo que ya calificaron, limpia la lista y cuenta el desempeño de la semana. | La lista queda limpia + se actualizan los números de **Entender**. |
+| **El transcriptor** | Cuando ustedes le pegan links (§8.2) | Le saca el script en español a videos que traen ustedes, no la máquina. | Los scripts en la zona **Transcribir**, y esos videos dejan de aparecer en el Feed. |
 
 Regla mental de la semana: **el lunes llega trabajo, durante la semana ustedes califican, el domingo
 se archiva y se mide.** Todo lo demás es automático.
 
 ---
 
-## 2. Las únicas dos herramientas que tocan
+## 2. La única herramienta que tocan
 
-| Herramienta | Para qué | Qué hacen ahí |
+**El cockpit**, y nada más: `pipeline-creacion-contenido.vercel.app`. Se entra con un **magic link**
+al mail (no hay contraseña que recordar).
+
+| Zona del cockpit | Para qué | Qué hacen ahí |
 |---|---|---|
-| **Airtable** | El tablero de trabajo | Leen los videos y los califican. Es donde viven el 95% del tiempo. |
-| **Históricos** (en el cockpit) | El archivo de lo ya elegido | Solo lo consultan. Hay un botón **Descargar CSV** que se abre en Excel o en Sheets. |
-| ~~Google Sheet "Histórico"~~ | *Se está yendo* | Sigue existiendo por ahora, pero lo reemplaza la pantalla de Históricos ([ADR-057](./adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)). No armen nada nuevo encima. |
+| **Curar → Feed** | El tablero de trabajo | Leen los videos y los califican. Es donde viven el 95% del tiempo. |
+| **Curar → Históricos** | El archivo de lo ya elegido | Solo lo consultan. Hay un botón **Descargar CSV** que se abre en Excel o en Sheets. |
+| **Operar** | Disparar una corrida | El botón **▶ Correr ahora** y el estado de lo que está corriendo. |
+
+> ☠️ **Airtable ya no existe en este sistema, y el Google Sheet "Histórico" tampoco.** Si alguien les
+> pasa un link a cualquiera de los dos, está viejo. Todo —el feed, los proyectos, las voces, los
+> referentes, las perillas y el archivo— vive en el cockpit.
 
 Todo lo demás (los robots, las bases de datos por detrás) es **sala de máquinas**. No necesitan entrar
 nunca. Si alguien menciona "n8n", "Supabase" o "el cron", es plomería interna, no es asunto del equipo
@@ -105,22 +115,22 @@ de redes.
 
 ## 3. La rutina (lo que hacen durante la semana)
 
-1. La máquina corre sola (una vez por semana) y deja videos nuevos en Airtable.
-2. Entran a Airtable, a la tabla **Candidatos** (o a la vista **Calificar**).
-3. Cada fila es un video ya transcrito y traducido al español, con su métrica y su link al original.
+1. La máquina corre sola (una vez por semana) y deja videos nuevos en el Feed.
+2. Entran al cockpit, a `Curar → Feed`.
+3. Cada tarjeta es un video ya transcrito y traducido al español, con su métrica y su link al original.
 4. Leen el texto (o miran el video original y la portada), y **deciden**.
 5. Califican (ver §6).
-6. Lo que aprueban queda guardado en el Histórico **automáticamente** y sale de la lista. Lo que no
+6. Lo que aprueban queda guardado en Históricos **automáticamente** y sale de la lista. Lo que no
    tocaron sigue esperando.
-7. Una vez por semana (2 min): pasan por **Descartes** y marcan el `veredicto` (§6.1), y
-   revisan los sugeridos en el cockpit, `Curar → Sugeridos` (§8.1).
+7. Una vez por semana (2 min): pasan por `Curar → Descartes` y marcan el `veredicto` (§6.1), y
+   revisan los sugeridos en `Curar → Sugeridos` (§8.1).
 
-Regla mental: **Airtable es su bandeja de entrada.** La máquina la llena, ustedes la vacían decidiendo.
+Regla mental: **el Feed es su bandeja de entrada.** La máquina la llena, ustedes la vacían decidiendo.
 Lo que califican desaparece de pendientes y queda archivado.
 
-> **¿Cuándo se limpia la lista?** Un proceso automático corre **los domingos a las 18:00** y se lleva al
-> Histórico todo lo que ustedes **ya calificaron** durante la semana (aprobado o descartado), y lo borra
-> de Airtable. Los que dejaron sin calificar **no se borran**: siguen esperando. Por eso conviene calificar
+> **¿Cuándo se limpia la lista?** Un proceso automático corre **los domingos a las 18:00** y se lleva a
+> Históricos todo lo que ustedes **ya calificaron** durante la semana (aprobado o descartado), y lo saca
+> del Feed. Los que dejaron sin calificar **no se borran**: siguen esperando. Por eso conviene calificar
 > **antes del domingo** — así el archivo queda ordenado y la lista no se amontona.
 
 ### 3.1 Corridas a demanda (nuevo)
@@ -155,7 +165,7 @@ Dos reglas que evitan sorpresas:
 
 ---
 
-## 4. Airtable por dentro: las tablas
+## 4. El cockpit por dentro: las pantallas
 
 Piénsenlas en tres grupos.
 
@@ -166,64 +176,52 @@ Piénsenlas en tres grupos.
 - **Voces** — para quién se selecciona (un personaje o marca). Organiza y afina el filtro.
 - **Referentes** — las **cuentas** (de Instagram **y** TikTok) que se siguen. **De ahí sale todo:**
   la máquina solo trae videos de estas cuentas.
-- **Las perillas** (cuánto trae por corrida, días, qué ejes se prenden) — **ya no están en Airtable: se
-  tocan en el cockpit, Curar → Ajustes.** Vienen con valores razonables; casi no se tocan. Más en §5.5.
+- **Las perillas** (cuánto trae por corrida, días, qué ejes se prenden) — en `Curar → Ajustes`.
+  Vienen con valores razonables; casi no se tocan. Más en §5.5.
 
 > Estas las arman una vez y las van ajustando. **No hace falta tocarlas para el trabajo del día.**
 
 ### Las que usan para trabajar
 
-- **Candidatos** — los videos que llegaron, esperando que ustedes los califiquen. Acá viven (todos
+- **Curar → Feed** — los videos que llegaron, esperando que ustedes los califiquen. Acá viven (todos
   los días).
-- **Referentes propuestos** — las cuentas nuevas que la máquina les sugiere para sumar al banco. Las
-  escribe acá, pero **la revisan y las deciden en el cockpit**, `Curar → Sugeridos`, **una vez por
+- **Curar → Sugeridos** — las cuentas nuevas que la máquina propone para sumar al banco. **Una vez por
   semana** (§8.1).
-- **Descartes del gate** — los ~10 videos más dudosos que la máquina descartó, para que auditen si se
+- **Curar → Descartes** — los ~10 videos más dudosos que la máquina descartó, para que auditen si se
   equivocó. También **una vez por semana**, 2 minutos (§6.1).
 
-### La que solo miran
+### Las que solo miran
 
-- **Métricas** — el desempeño de cada semana (páginas *Calidad por Proyecto*, *Salud del Sistema* y *Costos*, §6.2).
-  La llena la máquina cada domingo; **nadie escribe ahí**.
+- **Entender** — el desempeño de cada semana: calidad por proyecto, salud del sistema y costos
+  (§6.2). Los números se calculan solos a partir de lo que ustedes califican; **nadie escribe ahí**.
 
-### 4.1 El layout que ven: el menú del "Cockpit Redes"
+### 4.1 El menú que ven
 
-Cuando entran a Airtable no ven las tablas crudas: ven una interfaz llamada **Cockpit Redes** con un
-menú de páginas a la izquierda. Cada página es una vista limpia de una tabla, con solo lo que hace
-falta. Este es el menú completo y qué pueden tocar en cada uno:
+A la izquierda hay cuatro zonas. Esto es todo lo que hay y qué se toca en cada una:
 
-| Página (lo que ven en el menú) | Para qué | Qué editan ahí |
+| Zona | Para qué | Qué editan ahí |
 |---|---|---|
-| **Feed de Calificación** | Su bandeja diaria de videos a calificar | `calificacion`, `estado`, `notas_equipo` |
-| **Descartes** | Los ~10 descartes dudosos de la semana (§6.1) | `veredicto` |
-| ~~**Proyectos**~~ · ~~**Voces**~~ | Se mudaron al cockpit (**Curar → Voces y proyectos**, §5.1 y §5.2) | **nada acá: lo que escriban no lo lee nadie** |
-| ~~**Referentes**~~ · ~~**Referentes - Revisar**~~ · ~~**Referentes - Sugeridos**~~ | Se mudaron al cockpit (**Curar → Referentes** y **Curar → Sugeridos**, §5.3) | **nada acá: lo que escriban no lo lee nadie** |
-| ~~**Configuración Global**~~ · ~~**Ajustes Dev-Only**~~ | Se mudaron al cockpit (**Curar → Ajustes**, §5.5) | **nada acá: lo que escriban no lo lee nadie** |
-| **Calidad por Proyecto** | Precisión por proyecto (§6.2) | **nada — solo lectura** |
-| **Salud del Sistema** | Los números de la máquina (§6.2) | **nada — solo lectura** |
-| **Costos** | Cuánto gastó la semana, por servicio | **nada — solo lectura** |
+| **Operar** | Disparar una corrida y ver la que está en curso | el botón **▶ Correr ahora** |
+| **Curar → Feed** | Su bandeja diaria de videos a calificar | la **calificación** y las **notas del equipo** |
+| **Curar → Descartes** | Los ~10 descartes dudosos de la semana (§6.1) | el **veredicto** |
+| **Curar → Voces y proyectos** | Para quién se selecciona y qué se busca (§5.1, §5.2) | todo: nombre, criterios, cuántos videos pide, prendido/apagado |
+| **Curar → Referentes** · **Sugeridos** | El banco de cuentas y la bandeja de propuestas (§5.3, §8.1) | agregar, apagar, aprobar/descartar |
+| **Curar → Ajustes** | Las perillas (§5.5) | los valores |
+| **Curar → Históricos** | El archivo de lo ya elegido | **nada — solo lectura** (+ el botón *Descargar CSV*) |
+| **Entender** | Precisión, salud y costos (§6.2) | **nada — solo lectura** |
+| **Transcribir** | Pegar un link suelto y recibir su texto | el link |
 
-> **Ojo con los nombres.** Algunas páginas se llaman distinto a la tabla que muestran: *Feed de
-> Calificación* es la tabla **Candidatos**; *Referentes
-> - Sugeridos* es la tabla **Referentes propuestos**; *Calidad por Proyecto* muestra **Métricas Proyectos**
-> y *Salud del Sistema* / *Costos* muestran **Métricas Global**. Guíense por el nombre del **menú**, no
-> por el de la tabla.
-> El formulario **"Nuevo Proyecto"** de Airtable **ya no se usa**: crear un proyecto (o una voz) se
-> hace en el cockpit, abajo de todo en **Curar → Voces y proyectos**.
+> **Calificar es un solo acto.** No hay que poner un emoji *y* además un estado: eligen 🔥 / 👍 / 👎 y
+> el sistema deduce el resto. Antes eran dos campos y el que se olvidaba era siempre el emoji.
 
-> ⚠️ **Si abren la página *Proyectos* de Airtable, van a ver dos campos que cambian solos** —
-> *criterios aprendidos* y una revisión de los criterios. Eso **no** es alguien editando: lo escribe
-> la máquina cada domingo, y es lo único que todavía vive ahí. Se lee en el cockpit, en
-> **Criterios** de cada proyecto. Ustedes no tienen que tocar nada en esa página.
-
-En cada candidato la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
+En cada tarjeta la máquina ya les dejó lleno: el **título**, el **script** (la transcripción en español),
 el **idioma original**, la **portada**, el **link al video original**, las **métricas** (views, likes,
-seguidores, engagement) y el **heat score** (§7). **Lo único que llenan ustedes:** la **calificación**, el
-**estado** y, si quieren, **notas del equipo**.
+seguidores, engagement) y el **heat score** (§7). **Lo único que llenan ustedes:** la **calificación**
+y, si quieren, **notas del equipo**.
 
-> **Todos los campos tienen ayuda incorporada.** Al lado del nombre de cada campo hay un ícono **ⓘ**:
-> tóquenlo y sale la explicación de qué es y quién lo llena. Si dudan de un campo, el ⓘ responde más
-> rápido que este manual.
+> ⚠️ **Hay dos campos del proyecto que cambian solos** — *criterios aprendidos* y una advertencia
+> sobre los criterios. Eso **no** es alguien editando: lo escribe la máquina cada domingo. Se leen en
+> **Criterios** de cada proyecto y ustedes no tienen que tocarlos.
 
 ---
 
@@ -235,17 +233,15 @@ Esto se hace **una sola vez** al arrancar (y cada vez que quieran sumar un tema 
 **Orden recomendado:** Voces → Proyectos → Referentes. (Hay que crear la Voz y el Proyecto
 antes, porque Referentes se "enganchan" a ellos.)
 
-> 🆕 **Voces y Proyectos ya no se cargan en Airtable: se cargan en el cockpit,
-> `Curar → Voces y proyectos`.** Es una sola pantalla: cada voz con sus proyectos adentro, y abajo
-> de todo los formularios para agregar un proyecto o una voz nueva. Los nombres de los campos que
-> siguen son los mismos, así que esta sección se lee igual — solo cambió dónde se escribe.
+> 📍 **Voces y Proyectos se cargan en `Curar → Voces y proyectos`.** Es una sola pantalla: cada voz
+> con sus proyectos adentro, y abajo de todo los formularios para agregar un proyecto o una voz nueva.
 >
-> **Dos cosas que la pantalla hace y Airtable no hacía:**
+> **Dos cosas que la pantalla hace por ustedes:**
 > - **Avisa cuando algo no va a correr.** Un proyecto prendido cuya voz está apagada aparece con el
 >   cartel *"no corre: su voz está apagada"*; una voz prendida sin ningún proyecto activo se avisa
->   arriba de todo. Antes eso solo se veía en los logs, o sea no se veía.
-> - **No deja crear un proyecto sin criterios de relevancia.** En Airtable el formulario dejaba, y
->   un proyecto sin criterios aprueba casi cualquier cosa.
+>   arriba de todo.
+> - **No deja crear un proyecto sin criterios de relevancia**, porque un proyecto sin criterios
+>   aprueba casi cualquier cosa.
 
 ### 5.1 `Voces` — para quién se selecciona
 
@@ -318,9 +314,8 @@ con los de otro.
 
 ### 5.3 Referentes — las cuentas de Instagram y TikTok que se siguen
 
-> **⚠️ CAMBIÓ DE LUGAR (2026-07-31): los Referentes se cargan y se podan en el cockpit,
-> en `Curar → Referentes`.** Las páginas de Airtable *Referentes*, *Referentes - Revisar* y
-> *Referentes - Sugeridos* quedan como archivo: **lo que escriban ahí no lo lee nadie.**
+> 📍 **Los Referentes se cargan y se podan en `Curar → Referentes`**, con *A revisar* adentro de la
+> misma pantalla.
 
 Cada cuenta es una fuente de la que la máquina trae videos. **Es la fuente más importante y de mejor
 calidad** (cuentas que ustedes eligieron a mano).
@@ -385,15 +380,13 @@ cada columna que van a ver:
 > video (audio raro, sin voz, o falló el transcriptor). No es un error de ustedes. Qué hacer: **miren el
 > video original** (el link `url_referente`) y la portada, y decidan igual; o si no vale la pena, **descártenlo**.
 
-### 5.5 Las perillas — **ahora se tocan en el cockpit, no en Airtable**
+### 5.5 Las perillas
 
-> ⚠️ **Cambió de lugar (2026-07-31).** Las perillas ya **no** se editan en Airtable: viven en el cockpit,
-> en **Curar → Ajustes**. La tabla `Ajustes` y la página *Configuración Global* quedan como archivo: lo
-> que escriban ahí **no lo lee nadie**. Lo que cambien en el cockpit aplica en la corrida siguiente.
+> 📍 **Viven en `Curar → Ajustes`**, y lo que cambien aplica en la corrida siguiente.
 >
-> En el cockpit ven **solo las perillas de equipo**; las avanzadas ya no aparecen "en gris para mirar",
-> directamente no están (para moverlas, avisen). El cockpit además **no deja guardar un valor imposible**
-> — antes Airtable aceptaba cualquier cosa y la máquina ordenaba raro sin decir nada.
+> Ven **solo las perillas de equipo**; las avanzadas directamente no aparecen (para moverlas, avisen).
+> La pantalla **no deja guardar un valor imposible**, así que no hay forma de dejar a la máquina
+> ordenando raro sin enterarse.
 
 La máquina ya viene con valores por defecto razonables. **No hace falta tocar nada para arrancar.** Es una
 lista de "perilla = valor" en español claro.
@@ -639,9 +632,8 @@ con la razón completa, la bio y los proyectos:
 
 Apenas deciden una, **desaparece de la lista**: la pantalla muestra solo lo que falta revisar.
 
-> **⚠️ No aprueben desde Airtable.** La página vieja *Referentes - Sugeridos* quedó como archivo, y
-> aprobar ahí siembra la cuenta en un lugar que la máquina ya no lee: parecería aprobada y no
-> traería nada. La decisión va en el cockpit.
+> 📍 **La decisión va en `Curar → Sugeridos`**, que es el único lugar desde donde una cuenta aprobada
+> se siembra de verdad en el banco.
 
 Tres cosas para saber:
 - **Propone Instagram y TikTok.** Para TikTok necesita que ya tengan **algunas cuentas de TikTok

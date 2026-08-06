@@ -22,19 +22,25 @@ en §Agent skills; acá solo se ubican.
 - [docs/agents/mapa-campos.md](docs/agents/mapa-campos.md) — mapa del cockpit: **por campo** (9 tablas) y **por página** (12 + 1 form), con huérfanos, hallazgos y reconciliación repo↔live (A.2 + A.3 del refactor, cerrados).
 
 - [docs/agents/plan-cockpit-propio.md](docs/agents/plan-cockpit-propio.md) — el plan del **cockpit propio**
-  que reemplaza a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
+  que reemplazó a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–058, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–059, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
-- [core/contracts/airtable-cockpit.md](core/contracts/airtable-cockpit.md) — 🧊 **congelado en D7**: el modelo de datos de Airtable, como registro histórico. Lo vivo está en [core/schema/](core/schema/).
+- *(`airtable-cockpit.md` **ya no existe.** Era el modelo de datos de Airtable, congelado en D7 como registro histórico y borrado el 2026-08-05 con el resto de la purga. **El modelo vivo es [core/schema/](core/schema/)** — las migraciones son el modelo, no su descripción en prosa. Está en git si hace falta arqueología.)*
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–021; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-04, **medido contra prod por PostgREST**, están las **21 de 21 aplicadas**.
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–022; se aplican a mano en el SQL Editor,
+  en orden). Al 2026-08-05, **medido contra prod por PostgREST**, están las **22 de 22 aplicadas**.
+  🧹 **La `022` (ADR-059) podó la "balde 2"**: 5 vistas sin consumidor, `outputs.publicado_en`,
+  `runs.costo_estimado`, `instances.config_ref` y las 6 `airtable_id`. Su hermana, la `023` (las 5
+  columnas write-only de `processed_items` + `outputs.source_items` + `transcripciones.pedido_por`),
+  **va después del `n8n:push` que deja de escribirlas** y lleva gate humano: PostgREST rechaza el
+  insert entero con `PGRST204` y esos POST son `onError: continue`, así que el 400 se traga y deja
+  al motor cerrando en verde **sin memoria de dedup**.
   ✅ **La ventana del expand se cerró**: la `019` mató `usuarios.rol` y `usuarios.client_id`, y el
   acceso vive solo en `app.usuarios_clientes` (**7 filas** al 05/08) + el flag `es_dueno` (ADR-051).
   ⚠️ **Una migración con gate humano no se da por aplicada porque se haya corrido, sino cuando se
@@ -63,7 +69,7 @@ porque es una sola regla (ADR-053): **cambiar un workflow es `n8n:push`, no re-i
 re-import queda solo para topología, y solo ahí aplican sus placeholders y credenciales.
 - [Workflows/workflow-short-form-content/CLAUDE.md](Workflows/workflow-short-form-content/CLAUDE.md) — el motor de reels (qué es, orden). Fuente de verdad: su `workflow.json`.
 - [Workflows/workflow-descubrimiento-referentes/README.md](Workflows/workflow-descubrimiento-referentes/README.md) — el descubrimiento de referentes (ADR-020): propone cuentas nuevas cada semana, el equipo aprueba, se siembran solas.
-- [Workflows/workflow-archivado/README.md](Workflows/workflow-archivado/README.md) — el archivado: manda los calificados a `outputs` y al Sheet Histórico, destila criterios (ADR-022) y barre. 🔴 El Sheet es **uno solo y global**: [ADR-057](docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) lo **sentenció** (el export CSV del cockpit ya está en prod); sacar los nodos va en el re-import de D8.
+- [Workflows/workflow-archivado/README.md](Workflows/workflow-archivado/README.md) — el archivado: manda los calificados a `outputs` y al Sheet Histórico, destila criterios (ADR-022) y barre. 🔴 **El Sheet es lo último de la vieja superficie que queda vivo**: [ADR-057](docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) lo sentenció (el export CSV ya está en prod) y sacar sus 3 nodos es **el único item de la cola del re-import**.
 - [Workflows/workflow-dispatcher/README.md](Workflows/workflow-dispatcher/README.md) — el que convierte **un** workflow parametrizado en **N corridas aisladas**, una por instancia (ADR-050). Los dos crons del sistema viven acá.
 - [Workflows/workflow-registro-fallos/README.md](Workflows/workflow-registro-fallos/README.md) — el error handler global: marca como `fallo` el run de la ejecución que se cayó, encontrado por `params.execution_id` (ADR-054). Activo y verificado end-to-end; lo apuntan los 4 workflows. Se rompió **dos veces** por un `<<SUPABASE_URL>>` sin resolver que `onError: continue` silenciaba: por eso `npm run n8n:diff` va después de cada import.
 
@@ -84,7 +90,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..058).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..059).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del
@@ -155,8 +161,9 @@ módulos), `/handoff` (compactar una sesión).
 - **Secretos JAMÁS en git** — ni credenciales ni IDs en ningún archivo del repo. Todo va al gestor de
   contraseñas compartido; el validador escanea el patrón `pat...` y otros secretos en cada corrida.
 - **Credenciales para trabajar: `.env` en la raíz** (gitignored, local, no versionado). Es el hub
-  único: Supabase, Airtable, el webhook del motor (el botón "Ejecutar"), run-plan, Apify, Anthropic,
-  Supadata, Google Sheets y la **API pública de n8n** (`N8N_API_KEY`). **Usalo proactivamente** — si
+  único: Supabase, el webhook del motor (el botón "Ejecutar"), run-plan, Apify, Anthropic,
+  Supadata y la **API pública de n8n** (`N8N_API_KEY`). *(Airtable se podó el 2026-08-03 y su PAT
+  está revocado.)* **Usalo proactivamente** — si
   necesitás pegarle a un componente del pipeline, cargá `set -a && source .env && set +a` y usá
   `"$VAR"`, no le pidas la key a Mani.
   Nunca imprimas un valor en el chat. Si una var está vacía, decílo y seguí con lo que sí se pueda.

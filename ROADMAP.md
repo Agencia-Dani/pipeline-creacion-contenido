@@ -22,18 +22,18 @@
 **El objetivo en una frase:** una máquina que corre sola **y también a demanda** — busca videos de
 referentes (priorizando otros idiomas), los ordena de caliente a frío, entrega cada uno
 **transcrito/traducido al español** con link al original y al script, deja que el equipo de
-redes (**Majo y Jero**) elija en Airtable — y **aprende de esa elección** mientras todo queda en
-un **histórico exportable a Sheets**.
+redes (**Majo y Jero**) elija en el cockpit — y **aprende de esa elección** mientras todo queda en
+un **histórico exportable a Excel**.
 
 > **Enmienda 2026-07-15 (refactor Voces→Proyectos):** el cron semanal autónomo **coexiste** con un
 > disparo **on-demand** (el equipo prende los proyectos que quiere, fija la N de cada uno, y corre con
-> un botón en Airtable — [ADR-023](./docs/adr/ADR-023-disparo-on-demand-boton-airtable.md),
+> un botón — [ADR-023](./docs/adr/ADR-023-disparo-on-demand-boton-airtable.md),
 > [ADR-024](./docs/adr/ADR-024-enmienda-adr016-n-por-proyecto.md)). El on-demand se **suma**; no retira
 > al cron. Es el único punto del norte que este refactor mueve, y va con ADR.
 
 ✅ Visto bueno dado · ✅ flag viral confirmado como concepto (~700K marca "high-end", no excluye)
 · ✅ división por proyectos/voces confirmada · ⬜ voz/proyecto inicial: aún no la dan — **y no
-bloquea**: las voces son registros de Airtable que el equipo crea/edita a gusto; el motor las
+bloquea**: las voces las crea y edita el equipo en el cockpit a gusto; el motor las
 lee en cada corrida.
 
 Los 7 puntos, con qué cambia cada uno:
@@ -44,26 +44,30 @@ Los 7 puntos, con qué cambia cada uno:
 2. **Prioridad multiidioma** *(complementa)* — referentes en EN/PT/IT/FR en la semilla y boost
    de idioma en el heat-score.
 3. **Histórico de selecciones** *(requisito visible)* — "el lunes 20 seleccionaron 5 videos para
-   tal voz": campo `calificado_en` + vistas `v_selecciones_por_dia` / `v_historico_seleccionados`
-   (schema `003`).
-4. **Cada script accesible** *(nuevo; ADR-009)* — el script vive como **texto** en Airtable
-   `Candidatos.script` (la transcripción/traducción literal), y el "link" es la **URL del video
+   tal voz": campo `calificado_en` + las vistas `v_selecciones_por_dia` / `v_historico_seleccionados`
+   (schema `003`). ⚠️ **Las dos vistas murieron en la [`022`](./core/schema/022_poda_balde_2.sql)**
+   (ADR-059): el requisito **sigue vivo** y hoy lo sirven `/curar/historicos` y su export CSV
+   (ADR-057), los dos sobre `outputs`. Lo que se cayó fue la implementación, no lo pedido.
+4. **Cada script accesible** *(nuevo; ADR-009)* — el script vive como **texto** en
+   `app.candidatos.script` (la transcripción/traducción literal), y el "link" es la **URL del video
    original**. Se descartó el Google Doc por script (llenaría el Drive); el motor no usa Google.
-5. **Mapa de calor re-rankeado de seleccionados** *(nuevo)* — vista de Airtable: filtro
-   `estado = aprobado` + orden `heat_score` desc. Se "rehace" sola, cero código.
+5. **Mapa de calor re-rankeado de seleccionados** *(nuevo)* — el filtro *aprobados* del Feed, con
+   el orden por `heat_score` desc que la pantalla ya trae. Se "rehace" solo.
 6. **El sistema aprende de la selección** *(redirige ADR-008)* — la curación alimenta el scoring
    (`v_senal_seleccion`), no la escritura.
-7. **Histórico exportable** *(nuevo)* — se materializa en un **Google Sheet** (el equipo ya vive
-   en Sheets; Excel sale nativo). Supabase sigue siendo la fuente de verdad del historial.
+7. **Histórico exportable** *(nuevo)* — se materializa en `/curar/historicos` con su botón
+   **Descargar CSV** (abre nativo en Excel). *Fue un Google Sheet hasta ADR-057, que lo mató: dejaba
+   el histórico de cada empresa en un archivo de Google donde el aislamiento del cockpit no llega.*
+   Supabase sigue siendo la fuente de verdad del historial.
 
-**Transversal:** Airtable es **el punto de entrada único** de quienes manejan el pipeline
-(proyectos, voces, referentes, calificación) — no-code e imposible de romper. El Sheet
-es la salida histórica. n8n y Supabase son sala de máquinas: ningún no-dev necesita tocarlos.
+**Transversal:** el cockpit es **el punto de entrada único** de quienes manejan el pipeline
+(proyectos, voces, referentes, calificación), y también la salida histórica. n8n y Supabase son
+sala de máquinas: ningún no-dev necesita tocarlos.
 
 > **Enmienda 2026-07-17 ([ADR-025](./docs/adr/ADR-025-cockpit-producto-propio.md)):** la superficie
-> del equipo **migra a un producto propio** (frontend+backend+DB+auth sobre Supabase). Airtable queda
-> como **cockpit interino** — sigue siendo la puerta no-code del equipo hasta que el producto opere,
-> curado al mínimo. El resto del invariante no cambia: n8n y Supabase siguen siendo sala de máquinas.
+> del equipo **migró a un producto propio** (frontend+backend+DB+auth sobre Supabase). ✅ **Completado
+> en D7 (2026-08-01):** Airtable salió del sistema, y el 2026-08-05 se borró hasta la última mención
+> en el repo. El resto del invariante no cambia: n8n y Supabase siguen siendo sala de máquinas.
 
 ### Heat-score v1 (los criterios, concretos)
 
@@ -91,11 +95,11 @@ Pesos iniciales razonables, no sagrados: se calibran con datos reales de curaci�
 
 | Dev | Carril | Foco |
 |---|---|---|
-| **Mani** | **B — Motor** | n8n online + rework del workflow (Airtable → dedup → heat → transcribe/traduce → link → candidatos) |
-| **Dev 2** *(¿Alejo?)* | **A — Capa de datos** | Supabase (schemas 001–003) + cockpit Airtable + semillas |
-| **Dev 3** | **C — Curación e histórico** | Sheet Histórico + workflow de archivado + tracking de selecciones |
+| **Mani** | **B — Motor** | n8n online + rework del workflow (fachada → dedup → heat → transcribe/traduce → link → candidatos) |
+| **Dev 2** *(¿Alejo?)* | **A — Capa de datos** | Supabase (schemas 001–003) + el cockpit + semillas |
+| **Dev 3** | **C — Curación e histórico** | el histórico + workflow de archivado + tracking de selecciones |
 
-Usuarios del sistema (no devs): **Majo y Jero** — equipo de redes, operan solo Airtable + Sheet.
+Usuarios del sistema (no devs): **Majo y Jero** — equipo de redes, operan solo el cockpit.
 
 Los tres carriles corren **en paralelo** tras M0. Único sync duro: **A10** (credenciales por el
 gestor — nunca por el repo).
@@ -112,10 +116,10 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
 ### M0 — Arranque (½ día) · los 3
 
 - [ ] **M0.1** Leer este doc completo (los 3) — cada dev sabe qué carril tiene y por qué.
-- [ ] **M0.2** Cuentas: Supabase, Airtable, InstaPods, Google Cloud (OAuth Sheets/Docs) — cada
+- [ ] **M0.2** Cuentas: Supabase, InstaPods, Vercel, Resend (magic link) — cada
       carril la suya; accesos al gestor de contraseñas.
 - [ ] **M0.3** Pedir al jefe la voz/proyecto inicial (no bloquea: se siembra una provisional;
-      el equipo la cambia cuando quiera desde Airtable).
+      el equipo la cambia cuando quiera desde el cockpit).
 
 ### Carril A — Capa de datos · 👤 Dev 2 · ~1.5 h
 
@@ -123,29 +127,24 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
 - [ ] **A2.** SQL Editor → correr en orden [`001`](./core/schema/001_registro_inicial.sql),
       [`002`](./core/schema/002_cockpit_y_dedup.sql) y [`003`](./core/schema/003_seleccion_e_historico.sql).
       Verificar: `select * from workflows;` (2 seeds), `select * from processed_items;` (vacía),
-      `select * from v_historico_seleccionados;` (existe, vacía).
+      `select * from outputs;` (existe, vacía). *(Era `v_historico_seleccionados`, dropeada por la
+      [`022`](./core/schema/022_poda_balde_2.sql).)*
 - [ ] **A3.** Guardar en el gestor (NUNCA en git): URL del proyecto + `service_role` key (Settings → API).
 - [ ] **A4.** Insertar cliente + instancia (snippet comentado al final del `001`) → anotar `instance_id`.
-- [ ] **A5.** Crear cuenta [airtable.com](https://airtable.com) (free) + workspace → copiar el `workspaceId` (`wsp...`) del URL.
-- [ ] **A6.** Generar un **Personal Access Token** (scopes `schema.bases:write`,
-      `data.records:read/write`) → al gestor (es secreto).
-- [ ] **A7.** Crear la base de un comando — incluye los campos ADR-009/010 (`idioma`, `thumbnail`,
-      `relevancia_score`/`relevancia_razon`, `fecha_calificacion`):
-      ```bash
-      export AIRTABLE_PAT='pat...'; export AIRTABLE_WORKSPACE_ID='wsp...'
-      node core/scripts/setup-airtable.mjs        # imprime el baseId (app...)
-      ```
-      Crear a mano la vista **"🔥 Seleccionados"** en `Candidatos` (filtro `estado=aprobado`,
-      orden `heat_score` desc — el re-rank del jefe). Modelo completo:
-      [core/contracts/airtable-cockpit.md](./core/contracts/airtable-cockpit.md).
-- [ ] **A8.** Dar acceso de **editor** a Majo y Jero (Share — hasta 5 en el plan free).
-- [ ] **A9.** Datos semilla: 1+ `Proyectos`, 1 `Voz` (provisional si el jefe no definió),
-      `Keywords`/`Referentes` del nicho — **incluyendo referentes en EN/PT/IT/FR**.
-- [ ] 🔗 **A10.** Pasar por el gestor a B y C: `supabase_url` + `service_role` + `instance_id` ·
-      `baseId` + `PAT`.
+- [x] ~~**A5–A8.** Crear la cuenta de Airtable, el PAT, la base por `setup-airtable.mjs` y los
+      accesos del equipo.~~ ☠️ **MUERTOS.** El cockpit es producto propio desde
+      [ADR-025](./docs/adr/ADR-025-cockpit-producto-propio.md) y Airtable salió del sistema en D7
+      ([ADR-035](./docs/adr/ADR-035-contrato-de-escritura-por-postgrest.md)). El equivalente hoy:
+      **correr las migraciones de [`core/schema/`](./core/schema/) en orden** (ahí vive el modelo,
+      tablas y vistas) y **deployar `apps/dashboard`** — el alta de personas es una fila en
+      `app.usuarios` + su membresía ([ADR-051](./docs/adr/ADR-051-el-acceso-es-membresia-explicita.md)),
+      no un "Share". Los pasos vivos están en [apps/dashboard/README.md](./apps/dashboard/README.md).
+- [ ] **A9.** Datos semilla: 1+ proyecto, 1 voz (provisional si el jefe no definió) y referentes del
+      nicho — **incluyendo referentes en EN/PT/IT/FR**. Se cargan **desde el cockpit**, en *Curar*.
+- [ ] 🔗 **A10.** Pasar por el gestor a B y C: `supabase_url` + `service_role` + `instance_id`.
 
-**Hecho cuando:** las vistas de Supabase responden · la base Airtable tiene las 5 tablas +
-campos ADR-009 + vista "🔥 Seleccionados" · Majo y Jero tienen acceso · A10 entregado.
+**Hecho cuando:** las vistas de Supabase responden · el cockpit levanta y muestra las 4 zonas ·
+Majo y Jero entran por magic link y tienen su membresía · A10 entregado.
 
 ### Carril B — Motor n8n · 👤 Mani · ~4–5 h
 
@@ -156,18 +155,18 @@ campos ADR-009 + vista "🔥 Seleccionados" · Majo y Jero tienen acceso · A10 
       `dist/piloto.workflow.json`, pegar keys, Execute Workflow → confirma el espinazo
       Apify→Claude→entrega antes del rework.
 - [ ] **B3. Rework del workflow** (el build del MVP — ADR-009), sobre el JSON del piloto:
-  - **Config:** leer de Airtable (Proyectos activos + Keywords/Referentes/Voz/filtros) en vez del `Set` de params.
+  - **Config:** leer de la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028) en vez del `Set` de params.
   - **COLECTAR:** Apify con ventana `dias_recencia` (backfill=180 la 1ª vez, diario=1–2). Cuentas/hashtags desde `Referentes`/`Keywords` (incluidos multiidioma).
   - **DEDUP:** consultar `processed_items` antes de transcribir; insertar lo nuevo con su `idioma` al final (`Prefer: resolution=ignore-duplicates`).
   - **SCOREAR:** heat-score v1 (fórmula de §1) — ordenar caliente→frío, tomar `top_n`; `flag_viral` marca.
   - **TRANSCRIBIR + TRADUCIR** *(reemplaza GENERAR)*: Supadata transcribe; Claude detecta idioma y **traduce literal al español solo si hace falta** — sin reescribir, sin embellecer. En español = transcripción tal cual (sin llamada de traducción).
   - **CALIDAD** *(ADR-010)*: gate Haiku estricto contra `criterios_relevancia` (Proyecto ⊕ Voz) → dropea lo irrelevante y compone el `heat_score`. El script vive como **texto** (sin Google Doc — ADR-009); el "link" es la URL del video original.
-  - **ENTREGAR:** candidatos a Airtable `Candidatos` (estado `nuevo`, con `idioma` + `thumbnail` + `relevancia_score`/`relevancia_razon`, batch 10/call) + registro Supabase (`runs`/`outputs`/`processed_items`, patrón [ingesta-registro](./core/contracts/ingesta-registro.md)). En `outputs.metadata`: proyecto, voz, referente, url_referente, idioma, métricas, heat_score.
-- [ ] **B4.** Credenciales en n8n: Apify (community node), Anthropic, Supadata, Airtable (PAT),
+  - **ENTREGAR:** candidatos a `app.candidatos` por PostgREST (estado `nuevo`, con `idioma` + `thumbnail` + `relevancia_score`/`relevancia_razon`, batch 10/call) + registro Supabase (`runs`/`outputs`/`processed_items`, patrón [ingesta-registro](./core/contracts/ingesta-registro.md)). En `outputs.metadata`: proyecto, voz, referente, url_referente, idioma, métricas, heat_score.
+- [ ] **B4.** Credenciales en n8n: Apify (community node), Anthropic, Supadata,
       Supabase Registro (service_role). **Sin Google** (el motor no usa credenciales de Google).
 - [x] **B5.** Importar el error workflow ([`Workflows/workflow-registro-fallos/`](./Workflows/workflow-registro-fallos/)), fijarlo como Error Workflow. ✅ activo, y los 4 workflows lo apuntan en `settings.errorWorkflow`.
 
-**Hecho cuando:** una corrida manual de backfill (180 días) deja candidatos en Airtable con
+**Hecho cuando:** una corrida manual de backfill (180 días) deja candidatos en el Feed con
 script en español, `idioma`, `thumbnail` y la razón de relevancia, y su rastro completo en Supabase.
 
 ### Carril C — Curación e histórico · 👤 Dev 3 · ~2–3 h *(C1 arranca ya; C2 necesita A10 + B1 — corre en la misma instancia n8n)*
@@ -216,7 +215,8 @@ links, (2) contado en `v_selecciones_por_dia` para su voz, (3) fuera de Airtable
 ## 4. MVP declarado cuando
 
 Backfill real deja candidatos (script literal en español + links) que Majo/Jero califican · el
-histórico aparece en el Sheet y `v_selecciones_por_dia` dice cuántos y para qué voz · una corrida
+histórico aparece en `/curar/historicos` y dice cuántos y para qué voz *(era el Sheet +
+`v_selecciones_por_dia`; ADR-057 y ADR-059)* · una corrida
 incremental no reprocesa · una falla simulada no tumba la entrega · los crons corren en
 `America/Bogota` · **el equipo de redes usa el sistema un día completo sin ayuda de un dev**.
 

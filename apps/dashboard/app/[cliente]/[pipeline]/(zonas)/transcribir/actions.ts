@@ -43,7 +43,7 @@ export async function pegarEnlaces(texto: string): Promise<ResultadoPegar> {
 
   let encolados;
   try {
-    encolados = await encolarEnlaces(ctx, validos, usuario.id);
+    encolados = await encolarEnlaces(ctx, validos);
   } catch (e) {
     console.error("[transcribir] falló el encolado:", e);
     return { ok: false, mensaje: "No se pudo guardar la lista. Probá de nuevo; si sigue, avisale a un dev." };

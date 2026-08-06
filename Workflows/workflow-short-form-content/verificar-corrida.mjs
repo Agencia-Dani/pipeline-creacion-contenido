@@ -1,10 +1,9 @@
-// ⚠️ MITAD HISTÓRICO (2026-08-03). Sus chequeos contra Supabase siguen valiendo; los que leen el
-// feed por `api.airtable.com` NO corren: Airtable salió del sistema en D7 (ADR-035) y el 2026-08-03
-// se podaron AIRTABLE_PAT / AIRTABLE_BASE_ID del `.env` y se revocó el PAT. El feed vivo es
-// `app.candidatos`, que se mira desde el cockpit (`/curar/feed`) o por PostgREST. Si vas a
-// resucitar este script, esa es la parte a reescribir — no le devuelvas la credencial.
-//
 // Verificación post-corrida del motor: embudo, dedup, sin-guion y el feed. SOLO LEE.
+//
+// ✅ **Corre entero otra vez desde el 2026-08-05.** Estuvo medio muerto desde D7: el bloque del feed
+// leía `api.airtable.com`, y Airtable salió del sistema (ADR-035) con su PAT revocado. Ahora el feed
+// se lee de `app.candidatos` por PostgREST, que es donde vive desde D7. **No le devuelvas la
+// credencial de Airtable a nada de acá.**
 //
 //   set -a && source .env && set +a && node Workflows/workflow-short-form-content/verificar-corrida.mjs [n]
 //
@@ -15,32 +14,25 @@
 // El chequeo de dedup cruza por `run_id`. Las corridas ANTERIORES al re-import de la enmienda
 // 2026-07-31 de ADR-029 lo tienen `null`, así que para esas se cae a la ventana de `primera_vez`
 // (entre `inicio` y `fin` del run) — si no, la intersección daría ∅ por vacío y no por dedup.
-const { SUPABASE_URL, SUPABASE_SERVICE_ROLE, AIRTABLE_PAT, AIRTABLE_BASE_ID } = process.env;
+const { SUPABASE_URL, SUPABASE_SERVICE_ROLE } = process.env;
 const N = Number(process.argv[2] || 2);
 
-const sb = async (path) => {
+// `esquema` es `public` por defecto; el feed y todo lo del cockpit viven en `app`, que PostgREST
+// solo sirve si se lo pedís por `Accept-Profile` (está en *Exposed schemas* desde D0).
+const sb = async (path, esquema) => {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { apikey: SUPABASE_SERVICE_ROLE, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE}` },
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE}`,
+      ...(esquema ? { "Accept-Profile": esquema } : {}),
+    },
   });
   if (!r.ok) throw new Error(`Supabase ${r.status} en ${path}`);
   return r.json();
 };
-const air = async (tabla) => {
-  const out = [];
-  let offset;
-  do {
-    const u = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tabla)}`);
-    if (offset) u.searchParams.set("offset", offset);
-    const r = await fetch(u, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
-    const p = await r.json();
-    out.push(...(p.records || []));
-    offset = p.offset;
-  } while (offset);
-  return out;
-};
 const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(0)}%` : "—");
 
-const runs = await sb(`runs?select=id,inicio,fin,estado,trigger_type,metricas,error&params->>workflow=eq.motor&order=inicio.desc&limit=${N}`);
+const runs = await sb(`runs?select=id,instance_id,inicio,fin,estado,trigger_type,metricas,error&params->>workflow=eq.motor&order=inicio.desc&limit=${N}`);
 
 console.log("═══ CORRIDAS ═══");
 for (const r of runs) {
@@ -109,19 +101,34 @@ if (runs.length >= 2 && runs.every((r) => r.estado === "ok")) {
 }
 
 // ── El feed: ni un solo ⚠️ SIN GUION (ADR-030) ──────────────────────────────────
-console.log("\n═══ FEED (Airtable Candidatos) ═══");
-const cands = await air("Candidatos");
-const sinGuion = cands.filter((c) => String(c.fields.titulo || "").includes("SIN GUION"));
-const porProy = {};
-for (const c of cands) {
-  const p = (c.fields.proyecto || ["?"])[0];
-  porProy[p] = (porProy[p] || 0) + 1;
+// Se lee de `app.candidatos`, el feed vivo desde D7. Se acota a la instancia de la corrida más
+// reciente: desde la Fase 4 hay varias instancias y sumarlas daría un reparto que no es de nadie.
+const instancia = runs[0]?.instance_id;
+if (!instancia) {
+  console.log("\n═══ FEED ═══\n   (sin corridas del motor: nada que mirar)");
+} else {
+  console.log(`\n═══ FEED (app.candidatos · instancia ${instancia.slice(0, 8)}…) ═══`);
+  const cands = await sb(
+    `candidatos?select=titulo,external_id,url_referente,proyecto_id&instance_id=eq.${instancia}`,
+    "app",
+  );
+  const proys = await sb(`proyectos?select=id,nombre`, "app");
+  const nombreDe = new Map(proys.map((p) => [p.id, p.nombre]));
+
+  const sinGuion = cands.filter((c) => String(c.titulo || "").includes("SIN GUION"));
+  const porProy = {};
+  for (const c of cands) {
+    // `(sin proyecto)` es visible y raro a propósito: un candidato sin proyecto resoluble existe
+    // (`Preparar candidatos` lo deja viajar) y tiene que verse, no perderse en un `?`.
+    const p = c.proyecto_id ? (nombreDe.get(c.proyecto_id) ?? c.proyecto_id.slice(0, 8)) : "(sin proyecto)";
+    porProy[p] = (porProy[p] || 0) + 1;
+  }
+  console.log(`   ${cands.length} candidatos · ${sinGuion.length} con ⚠️ SIN GUION ${sinGuion.length === 0 ? "✓" : "✖ (ADR-030 dice que deben descartarse)"}`);
+  const conEid = cands.filter((c) => c.external_id).length;
+  console.log(`   con external_id escrito (ADR-029): ${conEid}/${cands.length} ${conEid === cands.length ? "✓" : "⚠️"}`);
+  const dupes = Object.entries(
+    cands.reduce((a, c) => { const k = c.url_referente; if (k) a[k] = (a[k] || 0) + 1; return a; }, {}),
+  ).filter(([, n]) => n > 1);
+  console.log(`   urls duplicadas en el feed: ${dupes.length} ${dupes.length === 0 ? "✓" : "✖ " + JSON.stringify(dupes.slice(0, 3))}`);
+  console.log(`   reparto: ${JSON.stringify(porProy)}`);
 }
-console.log(`   ${cands.length} candidatos · ${sinGuion.length} con ⚠️ SIN GUION ${sinGuion.length === 0 ? "✓" : "✖ (ADR-030 dice que deben descartarse)"}`);
-const conEid = cands.filter((c) => c.fields.external_id).length;
-console.log(`   con external_id escrito (ADR-029): ${conEid}/${cands.length} ${conEid === cands.length ? "✓" : "⚠️"}`);
-const dupes = Object.entries(
-  cands.reduce((a, c) => { const k = c.fields.url_referente; if (k) a[k] = (a[k] || 0) + 1; return a; }, {}),
-).filter(([, n]) => n > 1);
-console.log(`   urls duplicadas en el feed: ${dupes.length} ${dupes.length === 0 ? "✓" : "✖ " + JSON.stringify(dupes.slice(0, 3))}`);
-console.log(`   reparto: ${JSON.stringify(porProy)}`);

@@ -1,0 +1,119 @@
+-- 023_poda_write_only.sql — la segunda mitad de la limpieza de D8: se van las columnas que
+-- alguien escribía y nadie leía. Gobernada por ADR-059. Hermana de la `022`, que ya está aplicada.
+--
+-- ⛔ **ESTA NO SE CORRE SOLA.** La `022` podía porque nada escribía lo que dropeaba; acá es al
+--    revés, y el modo de falla es de los mudos:
+--
+--      PostgREST rechaza el **insert entero** con `PGRST204` si el body trae una columna que no
+--      existe (medido el 2026-08-05). Y los dos POST que mandaban estas columnas son
+--      **`onError: continueRegularOutput`** — fail-open conservado a propósito por ADR-029. O sea
+--      que el 400 **se traga**:
+--
+--        · `POST processed_items` → la corrida cierra **EN VERDE** sin escribir la memoria del
+--          dedup ⇒ la corrida siguiente re-trae y **re-paga** los mismos videos. Es exactamente
+--          el modo de falla de los 15 duplicados del 20→21/07.
+--        · `Registrar outputs` → el archivado cierra **EN VERDE** habiendo **borrado los
+--          calificados sin archivarlos** (`Borrar candidatos` está aguas abajo). Pérdida
+--          irreversible del histórico.
+--
+--    Por eso el orden es: **primero se deja de escribir, después se dropea**, con una corrida
+--    verde en el medio. El §0 lo hace cumplir.
+--
+-- ✅ **El lado "dejar de escribir" YA SALIÓ** (2026-08-05, commit de la sesión de ADR-059):
+--    · `Preparar procesados` (motor) — empujado al live con `n8n:push`, `n8n:diff` limpio.
+--    · `Armar filas archivado` (archivado) — ídem.
+--    · `apps/dashboard/lib/transcripciones.ts` — `encolarEnlaces` ya no manda `pedido_por` y
+--      `registrarEnDedup` ya no manda `url`/`flag_viral`. **Esto viaja por el deploy de Vercel**,
+--      no por n8n: es la mitad que se olvida.
+--    Lo que falta es **verlo correr**, que es lo único que el SQL no puede saber.
+--
+-- 🔎 **Qué NO está acá, y por qué** — `processed_items.run_id` y `.primera_vez` **se quedan**. El
+--    inventario las había marcado write-only y estaba mal: las lee
+--    `Workflows/workflow-short-form-content/verificar-corrida.mjs`, que es justamente la
+--    herramienta que prueba que el dedup no trae duplicados (`run_id` = atribución exacta,
+--    `primera_vez` = el fallback para corridas viejas), y `test-nodos.mjs` tiene 4 asserts sobre
+--    `run_id`. *Fue la tercera vez que el método de la balde 2 sub-contó consumidores: el corpus
+--    medía `apps/dashboard` y los `workflow.json`, y dejaba afuera los `.mjs` de herramientas.*
+
+
+-- ═════════════════════════ §0 · La confirmación humana ═════════════════════════
+-- Desde la base no hay forma de distinguir una corrida que ya no manda estas columnas de una que
+-- todavía las manda: las dos escriben filas idénticas. Así que el gate se firma a mano, igual que
+-- en la `017` y la `019`.
+
+create temporary table if not exists _cierre_poda (confirmado boolean);
+delete from _cierre_poda;
+
+-- ⬇️ DESCOMENTAR solo si las CUATRO son ciertas:
+--    1. `npm run n8n:diff` limpio en los 5 (el live corre el repo, con los 2 nodos ya cambiados);
+--    2. el deploy de Vercel con `lib/transcripciones.ts` está en producción;
+--    3. hubo **una corrida del motor verde** después de eso, y escribió memoria de dedup:
+--         select count(*) from processed_items where run_id = '<el run de esa corrida>';   -- > 0
+--    4. hubo **un archivado verde** después de eso, y escribió histórico:
+--         select count(*) from outputs where run_id = '<el run del archivado>';            -- > 0
+--       (si esa semana no hubo calificados, el archivado cierra con 0 y NO sirve de prueba:
+--        califiquen algo en `/curar/feed` y esperen al domingo, o dispárenlo a mano.)
+-- insert into _cierre_poda values (true);
+
+do $gate$
+begin
+  if not exists (select 1 from _cierre_poda where confirmado) then
+    raise exception
+      '023: falta confirmar el push + el deploy + las 2 corridas verdes. Leé la cabecera y descomentá el insert de _cierre_poda. (Si todavía no corriste nada, NO corras este archivo: dropear antes deja al motor cerrando en verde sin memoria de dedup.)';
+  end if;
+end
+$gate$;
+
+
+-- ═══════════ §1 · `processed_items` — 4 columnas que el dedup nunca leyó ═══════════
+-- El dedup lee `select=external_id,platform` (`Leer procesados`) y su clave es el unique
+-- `(instance_id, platform, external_id)` de la `016`. Ninguna de estas 4 participa de ninguna de
+-- las dos cosas, así que **la garantía de no-duplicados no se toca**. Tenían dato real (url 772/772,
+-- seguidores 770, flag_viral 282 en true, idioma 770) y eso es traza forense, no lectura: la
+-- decisión de ADR-059 es que lo que nadie lee no existe.
+
+alter table processed_items drop column url;
+alter table processed_items drop column seguidores;
+alter table processed_items drop column flag_viral;
+alter table processed_items drop column idioma;
+
+
+-- ═══════════ §2 · `outputs.source_items` — trazabilidad que nadie consultó ═══════════
+-- La escribía `Armar filas archivado` (y la declaraba `ingesta-registro.md` §2). Ninguna vista, ni
+-- la app, ni ningún workflow la leyó nunca. Lo que sí se consulta del origen —el referente y su
+-- url— vive en `outputs.metadata`, que la pantalla de Históricos y el export CSV sí usan.
+-- ⚠️ Sale de `core/contracts/ingesta-registro.md` §2 en el mismo commit que esta migración: si el
+-- contrato la sigue declarando, el primer pipeline nuevo (LinkedIn, ADR-055) copia la plantilla y
+-- su primer `POST outputs` se come un 400.
+
+alter table outputs drop column source_items;
+
+
+-- ═══════════ §3 · `transcripciones.pedido_por` — auditoría duplicada ═══════════
+-- La escribía `encolarEnlaces` y no la leía nadie: ninguna pantalla muestra quién pidió una
+-- transcripción. **Quién pidió qué no se pierde** — el acto queda en `app.eventos`, que es donde
+-- vive la auditoría desde D7. Es la única de las 6 que también borra una FK (a `app.usuarios`).
+
+alter table app.transcripciones drop column pedido_por;
+
+
+-- ═════════════════════════════ §4 · Verificación ═════════════════════════════
+-- Las dos primeras tienen que dar CERO filas:
+--
+--   select table_name, column_name from information_schema.columns
+--    where (table_name, column_name) in
+--          (('processed_items','url'), ('processed_items','seguidores'),
+--           ('processed_items','flag_viral'), ('processed_items','idioma'),
+--           ('outputs','source_items'), ('transcripciones','pedido_por'));
+--
+--   -- y las dos que NO se tocaron tienen que seguir:
+--   select column_name from information_schema.columns
+--    where table_name = 'processed_items' and column_name in ('run_id','primera_vez');   -- 2 filas
+--
+-- 🩸 **La verificación de verdad es la corrida siguiente, y es la misma de siempre:**
+--
+--   node Workflows/workflow-short-form-content/verificar-corrida.mjs 2
+--
+-- Tiene que decir **`intersección: 0 ✓ (∅, el dedup funciona)`** y contar los `processed_items`
+-- **por `run_id`**, no por la ventana de `primera_vez`. Si cae a la ventana, la memoria de esa
+-- corrida no se escribió y hay que mirar por qué antes de dejar pasar otro lunes.

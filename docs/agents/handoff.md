@@ -22,7 +22,15 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## ✅ AL CIERRE 96 (2026-08-05) EL FLIP ESTÁ CERRADO. QUEDAN DOS CLICS.
+> ## ✅ AL CIERRE 97 (2026-08-05): EL FLIP CERRADO, LA BALDE 2 PODADA, AIRTABLE FUERA.
+>
+> **Lo único que bloquea algo:** la **`023`** espera **una corrida del motor y un archivado verdes**
+> para firmar su gate — su mitad de escritura ya está en el live (`n8n:diff` limpio). Después de la
+> corrida del lunes, `node Workflows/workflow-short-form-content/verificar-corrida.mjs 2` tiene que
+> decir **`intersección: 0`** y contar por **`run_id`** (si cae a la ventana de `primera_vez`, la
+> memoria no se escribió y hay que mirar por qué antes de dropear nada).
+>
+> ### Lo del cierre 96, que sigue igual: quedan dos clics
 >
 > **La Capa 2 está viva y verificada por las dos mitades**: con cuenta no dueña (3 de 4 voces sin
 > filtro de tenant) y con cuenta dueña sobre las pantallas con datos (las 4 zonas, `Entender`
@@ -1215,10 +1223,55 @@ producción**. El orden de acá en adelante:
    sistema, `grep -c api.airtable.com Workflows/*/workflow.json` da `0 0 0`, y el paso 3 del
    expand/contract cerró (el `id` del contrato es el uuid). Mató las 3 llamadas que le quedaban a
    Airtable en la app y la traducción de ids (ADR-033, que murió cumplida).
-5. **D8 — apagado de Airtable** (todo no-código) **+ la migración de limpieza**: balde 2 (4 vistas
-   sin consumidor + 6 columnas write-only) y las columnas `airtable_id`. También muere ahí
-   `fields.uuid` y el `uuidDe` que quedó sin trabajo — **necesita re-import**, así que conviene
-   juntarlo con otro re-import y no gastar uno solo en eso.
+5. **D8 — apagado de Airtable + la poda del schema.** 📐 **Decidido y escrito el 2026-08-05:
+   [ADR-059](../adr/ADR-059-lo-que-no-se-usa-no-existe.md).** La balde 2 resultó ser **5 vistas y
+   12 columnas** (no las "4 y 6" que este doc recordaba) más las 6 `airtable_id`; el inventario
+   completo vive en
+   [plan-cockpit-propio §D8](./plan-cockpit-propio.md#la-balde-2--el-inventario-medido-el-2026-08-05).
+   Manda el consumo de código, con dos excepciones: **`clients.parent_id` se queda** (ADR-051 §4 le
+   dio trabajo nuevo) y **`runs.costo_estimado` se va con su línea del contrato**.
+   - ✅ **[`022`](../../core/schema/022_poda_balde_2.sql) APLICADA por Mani el 05/08 y verificada
+     por su efecto** (PostgREST: las 5 vistas fuera, las 3 columnas fuera, **cero `airtable_id`**,
+     las 6 vistas de `app.` intactas, `parent_id` en su lugar). Prod después: `/` 307 · `/login`
+     200 · `run-plan` 403 sin header y **`version: 2`** con header. Y el dedup, medido con
+     `verificar-corrida.mjs`: **intersección 0 entre las 2 últimas corridas**.
+   - 🟡 **[`023`](../../core/schema/023_poda_write_only.sql) ESCRITA, con su gate `§0` sin firmar.**
+     **5 columnas, no 7**: `processed_items.url`/`.seguidores`/`.flag_viral`/`.idioma` +
+     `outputs.source_items` + `transcripciones.pedido_por`. 🔎 **`run_id` y `primera_vez` salieron de
+     la lista**: las lee `verificar-corrida.mjs` (la herramienta que verifica el dedup) y
+     `test-nodos.mjs` tiene 4 asserts sobre `run_id`. *Tercera vez que el método sub-cuenta
+     consumidores: el corpus no incluía los `.mjs` de herramientas.*
+     ✅ **El lado "dejar de escribir" YA SALIÓ el 05/08**: `Preparar procesados` y `Armar filas
+     archivado` empujados con `n8n:push` (`n8n:diff` limpio en los 5), y `lib/transcripciones.ts`
+     va en el deploy de Vercel de este commit. **Falta ver correr una corrida del motor y un
+     archivado, y firmar el gate.**
+     🩸 **El orden no es estética:** PostgREST rechaza el insert entero con `PGRST204` y los dos POST
+     son `onError: continue` ⇒ el 400 se traga, el motor cierra en verde **sin memoria de dedup**
+     (⇒ duplicados re-pagados) y el archivado **borra calificados sin archivarlos**. Hay un guard
+     nuevo en `test-nodos.mjs` que se pone rojo si alguien devuelve una columna al batch del dedup.
+   ☠️ **`fields.uuid` y los tres `uuidDe` ya murieron** con el contrato v2 (ADR-048 §5): este doc
+   los daba como pendientes de re-import y no lo están. **La cola del re-import tiene un solo
+   item: sacar los 3 nodos del Sheet** del archivado (ADR-057 paso 2).
+   🟡 **Y ese re-import ya NO es un límite técnico, es una decisión pendiente.** `PUT` reemplaza el
+   array `nodes` entero, así que borrar los 3 nodos por API se puede: el que se niega es **nuestro**
+   `n8n:push`, porque *"un push que crea nodos también puede borrarlos"* y falta la red de seguridad.
+   Escrito para retomarlo en [plan-multi-tenant §14.2](./plan-multi-tenant.md). **Destrabar eso
+   destraba el Sheet**, que es lo último de la superficie vieja que sigue vivo.
+   ✅ **"Nada de Airtable" — HECHO en el repo el 05/08** (pedido de Mani). Borrados
+   `core/scripts/setup-airtable.mjs`, `core/contracts/airtable-cockpit.md` (sin reemplazo a
+   propósito: **el modelo vivo son las migraciones**) y `apps/dashboard/scripts/cortar-feed.ts` con
+   su npm script. `verificar-corrida.mjs` **volvió a correr entero**: su bloque del feed lee
+   `app.candidatos` por PostgREST en vez de `api.airtable.com`. Menciones: README **1→0**,
+   one-pager **2→0**, onboarding **18→2** (las 2 son el aviso de que ya no existe), PLAN **15→4**,
+   ROADMAP **29→14**, CLAUDE.md reescrito. Lo que queda es **historia** (items `[x]`, nombres de
+   archivo de ADRs, el porqué de decisiones viejas) y se deja a propósito.
+   🔌 **La cuenta de Airtable quedó DESCONECTADA (Mani, 05/08): no se cancela, simplemente no se
+   usa más.** No hay nada que hacer ahí.
+   🎯 **Y el export final NO hacía falta** — era el último bloqueante.
+   `Métricas Proyectos` y `Métricas Global` eran **proyección derivada y regenerable** (lo decía el
+   propio contrato congelado): las 4 vistas de `app.` las reconstruyen desde `runs.metricas` +
+   `outputs`, **desde el 2026-06-29** — más historia que la que esas tablas tuvieron (se partieron
+   el 15/07). Verificado vista por vista contra prod. **Cancelar Airtable no pierde nada.**
 6. **D7.5 (alternativa a D8, sin orden fijo):** que la app escriba `outputs` al calificar, para
    matar el archivado. Es enmienda de ADR-014 y toca `core/`: va con `/grill-with-docs`.
 
@@ -1260,6 +1313,28 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-05 (cierre 97) — La balde 2 medida y podada, y Airtable fuera del repo hasta la última mención (Claude, con Mani).**
+**Qué se hizo:** el inventario que D7 apartó y nunca listó, la sesión de grilling que lo decidió (**[ADR-059](../adr/ADR-059-lo-que-no-se-usa-no-existe.md)**), la **`022` aplicada y verificada por su efecto**, la **`023` escrita y gateada** con su mitad de escritura ya en el live, y la purga de Airtable del repo entero.
+
+**🩸 El inventario dijo "5 vistas y 12 columnas" donde el recuerdo decía "4 y 6" — y casi nada era huérfano.** De las 5 vistas, **4 tenían dueño escrito**: ADR-019 §4 conserva `v_senal_tema` *a propósito* y **descartó por escrito esta misma migración**; ADR-009 tenía `v_corpus_aprobados` "en pausa"; `v_historico_seleccionados`/`v_selecciones_por_dia` son criterio de aceptación del ROADMAP §C3. Y 2 columnas estaban declaradas en `ingesta-registro.md`. *Medir el código no alcanzaba: había que medirlo contra las decisiones.*
+
+**🔬 El método sub-contó consumidores TRES veces, y las tres por el mismo hueco.** (1) `v_outputs_recientes` figuraba huérfana y su consumidor era **§Verificación de un contrato**: un humano en el SQL Editor, invisible a grep. (2) Lo mismo, más barato, con las otras tres vistas y sus ADRs. (3) `processed_items.run_id` y `primera_vez` figuraban write-only y las lee **`verificar-corrida.mjs`**, justo la herramienta que prueba que el dedup no trae duplicados — el corpus medía `apps/dashboard` y los `workflow.json` y dejaba afuera los `.mjs`. **La regla que queda: un objeto también está vivo si lo cita un runbook o una herramienta del repo.**
+
+**⚖️ La decisión de Mani fue "manda el consumo de código"** — *"no aporta tener cableados muertos, o que cambiaron y ya no son así"* — con dos excepciones decididas de frente: **`clients.parent_id` se queda** (ADR-051 §4 le dio trabajo nuevo hace tres días, y es del modelo de tenancy que se está construyendo) y **`runs.costo_estimado` se va con su línea del contrato**, porque el costo de este sistema **se calcula** (`metricas × tarifas` → `v_costos_semana`), no se guarda.
+
+**🚨 Y el hallazgo que partió la poda en dos: dropear una columna write-only NO es gratis.** Medido: **PostgREST rechaza el insert entero con `PGRST204`** si el body trae una columna inexistente. Y los dos POST que las mandaban son **`onError: continueRegularOutput`**, así que el 400 **se traga**: el motor cerraría **en verde sin escribir la memoria del dedup** (⇒ la corrida siguiente re-trae y re-paga: los 15 duplicados del 20→21/07 otra vez) y el archivado cerraría **en verde habiendo borrado los calificados sin archivarlos**. De ahí: **`022` = lo que nadie escribe** (corre sola) y **`023` = lo que alguien escribe**, después del push, con gate humano.
+
+**✅ La `022` se aplicó y se verificó por su EFECTO, no porque corriera** (la lección de la `019`): 5 vistas fuera, 3 columnas fuera, **cero `airtable_id` en toda la base**, las 6 vistas de `app.` intactas, `parent_id` en su lugar. Prod después: `/` 307 · `/login` 200 · `run-plan` **`version: 2`**. Y el invariante que Mani puso como condición, medido: **intersección 0** entre las 2 últimas corridas.
+
+**🧹 Airtable salió del repo, no solo del sistema.** Borrados `setup-airtable.mjs`, `core/contracts/airtable-cockpit.md` (**sin reemplazo a propósito: el modelo vivo son las migraciones, no una prosa que las describa**) y `scripts/cortar-feed.ts`. **`verificar-corrida.mjs` volvió a correr entero** — estaba medio muerto desde D7 porque su bloque del feed pegaba a `api.airtable.com`; ahora lee `app.candidatos` y el reparto sale con nombres de proyecto. Menciones: README 1→0 · one-pager 2→0 · **onboarding 18→2** (§2 pasó de *"Airtable, donde viven el 95% del tiempo"* a las 4 zonas del cockpit) · PLAN 15→4 · ROADMAP 29→14. Lo que queda es historia y se deja.
+
+**🎯 Y el export final —el último bloqueante para apagar Airtable— no hacía falta.** `Métricas Proyectos` y `Métricas Global` eran *"proyección derivada y regenerable"* según el propio contrato congelado: las 4 vistas de `app.` las reconstruyen desde `runs.metricas` + `outputs` **y cubren desde el 2026-06-29**, más historia que la que esas tablas tuvieron. *Lo que parecía el único dato irrecuperable era una caché de algo que el sistema ya sabe calcular.* La cuenta queda **desconectada, no cancelada** (decisión de Mani).
+
+**Verde:** `typecheck` 0 · **175 tests** (+1: el guard de la `023`) · `build` · `validate` **2055 checks** · `auditar-workflows` sin hallazgos · `test-nodos` verde · **`n8n:diff` limpio en los 5** después del push.
+**Qué sigue:** ver correr un motor y un archivado → firmar el gate de la **`023`** → **la red de seguridad de topología** en `n8n-sync` ([§14.2](./plan-multi-tenant.md)), que es lo que destraba los **3 nodos del Sheet** (ya no es un límite de la API, es una decisión) → paginación del feed (§12 #7) → **Fase 5, LinkedIn**, que arranca por §14.6 (sus 4 tablas sin policy).
+**Skills sugeridas:** `/diagnose` si la corrida del lunes cierra verde pero `verificar-corrida.mjs` cae a la ventana de `primera_vez` · `/grill-with-docs` antes de tocar la topología por API.
+
 
 **2026-08-05 (cierre 96) — El mismo flip, hecho dos veces el mismo día: lo que sobró se tiró y lo que faltaba se escribió (Claude, pedido de Mani).**
 **Qué se hizo:** una sesión que arrancó a construir el flip de la Capa 2, lo construyó entero y verificado, y al ir a mergear **descubrió que ya estaba en `main`** hecho por Alejandro. Se descartó el código duplicado y se quedó lo que la otra sesión no tenía: **[ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)**, el hallazgo de LinkedIn sin policies (§14.6 del plan), dos términos de glosario, la enmienda a ADR-047, seis comentarios que el flip volvió falsos, y **el operador entrando a Entender**.

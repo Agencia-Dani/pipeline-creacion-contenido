@@ -42,8 +42,8 @@ inputs:
   # MVP: 1 instancia editada a mano en el nodo 'Config' de n8n (deploy.mjs quedó obsoleto;
   # multi-cliente real = F5). El patrón de ruta queda declarado para cuando exista.
   client_config: "clients/{cliente}/short-form-content.yaml"
-  config_node: "Nodo 'Config' (editar tras importar): airtable_base_id, supabase_url, instance_id + pesos del heat y límites de scrape."
-  airtable_cockpit: "core/contracts/airtable-cockpit.md — Proyectos/Voces/Referentes (lectura) + Candidatos (escritura)."
+  config_node: "Nodo 'Config' (editar tras importar): supabase_url, dashboard_url + pesos del heat y límites de scrape. La instancia viaja en el payload (ADR-048), ya no es constante del archivo."
+  cockpit: "core/contracts/run-plan.md — el motor LEE su config por la fachada (ADR-028) y ESCRIBE por PostgREST (ADR-035). Airtable salió del sistema en D7."
   # filtros calibrables. scope: client = identidad estable del cliente (hoy viven en Airtable
   # por-proyecto + en el nodo Config; ninguno se pasa por corrida porque no hay form trigger).
   filters:

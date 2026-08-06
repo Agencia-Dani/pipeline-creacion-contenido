@@ -167,7 +167,7 @@ export async function actualizarReferente(
   await fijarProyectos(ctx, id, datos.proyectoIds);
 }
 
-/** Devuelve el uuid del referente nuevo. Sin `airtable_id`: nació acá (ADR-027 — Postgres es el dueño). */
+/** Devuelve el uuid del referente nuevo (ADR-027 — Postgres es el dueño; desde la `022` no hay otro). */
 export async function crearReferente(ctx: TenantContext, datos: DatosReferente): Promise<string> {
   const { data, error } = await (await scoped(ctx))
     .insert("app.referentes", [

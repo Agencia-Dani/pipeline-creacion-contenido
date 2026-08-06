@@ -574,6 +574,17 @@ seccion('Preparar procesados — atribuir la memoria a su corrida (H3, cierre 70
   const batch = runPreparar({ videos: [pvid('a'), { url: 'https://v/x' }], runId: 'r-1' });
   check('sigue filtrando lo que no tiene external_id (la clave del dedup)', batch.length === 1, 'quedaron ' + batch.length);
 }
+{
+  // Guard de la `023` (ADR-059). La fila escribe EXACTAMENTE estas 4 columnas: las otras 4 que
+  // mandaba (url/seguidores/flag_viral/idioma) no las leía nadie y la migración las dropea. Si
+  // alguien las devuelve acá, el insert entero se muere con PGRST204 — y `POST processed_items` es
+  // `onError: continue`, así que la corrida cerraría EN VERDE sin memoria de dedup y la siguiente
+  // re-traería y re-pagaría los mismos videos. Este test es lo que hace ruidoso ese fallo mudo.
+  const batch = runPreparar({ videos: [pvid('a', { seguidores: 999, idioma_guess: 'en', viral_por_tamano: true })], runId: 'r-1' });
+  const cols = Object.keys(batch[0]).sort().join(',');
+  check('la fila del dedup lleva solo instance_id/run_id/platform/external_id (guard de la 023)',
+    cols === 'external_id,instance_id,platform,run_id', cols);
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // Gate de relevancia — descarte duro de sin-guion (ADR-030): sin transcript = _descarte, sin gastar

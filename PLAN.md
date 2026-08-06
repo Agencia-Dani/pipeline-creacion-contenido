@@ -18,7 +18,7 @@ Lo que existe hoy en el repo:
 | Pieza | Qué es | Estado |
 |---|---|---|
 | `README.md` | Visión del sistema central | ✅ Escrito |
-| `Workflows/workflow-short-form-content/` | **Máquina**: motor de reels n8n (30 nodos, JSON importable; ADR-009 + ADR-010 + ADR-011 + ADR-019). Cron semanal + Execute manual → lee la config del equipo en Airtable (incl. Ajustes) → Apify (solo por referentes: IG + TikTok, 2 llamadas) → pre-trim Haiku + heat-score métrico + dedup → Supadata transcribe + Claude Haiku traduce literal → Gate Haiku (CALIDAD) → candidatos a Airtable + registro Supabase. Sin Google en el motor. | ✅ Corrió manual (V1) · ❌ **cron sin activar** · placeholders `<<...>>` por cliente |
+| `Workflows/workflow-short-form-content/` | **Máquina**: motor de reels n8n (30 nodos, JSON importable; ADR-009 + ADR-010 + ADR-011 + ADR-019). Cron (dispatcher) + webhook on-demand → lee la config por la fachada del cockpit (`run-plan`, ADR-028) → Apify (solo por referentes: IG + TikTok, 2 llamadas) → pre-trim Haiku + heat-score métrico + dedup → Supadata transcribe + Claude Haiku traduce literal → Gate Haiku (CALIDAD) → candidatos a `app.candidatos` por PostgREST (ADR-035) + registro Supabase. Sin Google en el motor. | ✅ Corrió manual (V1) · ❌ **cron sin activar** · placeholders `<<...>>` por cliente |
 | `Workflows/workflow-descubrimiento-referentes/` | **Máquina**: descubrimiento de referentes n8n (27 nodos; ADR-020). Cron semanal → semillas = referentes que mejor convierten (`v_senal_seleccion`) → IG: sugeridos del propio IG (Apify `relatedProfiles`); TikTok: lookalikes (Apify dataovercoffee, rama paralela — ADR-020 §8) → dedup → vetting Haiku contra criterios → propuestas a la tabla `Referentes propuestos` + promoción de aprobados a `Referentes`. No toca el motor de reels. | ✅ Construido · ❌ **sin importar en n8n** · placeholders `<<...>>` por cliente |
 | `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) · ❌ **hoy inactivo** — se re-monta en F3 |
 
@@ -44,7 +44,7 @@ registro de outputs**, no un motor de ejecución único.
    ┌──────────────────────────────┐    ┌──────────────────────────────┐
    │ workflow-short-form-content  │    │ workflow-substack            │
    │ motor: n8n (managed host)    │    │ motor: OpenClaw + Telegram   │
-   │ destino: Airtable + Sheet    │    │ destino nativo: Notion       │
+   │ destino: cockpit propio      │    │ destino nativo: Notion       │
    └─────────────┬────────────────┘    └─────────────┬────────────────┘
                  │ push directo                      │ sync job
                  │ (nodo HTTP al final                │ (lee Notion,
@@ -108,9 +108,9 @@ pipeline-creacion-contenido/
 │   ├── transcripciones/       ← fuentes de decisiones (conversaciones con el jefe)
 │   └── one-pager-reels-mvp.md ← la visión del MVP en una página (no técnica)
 ├── core/                      ← EL NÚCLEO: solo cambia con ADR
-│   ├── contracts/             ← contrato del manifest · cockpit Airtable · ingesta · schemas de datos
-│   ├── schema/                ← SQL de Supabase, versionado (001–003)
-│   ├── scripts/               ← validate.mjs · deploy.mjs · setup-airtable.mjs
+│   ├── contracts/             ← contrato del manifest · ingesta · run-plan · schemas de datos
+│   ├── schema/                ← SQL de Supabase, versionado (001–022)
+│   ├── scripts/               ← validate.mjs · n8n-sync.mjs · deploy.mjs (deprecado)
 │   ├── n8n/                   ← piezas n8n del núcleo (error workflow del registro)
 │   ├── sync/                  ← (se crea en F3) sync Notion → registro
 │   └── templates/             ← (se crea en F5) scaffolding de workflow/cliente nuevo
@@ -128,14 +128,14 @@ de contenido se mapea contra estas 8 etapas en su manifest (las que no aplican s
 
 | Etapa | Responsabilidad | En reels (MVP — ADR-009) | En substack hoy |
 |---|---|---|---|
-| 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok (cuentas de referentes desde el cockpit Airtable — ADR-019) | Bot recorre fuentes validadas |
+| 1. COLECTAR | Fuentes → items crudos. **Las fuentes son adaptadores enchufables** — acá vive la diferencia principal entre workflows | Apify IG + TikTok (cuentas de referentes servidas por la fachada del cockpit — ADR-019/028) | Bot recorre fuentes validadas |
 | 2. NORMALIZAR | Todo item cae al schema común `content_item` | Nodos "Normalizar IG/TT" (mismas keys desde cada API) | Implícito en el playbook |
 | 3. FILTRAR / SCOREAR | Params de la corrida + criterios del cliente → selección | Pre-trim Haiku laxo (descarta off-topic obvio del caption, recall) + heat-score v1 métrico: likes+views+engagement × idioma/selección (fórmula: ROADMAP §1) + dedup contra `processed_items`. El substring `tema` salió (ADR-010) | Pregunta filtro + scoring 5 criterios |
 | 4. ENRIQUECER | Transcribir, extraer, research profundo | Supadata Whisper + traducción literal al español (Claude Haiku, solo si hace falta), en 2 Code nodes | Research profundo del brief |
 | 5. GENERAR | **Perfil de output** del workflow (formato + voz si aplica) | Perfil "script literal": el script es la transcripción/traducción en español tal cual, campo de texto (sin Doc, voz propia en pausa — ADR-009) | Bot → borrador / nugget |
 | 6. CALIDAD | Checklist antes de entregar | Gate de relevancia (Haiku) sobre el transcript: jurado estricto vs `criterios_relevancia` → heat-score composite (semántico ⊕ métricas), dropea irrelevantes (ADR-010) | Checklist de 5 preguntas |
-| 7. ENTREGAR | Destino nativo + registro central | Airtable `Candidatos` + registro Supabase; seleccionados → Sheet Histórico | Notion |
-| 8. NOTIFICAR | Resumen / alerta | n/a (el equipo vive en Airtable; sin email en el MVP) | Telegram |
+| 7. ENTREGAR | Destino nativo + registro central | `app.candidatos` por PostgREST (ADR-035) + registro Supabase; lo calificado → `outputs`, el histórico canónico | Notion |
+| 8. NOTIFICAR | Resumen / alerta | n/a (el equipo vive en el cockpit; sin email en el MVP) | Telegram |
 
 Interfaces estándar entre etapas (se definen en F1, viven en `core/contracts/`):
 
@@ -158,8 +158,10 @@ Los que nunca se doblan; toda decisión nueva se chequea contra esta lista:
 
 1. **Aislamiento de fallos:** la caída de un workflow — o del registro central — nunca detiene a
    los demás. **El registro es sumidero de datos, jamás dependencia de ejecución.**
-2. **Lo que el equipo no técnico toca es no-code e imposible de romper** (Airtable, Sheets,
-   formularios, vistas de solo lectura).
+2. **Lo que el equipo no técnico toca es imposible de romper.** Hasta D7 eso se compraba usando
+   no-code (Airtable, Sheets); con cockpit propio se paga construyéndolo: validación que no deja
+   guardar un valor imposible, borrado que solo se permite si el registro nunca produjo nada
+   (ADR-045), y el aislamiento entre empresas en dos capas (ADR-047).
 3. **Agregar un workflow o cliente N+1 no toca el núcleo** (`core/`): solo plantilla + config.
    Las unidades de extensión: un *cliente* = carpeta en `clients/` · un *workflow* = carpeta en
    `Workflows/` con manifest · una *fuente* = un adaptador que produce `content_item`.
@@ -171,7 +173,8 @@ Los que nunca se doblan; toda decisión nueva se chequea contra esta lista:
 
 **Una sola fuente de verdad por cada cosa:** la *config* vive en el repo (`clients/`,
 `workflow.yaml`); el *historial* en Supabase; el *espacio de trabajo* en el destino nativo de
-cada workflow (Airtable/Sheets/Notion). Ningún dato con dos dueños.
+cada workflow (el cockpit propio para reels y LinkedIn; Notion para Substack). Ningún dato con dos
+dueños.
 
 **Límites conocidos (cuándo repensar):** Supabase free (500 MB, pausa por inactividad) → upgrade
 o Postgres en VPS · n8n managed single-instance → suficiente hasta decenas de clientes; después
@@ -209,7 +212,7 @@ afuera (humano en el loop por diseño).
 - [x] **PikaPods vs InstaPods** — InstaPods (SSH y terminal web, útil para debug). Decisión
       liviana: migrar = export/import. Mani confirma al crear la cuenta (B1 del ROADMAP).
 - [ ] **Looker Studio vs Metabase** para el dashboard central — se decide en F4 con un spike de
-      1 hora. *Bloquea:* F4. *(El dashboard del equipo de redes no espera a esto: Airtable +
+      1 hora. *Bloquea:* F4. *(El dashboard del equipo de redes no espera a esto: el cockpit +
       Sheet Histórico, ROADMAP §5.)*
 - [x] **Zona horaria de los crons** — **America/Bogota**, confirmado 2026-06-12. Resta la
       validación explícita al activar (D1 del ROADMAP).
@@ -218,7 +221,7 @@ afuera (humano en el loop por diseño).
       qué quiere ver/filtrar el jefe en el dashboard central — se confirma con prototipo en
       mano. *Bloquea:* F4.
 - [ ] **Voz/proyecto inicial del MVP de reels** — el jefe no la ha dado; no bloquea (las voces
-      son registros de Airtable editables por el equipo). *Seguimiento:* M0.3 del ROADMAP.
+      las edita el equipo en el cockpit). *Seguimiento:* M0.3 del ROADMAP.
 
 ---
 
@@ -231,9 +234,9 @@ para tener visibilidad real):
 | Concepto | Herramienta | Costo/mes | Nota |
 |---|---|---|---|
 | Ejecución workflows n8n | InstaPods (D5) | ~$7 | Ejecuciones ilimitadas; motor + archivado + futuros en la misma instancia |
-| Cockpit del equipo | Airtable free | $0 | 1.000 records/base · 1.000 API calls/mes (reglas en el contrato del cockpit) |
+| Cockpit del equipo | Vercel free (`apps/dashboard`) | $0 | ADR-025/026. Reemplazó a Airtable free en D5–D7 |
 | Registro central | Supabase free | $0 | 500 MB ≈ años de texto. ⚠️ Pausa tras ~7 días sin actividad — el cron diario lo mantiene vivo; plan B: Pro $25 o Postgres en VPS |
-| Histórico + dashboard equipo | Google Sheets + Looker (si hace falta) | $0 | |
+| Histórico + métricas del equipo | El propio cockpit (`outputs` + las vistas de *Entender*) | $0 | El Sheet murió en ADR-057: el export es un botón *Descargar CSV* |
 | Bot newsletter | OpenClaw | (ya se paga hoy) | Sin cambio |
 | **Total fijo nuevo** | | **~$7–8/mes** | Dentro del rango tentativo con margen |
 
@@ -265,7 +268,7 @@ pasan en verde; el manifest del wf de reels mapea las 8 etapas. Resta solo actua
 manifest al estado real del motor tras el rework (D2 del ROADMAP).
 
 ### F2 — Esqueleto que camina: el MVP de reels *(en curso — vive en el [ROADMAP](./ROADMAP.md))*
-La rebanada fina end-to-end con la dirección ADR-009: cockpit Airtable + motor n8n
+La rebanada fina end-to-end con la dirección ADR-009: cockpit + motor n8n
 (dedup/heat/transcribe-traduce) + registro Supabase + histórico en Sheets. Todo el detalle
 (carriles, tasks, validación, criterio de hecho) está en el ROADMAP y el avance en
 [handoff](./docs/agents/handoff.md) — no se duplica acá.

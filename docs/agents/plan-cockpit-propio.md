@@ -421,11 +421,104 @@ No entró en D7 por "una corrida, una variable": cambiar quién escribe el hist�
 que se re-importan 3 workflows significa no saber cuál de los dos lo rompió.
 
 ### D8 — Apagado y sostenibilidad
-Export final de Airtable al repo · base a read-only · `setup-airtable.mjs` deprecado ·
-`airtable-cockpit.md` congelado y reemplazado por `core/contracts/cockpit-datos.md` · costuras del
+~~Export final de Airtable al repo~~ · base a read-only y cancelar · ~~`setup-airtable.mjs`
+deprecado~~ **borrado** · ~~`airtable-cockpit.md` congelado y reemplazado por
+`core/contracts/cockpit-datos.md`~~ **borrado, y sin reemplazo a propósito: el modelo vivo son las
+migraciones de [`core/schema/`](../../core/schema/), no una prosa que las describa** · costuras del
 N+1 (`workflow_id` en rutas y modelo) · runbook de operación y backups.
 **Hecho cuando:** Airtable se puede cancelar sin que nada se rompa, y la prueba de salud de
 [PLAN §F6](../../PLAN.md) pasa entera.
+
+> ☠️ **El export final NO hace falta, y eso se midió el 2026-08-05.** Era el último bloqueante para
+> cancelar la cuenta. Las 2 tablas que nunca se migraron —`Métricas Proyectos` y `Métricas Global`—
+> eran **proyección derivada y regenerable** (lo decía el propio contrato congelado): su verdad cruda
+> es `runs.metricas` + `outputs`, que están en Postgres. Las 4 vistas de `app.` las reconstruyen
+> campo por campo y **cubren desde el 2026-06-29**, o sea más historia que la que esas tablas
+> llegaron a tener (se partieron en dos el 2026-07-15). Verificado contra prod, vista por vista.
+
+#### La "balde 2" — el inventario, medido el 2026-08-05
+
+El cierre 77 apartó *"4 vistas sin consumidor + 6 columnas write-only"* para una migración de
+limpieza aparte, y **nunca listó cuáles**. Derivado ahora contra el código vivo (los 5
+`workflow.json`, `apps/dashboard/`, las vistas del schema) y contra prod por PostgREST: **son 5
+vistas y 12 columnas**, más las 6 `airtable_id`. El recuerdo se quedaba corto en las dos.
+
+**Método, para poder rehacerlo:** *consumidor vivo* = alguien la `select`ea. Estar en el mapa
+`TABLAS` de [`scoped.ts`](../../apps/dashboard/lib/supabase/scoped.ts) **no cuenta** — ese mapa es
+una whitelist de lo que se *puede* leer, no de lo que se lee. `Workflows/*/workflow-versions/`
+**no cuenta**: es archivo. Una columna leída solo por una vista sin consumidor está muerta con ella.
+
+**Las 5 vistas sin un solo consumidor** (todas en `public`; las 6 de `app.` están vivas, las lee
+*Entender* y `referentes.ts`):
+
+| Vista | Filas hoy | Por qué quedó sin consumidor |
+|---|---|---|
+| `v_outputs_recientes` | 88 | La `001`. Su reemplazo es `/curar/historicos`, que lee `outputs` directo |
+| `v_selecciones_por_dia` | 10 | La `003`. Nunca tuvo pantalla |
+| `v_corpus_aprobados` | 31 | La `002`. En el mapa de `scoped.ts`, jamás `select`eada |
+| `v_historico_seleccionados` | 88 | La `003`/`004`. Mismo caso, y **el CSV de ADR-057 tampoco la usa**: arma sus 15 columnas desde `outputs` |
+| `v_senal_tema` | 1 | La `006`, y es la peor de las cinco: solo aparece en `workflow-versions/`, y **su premisa está rota** — agrupa por `metadata->>'tema'`, que dejó de escribirse con la poda D.4. La única fila es de antes |
+
+**Las 12 columnas**, en dos grupos que no se deciden igual:
+
+*Escritas y nunca leídas (hay dato adentro — borrarlas tira traza):*
+
+| Columna | Quién la escribe | Estado en prod |
+|---|---|---|
+| `processed_items.url` | `Preparar procesados` (motor) + `registrarEnDedup` (app) | 772/772 |
+| `processed_items.seguidores` | `Preparar procesados` | 770 ≠ 0 |
+| `processed_items.flag_viral` | `Preparar procesados` + app | 282 en `true` |
+| `processed_items.idioma` | `Preparar procesados` | 770 no-null |
+| `processed_items.run_id` | `Preparar procesados` | 171 no-null |
+| `outputs.source_items` | `Armar filas archivado` | poblada |
+| `transcripciones.pedido_por` | `lib/transcripciones.ts` | 2/2 |
+
+El dedup lee **`external_id, platform` y nada más** (`Leer procesados`), así que las 5 de
+`processed_items` son el registro forense de lo que el motor vio y de nada más depende una lectura.
+
+*Ni escritas ni leídas (peso muerto de verdad):*
+
+| Columna | Medido en prod |
+|---|---|
+| `processed_items.primera_vez` | `default now()`, nadie la escribe a mano y nadie la lee |
+| `outputs.publicado_en` | **0 de 88** no-null. Su único lector era `v_corpus_aprobados`, que también se cae |
+| `runs.costo_estimado` | 41 filas, **ninguna ≠ 0**. Los costos salen de `runs.metricas` × `app.tarifas` (`v_costos_semana`), no de acá. Su único lector era `v_outputs_recientes` |
+| `instances.config_ref` | 1 de 4, y vale `clients/piloto/short-form-content.yaml` — el mundo del `deploy.mjs` **deprecado**. Muere con él, no antes |
+| `clients.parent_id` | **0 de 3**. 🛑 **No es peso muerto: es ADR-046 (doble grano por árbol) que ADR-051 reemplazó por membresías.** Sepultarlo se lleva puesto el trigger anti-ciclo de la `016` y es una **enmienda de ADR**, no una línea de una migración de limpieza |
+
+**Las 6 `airtable_id`** (`voces` 3/4 · `proyectos` 6/6 · `referentes` 14/16 · `candidatos` 136/165 ·
+`descartes` 20/38 · `referentes_propuestos` 8/8). Su único lector vivo era
+[`scripts/cortar-feed.ts`](../../apps/dashboard/scripts/cortar-feed.ts), cuyo trabajo terminó en D7.
+⚠️ **Orden obligado:** son la clave de join entre el export final de Airtable y las filas vivas.
+**Primero el export, después el drop** — al revés, el export queda sin forma de reconciliarse.
+
+> **✅ DECIDIDO el 2026-08-05 — [ADR-059](../adr/ADR-059-lo-que-no-se-usa-no-existe.md).** Manda el
+> consumo de código: lo que ningún código consume no existe, y los docs que lo conservaban se
+> enmiendan en el mismo commit. Con dos excepciones decididas de frente: **`clients.parent_id` se
+> queda** (ADR-051 §4 le dio trabajo nuevo hace tres días) y **`runs.costo_estimado` se va junto con
+> su línea del contrato** (el costo se calcula, no se guarda).
+>
+> **Y la poda va en dos migraciones, porque las columnas no se parten por si tienen dato sino por
+> quién las escribe.** Medido: PostgREST rechaza el insert **entero** con `PGRST204` si el body trae
+> una columna que no existe, y los dos POST que mandan las write-only son `onError:
+> continueRegularOutput` ⇒ el 400 **se traga**. El motor cerraría en verde sin escribir la memoria
+> del dedup (⇒ re-trae y re-paga: los 15 duplicados del 20→21/07) y el archivado cerraría en verde
+> **habiendo borrado los calificados sin archivarlos**.
+>
+> | | Qué | Estado |
+> |---|---|---|
+> | **[`022`](../../core/schema/022_poda_balde_2.sql)** | las 5 vistas · `outputs.publicado_en` · `runs.costo_estimado` · `instances.config_ref` · las 6 `airtable_id` | ✍️ **escrita** — se corre sola, sin coordinar con nadie |
+> | **`023`** | las 7 write-only (`processed_items` ×5 · `outputs.source_items` · `transcripciones.pedido_por`) | ⬜ va **después** del `n8n:push` que deja de escribirlas + corrida verde, con gate `§0` humano como la `019` |
+>
+> 🩸 **El invariante que la poda no toca, y se verificó:** el dedup no puede traer duplicados. Su
+> clave es el unique `(instance_id, platform, external_id)` de la `016` y `Leer procesados` pide
+> `select=external_id,platform` — **ninguna columna que cae participa**. Lo que puede romper el
+> dedup no es el drop, es el orden.
+>
+> 📌 **Y una corrección al método de este inventario, que casi se lleva puesta una vista viva:**
+> *"consumidor = alguien la `select`ea"* no ve **runbooks**. `v_outputs_recientes` figuraba como
+> huérfana y su consumidor era §Verificación de `ingesta-registro.md` — un humano en el SQL Editor.
+> El próximo inventario tiene que grepear también los contratos y los checklists.
 
 ### Orden y por qué
 D1 y D2 dan valor sin tocar un dato: mientras se aprende el stack, el riesgo es cero. D3 y D4 son la

@@ -52,10 +52,13 @@ export type ResultadoEncolar = { nuevos: number; yaEstaban: number };
 //
 // Y ahora es **por instancia**: que otra empresa haya pedido este video no significa que esta ya lo
 // tenga. El script vive en su fila, no en la de al lado.
+// ⚠️ Ya no recibe `pedidoPor`. `transcripciones.pedido_por` se escribía y no la leía nadie, así que
+// la dropea la `023` (ADR-059) y este insert tiene que dejar de mandarla antes — un body con una
+// columna inexistente es `PGRST204` y se lleva el encolado entero. **Quién pidió qué no se pierde**:
+// el acto queda en `app.eventos`, que es donde vive la auditoría.
 export async function encolarEnlaces(
   ctx: TenantContext,
   enlaces: EnlaceVideo[],
-  pedidoPor: string,
 ): Promise<ResultadoEncolar> {
   if (enlaces.length === 0) return { nuevos: 0, yaEstaban: 0 };
   const { data, error } = await (await scoped(ctx))
@@ -65,7 +68,6 @@ export async function encolarEnlaces(
         plataforma: e.plataforma,
         external_id: e.external_id,
         url: e.url,
-        pedido_por: pedidoPor,
       })),
       { onConflict: "instance_id,plataforma,external_id", ignoreDuplicates: true },
     )
@@ -123,10 +125,11 @@ export async function registrarEnDedup(ctx: TenantContext, enlace: EnlaceVideo):
     "public.processed_items",
     [
       {
+        // Solo la clave del dedup. `url` y `flag_viral` se escribían y no las leía nadie: se van
+        // en la `023` (ADR-059), y este upsert deja de mandarlas antes para no comerse un PGRST204
+        // — que acá sería peor que en el motor, porque el enlace quedaría fuera de la memoria.
         platform: enlace.plataforma,
         external_id: enlace.external_id,
-        url: enlace.url,
-        flag_viral: false,
       },
     ],
     // El arbiter nuevo de la `016`. El viejo (`platform,external_id`) sigue existiendo hasta la

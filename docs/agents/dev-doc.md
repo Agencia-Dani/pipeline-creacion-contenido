@@ -117,9 +117,9 @@
 > [`workflows/workflow-short-form-content/`](../../workflows/workflow-short-form-content/), el
 > descubrimiento en
 > [`workflows/workflow-descubrimiento-referentes/`](../../Workflows/workflow-descubrimiento-referentes/), el
-> archivado en [`workflows/workflow-archivado/`](../../workflows/workflow-archivado/). El cockpit
-> Airtable en [`core/contracts/airtable-cockpit.md`](../../core/contracts/airtable-cockpit.md); los
-> schemas Supabase en [`core/schema/`](../../core/schema/) (`001`–`006`).
+> archivado en [`workflows/workflow-archivado/`](../../Workflows/workflow-archivado/). El cockpit es
+> [`apps/dashboard/`](../../apps/dashboard/) desde ADR-025 (el contrato de Airtable se borró el
+> 2026-08-05); el modelo de datos son los schemas de [`core/schema/`](../../core/schema/) (`001`–`022`).
 
 ---
 

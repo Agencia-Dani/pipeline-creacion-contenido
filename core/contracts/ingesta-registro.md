@@ -103,10 +103,14 @@ La service role key bypassa RLS — vive SOLO en n8n (y en el gestor de contrase
   "titulo": "{{ titulo }}",
   "contenido_o_link": "{{ link_a_la_fila_del_sheet_o_texto }}",
   "estado": "draft",
-  "source_items": [{ "platform": "instagram", "url": "{{ url_referente }}" }],
   "metadata": { "views": 0, "likes": 0, "followers": 0, "hashtags": [] }
 }]
 ```
+
+> ☠️ **`source_items` murió en la [`023`](../schema/023_poda_write_only.sql)** (ADR-059). Era la
+> trazabilidad al contenido de origen, la escribía el archivado y **no la leyó nunca nadie**: ni una
+> vista, ni la app, ni otro workflow. Lo que sí se consulta del origen —el referente y su url— vive
+> en `metadata`, que es lo que muestran Históricos y el export CSV.
 
 `metadata` lleva las métricas del referente (las del `content_item`) — son las que el dashboard
 usa para filtrar por views/likes/seguidores.
@@ -119,10 +123,20 @@ usa para filtrar por views/likes/seguidores.
 {
   "fin": "{{ $now }}",
   "estado": "ok",
-  "costo_estimado": 0,
   "metricas": { "colectados": 0, "filtrados": 0, "outputs": 0 }
 }
 ```
+
+> ☠️ **`costo_estimado` murió en la [`022`](../schema/022_poda_balde_2.sql)** (ADR-059). Este
+> contrato la declaró desde el día 1 y **ningún workflow la escribió nunca** (41 corridas: 36 NULL y
+> 5 ceros de quien copió esta plantilla al pie de la letra). No es un dato que falte: **el costo de
+> este sistema se calcula, no se guarda** — contadores en `metricas` × `app.tarifas`, que es lo que
+> hace `app.v_costos_semana`. Un número por corrida sería una segunda fuente de verdad para lo
+> mismo, y se desactualizaría solo el día que alguien edite una tarifa.
+>
+> ⚠️ **Por eso `metricas` importa más de lo que parece:** las claves que pongas ahí son las que
+> terminan siendo costo. Un pipeline nuevo que no reporte sus contadores de consumo no aparece en
+> *Entender* — no falla, sale en cero.
 
 ### 4. Workflow de error (n8n Error Workflow, global)
 
@@ -133,8 +147,20 @@ Si la corrida murió antes de abrir el run, inserta uno nuevo con `estado: "fall
 
 ## Verificación
 
-Tras una corrida: `select * from v_outputs_recientes limit 30;` en el SQL Editor de Supabase —
-deben aparecer las piezas con su cliente, workflow, corrida y metadata.
+Tras una corrida, en el SQL Editor de Supabase — deben aparecer las piezas con su corrida y metadata:
+
+```sql
+select o.creado_en, o.tipo, o.titulo, o.estado, o.metadata, r.trigger_type, r.inicio
+  from outputs o join runs r on r.id = o.run_id
+ where o.instance_id = '<la instancia>'
+ order by o.creado_en desc limit 30;
+```
+
+> 📌 **Esto era `select * from v_outputs_recientes`**, hasta que la
+> [`022`](../schema/022_poda_balde_2.sql) dropeó la vista (ADR-059). La vista existía **solo para
+> este chequeo** — ningún código la consultaba — y el inventario que la marcó huérfana casi se la
+> lleva sin ver a su consumidor, porque **el consumidor era este runbook y grep no lee runbooks**.
+> La query de arriba hace lo mismo sin un objeto de schema que mantener.
 
 ---
 

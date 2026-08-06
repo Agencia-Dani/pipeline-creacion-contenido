@@ -70,8 +70,9 @@ const TABLAS = {
   "public.outputs": { esquema: "public", grano: "instancia" },
   "public.processed_items": { esquema: "public", grano: "instancia" },
   "public.v_senal_seleccion": { esquema: "public", grano: "instancia" },
-  "public.v_corpus_aprobados": { esquema: "public", grano: "instancia" },
-  "public.v_historico_seleccionados": { esquema: "public", grano: "instancia" },
+  // `v_corpus_aprobados` y `v_historico_seleccionados` estaban acá y las dropeó la `022`
+  // (ADR-059). Vivían en este mapa sin que nadie las leyera: **estar en la whitelist no es ser
+  // consumidor**, y esa confusión las hizo pasar por vivas en el primer inventario de la balde 2.
 
   // Puentes: heredan por FK (migraciones `012` y `013`).
   // ⚠️ Leerlas trae los pares de todos los tenants. Está bien porque el llamador las cruza contra

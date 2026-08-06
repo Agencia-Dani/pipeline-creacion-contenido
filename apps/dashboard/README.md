@@ -55,12 +55,13 @@ El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpi
   browser bloquea el `<img>` cross-origin siempre. Sirve desde nuestro origen y copia a Storage en
   la primera vista. Lo protege `proxy.ts` — si alguien agrega `/api/miniatura` a `esRutaPublica`,
   pasa a ser un endpoint anónimo.
-- `scripts/` — solo queda **`npm run cortar:feed`**, el corte de D7: arrastra `Candidatos`,
-  `Descartes del gate` y `Referentes propuestos` de Airtable a Postgres **por última vez**, e
-  imprime el A/B que autoriza el flip (`-- --dry` verifica sin escribir). Es autocontenido a
-  propósito: el modo sombra de D3 (`comun.ts`, `sombra:import`, `sombra:diff`) y los cortes 2/4 y
-  3/4 se borraron en D7 — con Postgres de dueño, un import posterior pisaría en silencio lo que el
-  equipo calificó. Están en git si hiciera falta mirarlos.
+- `scripts/` — **ya no existe.** Su último habitante era `cortar:feed`, el corte de D7 (arrastraba
+  `Candidatos`, `Descartes del gate` y `Referentes propuestos` de Airtable a Postgres por última
+  vez), y murió con la [`022`](../../core/schema/022_poda_balde_2.sql): leía las columnas
+  `airtable_id` que esa migración dropea (ADR-059). Antes se habían borrado, en D7, el modo sombra
+  de D3 y los cortes 2/4 y 3/4 — con Postgres de dueño, un import posterior pisaría en silencio lo
+  que el equipo calificó. **Todos están en git si hiciera falta mirarlos**, que es exactamente
+  donde tiene que vivir un script de migración una vez que migró.
 - `proxy.ts` — refresh de sesión + redirect a login (en Next 16 middleware se llama proxy).
   **No cambió con el multi-tenant y no tiene que cambiar:** sigue siendo el chequeo optimista de
   sesión, y la autoridad sigue en cada página.
@@ -120,8 +121,8 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    (sin esto la app no lee roles ni las vistas analíticas).
    La 010 es la del transcriptor (ADR-031); la **012 es el corte 2/4** (ADR-032: el vínculo
    referente↔proyecto pasa a tabla puente) y la **013 es D7** (ADR-035/036: `external_id` con
-   `unique`, la puente de propuestas, las 2 vistas nuevas), que va **antes** de
-   `npm run cortar:feed`. La **011 es obligatoria**: sin ella el BFF recibe
+   `unique`, la puente de propuestas, las 2 vistas nuevas), que iba **antes** del corte de D7
+   (`cortar:feed`, ya borrado). La **011 es obligatoria**: sin ella el BFF recibe
    `42501 permission denied for schema app` en TODO lo que lee de `app.*`. El login no lo delata
    porque va por la anon key.
 
@@ -187,7 +188,7 @@ el costo de la semana solo (zona *Entender*, con la migración 008 aplicada).
 
 **Hecho-cuando de cada corte de D5:** el equipo edita ese dominio solo en la app y su página de
 Airtable queda congelada. Cada corte suma su propia evidencia previa, que tiene que terminar en
-verde **antes** de publicar el flip. El último es `npm run cortar:feed` (D7): 145 candidatos con
+verde **antes** de publicar el flip. El último fue el corte de D7 (`cortar:feed`): 145 candidatos con
 **0 sin `external_id` y 0 sin proyecto resoluble**, y las propuestas con **más de 1 proyecto cada
 una** — si esa última línea diera 0, el corte estaría tirando la mitad de la atribución.
 
