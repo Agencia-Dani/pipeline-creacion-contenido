@@ -1178,7 +1178,25 @@ de React ni en las opciones de un `<select>`.
 🔑 **El compilador lleva la mano:** `COPY` en `curar/page.tsx` es un `Record<PantallaCurar, …>`
 exhaustivo, así que sacar `ajustes` de `PANTALLAS_CURAR` **no compila** hasta borrar su copy.
 
-#### A5 · `lib/equipo.ts` + `ajustes/equipo/`
+#### A5 · `lib/equipo.ts` + `ajustes/equipo/` — ✅ **CONSTRUIDA el 06/08 · ⬜ falta el clic**
+
+> **Dos cosas que se decidieron construyendo, y no estaban en el plan:**
+>
+> 1. **El alta pide `nombre` además de mail y rol.** `invitar(email, rol)` no alcanza:
+>    `app.usuarios.nombre` es `not null`, y derivarlo del mail deja *"jperez"* como nombre en la
+>    lista del cliente. Tres campos.
+> 2. **El mail se lee por RPC y se cruza en TS**, porque los dos lados tienen grano distinto:
+>    `emails_visibles()` devuelve a toda la gente con la que compartís *alguna* empresa (RLS no sabe
+>    qué cockpit hay abierto) y la lista scopeada es la de *esta*. Manda la scopeada.
+>
+> ✅ **Verificado contra prod lo que se podía sin una sesión ajena:** el embed
+> `usuarios_clientes?select=…,usuarios(nombre)` resuelve (7 filas en `retia` con `service_role`,
+> **incluidas las 2 de los dueños** — que es justo lo que la `025` tiene que esconderle a una
+> sesión: tienen que ser **5**).
+>
+> 🐛 **Y un bug que solo aparece corriendo el código:** `z.email().trim()` valida **antes** de
+> limpiar, así que un mail pegado con un espacio al final —copiarlo de un chat— se rechazaba como
+> inválido. Va `z.string().trim().toLowerCase().pipe(z.email(...))`. El typecheck no lo veía.
 
 - **Lectura** por `(await scoped(ctx))` con sesión ⇒ las policies de A1 se evalúan de verdad. Lista:
   nombre, mail, rol, desde cuándo. Sin dueños, y eso lo hace la policy.
