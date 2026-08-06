@@ -8,6 +8,11 @@
 
 **Estado:** **en ejecución — Fases 0–4 y 6 en producción** (la Capa 2 quedó viva el 05/08, ADR-058). La **paginación del feed** (§12 #7) se cerró el 06/08; queda la **Fase 5, LinkedIn** (§12 #9) · **Escrito:** 2026-08-02 · **Última verificación contra prod:** 2026-08-06 · **Origen:** pedido de Alejandro — expandir el cockpit a otros pipelines (1) y a otras empresas (2), priorizando disponibilidad y capacidad, sin construir sin plan.
 
+> 🚦 **Si venís a ejecutar HOY, andá directo a [§15](#15-el-cierre-del-producto-en-dos-carriles).**
+> Tres personas de Retia empiezan a usar la herramienta, y eso cruzó tres disparadores que este repo
+> dejó escritos con fecha. §15 los ordena en dos carriles paralelos con dueño único por archivo,
+> para dos agentes trabajando a la vez.
+
 ---
 
 ## 0. Estado al 2026-08-04 — medido, no recordado
@@ -911,3 +916,349 @@ filas, y una pantalla de LinkedIn con una fila sembrada la muestra a quien corre
 **30X** y mirarlo con la cuenta que alcanza **30X y EstadoX** (existe desde el 05/08). Tiene que
 verse en el cockpit de 30X y **no** en el de EstadoX — RLS deja pasar lo propio, `scoped.ts` acota al
 cockpit abierto.
+
+---
+
+## 15. El cierre del producto, en dos carriles
+
+> **Qué es esta sección y por qué existe.** §14 listaba pendientes sueltos, cada uno con su forma
+> *qué · evidencia · qué lo destraba · hecho cuando*, y todos con la misma nota al pie: *"ninguna
+> bloquea a Retia hoy"*. **Eso dejó de ser cierto el 2026-08-06**: tres personas de Retia —empresa
+> cliente, no la agencia— empiezan a usar la herramienta. Eso cruza de golpe tres disparadores que
+> el repo dejó escritos y nunca ejecutó, y agrega uno que nadie había nombrado.
+>
+> §15 no reemplaza a §14: la ordena para ejecutarla **con dos agentes en paralelo**, que es la
+> restricción nueva. §15.0 son las cuatro preguntas de producto que Mani hizo el 06/08, respondidas
+> contra el código. §15.A y §15.B son los dos carriles. **§15.C es el protocolo que hace que no se
+> pisen** — dueño único por archivo, no buena voluntad.
+
+**Los tres disparadores que se cruzaron, con su cita:**
+
+1. **[ADR-051](../adr/ADR-051-el-acceso-es-membresia-explicita.md)**, sobre dejar el alta manual:
+   *"Disparador para automatizarla: **el primer usuario que no sea de la agencia**."*
+2. **[`domain/roles.ts:25-31`](../../apps/dashboard/domain/roles.ts)**, sobre el gate de costos:
+   *"Hoy está bien porque todos los operadores son gente de adentro. El día que una persona de una
+   empresa cliente reciba `operador`, ese gate le publica el margen de la agencia — y **falla hacia
+   MOSTRAR**, así que no va a romperse, va a filtrar."*
+3. **§10 de este doc**, sobre el eje *+usuarios*: *"Con 3 empresas × varias personas esto se vuelve
+   fricción real. Una pantalla de alta scopeada por tenant es candidata a fase propia."*
+
+---
+
+### 15.0 · Las cuatro preguntas, respondidas contra el código
+
+Se escriben acá porque las respuestas **existían y estaban dispersas** —ADR-023, ADR-050, §14.5 y
+tres comentarios de código— y por eso se volvieron a preguntar. Un hecho, un dueño.
+
+#### ¿Cada empresa corre en simultáneo, o hay una sola corrida global?
+
+**En simultáneo, por instancia.** El guard single-flight del motor filtra por
+`instance_id=eq.<instancia>` —[ADR-050](../adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md) §3.3
+lo convirtió de global a por-instancia— y el dispatcher dispara N ejecuciones en paralelo, una por
+cockpit. Retia, EstadoX y 30X no se bloquean entre sí.
+
+**Lo que sí es compartido, y nadie midió:**
+- El pod de n8n. Es el disparador de la fase 2 de ADR-005 (VPS), que sigue escrito como *"medido, no
+  anticipado"*.
+- Las cuentas de Apify / Supadata / Anthropic: el **costo** se atribuye por instancia
+  (`runs.metricas × app.tarifas`), el **cupo no**. Una empresa le puede quemar la cuota a otra sin
+  que nada avise (§14.5).
+- `concurrencia_transcribir` y los presupuestos viven en el `Config` del motor, fuera de
+  `AJUSTE_MAP` ⇒ son del pod, no de la empresa. Tres corridas en paralelo multiplican por tres las
+  llamadas en vuelo a Supadata.
+
+**Nada que hacer hoy.** Queda como el disparador de ADR-005 fase 2, sin ejecutar y sin medir.
+
+#### ¿Transcribir detecta lo ya transcrito? ¿Dos usuarios a la vez?
+
+**Sí, y lo dice en pantalla.** `app.transcripciones` tiene `unique (instance_id, plataforma,
+external_id)` desde la `016`, y `encolarEnlaces` upsertea con `ignoreDuplicates` devolviendo
+*"N ya estaban (no se vuelven a pagar)"*. El motor usa la memoria hermana (`processed_items`),
+fail-closed (ADR-029).
+
+Dos matices que son decisión, no bug:
+- **El dedup es por instancia a propósito.** Si Retia transcribió un video, EstadoX lo paga de nuevo.
+  El unique global murió en la `017` porque le vaciaba el supply a la segunda empresa (`016:301`).
+  Correcto para el motor; para el transcriptor a pedido significa pagar dos veces la misma URL.
+- **Dos personas de la misma empresa procesando a la vez pueden agarrar el mismo enlace.** Está
+  decidido y escrito en [`transcribir/actions.ts:81`](../../apps/dashboard/app/[cliente]/[pipeline]/(zonas)/transcribir/actions.ts):
+  *"no vale un estado 'procesando' para eso: los writes ya son idempotentes"*. ~USD 0,014 por
+  colisión. Con 3 personas pasa de hipotético a probable, y **sigue siendo más barato que el claim
+  atómico**. Se deja y se mide; si molesta, el fix es un `update … where estado = 'pendiente'
+  returning`.
+
+#### Si alguien de Retia ejecuta, ¿al otro le sale?
+
+**Solo si carga o navega la pantalla.** Dos agujeros, los dos reales:
+- El polling de 5 s (`operar/auto-refresh.tsx`) se monta con `activo={corridaViva}`, o sea **solo si
+  ya había corrida viva al renderizar**. Quien tenía Operar abierta antes de que otro dispare no se
+  entera nunca.
+- **`correrAhora()` no re-chequea del lado del servidor**, a diferencia de su gemela `buscarAhora()`
+  que sí llama `hayBusquedaViva(ctx)` sesenta líneas más abajo **en el mismo archivo**. El botón
+  deshabilitado es cosmético, y el mensaje de vuelta dice *"Señal enviada… aparece abajo como
+  Corriendo"* incluso cuando el guard de n8n la bloqueó.
+
+→ Es la tarea **A7**. No cierra la race de 1-2 s de ADR-023 C.3.3 (aceptada y argumentada): cierra el
+agujero de UX que la vuelve visible tres veces por semana.
+
+#### ¿Se puede invitar gente desde el cockpit?
+
+**No existe la pantalla.** El alta son 3 pasos manuales con el modo de falla mudo que ADR-051 nombró:
+una membresía con la empresa equivocada mete a alguien en el cockpit de otro cliente **sin un solo
+error**. Construirla necesita tres cosas que faltan, y la primera está escrita como deuda en la
+propia `021` (línea 216): *"una pantalla de accesos —quiénes entran a mi empresa— necesitaría una
+policy nueva; no existe todavía, así que no se escribe"*.
+
+→ Es el carril **A** entero.
+
+---
+
+### 🔴 15.0.bis · Carril 0 — lo que va ANTES de que entren
+
+*Bloquea el live, no bloquea el código. Lo hace Mani a mano, son 10 minutos.*
+
+No hay que esperar la pantalla para dar de alta a Retia. **Pero hay que decidir el rol primero,
+porque el gate de costos muerde exactamente acá:**
+
+| Rol | Qué ve | Consecuencia |
+|---|---|---|
+| `operador` | Las 4 zonas, **incluidos los costos de proveedor** en Entender | Les publica el margen de la agencia |
+| `sponsor` | Solo Entender, sin costos | No pueden calificar ni operar: inservible para su trabajo |
+
+Ninguna de las dos sirve, y el arreglo ya está escrito en `domain/roles.ts:31`: **cambiar `veCostos`
+de `rol !== "sponsor"` a `rol === "dev"`** en [`entender/page.tsx:41`](../../apps/dashboard/app/[cliente]/[pipeline]/(zonas)/entender/page.tsx).
+Es lo que ADR-052 dejó escrito y descartó por innecesario; ahora es necesario. Una línea y su test.
+
+1. Cambiar el gate a `rol === "dev"` + test. Deploy.
+2. Alta de las 3 personas por los 3 pasos de ADR-051, rol `operador`, `client_id = 'retia'`.
+3. Correr la query de verificación que la `018` dejó escrita (`018:125-130`) y **leerla fila por
+   fila**, no contarla.
+
+---
+
+### 15.A · Carril A — Accesos y concurrencia visible
+
+**Rama `carril-a-accesos`.** Superficie nueva del cockpit: **no toca n8n ni el motor.**
+
+| # | Qué | Archivos |
+|---|---|---|
+| **A1** | La migración `025_accesos.sql` | `core/schema/025_accesos.sql` |
+| **A2** | El landmine de `scoped.ts` | `lib/supabase/scoped.ts` |
+| **A3** | `domain/permisos.ts` + tests | `domain/permisos.ts(.test.ts)` |
+| **A4** | La zona `ajustes` (5ª) | `domain/roles.ts`, `domain/pipelines.ts`, `(zonas)/ajustes/**` |
+| **A5** | La pantalla de equipo y el alta | `lib/equipo.ts`, `ajustes/equipo/**` |
+| **A6** | ADR-060 | `docs/adr/ADR-060-*.md` |
+| **A7** | Concurrencia visible | `operar/actions.ts`, `operar/auto-refresh.tsx` |
+
+#### A1 · `core/schema/025_accesos.sql`
+
+Las policies que la `021` dejó explícitamente sin escribir. Mismo molde que su §1, que es el estándar
+de Supabase y no un atajo:
+
+- **`app.usuarios_visibles()`** — `security definer` + `stable` + `set search_path`. Devuelve los
+  `usuario_id` que comparten empresa con la sesión, **excluyendo `es_dueno`**. La exclusión va en la
+  policy y no en un `.filter()` de React porque ADR-051 §3 la puso como propiedad del sistema: *"la
+  agencia queda FUERA de toda superficie que liste personas"*.
+  El `security definer` es lo que evita la recursión: una policy sobre `app.usuarios_clientes` que
+  seleccione `app.usuarios_clientes` necesitaría una policy para su policy (`021:77`).
+- **`policy select` en `app.usuarios`** para esos ids. **Se suma** a la de la `007` (las policies se
+  OR-ean), así que un dueño sigue leyendo su propia fila.
+- **`policy select` en `app.usuarios_clientes`** con `client_id in (select app.clientes_visibles())`,
+  ampliando la de `021:307` que solo deja ver las membresías propias.
+- **Sin grants de escritura.** La `021` §2 dejó `usuarios` y `usuarios_clientes` fuera de los
+  `grant insert/update/delete` a propósito, y se mantiene: el alta escribe con `service_role` desde
+  la Server Action porque **`auth.admin.inviteUserByEmail` no existe con la clave anon**.
+- Gate humano, verificado **por efecto** y no por *"corrió sin error"* — la lección de la `019`
+  (§14.1).
+
+⚠️ **Orden que no se puede invertir: la `025` va a prod ANTES que la pantalla.** El flip de la Capa 2
+está vivo desde el 05/08, así que una pantalla sin policy devuelve cero filas o `42501`. Es la misma
+nota que abre la `024`.
+
+#### A2 · El landmine de `scoped.ts`
+
+[`scoped.ts:51`](../../apps/dashboard/lib/supabase/scoped.ts) declara
+`"app.usuarios": { grano: "cliente" }` ⇒ filtraría por `client_id`, **columna que la `019` dropeó**
+(`019:59`). Hoy nadie lo ejerce porque `lib/auth.ts` lee esa tabla con `createClient()` directo. **La
+pantalla de equipo sería la primera en tocarlo**, y el síntoma sería un error de PostgREST sobre una
+columna inexistente.
+
+Fix: **`app.usuarios_clientes` entra al mapa con grano `"cliente"`** —tiene la columna y filtra exacto
+al cockpit abierto— y la entrada mentirosa de `app.usuarios` se corrige. El equipo se lee por
+`usuarios_clientes` con embedding a `usuarios`: la Capa 1 sigue siendo el `.eq("client_id")` de
+siempre y la Capa 2 filtra el embed.
+
+#### A3 · `domain/permisos.ts`
+
+Dominio puro, misma disciplina que `roles.ts` y `tenant.ts`: sin IO, `.test.ts` al lado, corre en
+Node sin build.
+
+- `puedeAdministrarEquipo(rol)` → `dev | sponsor`.
+- `rolesQuePuedeOtorgar(rol, esDueno)` → la agencia otorga los 3; el `sponsor` otorga
+  `operador | sponsor`, **nunca `dev`**, porque ese rol ve el costo del proveedor.
+
+**La regla es *nadie otorga un rol que no tiene*, y vive en una función testeable** — no en un `if`
+de React ni en las opciones de un `<select>`.
+
+#### A4 · La zona `ajustes`
+
+- `domain/roles.ts`: `ZONAS` y `ZONAS_POR_ROL` ganan `"ajustes"` para `dev` y `sponsor`, **no** para
+  `operador`. Va **última** en el array de `dev`: el archivo avisa en la línea 22 que *"el orden de
+  este array es prioridad"* y `zonaInicial` devuelve el primero. Para el `sponsor`, `entender` sigue
+  siendo la primera.
+- `domain/pipelines.ts`: `ZONAS_POR_PIPELINE` la suma a los **dos** pipelines (el equipo es de la
+  empresa: existe con o sin pipeline). `PANTALLAS_CURAR` **pierde** `"ajustes"`.
+- `(zonas)/ajustes/page.tsx` — índice con tarjetas **derivadas** del dominio, igual que
+  `curar/page.tsx`: la lista que se dibuja y la que consulta la guardia tienen que ser una sola.
+- `(zonas)/ajustes/motor/` — los knobs, movidos tal cual desde `curar/ajustes/`.
+- `curar/ajustes` → `redirect` a `ajustes/motor`. El equipo tiene bookmarks y el 404 de la Fase 3 ya
+  cobró ese precio una vez (cierre 89).
+
+🔑 **El compilador lleva la mano:** `COPY` en `curar/page.tsx` es un `Record<PantallaCurar, …>`
+exhaustivo, así que sacar `ajustes` de `PANTALLAS_CURAR` **no compila** hasta borrar su copy.
+
+#### A5 · `lib/equipo.ts` + `ajustes/equipo/`
+
+- **Lectura** por `(await scoped(ctx))` con sesión ⇒ las policies de A1 se evalúan de verdad. Lista:
+  nombre, mail, rol, desde cuándo. Sin dueños, y eso lo hace la policy.
+- **`invitar(email, rol)`**: `exigirTenant("ajustes")` → `puedeAdministrarEquipo` →
+  `rolesQuePuedeOtorgar` → `createAdminClient().auth.admin.inviteUserByEmail` →
+  `insert app.usuarios` → `insert app.usuarios_clientes` → `registrarEvento`. **Los 3 pasos manuales
+  de ADR-051, en un acto.**
+- 🔑 **El modo de falla mudo desaparece por construcción:** la empresa no se elige en un formulario,
+  sale de `ctx.clientId` — el cockpit abierto. No hay dónde equivocarse.
+- **El caso que ya existe en prod es el de la persona con dos membresías.** Si el mail ya está en
+  `auth.users`, `inviteUserByEmail` falla y hay que sumar solo la membresía. Es el camino normal, no
+  el borde.
+- Quitar acceso y cambiar rol: mismo gate, mismo techo de roles. Zod en todo input, `revalidatePath`
+  después de cada mutación.
+
+#### A6 · ADR-060
+
+**Se escribe antes de construir**, y esto no es ceremonia: es la lección del cierre 96, donde el
+mismo flip se hizo **dos veces el mismo día** por dos sesiones que no se vieron, y la conclusión fue
+*"escribir el ADR antes —como manda el repo— habría ahorrado el día duplicado"*.
+
+Cubre: la 5ª zona y por qué los knobs se mudan; quién administra el equipo y el techo de roles; y
+**por qué la lectura va por RLS pero la escritura por `service_role`** — la autoridad la pone la
+Server Action y no la base, que es la excepción del sistema y hay que nombrarla, no descubrirla.
+Enmienda ADR-051 (el alta deja de ser manual) y ADR-056 (una zona más).
+
+#### A7 · Concurrencia visible
+
+- `correrAhora()` gana el chequeo server-side **que su gemela ya tiene en el mismo archivo**. Reusa
+  `hayCorridaViva` de `domain/corrida.ts` y `ultimasCorridasMotor` de `lib/runs.ts`, que ya existen y
+  que ya usa `operar/page.tsx`. El mensaje deja de mentir.
+- `auto-refresh.tsx` se monta **siempre** en Operar, con dos cadencias: 5 s con corrida viva, 30 s
+  sin ella.
+
+---
+
+### 15.B · Carril B — Cerrar reels
+
+**Rama `carril-b-cierres`.** SQL contra prod, verificación y docs: **no toca `apps/dashboard/`.**
+
+*Por qué este carril y no la Fase 5: LinkedIn sigue bloqueado por lo **no técnico** (cierre 92) — no
+hay definición de "funcionó", no existe el banco de referentes y faltan los few-shot. Construir sus
+pantallas ahora es superficie para datos que no existen.*
+
+| # | Qué | Estado |
+|---|---|---|
+| **B1** | El gate de la `023` | ⏳ espera corridas del fin de semana |
+| **B2** | Check #1 de la `021` contra PROD | ⬜ va después de A1 |
+| **B3** | La prueba de §14.6 con filas | ⬜ escrita paso a paso en el handoff |
+| **B4** | `docs/runbooks/` + `core/templates/` | ⬜ va después de A5 |
+| **B5** | Las verificaciones de ojo humano | ⬜ preparar, no ejecutar |
+| **B6** | Deuda de docs medida | ⬜ |
+
+**B1 — el único bloqueante numerado del repo.** Depende del calendario, no del trabajo: archivado
+domingo 18:00, motor lunes 08:00. Con las dos corridas verdes,
+`node Workflows/workflow-short-form-content/verificar-corrida.mjs 2` tiene que decir
+**`intersección: 0`** contando por `run_id`. Si cae a la ventana de `primera_vez`, la memoria no se
+escribió y hay que mirar por qué **antes de dropear nada**: el modo de falla está medido — `PGRST204`
+que los `onError: continue` se tragan ⇒ motor en verde **sin memoria de dedup**.
+
+**B2 — el check #1 contra prod.** El SQL está al pie de la [`024`](../../core/schema/024_rls_linkedin.sql).
+Cero filas. Nunca corrió contra la base real. ⚠️ Va **después** de que la `025` esté aplicada, o
+reporta las tablas nuevas.
+
+**B3 — §14.6 con filas.** Escrita paso a paso en el handoff, con los dos `instance_id`, la cuenta de
+doble membresía y la matriz de interpretación (**1 y 1** anda · **2 y 2** Capa 1 rota · **0 y 0**
+policy que no matchea o grant que falta · **`42501`** falta un grant). No sirve con una cuenta
+`es_dueno`. Termina con un alta desde el botón: lo único que ejercita los `grant insert/update/delete`.
+
+**B4 — los runbooks que F5 pidió siempre y nunca se escribieron.** `agregar-cliente.md` y
+`agregar-workflow.md`. El criterio de hecho de PLAN §F5 es la auditoría honesta del refactor entero:
+*"si algún paso de la guía exige modificar el núcleo, el diseño no está listo — se corrige la guía o
+el contrato, no se parchea a mano"*.
+🔗 **Único punto de dependencia entre carriles:** el paso "dar de alta a los usuarios" pasa de 3 pasos
+de SQL a un click cuando A5 esté en prod.
+
+**B5 — de ojo humano, no de agente.** El carril deja el checklist de qué mirar; lo ejecutan Mani y el
+equipo. Arrastres del handoff: el clic al **Descargar CSV** de `/curar/historicos` (el más viejo
+abierto), el **feed paginado**, el tab **Entender** de un operador. Del ROADMAP: **V2** (literalidad),
+**V5** (incremental `dias=1`), **V6** (resiliencia) y **D3** (demo con Majo y Jero).
+
+**B6 — lo que hoy dice falso**, y hace que el próximo agente arranque con datos equivocados:
+ROADMAP §3 (M0/A/B sin marcar y en producción hace meses) · §12 fila 9 (dice que la `024` está sin
+aplicar; entró el 06/08) · §14.4 (no refleja que el Sheet salió, cierre 97) · plan-cockpit §8 (dos
+decisiones abiertas ya resueltas por ADR-046 y ADR-057) · 4 links rotos entre ADRs y migraciones.
+
+---
+
+### 15.C · El protocolo de paralelo
+
+**Lo que hace que dos agentes no se pisen es dueño único por archivo, no buena voluntad.**
+
+Ramas desde `main`: **`carril-a-accesos`** y **`carril-b-cierres`**. Merge con **rebase** (el repo va
+directo a `main`, commits en español y concisos).
+
+| Zona del repo | A | B |
+|---|:-:|:-:|
+| `(zonas)/ajustes/**` · `(zonas)/operar/**` · `(zonas)/curar/ajustes/**` | ✍️ | — |
+| `(zonas)/entender/page.tsx` (Carril 0) | ✍️ | — |
+| `domain/roles.ts` · `domain/permisos.ts` · `lib/equipo.ts` · `lib/supabase/scoped.ts` | ✍️ | — |
+| **`domain/pipelines.ts`** | ✍️ | 🚫 |
+| `core/schema/025_accesos.sql` | ✍️ | — |
+| `core/schema/023_poda_write_only.sql` (firmar el gate) | — | ✍️ |
+| `Workflows/**` | — | ✍️ |
+| `docs/runbooks/**` · `core/templates/**` | — | ✍️ |
+| `docs/adr/ADR-060-*.md` | ✍️ | — |
+| `ROADMAP.md` · `plan-cockpit-propio.md` | — | ✍️ |
+| **este doc** | §15.A | §15.0 · §15.B · §12 · §14 |
+| `docs/agents/handoff.md` | bloque propio | bloque propio |
+
+**`domain/pipelines.ts` es el único archivo que los dos querrían tocar** — A le agrega la zona
+`ajustes`, y B lo tocaría si siguiera a LinkedIn. Con el carril B en *cerrar reels*, **B no lo toca**.
+Queda escrito para que no haya que acordarse.
+
+**Las cuatro reglas duras:**
+
+1. **Números de migración:** A se reserva la **`025`**. B no crea ninguna: solo aplica la `023`, que
+   ya existe. Si B necesitara una, es la `026` y avisa antes.
+2. **Docs compartidos:** cada carril escribe **solo su sub-bloque**, con encabezado propio. Como no
+   se solapan, git resuelve casi todo; el segundo en mergear rebasea.
+3. **Orden que no se puede invertir:** Carril 0 antes de las altas · **A1 antes que A5 en prod** ·
+   **B2 después de A1** · **B4 después de A5**.
+4. **Antes de mergear**, el loop entero del carril:
+   `cd apps/dashboard && npm run typecheck && npm test && npm run build` ·
+   `cd core/scripts && npm run validate` · y `npm run n8n:diff` si tocó `Workflows/`.
+
+---
+
+### 15.D · Hecho cuando
+
+- **Carril 0:** una cuenta `operador` entra a `/retia/reels/entender` y **no** ve la tarjeta de
+  costos; una `dev` sí. Las 3 personas de Retia entran solas.
+- **A1:** `pg_policies` muestra las policies nuevas, y el mismo `count(*)` sobre
+  `app.usuarios_clientes` da distinto con una cuenta de Retia que con una ajena. **Medido por
+  efecto**, no por haber corrido.
+- **A5:** un mail de prueba invitado desde `/retia/reels/ajustes/equipo` recibe el magic link, entra,
+  cae en el cockpit de Retia, **aparece en la lista de Retia y no en la de 30X**, y un `sponsor` no
+  logra otorgar `dev` ni forzando el request (lo rechaza la Server Action, no el `<select>`).
+- **A7:** dos ventanas en Operar; la segunda se entera sola en ≤30 s, y un segundo click devuelve
+  *"Ya hay una corrida corriendo"* y no *"Señal enviada"*.
+- **B1:** `verificar-corrida.mjs 2` da `intersección: 0` por `run_id`, y recién ahí se firma el `§0`.
+- **B2 / B3:** el check #1 da **cero filas**; la prueba de §14.6 da **1 y 1**.
+- **B4:** se da de alta un cliente nuevo siguiendo `agregar-cliente.md` **sin leer nada más**. Si
+  algún paso obliga a tocar `core/`, la guía no está lista y el diseño tampoco.

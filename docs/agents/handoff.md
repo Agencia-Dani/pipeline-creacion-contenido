@@ -22,6 +22,35 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🚦 2026-08-06 · RETIA ENTRA, Y HAY UN PLAN DE DOS CARRILES: [plan-multi-tenant §15](./plan-multi-tenant.md#15-el-cierre-del-producto-en-dos-carriles)
+>
+> **Leelo antes de tomar nada de la tabla de abajo.** Tres personas de Retia —empresa cliente, no la
+> agencia— empiezan a usar la herramienta, y eso cruzó tres disparadores que el repo dejó escritos
+> con fecha: el alta manual de ADR-051, el gate de costos de `domain/roles.ts:25-31`, y el eje
+> *+usuarios* de §10.
+>
+> **§15 está escrito para dos agentes trabajando en paralelo**, con dueño único por archivo (§15.C):
+>
+> | Carril | Rama | Qué | No toca |
+> |---|---|---|---|
+> | **A** | `carril-a-accesos` | La zona **Ajustes** (5ª), la pantalla de **equipo** con invitaciones, la migración **`025`** con las policies que la `021` dejó sin escribir, y la concurrencia visible en Operar | n8n, el motor |
+> | **B** | `carril-b-cierres` | El gate de la **`023`**, el **check #1** contra prod, la prueba de **§14.6**, los **runbooks** + `core/templates/`, y la deuda de docs medida | `apps/dashboard/` |
+>
+> 🔴 **Antes de los dos, y lo hace Mani a mano (Carril 0, §15.0.bis):** el gate de costos de
+> [`entender/page.tsx:41`](../../apps/dashboard/app/[cliente]/[pipeline]/(zonas)/entender/page.tsx)
+> dice `rol !== "sponsor"`, así que **un `operador` ve lo que cuestan los proveedores**. Con gente de
+> Retia adentro eso es el margen de la agencia, y *falla hacia MOSTRAR*. El arreglo ya estaba escrito
+> en `roles.ts:31`: pasarlo a `rol === "dev"`. **Va antes de dar las 3 altas.**
+>
+> ⚠️ **Cuatro dependencias de orden que no se pueden invertir:** Carril 0 antes de las altas ·
+> **A1 (`025`) antes que A5 en prod** (el flip está vivo: pantalla sin policy = cero filas o `42501`)
+> · **B2 después de A1** (si no, el check reporta las tablas nuevas) · **B4 después de A5** (el
+> runbook de alta de cliente cambia de forma cuando el alta deja de ser SQL).
+>
+> 💣 **Landmine que la pantalla de equipo va a tocar primero:** `scoped.ts:51` declara
+> `"app.usuarios": { grano: "cliente" }` ⇒ filtra por `client_id`, **columna que la `019` dropeó**.
+> Hoy nadie lo ejerce porque `lib/auth.ts` lee esa tabla con `createClient()` directo. Es la tarea A2.
+
 > ## ✅ AL CIERRE 98 (2026-08-06): EL FEED PAGINA. ANTES: EL FLIP CERRADO, LA BALDE 2 PODADA, AIRTABLE FUERA.
 >
 > **Lo único que bloquea algo:** la **`023`** espera **una corrida del motor y un archivado verdes**
@@ -41,8 +70,9 @@
 > tests, pero nadie la abrió en un browser.
 >
 > 🚀 **Y la Fase 5 arrancó el 06/08:** primera pantalla de LinkedIn (Referentes) + la **[`024`](../../core/schema/024_rls_linkedin.sql)**
-> con sus 4 policies. **La `024` está SIN APLICAR y es lo único de esta tanda que necesita el SQL
-> Editor.** ⚠️ Ojo con una diferencia contra la `021`: aquella era inerte al entrar porque el BFF
+> con sus 4 policies. ✅ **La `024` se APLICÓ el 06/08 y se verificó por su efecto** (`pg_policies`
+> devuelve las 4 filas, todas con `instancias_visibles` en el `qual`). ⚠️ Ojo con una diferencia
+> contra la `021`: aquella era inerte al entrar porque el BFF
 > leía con `service_role`; **con el flip en prod, la `024` se evalúa desde el minuto que entra.**
 >
 > 🔴 **Aparte, y es de seguridad:** la `ANTHROPIC_API_KEY` del `.env` local es **la key filtrada en
