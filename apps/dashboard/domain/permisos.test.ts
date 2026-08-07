@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { puedeAdministrarEquipo, rolesQuePuedeOtorgar } from "./permisos.ts";
+import { puedeAdministrarEquipo, rolesQuePuedeOtorgar, rolesQuePuedeTocar } from "./permisos.ts";
 import { ROLES, type Rol } from "./roles.ts";
 
 test("administran el equipo el dev y el sponsor — el operador no", () => {
@@ -64,4 +64,23 @@ test("quien no administra no otorga: las dos funciones no pueden discrepar", () 
       assert.equal(otorga, puedeAdministrarEquipo(rol), `${rol} (dueño: ${esDueno})`);
     }
   }
+});
+
+test("🔒 un sponsor solo toca operadores: no degrada ni echa a otro sponsor (ADR-063 §3)", () => {
+  // El eje que no existía: `rolesQuePuedeOtorgar` dice QUÉ rol doy, este dice A QUIÉN se lo aplico.
+  // Sin él, dos sponsors de la misma empresa podían sacarse el acceso entre ellos.
+  assert.deepEqual(rolesQuePuedeTocar("sponsor"), ["operador"]);
+  assert.equal(rolesQuePuedeTocar("sponsor").includes("sponsor"), false);
+  assert.equal(rolesQuePuedeTocar("sponsor").includes("dev"), false);
+});
+
+test("el dev toca a cualquiera, y el operador a nadie", () => {
+  assert.deepEqual(rolesQuePuedeTocar("dev"), ["operador", "sponsor", "dev"]);
+  assert.deepEqual(rolesQuePuedeTocar("operador"), []);
+});
+
+test("🔓 y de paso: un sponsor ya no puede quitarse el acceso a sí mismo", () => {
+  // Era el agujero que este módulo documentaba como aceptado a sabiendas ("el último sponsor deja
+  // la empresa sin quién administre"). Un sponsor no está entre los roles que un sponsor alcanza.
+  assert.equal(rolesQuePuedeTocar("sponsor").includes("sponsor"), false);
 });

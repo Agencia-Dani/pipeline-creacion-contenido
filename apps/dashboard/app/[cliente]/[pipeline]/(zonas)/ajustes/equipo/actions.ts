@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { puedeAdministrarEquipo, rolesQuePuedeOtorgar } from "@/domain/permisos";
+import { puedeAdministrarEquipo, rolesQuePuedeOtorgar, rolesQuePuedeTocar } from "@/domain/permisos";
 import { esRol, type Rol } from "@/domain/roles";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { exigirTenant } from "@/lib/auth";
@@ -103,8 +103,19 @@ export async function cambiarRol(
     return { ok: false, mensaje: `No podés otorgar el rol "${rol}".` };
   }
 
-  if (!(await cambiarRolEnEmpresa(ctx.clientId, usuarioId, rol))) {
-    return { ok: false, mensaje: "No se pudo cambiar el rol. Recargá la página y probá de nuevo." };
+  // 🔒 El segundo eje (ADR-063 §3): *a quién* se lo aplico. Un sponsor solo toca operadores, así que
+  // no puede degradar ni echar a otro sponsor — ni siquiera al que le dio el acceso a él. Viaja
+  // dentro del `where` y no como chequeo previo: la escritura va con `service_role`, y entre leer el
+  // rol del objetivo y escribirlo hay una ventana donde ese objetivo pudo volverse sponsor.
+  const tocables = rolesQuePuedeTocar(sesion.rol);
+  if (!(await cambiarRolEnEmpresa(ctx.clientId, usuarioId, rol, tocables))) {
+    return {
+      ok: false,
+      mensaje:
+        sesion.rol === "sponsor"
+          ? "Solo podés cambiarle el rol a un operador. A otro sponsor lo cambia la agencia."
+          : "No se pudo cambiar el rol. Recargá la página y probá de nuevo.",
+    };
   }
 
   await registrarEvento(ctx, usuario.id, "equipo.cambiar-rol", { usuarioId, rol });
@@ -129,8 +140,16 @@ export async function quitarAcceso(
     return { ok: false, mensaje: "No podés quitarte el acceso a vos mismo. Pedíselo a otra persona." };
   }
 
-  if (!(await quitarDeEmpresa(ctx.clientId, usuarioId))) {
-    return { ok: false, mensaje: "No se pudo quitar el acceso. Recargá la página y probá de nuevo." };
+  // El mismo techo que `cambiarRol`, y va junto a propósito: si un sponsor no puede degradar a otro
+  // sponsor pero sí echarlo, el techo es decorativo (ADR-063 §3).
+  if (!(await quitarDeEmpresa(ctx.clientId, usuarioId, rolesQuePuedeTocar(sesion.rol)))) {
+    return {
+      ok: false,
+      mensaje:
+        sesion.rol === "sponsor"
+          ? "Solo podés quitarle el acceso a un operador. A otro sponsor lo saca la agencia."
+          : "No se pudo quitar el acceso. Recargá la página y probá de nuevo.",
+    };
   }
 
   await registrarEvento(ctx, usuario.id, "equipo.quitar", { usuarioId });

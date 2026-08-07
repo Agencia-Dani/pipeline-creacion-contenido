@@ -160,9 +160,23 @@ entra al dedup— se **deriva de la URL**, no de una llamada a Apify.
 
 **Transcripción a pedido**:
 Lo que produce el transcriptor por un enlace pegado: el video, su **script literal**, y el estado del
-pedido (`pendiente` → `listo` | `sin_transcript` | `fallo`). **No es un Candidato**: no pasó por el
-gate, no tiene heat-score, no consume la `N` de ningún proyecto y no está atada a una dupla
-(video, proyecto). Vive en `app.transcripciones`, no en el feed de calificación.
+pedido (`pendiente` → `listo` | `sin_transcript` | `fallo` | `abandonado`). **No es un Candidato**: no
+pasó por el gate, no tiene heat-score, no consume la `N` de ningún proyecto y no está atada a una
+dupla (video, proyecto). Vive en `app.transcripciones`, no en el feed de calificación — pero cuando
+queda `listo` **entra al Histórico**, porque el equipo la quiso (ADR-062).
+
+**Abandonar** (una transcripción):
+Declarar que un enlace pegado **nunca va a dar un script**, y dejar de ofrecer el reintento — el caso
+típico es un video sin voz. Es distinto de **descartar**, que en este dominio siempre es un *juicio
+de mérito* (el gate rechazó el video, o el equipo le puso 👎): abandonar dice que el insumo está
+roto, no que no guste. Por eso no alimenta ningún aprendizaje. La fila **queda**, para que el mismo
+link no se vuelva a colar ni a pagar (ADR-062).
+
+**Histórico**:
+El archivo de guiones del equipo: **todo guion que el equipo quiso guardar**, de todas las semanas y
+venga de donde venga — un Candidato que aprobó en el feed o un **enlace pegado** que transcribió a
+mano. Es lo que se descarga en el CSV, y cada fila dice de qué **origen** vino. *No es "lo aprobado"*:
+ese era su significado mientras el archivado era su único escritor (ADR-062, que enmienda ADR-014).
 
 **El transcriptor**:
 Cómo se llama de cara al equipo la máquina que atiende los enlaces pegados, en la familia de *el
@@ -170,7 +184,10 @@ motor*, *el buscador de cuentas* y *el archivador*. A diferencia de las otras tr
 corre en el cockpit (ADR-031).
 
 **Corrida**:
-Una ejecución del motor. Dos modos que **coexisten**: el **cron semanal** (autónomo, barre los
+Una ejecución de una de las máquinas del sistema. Casi siempre es **del motor**, y el resto de este
+término habla de esa; pero el archivador, el buscador de cuentas y —desde ADR-062— **el transcriptor**
+también abren la suya, que es lo que hace que su gasto se vea en Entender.
+Dos modos que **coexisten** en el motor: el **cron semanal** (autónomo, barre los
 proyectos activos — el norte "corre sola" de ROADMAP §1) y la **corrida on-demand** (el equipo
 prende los proyectos que quiere, fija la `N` de cada uno, y dispara con un botón que corre
 **todos los proyectos activos** — la selección se expresa con los toggles, no con un payload).

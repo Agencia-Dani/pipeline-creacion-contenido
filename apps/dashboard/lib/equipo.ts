@@ -177,11 +177,19 @@ async function buscarPorEmail(
   return null;
 }
 
-/** Cambiar el rol de alguien EN ESTA empresa. El `client_id` acota: la persona puede estar en otras. */
+/**
+ * Cambiar el rol de alguien EN ESTA empresa. El `client_id` acota: la persona puede estar en otras.
+ *
+ * `rolesTocables` es el techo de ADR-063 §3 **metido en el `where`**, no chequeado antes: la
+ * escritura va con `service_role`, así que la única forma de que la condición no se pueda saltear
+ * en el medio es que viaje en la misma query. Es el patrón de `reencolar` y por la misma razón. Sin
+ * él, entre leer el rol del objetivo y escribirlo hay una ventana donde alguien se volvió sponsor.
+ */
 export async function cambiarRolEnEmpresa(
   clientId: string,
   usuarioId: string,
   rol: Rol,
+  rolesTocables: readonly Rol[],
 ): Promise<boolean> {
   const { data, error } = await createAdminClient()
     .schema("app")
@@ -189,6 +197,7 @@ export async function cambiarRolEnEmpresa(
     .update({ rol })
     .eq("client_id", clientId)
     .eq("usuario_id", usuarioId)
+    .in("rol", rolesTocables as string[])
     .select("usuario_id");
   if (error) {
     console.error("[equipo] no se pudo cambiar el rol:", error.message);
@@ -204,13 +213,18 @@ export async function cambiarRolEnEmpresa(
  * eventos en `app.eventos` siguen apuntando a un usuario que existe. Borrar la cuenta sería
  * destruir la auditoría de lo que hizo mientras estuvo.
  */
-export async function quitarDeEmpresa(clientId: string, usuarioId: string): Promise<boolean> {
+export async function quitarDeEmpresa(
+  clientId: string,
+  usuarioId: string,
+  rolesTocables: readonly Rol[],
+): Promise<boolean> {
   const { data, error } = await createAdminClient()
     .schema("app")
     .from("usuarios_clientes")
     .delete()
     .eq("client_id", clientId)
     .eq("usuario_id", usuarioId)
+    .in("rol", rolesTocables as string[])
     .select("usuario_id");
   if (error) {
     console.error("[equipo] no se pudo quitar el acceso:", error.message);

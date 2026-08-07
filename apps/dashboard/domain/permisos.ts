@@ -20,6 +20,9 @@ export function puedeAdministrarEquipo(rol: Rol): boolean {
 // El orden es el del `<select>`: de menos a más alcance. `dev` último y solo.
 const CON_DEV: readonly Rol[] = ["operador", "sponsor", "dev"];
 const SIN_DEV: readonly Rol[] = ["operador", "sponsor"];
+// A quién alcanza un sponsor (ADR-063 §3). Es una lista de UN elemento a propósito y no un booleano:
+// va derecho al `where` de la query, igual que `rolesQuePuedeOtorgar` va al `<select>`.
+const SOLO_OPERADOR: readonly Rol[] = ["operador"];
 
 /**
  * Los roles que esta persona puede otorgar en el cockpit abierto. Vacío = no administra.
@@ -44,4 +47,27 @@ const SIN_DEV: readonly Rol[] = ["operador", "sponsor"];
 export function rolesQuePuedeOtorgar(rol: Rol, esDueno: boolean): readonly Rol[] {
   if (!puedeAdministrarEquipo(rol)) return [];
   return esDueno ? CON_DEV : SIN_DEV;
+}
+
+/**
+ * Si quien administra puede tocar a un miembro con este rol — cambiarle el rol o quitarle el acceso.
+ *
+ * 🔑 **Es un eje distinto de `rolesQuePuedeOtorgar`, y hasta ADR-063 §3 no existía.** Aquella
+ * pregunta *qué rol otorgo*; esta, *a quién se lo aplico*. Un solo gate no cubre las dos: sin esta,
+ * un sponsor podía degradar o echar a **otro sponsor**, incluso al que le dio el acceso a él.
+ *
+ * La regla: **un `sponsor` solo toca `operador`.** Sube operadores a sponsor, pero un sponsor ya
+ * nombrado es intocable para sus pares — lo puso la agencia o un par, y solo la agencia lo saca.
+ * El `dev` toca a cualquiera.
+ *
+ * Vale igual para cambiar el rol y para quitar el acceso: separarlos sería peor que no tener el
+ * techo — si no podés degradarme pero sí echarme, el techo es decorativo.
+ *
+ * 🔓 **Cierra de paso el agujero que este archivo documentaba como aceptado a sabiendas**: que el
+ * último sponsor se quite el acceso a sí mismo y deje a la empresa sin quién administre. Un sponsor
+ * no puede tocar a un sponsor, y él es uno.
+ */
+export function rolesQuePuedeTocar(rol: Rol): readonly Rol[] {
+  if (!puedeAdministrarEquipo(rol)) return [];
+  return rol === "dev" ? CON_DEV : SOLO_OPERADOR;
 }

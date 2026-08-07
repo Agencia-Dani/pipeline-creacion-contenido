@@ -28,7 +28,10 @@ export default async function EntenderPage({
 }) {
   const { cliente, pipeline } = await params;
   const { usuario, ctx, rol } = await exigirTenant("entender", cliente, pipeline);
-  const esDev = rol === "dev";
+  // 🔑 **Actividad y Costos NO son el mismo gate**, y confundirlos era el estado hasta ADR-063 §2.
+  // El log de quién tocó qué es el trabajo de un jefe de equipo, así que lo ve también el `sponsor`;
+  // los costos son el margen de la agencia y siguen siendo solo del `dev` (abajo).
+  const veActividad = rol === "dev" || rol === "sponsor";
   // ADR-052 + ADR-060: los costos de proveedor (`v_costos_semana` = consumo × `app.tarifas`) son
   // el margen de la agencia, y desde el 2026-08-06 los ve **solo el `dev`**. La regla vive en
   // `domain/roles.ts` con su test, no acá: es una decisión de quién ve qué, no de esta pantalla.
@@ -45,7 +48,7 @@ export default async function EntenderPage({
       leerAuditoria(ctx),
       leerDescubrimiento(ctx),
       puedeVerCostos ? leerCostos(ctx) : Promise.resolve([]),
-      esDev ? leerEventos(ctx) : Promise.resolve({ filas: [], hayMas: false }),
+      veActividad ? leerEventos(ctx) : Promise.resolve({ filas: [], hayMas: false }),
       leerProyectos(ctx),
     ]);
 
@@ -153,13 +156,12 @@ export default async function EntenderPage({
       </Card>
       )}
 
-      {esDev && (
+      {veActividad && (
         <Card>
           <CardHeader>
             <CardTitle>Actividad</CardTitle>
             <CardDescription>
-              Quién cambió qué, y cuándo. Solo para dev: al equipo no le sirve, pero cuando algo
-              cambió solo esto es lo que responde por qué.
+              Quién cambió qué, y cuándo. Cuando algo cambió, solo esto responde por qué.
             </CardDescription>
           </CardHeader>
           <CardContent>
