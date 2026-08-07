@@ -13,6 +13,7 @@ import { leerTranscripciones, type Transcripcion } from "@/lib/transcripciones";
 import { Copiar } from "./copiar";
 import { PegarEnlaces } from "./pegar-enlaces";
 import { Procesador } from "./procesador";
+import { Reintentar } from "./reintentar";
 
 export const dynamic = "force-dynamic";
 // Aplica a las Server Actions de esta página (docs de Next, route-segment-config). Alcanza de
@@ -132,6 +133,14 @@ export default async function TranscribirPage({
                   )}
 
                   {t.error && <p className="text-xs text-muted-foreground">{t.error}</p>}
+
+                  {/* Sin esto un enlace que falló quedaba clavado para siempre: el procesador solo
+                      levanta `pendiente`, y volver a pegar el link tampoco servía porque el
+                      encolado lo descarta como duplicado. Con Supadata devolviendo 65% de
+                      transcripciones vacías, no es un caso raro. */}
+                  {(t.estado === "fallo" || t.estado === "sin_transcript") && (
+                    <Reintentar id={t.id} />
+                  )}
                 </li>
               ))}
             </ul>

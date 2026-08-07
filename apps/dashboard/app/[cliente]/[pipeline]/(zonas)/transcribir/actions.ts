@@ -4,16 +4,19 @@ import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import type { TenantContext } from "@/domain/tenant";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { parsearEnlaces } from "@/domain/enlace";
+import { parsearEnlaces, repartirEnlaces } from "@/domain/enlace";
 import { exigirTenant } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import { transcribir, traducir } from "@/lib/transcribir";
 import {
   contarPendientes,
+  cualesEnCola,
+  cualesVistosPorElMotor,
   encolarEnlaces,
   marcarResultado,
+  reclamarPendientes,
+  reencolar,
   registrarEnDedup,
-  tomarPendientes,
   type Transcripcion,
 } from "@/lib/transcripciones";
 
@@ -75,6 +78,92 @@ export async function pegarEnlaces(
   return { ok: true, mensaje: partes.join(" · ") + "." };
 }
 
+export type Revision = {
+  /** Los que se van a transcribir, en su forma canónica: es lo que queda en el campo al aceptar. */
+  nuevos: string[];
+  yaEnCola: number;
+  yaVistosPorElMotor: number;
+  noReconocidos: number;
+};
+
+/**
+ * Mira el pegote **antes** de encolar y dice qué no hace falta transcribir.
+ *
+ * Es el paso que faltaba: hasta hoy el único aviso era un conteo al final del encolado
+ * (*"2 ya estaban"*), o sea después, sin decir cuáles, y **sin mirar la memoria del motor** — que
+ * era el caso donde de verdad se pagaba de más.
+ *
+ * No escribe nada y no cobra nada: dos `select` contra tablas que ya se consultan. Quién decide es
+ * la pantalla, que ofrece quitarlos y deja seguir igual (ver `repartirEnlaces`: que el motor haya
+ * visto un video no significa que exista su guion).
+ */
+export async function revisarPegote(
+  enRuta: CockpitEnRuta,
+  texto: string,
+): Promise<{ ok: true; revision: Revision } | { ok: false; mensaje: string }> {
+  const { ctx } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
+
+  const parseo = textoPegado.safeParse(texto);
+  if (!parseo.success) {
+    return { ok: false, mensaje: "Pegá al menos un link (y menos de 20.000 caracteres)." };
+  }
+
+  const { validos, invalidos } = parsearEnlaces(parseo.data);
+  if (validos.length === 0) {
+    return {
+      ok: false,
+      mensaje:
+        invalidos[0]?.razon ?? "No encontré ningún link de Instagram o TikTok en eso que pegaste.",
+    };
+  }
+
+  try {
+    const ids = validos.map((e) => e.external_id);
+    const [enCola, vistos] = await Promise.all([
+      cualesEnCola(ctx, ids),
+      cualesVistosPorElMotor(ctx, ids),
+    ]);
+    const reparto = repartirEnlaces(validos, enCola, vistos);
+
+    return {
+      ok: true,
+      revision: {
+        nuevos: reparto.nuevos.map((e) => e.url),
+        yaEnCola: reparto.enCola.length,
+        yaVistosPorElMotor: reparto.vistosPorElMotor.length,
+        noReconocidos: invalidos.length,
+      },
+    };
+  } catch (e) {
+    console.error("[transcribir] falló la revisión previa:", e);
+    return { ok: false, mensaje: "No se pudo revisar la lista. Probá de nuevo." };
+  }
+}
+
+/** Devuelve a la cola un enlace que falló o volvió sin voz. El servidor comprueba el estado. */
+export async function reintentarTranscripcion(
+  enRuta: CockpitEnRuta,
+  id: string,
+): Promise<ResultadoPegar> {
+  const { usuario, ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
+
+  let reencolado: boolean;
+  try {
+    reencolado = await reencolar(ctx, id);
+  } catch (e) {
+    console.error(`[transcribir] falló reintentar ${id}:`, e);
+    return { ok: false, mensaje: "No se pudo reintentar. Probá de nuevo." };
+  }
+
+  if (!reencolado) {
+    return { ok: false, mensaje: "Ese enlace ya no se puede reintentar. Recargá la página." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "transcribir.reintentar", { transcripcion: id });
+  revalidatePath(rutaDe(comoRuta(cockpit), "transcribir"));
+  return { ok: true, mensaje: "De vuelta en la cola." };
+}
+
 // Pool de 8 en paralelo con presupuesto de tiempo, misma idea que el nodo `Transcribir (Supadata)`
 // del motor: no se ARRANCAN videos nuevos pasado el límite, los en vuelo terminan. Cada enlace se
 // marca apenas vuelve, así que si Vercel corta la función a mitad no se pierde nada — la pasada
@@ -89,10 +178,11 @@ export type ResultadoProcesar = { procesados: number; quedan: number };
 export async function procesarPendientes(enRuta: CockpitEnRuta): Promise<ResultadoProcesar> {
   const { ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
 
-  // Nota: dos personas procesando a la vez pueden agarrar el mismo enlace y pagarlo dos veces
-  // (~USD 0.014). No vale un estado 'procesando' para eso: los writes ya son idempotentes.
-  const pendientes = await tomarPendientes(ctx, LOTE);
-  if (pendientes.length === 0) return { procesados: 0, quedan: 0 };
+  // 🔑 Reclama en vez de solo leer: dos pestañas abiertas (y la pantalla arranca sola) recibían el
+  // MISMO lote de 64 y lo pagaban dos veces. El porqué y el vencimiento, en `reclamarPendientes`.
+  // Si otro ya se los llevó, esto vuelve vacío y el bucle del cliente corta solo.
+  const pendientes = await reclamarPendientes(ctx, LOTE);
+  if (pendientes.length === 0) return { procesados: 0, quedan: await contarPendientes(ctx) };
 
   const inicio = Date.now();
   let siguiente = 0;

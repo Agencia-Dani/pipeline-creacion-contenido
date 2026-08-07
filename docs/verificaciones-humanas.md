@@ -91,19 +91,44 @@ derechos** (si ves `MÃ©tricas`, el BOM/encoding se rompió).
 **Si el archivo baja vacío o con 0 filas:** no es el CSV, es la lectura — mirá primero si la pantalla
 misma muestra las 31.
 
-## 2. 🟡 Recorrer el **feed paginado**
+## 2. 🟡 Recorrer el **feed entero**
 
-**Quién:** Majo, Jero o Alejo · **5 minutos** · *Nuevo del cierre 98; se despacha en el mismo login
-que el #1.*
+**Quién:** Majo, Jero o Alejo · **3 minutos** · *Reescrito el 07/08: el feed **dejó de paginar**, así
+que los dos items sobre "Cargar más" y el keyset ya no existen.*
 
-En `/retia/reels/curar/feed`, mirar **cuatro** cosas:
+En `/retia/reels/curar/feed`, mirar **tres** cosas:
 
-1. **Cargar más** trae 25 nuevas, **sin repetir ninguna y sin saltear ninguna**.
-2. Los **chips dicen el total real** (**165**), no 25.
+1. **Están todas de una**, sin botón al pie. Al 07/08 son **170** (eran 175; el archivado se llevó
+   los 5 calificados). El pie dice el número.
+2. Los **chips dicen el total de cada filtro** sobre la tabla entera, no sobre lo que se ve.
 3. **Abrir una tarjeta trae el guion** (los 3 textos largos salieron del listado para que pese 16 KB
    en vez de 405 KB — se cargan al abrir).
-4. 🔑 **El caso que el keyset existe para cubrir: calificar una tarjeta y DESPUÉS cargar más.**
-   No se tiene que saltear ni repetir nada. Con `offset` esto se rompía; con keyset no.
+
+## 2-bis. 🔴 La pestaña **Transcribir**, sus tres arreglos *(nuevo del 07/08)*
+
+**Quién:** Majo o Jero · **10 minutos** · El punto 3 necesita **dos navegadores a la vez**.
+
+Esto es lo único de la sesión que no se pudo verificar solo: las queries se probaron contra prod y
+el dominio tiene tests, pero **la interacción de pantalla no la tocó nadie**.
+
+1. **La oferta de quitar.** Pegar un puñado de links **mezclando** algunos nuevos con alguno que ya
+   esté en la lista de abajo. Tiene que aparecer el panel *"N de estos M no hace falta
+   transcribirlos"*, separando *ya los pediste* de *ya los vio el motor*, con el costo estimado.
+   Al apretar **Quitarlos y transcribir N**, el campo tiene que quedar **solo con los que van**, uno
+   por línea, y arrancar.
+   · El otro botón, **Transcribir los M igual**, manda todo — existe porque *"el motor lo vio"* no
+   garantiza que exista el guion.
+   · Y pegando **solo links nuevos** el panel **no** tiene que aparecer: un click, como antes.
+2. **El reintento.** Buscar una fila en **Falló** o **Sin voz** y apretar **Reintentar**. Vuelve a
+   **En cola** y se procesa sola, sin recargar.
+   ⚠️ **En un `Listo` no tiene que haber botón**: reintentarlo sería pagar de nuevo un guion que ya
+   tenemos. El servidor lo rechaza igual, pero el botón no debería estar.
+3. 🔑 **El que importa, y necesita dos:** abrir `/retia/reels/transcribir` en **dos navegadores a la
+   vez** con la cola llena. Antes los dos se llevaban el mismo lote de 64 y se pagaba todo dos
+   veces. Ahora el segundo tiene que **no procesar nada**.
+   **Cómo se comprueba sin adivinar:** cada fila tiene que pasar a `listo` **una sola vez**; y si
+   hace falta la cuenta fina, el gasto de Supadata del día contra las filas nuevas tiene que dar
+   **1 a 1, no 2 a 1**.
 
 ## 3. 🟡 Que el tab **Entender** aparezca en el nav de un **operador**
 

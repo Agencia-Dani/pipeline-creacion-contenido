@@ -78,18 +78,166 @@ export async function encolarEnlaces(
   return { nuevos, yaEstaban: enlaces.length - nuevos };
 }
 
-export async function tomarPendientes(
+/**
+ * Cuánto vale un reclamo antes de que otra pasada pueda quedarse con el enlace.
+ *
+ * 🔑 **3 minutos porque el techo real son 60 segundos, no porque suene prudente.** La pantalla
+ * declara `maxDuration = 60`, así que Vercel mata la función a los 60 s pase lo que pase: ningún
+ * enlace puede seguir en vuelo más allá de eso, ni siquiera el peor caso teórico (90 s de Supadata
+ * + 60 s de Haiku, que la plataforma nunca deja llegar). Con 3× ese techo, **un reclamo vencido
+ * significa siempre que el trabajador murió**, nunca que está tardando.
+ *
+ * El precio de pasarse para arriba es que la cola parezca trabada un rato tras una función muerta;
+ * el de quedarse corto es pagar el video dos veces, que es justo lo que esto existe para evitar.
+ * Por eso el error se comete hacia arriba.
+ */
+const RECLAMO_VENCE_MS = 3 * 60_000;
+
+/**
+ * Toma hasta `limite` pendientes **reclamándolos**, para que dos pasadas en paralelo no trabajen
+ * sobre los mismos enlaces.
+ *
+ * 🩸 El bug que arregla: `tomarPendientes` era un `select` puro, y la pantalla **arranca sola** al
+ * cargar. Dos personas con la pestaña abierta no competían por un enlace suelto: `order creado_en
+ * limit 64` les daba a las dos **el mismo lote entero**, así que se transcribían y se pagaban los
+ * 64 dos veces (~USD 0,014 c/u). El comentario viejo lo minimizaba como *"pueden agarrar el mismo
+ * enlace"*.
+ *
+ * 🔑 **El reclamo es un solo UPDATE, y ahí está toda la atomicidad.** No hay lock ni tabla de
+ * colas: el `where` incluye la condición de "libre", así que la segunda pasada no matchea las
+ * filas que la primera acaba de marcar y se las lleva 0. `select()` devuelve exactamente las que
+ * este llamador ganó.
+ *
+ * ⏱️ **El reclamo vence solo**, así que no hace falta un barrido: si una función de Vercel muere a
+ * mitad, sus filas vuelven a estar libres a los 3 minutos por la misma condición del `where`.
+ *
+ * ponytail: el reclamo se marca en `procesado_en` en vez de un estado `procesando` propio, porque
+ * lo segundo pide un valor de enum nuevo ⇒ migración en `core/schema/` ⇒ ADR, y esto es un
+ * problema de ~USD 0,90 por cola duplicada. El techo: mientras la fila está `pendiente`,
+ * `procesado_en` significa *"reclamada en"*, y al terminar `marcarResultado` lo pisa con la hora
+ * real de fin. Nadie más lee esa columna (verificado: 3 referencias, las 3 en este archivo, y la
+ * pantalla muestra `creado_en`). Si algún día hace falta distinguir *reclamada* de *terminada* —
+ * por ejemplo para mostrar "procesando…" en la lista— eso ya es un estado de verdad y va con ADR.
+ */
+export async function reclamarPendientes(
   ctx: TenantContext,
   limite: number,
 ): Promise<Transcripcion[]> {
-  const { data, error } = await (await scoped(ctx))
-    .select("app.transcripciones", COLUMNAS)
+  const s = await scoped(ctx);
+  const vencido = new Date(Date.now() - RECLAMO_VENCE_MS).toISOString();
+
+  // Primero los candidatos, solo para acotar el UPDATE a un lote: quién se los queda lo decide el
+  // `where` de abajo, no esta lectura.
+  const { data: candidatos, error: errorLectura } = await s
+    .select("app.transcripciones", "id")
     .eq("estado", "pendiente")
+    .or(`procesado_en.is.null,procesado_en.lt.${vencido}`)
     .order("creado_en", { ascending: true })
     .limit(limite);
+  if (errorLectura)
+    throw new Error(`Supabase respondió con error leyendo la cola: ${errorLectura.message}`);
+
+  const ids = z.array(z.object({ id: z.string() })).parse(candidatos ?? []).map((c) => c.id);
+  if (ids.length === 0) return [];
+
+  const { data, error } = await (await scoped(ctx))
+    .update("app.transcripciones", { procesado_en: new Date().toISOString() })
+    .in("id", ids)
+    .eq("estado", "pendiente")
+    .or(`procesado_en.is.null,procesado_en.lt.${vencido}`)
+    .select(COLUMNAS);
   if (error)
-    throw new Error(`Supabase respondió con error leyendo la cola: ${error.message}`);
-  return z.array(filaTranscripcion).parse(data);
+    throw new Error(`Supabase respondió con error reclamando la cola: ${error.message}`);
+
+  return z.array(filaTranscripcion).parse(data ?? []);
+}
+
+/**
+ * Devuelve un enlace terminado-en-mal a la cola.
+ *
+ * 🩸 Hasta el 2026-08-07 no existía, y era el hueco más caro de los tres: `reclamarPendientes` solo
+ * levanta filas `pendiente`, así que una que quedó en `fallo` o `sin_transcript` **no se
+ * reintentaba nunca**; y volver a pegar el link tampoco servía, porque el `ignoreDuplicates` del
+ * encolado lo descartaba como repetido. La fila quedaba clavada para siempre salvo borrarla por
+ * SQL. Con el 65% de transcripciones vacías que viene marcando Supadata, eso no es un caso raro.
+ *
+ * 🔒 El `.in("estado", …)` no es decoración: sin él, esto reencola un `listo` y **se vuelve a
+ * pagar** un video cuyo guion ya tenemos. La pantalla solo dibuja el botón en los dos estados
+ * malos, pero la pantalla esconde y el servidor impide.
+ *
+ * `procesado_en: null` lo devuelve al estado "libre" que mira el reclamo; sin eso quedaría
+ * invisible hasta que venciera el reclamo fantasma de su corrida anterior.
+ */
+export async function reencolar(ctx: TenantContext, id: string): Promise<boolean> {
+  const { data, error } = await (await scoped(ctx))
+    .update("app.transcripciones", {
+      estado: "pendiente",
+      script: null,
+      idioma: null,
+      error: null,
+      procesado_en: null,
+    })
+    .eq("id", id)
+    .in("estado", ["fallo", "sin_transcript"])
+    .select("id");
+  if (error)
+    throw new Error(`Supabase respondió con error reencolando: ${error.message}`);
+  // 0 filas = o no existe, o no es de este cockpit, o ya estaba `listo`. Las tres se contestan
+  // igual, y ninguna es un error del servidor.
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * De un lote de enlaces, cuáles **ya están en la cola de este cockpit** (en cualquier estado) y
+ * cuáles **ya los vio el motor**. Devuelve claves de `claveDe`, listas para `repartirEnlaces`.
+ *
+ * Se pregunta por `external_id` y la plataforma se compara después, en la clave: PostgREST no tiene
+ * una forma cómoda de filtrar por tuplas, y traer las dos columnas y armar la clave en memoria es
+ * más barato que dos queries por plataforma.
+ *
+ * Se trocea de a 200 por la misma razón que el archivado: 400 links en un `in.()` arman una URL de
+ * varios KB, y el límite del que se entera uno es el 414 en producción.
+ */
+async function clavesConocidas(
+  ctx: TenantContext,
+  tabla: "app.transcripciones" | "public.processed_items",
+  externalIds: string[],
+): Promise<Set<string>> {
+  // Las dos tablas nombran distinto la misma columna: `plataforma` la nuestra, `platform` la del
+  // motor. Se normaliza acá para que `claveDe` reciba siempre la misma forma.
+  const filaClave =
+    tabla === "app.transcripciones"
+      ? z.object({ plataforma: z.string(), external_id: z.string() })
+      : z
+          .object({ platform: z.string(), external_id: z.string() })
+          .transform((f) => ({ plataforma: f.platform, external_id: f.external_id }));
+  const columnas = tabla === "app.transcripciones" ? "plataforma, external_id" : "platform, external_id";
+
+  const s = await scoped(ctx);
+  const claves = new Set<string>();
+
+  for (let i = 0; i < externalIds.length; i += 200) {
+    const { data, error } = await s
+      .select(tabla, columnas)
+      .in("external_id", externalIds.slice(i, i + 200));
+    if (error)
+      throw new Error(`Supabase respondió con error consultando ${tabla}: ${error.message}`);
+    for (const fila of z.array(filaClave).parse(data ?? [])) {
+      claves.add(`${fila.plataforma}:${fila.external_id}`);
+    }
+  }
+  return claves;
+}
+
+export async function cualesEnCola(ctx: TenantContext, ids: string[]): Promise<Set<string>> {
+  return ids.length === 0 ? new Set() : clavesConocidas(ctx, "app.transcripciones", ids);
+}
+
+export async function cualesVistosPorElMotor(
+  ctx: TenantContext,
+  ids: string[],
+): Promise<Set<string>> {
+  return ids.length === 0 ? new Set() : clavesConocidas(ctx, "public.processed_items", ids);
 }
 
 export async function contarPendientes(ctx: TenantContext): Promise<number> {

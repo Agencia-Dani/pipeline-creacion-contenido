@@ -1,6 +1,12 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { parsearEnlaces, shortcodeAExternalId } from "./enlace.ts";
+import {
+  claveDe,
+  parsearEnlaces,
+  repartirEnlaces,
+  shortcodeAExternalId,
+  type EnlaceVideo,
+} from "./enlace.ts";
 
 // Pares reales sacados de processed_items en la base viva (2026-07-28). Cuando se corrió el
 // chequeo completo dio 381/381 en Instagram y 27/27 en TikTok, cero mismatches sobre 408 filas.
@@ -144,5 +150,61 @@ describe("parsearEnlaces — el pegote real que manda el equipo", () => {
       https://www.youtube.com/watch?v=abc123
     `);
     assert.equal(invalidos.length, 1);
+  });
+});
+
+describe("repartirEnlaces", () => {
+  const ig = (id: string): EnlaceVideo => ({
+    plataforma: "instagram",
+    external_id: id,
+    url: `https://www.instagram.com/p/x${id}/`,
+  });
+  const tt = (id: string): EnlaceVideo => ({
+    plataforma: "tiktok",
+    external_id: id,
+    url: `https://www.tiktok.com/@a/video/${id}`,
+  });
+
+  it("lo que no conocemos va a nuevos", () => {
+    const r = repartirEnlaces([ig("1"), ig("2")], new Set(), new Set());
+    assert.deepEqual(r.nuevos.map((e) => e.external_id), ["1", "2"]);
+    assert.deepEqual(r.enCola, []);
+    assert.deepEqual(r.vistosPorElMotor, []);
+  });
+
+  it("separa los dos montones, porque no significan lo mismo", () => {
+    const r = repartirEnlaces(
+      [ig("1"), ig("2"), ig("3")],
+      new Set([claveDe(ig("2"))]),
+      new Set([claveDe(ig("3"))]),
+    );
+    assert.deepEqual(r.nuevos.map((e) => e.external_id), ["1"]);
+    assert.deepEqual(r.enCola.map((e) => e.external_id), ["2"]);
+    assert.deepEqual(r.vistosPorElMotor.map((e) => e.external_id), ["3"]);
+  });
+
+  it("estar en la cola gana sobre estar en la memoria del motor", () => {
+    // Pasa siempre que la herramienta ya transcribió ese link: escribe en las DOS tablas. Si
+    // ganara el motor, el aviso diría "lo vio el motor" sobre algo cuyo guion tenemos acá abajo.
+    const e = ig("7");
+    const r = repartirEnlaces([e], new Set([claveDe(e)]), new Set([claveDe(e)]));
+    assert.deepEqual(r.enCola.map((x) => x.external_id), ["7"]);
+    assert.deepEqual(r.vistosPorElMotor, []);
+  });
+
+  it("🩸 la clave lleva la plataforma: el mismo id en IG y TikTok NO es el mismo video", () => {
+    // Los dos ids son enteros largos, así que una clave sin plataforma los confundiría y la
+    // pantalla ofrecería quitar un video que nadie transcribió nunca.
+    const r = repartirEnlaces([tt("42")], new Set([claveDe(ig("42"))]), new Set());
+    assert.deepEqual(r.nuevos.map((e) => e.external_id), ["42"]);
+    assert.deepEqual(r.enCola, []);
+  });
+
+  it("sin links no rompe", () => {
+    assert.deepEqual(repartirEnlaces([], new Set(), new Set()), {
+      nuevos: [],
+      enCola: [],
+      vistosPorElMotor: [],
+    });
   });
 });

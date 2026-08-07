@@ -27,6 +27,18 @@ export type LoteDeEnlaces = {
   invalidos: EnlaceInvalido[];
 };
 
+/**
+ * La identidad de un video para comparar contra lo que ya tenemos.
+ *
+ * Lleva la plataforma adentro y no es paranoia: el `external_id` de Instagram es un entero de 19
+ * dígitos y el de TikTok también, así que dos ids de plataformas distintas pueden coincidir sin
+ * que nada avise. Es una sola función porque hay **tres** lugares que la calculan (el dedup del
+ * pegote, la cola y la memoria del motor) y tres formatos distintos serían tres bugs mudos.
+ */
+export function claveDe(e: { plataforma: Plataforma; external_id: string }): string {
+  return `${e.plataforma}:${e.external_id}`;
+}
+
 // Alfabeto base64 de Instagram (el estándar url-safe).
 const ALFABETO = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -114,7 +126,7 @@ export function parsearEnlaces(texto: string): LoteDeEnlaces {
   for (const token of texto.match(TOKEN_LINK) ?? []) {
     const resultado = clasificar(token);
     if (esValido(resultado)) {
-      const clave = `${resultado.plataforma}:${resultado.external_id}`;
+      const clave = claveDe(resultado);
       if (vistos.has(clave)) continue; // pegar el mismo link dos veces en el lote no lo duplica
       vistos.add(clave);
       validos.push(resultado);
@@ -124,4 +136,43 @@ export function parsearEnlaces(texto: string): LoteDeEnlaces {
   }
 
   return { validos, invalidos };
+}
+
+/**
+ * Reparte los links válidos en los tres montones que decide la pantalla: los que se van a
+ * transcribir y los dos que **ya no hace falta pagar**.
+ *
+ * Existe porque hasta el 2026-08-07 el aviso era un número al final (*"2 ya estaban"*) y llegaba
+ * **después** de encolar. Dos problemas: no decía cuáles, y no miraba la memoria del motor.
+ *
+ * 🩸 **Los dos montones no significan lo mismo, y por eso están separados:**
+ *  · `enCola` — ya se pidió en ESTE cockpit. El `ignoreDuplicates` del upsert lo iba a descartar
+ *    igual, así que no había gasto: lo que faltaba era decirlo antes y por su nombre.
+ *  · `vistosPorElMotor` — está en `processed_items`. Acá **sí había gasto silencioso**: el upsert
+ *    no consulta esa tabla, así que se transcribía y se pagaba de nuevo sin una palabra.
+ *    Y no siempre es un error querer transcribirlo: el motor escribe en `processed_items` todo lo
+ *    que *consideró*, aunque el pre-trim o el gate lo hayan matado antes de transcribirlo, así que
+ *    puede no existir el guion en ningún lado. Por eso se ofrece quitarlos y no se quitan solos.
+ *
+ * Precedencia: estar en la cola gana, porque es el montón donde el guion o está o viene en camino.
+ */
+export type Reparto = {
+  nuevos: EnlaceVideo[];
+  enCola: EnlaceVideo[];
+  vistosPorElMotor: EnlaceVideo[];
+};
+
+export function repartirEnlaces(
+  validos: readonly EnlaceVideo[],
+  enCola: ReadonlySet<string>,
+  vistosPorElMotor: ReadonlySet<string>,
+): Reparto {
+  const reparto: Reparto = { nuevos: [], enCola: [], vistosPorElMotor: [] };
+  for (const e of validos) {
+    const clave = claveDe(e);
+    if (enCola.has(clave)) reparto.enCola.push(e);
+    else if (vistosPorElMotor.has(clave)) reparto.vistosPorElMotor.push(e);
+    else reparto.nuevos.push(e);
+  }
+  return reparto;
 }
