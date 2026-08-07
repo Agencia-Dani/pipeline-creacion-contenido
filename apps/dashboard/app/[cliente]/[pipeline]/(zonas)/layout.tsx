@@ -91,9 +91,14 @@ export default async function ZonasLayout({
             {pipelinesDelEquipo > 1 && (
               <SelectorPipeline cockpits={opciones} actual={enRuta} />
             )}
-            <span className="text-sm text-muted-foreground">
+            {/* El nombre es el link a Mi cuenta: es donde todo el mundo busca lo suyo, y evita
+                sumar un ítem más al nav. No lleva gate de rol — la contraseña es de la persona. */}
+            <Link
+              href="/mi-cuenta"
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
               {usuario.nombre}
-            </span>
+            </Link>
             <Badge variant="secondary">{sesion.rol}</Badge>
             <form action={cerrarSesion}>
               <Button variant="ghost" size="sm" type="submit">

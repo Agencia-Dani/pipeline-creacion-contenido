@@ -4,11 +4,14 @@ La superficie propia que reemplaza a Airtable ([ADR-025](../../docs/adr/ADR-025-
 El plan por fases vive en [plan-cockpit-propio.md](../../docs/agents/plan-cockpit-propio.md); esto es solo cómo correr y operar la app.
 
 **Stack:** Next.js (App Router) + TypeScript + Tailwind + shadcn/ui (copiado al repo) · Supabase
-(Auth magic link + RLS) · Zod en los bordes · sin ORM (el schema vive en [`core/schema/`](../../core/schema/)).
+(Auth mail+contraseña, con magic link de repuesto — [ADR-065](../../docs/adr/ADR-065-la-puerta-se-abre-con-contrasena.md) — + RLS) ·
+Zod en los bordes · sin ORM (el schema vive en [`core/schema/`](../../core/schema/)).
 
 ## Mapa del código
 
-- `app/` — rutas. `login/` + `auth/confirm/` (magic link), las 4 zonas en
+- `app/` — rutas. `login/` (mail+contraseña, con el link plegado como repuesto) + `auth/confirm/`
+  (el aterrizaje del link) + `mi-cuenta/` (ponerse la contraseña uno mismo; vive en la raíz porque
+  la contraseña es de la persona y no de la empresa), las 4 zonas en
   **`[cliente]/[pipeline]/(zonas)/`**: `operar` · `curar` · `transcribir` · `entender`
   (plan-cockpit §2.1 + ADR-031), y `api/engine/run-plan/` — la fachada del motor (ADR-028, contrato en
   [core/contracts/run-plan.md](../../core/contracts/run-plan.md)): header compartido, fail-closed.
@@ -163,6 +166,20 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
    > Add Domain*, cargar SPF/DKIM en el DNS del dominio, y poner el Sender email en ese dominio
    > (`noreply@dominio`). Eso además saca al mail del spam (SPF/DKIM firmados). Con `onboarding@resend.dev`
    > solo se puede probar contra el mail de la cuenta.
+3-bis. **Contraseñas** ([ADR-065](../../docs/adr/ADR-065-la-puerta-se-abre-con-contrasena.md)): la
+   invitación sigue siendo el alta, y la contraseña se pone **después**. Dos caminos, y el segundo es
+   el bueno: *Authentication → Users → …* la setea un admin, o la persona entra una vez con el link y
+   se la pone sola en **`/mi-cuenta`** (el nombre en el nav es el link).
+   > 🩸 **El modo de falla que va a confundir:** si a una cuenta invitada que **nunca aceptó la
+   > invitación** le ponés contraseña desde el dashboard, entrar sigue fallando — y la pantalla dice
+   > *"mail o contraseña incorrectos"*, que es mentira a propósito (la puerta no revela quién existe,
+   > ADR-065 §3). **El motivo real está en el log del servidor: `email_not_confirmed`.** El arreglo es
+   > confirmarle el mail, no cambiarle la contraseña otra vez.
+   > ⚠️ **Dos ajustes de Supabase que van con esto:** *Auth → Password Requirements* al mismo mínimo
+   > que valida `domain/credenciales.ts` (si la base es más laxa, la constante de la app es
+   > decorativa: `updateUser` es una API pública), y **cerrar el signup** del provider Email — el alta
+   > es manual (ADR-051) y con signup abierto cualquiera crea una fila en `auth.users` pegándole a la
+   > API. No alcanza datos (cae en `/sin-rol`, RLS le da cero), pero no debería poder entrar.
 4. **Vercel:** proyecto nuevo apuntando a este repo con *Root Directory* = `apps/dashboard`, y las
    env vars de `.env.example` (del gestor). Producción en `main`, preview por rama (ADR-026).
    En Supabase, *Authentication → URL Configuration*: agregar la URL de Vercel a *Redirect URLs*.

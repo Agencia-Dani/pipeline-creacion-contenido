@@ -224,6 +224,13 @@ Con gente de Retia adentro, eso es el margen de la agencia, y el gate **falla ha
 **Quién:** Mani, o dos personas del equipo · **1 minuto** · *Necesita **dos** sesiones, y por eso no
 la puede cerrar un agente.*
 
+> 🔑 **Cómo tener dos sesiones vivas, que es lo que trabó esta prueba durante días:** **dos perfiles
+> de Chrome**, no dos ventanas y **no incógnito**. La sesión es **una sola cookie por dominio y por
+> perfil**, así que entrar con la cuenta B en el mismo perfil **borra** la de A — y con incógnito se
+> pierde al cerrar la ventana. Un perfil por cuenta y las dos duran (la cookie vive 400 días).
+> Desde [ADR-065](./adr/ADR-065-la-puerta-se-abre-con-contrasena.md) cada entrada es mail +
+> contraseña, así que armar el segundo perfil ya no cuesta esperar un correo.
+
 Antes, `auto-refresh` solo se montaba si ya había una corrida viva **al renderizar**: quien tenía
 Operar abierta cuando otro disparó no se enteraba nunca. Y `correrAhora()` no preguntaba del lado del
 servidor, así que el segundo click contestaba *"Señal enviada"* aunque el guard de n8n lo hubiera
