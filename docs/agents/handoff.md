@@ -33,7 +33,7 @@
 > | | |
 > |---|---|
 > | ✅ **[ADR-064](../adr/ADR-064-la-tanda-es-el-pegote-no-el-procesamiento.md) CONSTRUIDA y la [`027`](../../core/schema/027_tandas.sql) APLICADA** (07/08) | Verificada por su efecto contra prod: **9 tandas**, reparto **52·48·2·2·2·1·1·1·1** (suma 110), **cero huérfanas**, y `autores_de_tandas()` da `42501` con `service_role` (existe, con el grant solo para `authenticated`). ⏳ Lo único que queda es **abrir una tanda con un clic** y renombrarla: pide login por magic link |
-> | ⬜ **D3 — la demo de 10 min** con Majo y Jero | **El ÚNICO item sin marcar del ROADMAP §3.** No depende de código y es de lo más viejo abierto del repo |
+> | ⬜ **D3 — la demo de 10 min** con Majo y Jero | **El ÚNICO item sin marcar del ROADMAP §3** ([ROADMAP.md:328](../../ROADMAP.md)): calificar → ver el re-rank → bajar el histórico. No es construir nada, es sentarse 10 min a que lo hagan ellos. Es de lo más viejo abierto del repo, y en la tabla de riesgos es la mitigación de uno concreto (*"el equipo no adopta la vista de re-rank"*). Las 3 cosas que pide funcionan hoy |
 > | 🔬 RLS de LinkedIn con filas | Necesita alguien con cuenta en 2 empresas. Si no existe, **se puede descartar**: las 4 tablas están vacías y su workflow no existe (ADR-055) |
 > | 🟡 Un clic suelto | ~~El tab **Entender** en el nav de un `operador`~~ ✅ **cerrado por Mani el 07/08: *"el operador ve todo excepto los costos"***, que es exactamente el reparto que ADR-052 pidió y la `025` §3 puso en la base (un `operador` obtiene **0 tarifas**, un `dev` las 8). Queda **A7** (que dos personas en Operar se vean) |
 >
@@ -2043,9 +2043,12 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 
 **✅ Y Mani cerró el tab Entender:** *"el operador ve todo excepto los costos"*. Es el reparto de ADR-052, y desde la `025` §3 lo sostiene la base y no la UI (un `operador` obtiene 0 tarifas, un `dev` las 8). De los "dos clics" queda **A7**.
 
-**Verde:** `typecheck` · **238 tests** (+11) · `build` · `validate` **2197 checks**.
-**Qué quedó a medias:** ⏳ **nadie hizo clic** — la pantalla está verificada a nivel query, dominio, build y ahora contra el dato real de prod, pero abrirla pide un login por magic link. Mismo hueco que arrastran el CSV y el feed paginado.
-**Qué sigue:** abrir una tanda y renombrarla. Y **D3** (la demo), que sigue siendo el único item sin marcar del ROADMAP §3 y no depende de código.
+**Verde:** `typecheck` · **238 tests** (+11) · `build` · `validate` **2197 checks**. Deployado (`0acb333` a `main`) y prod respondiendo: `/` **307** · `/login` **200**.
+
+**🔧 Gotcha de herramienta, para no repetir la vuelta:** el **MCP de Vercel está conectado a una cuenta sin proyectos** (`manigreeens-projects` devuelve `projects: []`), así que un agente **no puede mirar el estado del deploy** de `pipeline-creacion-contenido` desde acá. Lo que sí sirve, y es lo que quedó usado: el smoke por `curl` contra la URL de prod (`/` 307 · `/login` 200), que es el mismo que la `022` dejó escrito.
+
+**Qué quedó a medias:** ⏳ **nadie hizo clic** — la pantalla está verificada a nivel query, dominio, build y ahora contra el dato real de prod, pero abrirla pide un login por magic link. Mismo hueco que arrastran el CSV y el feed paginado. Lo que falta ver con los ojos: **abrir una tanda y renombrarla**.
+**Qué sigue:** **D3**, la demo de 10 min con Majo y Jero (calificar → ver el re-rank → bajar el histórico). Es el **único** item sin marcar del ROADMAP §3, no depende de código, y hoy tiene más para mostrar que cuando se escribió: el histórico pasó de 31 a **140 filas** y el CSV a **16 columnas** (ADR-062).
 
 **2026-08-07 (cierre 102) — El transcriptor entra al sistema, el sponsor pasa a operar, y el checklist del MVP queda con un solo item (Claude, sesión larga con Mani).**
 **Qué se hizo:** tres ADRs (**062, 063, 064**), dos construidas y deployadas, una decidida y sin código. Migración `026` aplicada. **V2 y V4 cerradas por el ojo de Mani**, más el CSV y el alta por `ajustes/equipo` ⇒ **B4 completa** y el ROADMAP §3 queda con **D3 solo**. Commits `041ad27` · `9e6ef6c` · `66c3691` · `5983156` · `d7e156f`.
