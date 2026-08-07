@@ -37,9 +37,30 @@
 
 
 -- ═════════════════════════ §0 · La confirmación humana ═════════════════════════
--- Desde la base no hay forma de distinguir una corrida que ya no manda estas columnas de una que
--- todavía las manda: las dos escriben filas idénticas. Así que el gate se firma a mano, igual que
--- en la `017` y la `019`.
+-- El gate se firma a mano, igual que en la `017` y la `019`.
+--
+-- 🩸 **Pero la premisa de esta sección era falsa, y se corrigió midiendo (2026-08-07).** Decía:
+-- *"Desde la base no hay forma de distinguir una corrida que ya no manda estas columnas de una que
+-- todavía las manda: las dos escriben filas idénticas."* **No son idénticas: la que ya no las manda
+-- las deja en NULL.** El contraste, contra prod:
+--
+--   · `processed_items` del run del **03/08** (`aa51af79`): `url` con la URL de Instagram,
+--     `seguidores` 563277, `idioma` 'en'.
+--   · `processed_items` del run del **06/08** (`12dcafa3`, el primero posterior al `n8n:push`):
+--     `url` NULL, `seguidores` NULL, `idioma` NULL. Las 48 filas.
+--   · Agregado: **772 de 820** filas tienen `url` — las 772 viejas. Las 48 nuevas, ninguna.
+--   · `outputs` del archivado del **07/08** (`73dac44a`): `source_items` NULL en las 5.
+--     Agregado: **88 de 93** lo tienen, y los 5 que faltan son los de esta corrida.
+--
+-- O sea que las condiciones 3 y 4 **sí se pueden verificar por su efecto**, y no solo por la
+-- palabra de quien firma. Es la lección de la `019` aplicada acá: una migración con gate no se da
+-- por lista porque alguien diga que sí, sino cuando se mide.
+--
+-- ⚠️ La que **no** se pudo medir así es `transcripciones.pedido_por`: solo la escribe la pantalla
+-- de Transcribir, y nadie la usó desde el deploy. Ahí el gate sigue apoyado en la condición 2 (que
+-- el deploy esté vivo), y hoy lo está — se comprobó por otra vía: las 5 calificaciones del 07/08
+-- aterrizaron en `retia/reels` y no en el tenant que el bug del cockpit elegía antes del deploy.
+-- Quedan **2 filas** con `pedido_por` no nulo, todas viejas.
 
 create temporary table if not exists _cierre_poda (confirmado boolean);
 delete from _cierre_poda;
@@ -53,7 +74,17 @@ delete from _cierre_poda;
 --         select count(*) from outputs where run_id = '<el run del archivado>';            -- > 0
 --       (si esa semana no hubo calificados, el archivado cierra con 0 y NO sirve de prueba:
 --        califiquen algo en `/curar/feed` y esperen al domingo, o dispárenlo a mano.)
--- insert into _cierre_poda values (true);
+--
+-- ✅ **LAS CUATRO, MEDIDAS EL 2026-08-07 (madrugada UTC). Firmado por Mani; los números los tomó
+--    el agente contra prod y contra la API de n8n, y están arriba.**
+--
+--    | # | Evidencia |
+--    |---|---|
+--    | 1 | `n8n:diff` → *"Los 5 workflows corren lo que dice el repo"* |
+--    | 2 | deploy hecho por Mani el 06/08 de noche. Verificado por su efecto: las 5 calificaciones del 07/08 escribieron en `retia/reels`, cosa que antes del deploy no pasaba (bug del cockpit adivinado, `c267980`) |
+--    | 3 | run `12dcafa3` (motor, 06/08 21:24→21:40, `ok`, exec 125) → **48 `processed_items` por `run_id`**, y `verificar-corrida.mjs 2` da `intersección: 0 ✓` sin caer en `⛔ NO CUENTA` |
+--    | 4 | run `73dac44a` (archivado, 07/08 00:42, `ok`, exec 126, `archivados: 5`) → **5 `outputs` por `run_id`**, con `source_items` NULL en las 5 |
+insert into _cierre_poda values (true);
 
 do $gate$
 begin

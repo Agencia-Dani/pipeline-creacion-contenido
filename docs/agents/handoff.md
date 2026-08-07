@@ -215,7 +215,7 @@
 > | **B4** · runbooks + `core/templates/` | ✅ El criterio de F5 da **partido**: empresa 🟢, pipeline 🔴. **Y el paso 2 se corrigió contra A5 en prod: decía 5 cosas mal** |
 > | **B5** · checklist de ojo humano | ✅ [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), **11 items** |
 > | **B6** · deuda de docs | ✅ Eran **21 links rotos**, no 4, y la lista era más larga |
-> | **B1** · gate de la `023` | ⏳ **2 de sus 4 condiciones firmadas (cierre 99). Ya no es calendario: es el deploy.** Ver el bloque de abajo y el 🔥 de arriba |
+> | **B1** · gate de la `023` | ✅ **Las 4 condiciones firmadas el 07/08, medidas contra prod. El `insert` del §0 está descomentado.** Falta un solo acto humano: pegar la `023` en el SQL Editor. Ver abajo |
 >
 > ### ✅ B3 cerrada sin browser, y el discriminante es lo que la hace valer
 >
@@ -247,7 +247,32 @@
 > persona real. Generarle un magic link y entrar como él es suplantarlo, y eso no lo hace un agente
 > aunque tenga la `service_role` para hacerlo.
 >
-> ### 🔄 B1, remedido el 06/08 de noche: Mani corrió el motor a mano y el gate avanzó a 2 de 4
+> ### ✅ B1 CERRADA (07/08): las 4 condiciones del gate, medidas por su efecto
+>
+> Mani deployó, calificó 5 videos y pidió correr el archivado. Se disparó por su webhook con
+> `{ instancia }` en el body (el header lo comparte con el motor) → **`73dac44a`, `ok`,
+> `execution_id 126`, `archivados: 5`**. Efectos verificados contra prod, no por el verde:
+> **5 `outputs` con ese `run_id`**, 175 → **170 candidatos**, y los **48 descartes intactos**
+> (ADR-036). Antes de disparar se midió que el barrido de 20 días borraba **0** y que el destilado
+> se salteaba los 2 proyectos (3 y 2 calificados, el mínimo es 4): cero llamadas a Haiku, cero
+> criterios tocados.
+>
+> 🩸 **Y el §0 de la `023` decía algo falso, que se corrigió midiendo.** Afirmaba que *"desde la base
+> no hay forma de distinguir una corrida que ya no manda estas columnas de una que todavía las
+> manda: las dos escriben filas idénticas"*. **No son idénticas: la que ya no las manda las deja en
+> NULL.** El run del 03/08 escribió `url`/`seguidores`/`idioma` con dato; el del 06/08 las 48 en
+> NULL. Los `outputs` de este archivado: `source_items` NULL en los 5, contra 88 de 93 que lo
+> tienen. **Las condiciones 3 y 4 sí se verifican por su efecto**, y así se firmaron.
+>
+> ⚠️ La única que no se pudo medir así es `transcripciones.pedido_por`: solo la escribe la pantalla
+> de Transcribir y nadie la usó desde el deploy. Se apoya en la condición 2, que sí quedó probada
+> por otra vía (las 5 calificaciones aterrizaron en `retia/reels`, cosa imposible antes del deploy).
+>
+> 🚧 **Lo único que queda: pegar [`023_poda_write_only.sql`](../../core/schema/023_poda_write_only.sql)
+> en el SQL Editor.** El `insert into _cierre_poda` ya está descomentado con la tabla de evidencia
+> al lado. Después, correr su §4 y `verificar-corrida.mjs 2` en la corrida del lunes.
+>
+> ### 🔄 Cómo llegó hasta acá (06/08 de noche): la corrida a mano y las 2 primeras condiciones
 >
 > La corrida existe y es la primera del motor **después** de que la mitad de escritura de la `023`
 > entrara al live el 05/08: **`2026-08-06 21:24 → 21:40`, `ok`, `execution_id 125`**, embudo
