@@ -20,10 +20,17 @@ export const dynamic = "force-dynamic";
 // sobra: cada pasada se corta sola a los 45s y lo que quede lo agarra la siguiente.
 export const maxDuration = 60;
 
+// 🩸 `sin_transcript` decía **"Sin voz"** hasta el 2026-08-07, y **"Voz" ya significa otra cosa en
+// este sistema**: el personaje o marca para quien se cura contenido (context.md). La misma app usa
+// las dos acepciones en dos pantallas — `operar/page.tsx` dice *"su voz está apagada o sin voz"*
+// hablando de la entidad. Un operador leyó "Sin voz" en Transcribir y preguntó si la herramienta
+// devolvía una Voz: la ambigüedad es real y la cazó un humano leyendo la pantalla.
+// "Sin transcripción" además es más honesto: el estado no distingue *"el video no tiene habla"* de
+// *"Supadata no pudo"*, y el nombre viejo afirmaba lo primero.
 const ESTADO_LEGIBLE: Record<Transcripcion["estado"], string> = {
   pendiente: "En cola",
   listo: "Listo",
-  sin_transcript: "Sin voz",
+  sin_transcript: "Sin transcripción",
   fallo: "Falló",
 };
 

@@ -145,7 +145,7 @@ export async function revisarPegote(
   }
 }
 
-/** Devuelve a la cola un enlace que falló o volvió sin voz. El servidor comprueba el estado. */
+/** Devuelve a la cola un enlace que falló o volvió sin transcripción. El servidor comprueba el estado. */
 export async function reintentarTranscripcion(
   enRuta: CockpitEnRuta,
   id: string,
@@ -215,11 +215,12 @@ async function procesarUno(ctx: TenantContext, fila: Transcripcion): Promise<voi
     const { texto, idioma } = await transcribir(fila.url);
 
     if (!texto) {
-      // Sin voz o Supadata no pudo. No entra al dedup (decisión de Mani): si el motor lo trae
-      // después, el gate lo descarta duro por sin_guion igual (ADR-030).
+      // El video no tiene habla, o Supadata no pudo: el estado no los distingue, y por eso ni el
+      // texto ni la etiqueta afirman cuál de los dos fue. No entra al dedup (decisión de Mani): si
+      // el motor lo trae después, el gate lo descarta duro por sin_guion igual (ADR-030).
       await marcarResultado(ctx, fila.id, {
         estado: "sin_transcript",
-        error: "El video no tiene voz o no se pudo transcribir.",
+        error: "No se pudo sacar el texto: el video no tiene habla, o Supadata no lo consiguió.",
       });
       return;
     }

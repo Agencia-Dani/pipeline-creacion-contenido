@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { reintentarTranscripcion } from "./actions";
 import { usarCockpit } from "../usar-cockpit";
 
-// Devuelve a la cola un enlace que falló o volvió sin voz. Solo se dibuja en esos dos estados —
-// reintentar un `listo` sería pagar de nuevo un guion que ya tenemos, y el servidor lo rechaza
-// igual (`reencolar` filtra por estado).
+// Devuelve a la cola un enlace que falló o volvió sin transcripción. Solo se dibuja en esos dos
+// estados — reintentar un `listo` sería pagar de nuevo un guion que ya tenemos, y el servidor lo
+// rechaza igual (`reencolar` filtra por estado).
 //
 // No hace falta un botón de "procesar": al volver la fila a `pendiente`, la página se vuelve a
 // renderizar, el `Procesador` ve pendientes > 0 y arranca solo.

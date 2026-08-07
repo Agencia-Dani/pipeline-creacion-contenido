@@ -119,8 +119,11 @@ Pasó. Está en el §Registro del final; el enunciado completo vive en git
    `procesado_en` en `null`, o sea que **el `Procesador` nunca arrancó**. Arreglado el mismo día con
    un `router.refresh()` en el botón — el porqué está en `reintentar.tsx`. **Falta ver que ahora sí
    arranque solo**, que es lo único que queda de este punto.
-   ✅ **Que vuelva a dar "Sin voz" TAMBIÉN es un pase**: lo que se prueba es la transición de estado,
-   no que Supadata acierte.
+   ✅ **Que vuelva a dar "Sin transcripción" TAMBIÉN es un pase**: lo que se prueba es la transición
+   de estado, no que Supadata acierte.
+   📛 *Esa etiqueta decía **"Sin voz"** hasta el 07/08, y se renombró porque **"Voz" ya nombra otra
+   cosa** en este sistema (el personaje para quien se cura contenido, `context.md`). La misma app
+   usaba las dos acepciones en dos pantallas.*
    ⚠️ **En un `Listo` no tiene que haber botón**: reintentarlo sería pagar de nuevo un guion que ya
    tenemos. El servidor lo rechaza igual, pero el botón no debería estar.
    📌 **Y el botón ya no hay que buscarlo:** las fallidas tienen su propia tarjeta arriba de todo
