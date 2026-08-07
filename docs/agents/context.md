@@ -165,6 +165,18 @@ pasó por el gate, no tiene heat-score, no consume la `N` de ningún proyecto y 
 dupla (video, proyecto). Vive en `app.transcripciones`, no en el feed de calificación — pero cuando
 queda `listo` **entra al Histórico**, porque el equipo la quiso (ADR-062).
 
+**Tanda**:
+Los enlaces que alguien pegó **de una sola vez** en *Transcribir*, como una unidad con nombre. Es la
+unidad con la que el equipo piensa su propio trabajo (*"los 20 de competencia que pegué el martes"*),
+y por eso existe: no la necesita la máquina, la necesita la persona que vuelve a buscar lo suyo.
+Lleva un título que el equipo elige al pegar —opcional, con uno automático si lo dejan vacío— y que
+puede cambiar después.
+
+⚠️ **No confundir con la Corrida del transcriptor.** La tanda es el **pegote** y nace cuando alguien
+aprieta el botón; la corrida es el **procesamiento**, trabaja de a 64 y se corta a los 45 s. Una
+tanda de 100 enlaces se procesa en varias corridas, y una corrida puede tocar enlaces de varias
+tandas. Agrupar por corrida daría grupos que no significan nada para el equipo (ADR-064).
+
 **Abandonar** (una transcripción):
 Declarar que un enlace pegado **nunca va a dar un script**, y dejar de ofrecer el reintento — el caso
 típico es un video sin voz. Es distinto de **descartar**, que en este dominio siempre es un *juicio
