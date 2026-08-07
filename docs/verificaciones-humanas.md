@@ -266,17 +266,37 @@ puede cruzar por ahí. **Comparar después de la corrida es imposible sin volver
 2. **La cara:** leer los logs de la corrida en n8n mientras corre (el nodo loguea, no persiste), o
    pegar la misma URL en **Transcribir** para obtener el transcript y compararlo a mano. Paga.
 
-## 7. ⬜ **V5 — corrida incremental + dedup** *(ROADMAP §3)*
+## 7. ✅ **V5 — corrida incremental + dedup: CORRIDA Y VERDE el 2026-08-07**
 
-**Quién:** Mani · **⚠️ gasta créditos: es una corrida real.**
+**Corrida real, `on_demand`, 13.8 min, estado `ok`. Costó ~$0.24.**
 
-El dedup ya quedó verificado en vivo; lo que falta es la corrida incremental completa. Correr con
-`dias_recencia = 1` y mirar que **no reaparezca nada ya procesado**.
+Se bajó `Días de recencia` de **100 → 3** (no 1: con 1 el riesgo era que Apify trajera cero y la
+prueba pasara **en falso**), se disparó el webhook y se restauró a 100 apenas cerró — verificado en
+`app.ajustes` **y** por la fachada, que es lo que el motor lee el lunes.
 
-⚠️ **No la corras antes de firmar el gate de la `023`** (tarea B1). El modo de falla está medido: si
-`processed_items` deja de escribirse, PostgREST rechaza el insert entero con `PGRST204`, el
-`onError: continue` se traga el 400 y **el motor cierra en verde sin memoria de dedup** — que es
-exactamente lo que esta prueba cree estar midiendo.
+| | |
+|---|---|
+| **Apify volvió a traer** | **69** videos (la ventana de 3 días cubre entera la corrida de ayer) |
+| **Sobrevivieron al dedup** | **4** |
+| **Se le pagó a Supadata** | **4 transcripciones**, no 69 |
+| **`processed_items` nuevos** | 4, contra 48 de la corrida de ayer |
+| **Intersección de `external_id` entre las 2 últimas** | **`0 ✓`, contada por `run_id`** |
+| **Feed** | 171 candidatos · **0** con ⚠️ SIN GUION · 171/171 con `external_id` · **0** urls duplicadas |
+
+🔑 **Por qué esto no es un ∅ vacío**, que era el único riesgo de la prueba: entraron **69 videos
+reales**, casi todos ya procesados ayer. Si el dedup no funcionara, esos 69 volvían a pasar y se
+re-pagaban. Pasaron 4. **El ∅ es de un dedup que filtra, no de una tabla vacía** — y el contador
+`registro_dedup: ok` lo confirma en las dos corridas.
+
+🩸 **Lo que NO se hizo, y por poco:** se evaluó bajar `Videos a transcribir por corrida` (250) como
+tope de gasto. **Habría sido destructivo.** Ese presupuesto **quema** (ADR-044): corre *después* del
+`POST processed_items`, así que lo que queda afuera ya está en la memoria de dedup, vuelve sin
+transcript y el gate lo descarta `sin_guion` **para siempre**. Se dejó en 250. *La red de seguridad
+de una prueba puede ser el daño.*
+
+*(El gate de la `023` que bloqueaba esta prueba ya estaba firmado, así que el modo de falla mudo
+—`PGRST204` tragado por `onError: continue`, motor en verde sin memoria— no aplicaba. El
+`registro_dedup: ok` de esta corrida lo vuelve a descartar.)*
 
 ## 8. 🛑 **V6 — resiliencia: hay que rediseñarla antes de correrla**
 

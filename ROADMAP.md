@@ -121,11 +121,14 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
 >
 > Lo de abajo se midió, no se dedujo: conteos por PostgREST y `pg_policies` contra la base de prod,
 > y los 5 `workflow.json` traídos por la API de n8n. **Cada `✅ medido` dice qué número lo prueba.**
-> Lo que sigue sin marcar es lo que sigue sin hacerse — y son **V2, V4, V5, D2 y D3**.
-> *(**V6 cerró el 07/08**, y no corriéndola: su simulacro era immontable —los 31 nodos HTTP comparten
-> `Config.supabase_url`— y el invariante resultó ser una propiedad estructural que ahora verifica el
-> check #6 del auditor. **V2 quedó a mitad por la misma clase de hallazgo:** su mitad española es una
-> garantía del código con test verde, no una muestra.)*
+> Lo que sigue sin marcar es lo que sigue sin hacerse — y son **V2, V4 y D3**.
+> *(El 07/08 cayeron tres. **V6** no corriéndola: su simulacro era immontable —los 31 nodos HTTP
+> comparten `Config.supabase_url`— y el invariante resultó ser una propiedad estructural que ahora
+> verifica el check #6 del auditor. **V5** sí con una corrida real (~$0.24): 69 videos vueltos a
+> traer, 4 sobrevivieron, intersección ∅. **D2** con el UPDATE en prod.
+> **V2 quedó a mitad por la misma clase de hallazgo que V6:** su mitad española es una garantía del
+> código con test verde, no una muestra. Lo que queda son **dos verificaciones de ojo** —V2 (la
+> traducción) y V4— más **D3**, la demo.)*
 
 ### M0 — Arranque (½ día) · los 3
 
@@ -266,8 +269,14 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       *(Era "la vista 🔥 Seleccionados", que era de Airtable y murió con él. Lo pedido —punto 5 del
       norte— sigue igual y hoy lo sirve el Feed, que ya ordena por `heat_score` desc. **Falta el ojo:**
       está en el checklist de B5, [plan-multi-tenant §15.B](./docs/agents/plan-multi-tenant.md).)*
-- [ ] **V5. Incremental + dedup:** correr con `dias_recencia=1` → no reaparece lo ya procesado.
-      *(parcial: el dedup quedó verificado en vivo, falta la corrida incremental `dias=1` completa.)*
+- [x] **V5. Incremental + dedup:** correr con `dias_recencia=1` → no reaparece lo ya procesado.
+      *(✅ **CORRIDA el 07/08 con ventana de 3 días, `ok`, 13.8 min, ~$0.24.** Se usó 3 y no 1 a
+      propósito: con 1 el riesgo era que Apify trajera cero y **la prueba pasara en falso**.
+      **Apify volvió a traer 69 videos** —la ventana cubre entera la corrida de ayer— y **sobrevivieron
+      4**: se le pagó a Supadata **4 transcripciones, no 69**. `intersección: 0 ✓` por `run_id`
+      (4 filas nuevas contra las 48 de ayer), feed en 171 con **0 sin-guion, 171/171 `external_id` y
+      0 urls duplicadas**. **El ∅ es de un dedup que filtra, no de una tabla vacía.**
+      `Días de recencia` restaurado a 100 y verificado por la fachada.)*
 - [x] **V6. Resiliencia:** romper la credencial Supabase a propósito → el workflow IGUAL entrega
       (el registro es sumidero, no dependencia — invariante #1 de PLAN). Restaurar. Un fallo real
       queda como `run` estado `fallo`.
@@ -298,7 +307,7 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       crons del sistema viven en el dispatcher ([ADR-050](./docs/adr/ADR-050-dispatcher-una-ejecucion-por-instancia.md)).
       ⚠️ **La cadencia no es la que decía este item:** no son diarios. Son **semanales** —
       `Cron — motor (lunes 8am)` y `Cron — archivado (domingo 6pm)`.)*
-- [ ] **D2.** `status: active` en el manifest + tabla `workflows` · actualizar el manifest al
+- [x] **D2.** `status: active` en el manifest + tabla `workflows` · actualizar el manifest al
       estado real del motor (stages/outputs post-rework) · commit.
       *(🔧 **La mitad del manifest se hizo el 06/08**: los 4 `workflow.yaml` de los pipelines vivos
       decían `status: draft` con comentarios ya falsos —"cron sin activar", "sin importar aún en la
@@ -309,7 +318,9 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       [`scoped.ts:43`](./apps/dashboard/lib/supabase/scoped.ts) deja `clients`/`instances`/`workflows`
       fuera del mapa a propósito— así que es cosmético, no un bug. Es un UPDATE:
       `update workflows set estado = 'active' where id = 'short-form-content';`
-      **`linkedin` se queda en `draft` a propósito**: su workflow no existe en n8n (ADR-055).)*
+      **`linkedin` se queda en `draft` a propósito**: su workflow no existe en n8n (ADR-055).
+      ✅ **APLICADO el 07/08 y verificado leyendo la tabla de vuelta:** `short-form-content: active` ·
+      `linkedin: draft` · `substack: inactive`. **D2 cerrada entera.**)*
 - [ ] **D3.** Demo de 10 min con Majo y Jero: calificar, ver el re-rank, bajar el histórico.
       El sistema solo sirve si lo usan.
       *(Sigue abierto y es de las cosas más viejas sin cerrar. Está en el checklist de ojo humano de
