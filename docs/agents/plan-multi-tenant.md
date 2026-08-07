@@ -1493,9 +1493,11 @@ sale rebotado. **El paso 2 lo hace la agencia**, entrando por `es_dueno` (que `r
 [item 11](../verificaciones-humanas.md) del checklist humano.
 
 **B5 — ✅ HECHO el 2026-08-06: [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md).**
-Los 11 items con quién los hace, cuánto tarda y **qué significa si falla** — los arrastres del handoff
-(el clic al CSV, el feed paginado, el tab Entender de un operador), el gate de costos del Carril 0, y
+Los items con quién los hace, cuánto tarda y **qué significa si falla** — los arrastres del handoff
+(el clic al CSV, recorrer el feed, el tab Entender de un operador), el gate de costos del Carril 0, y
 del ROADMAP **V2 · V4 · V5 · V6 · D3**. Los ejecutan Mani y el equipo; el carril solo los dejó escritos.
+*(El 07/08 se le sumó el **2-bis**, los 3 arreglos de Transcribir, y el del feed se reescribió: dejó
+de paginar, así que sus dos items sobre "Cargar más" y el keyset ya no existen.)*
 
 🩸 **Y escribirlo destapó lo que lo hacía peligroso: la tabla de números esperados tenía 4 de 9 filas
 mal**, todas hacia el mismo lado —pedían el `count(*)` crudo de la tabla donde la pantalla filtra.

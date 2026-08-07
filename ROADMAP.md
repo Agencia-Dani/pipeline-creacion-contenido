@@ -146,10 +146,11 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
       Verificar: `select * from workflows;` (2 seeds), `select * from processed_items;` (vacía),
       `select * from outputs;` (existe, vacía). *(Era `v_historico_seleccionados`, dropeada por la
       [`022`](./core/schema/022_poda_balde_2.sql).)*
-      *(✅ medido 06/08, y ya son muchas más que 3: **23 de las 24 migraciones aplicadas**, verificadas
-      por su efecto — la `022` no dejó viva ninguna de sus 5 vistas ni de sus columnas, y la `024` tiene
-      sus 4 policies. **La única sin aplicar es la [`023`](./core/schema/023_poda_write_only.sql)**: sus
-      7 columnas siguen en la base, y su gate espera las corridas del fin de semana.)*
+      *(✅ medido 07/08, y ya son muchas más que 3: **las 25 de 25 migraciones aplicadas**, verificadas
+      por su efecto — la `022` no dejó viva ninguna de sus 5 vistas ni de sus columnas, la `024` tiene
+      sus 4 policies, y la [`023`](./core/schema/023_poda_write_only.sql) **cerró su gate el 07/08**:
+      sus 6 columnas dan `42703` y las 2 que se quedan (`run_id`, `primera_vez`) siguen con dato. **No
+      queda ninguna pendiente.**)*
 - [x] **A3.** Guardar en el gestor (NUNCA en git): URL del proyecto + `service_role` key (Settings → API).
 - [x] **A4.** Insertar cliente + instancia (snippet comentado al final del `001`) → anotar `instance_id`.
       *(✅ medido 06/08: **3 clientes** —`retia`, `30x`, `estadox`— y **4 instancias**: `retia/reels`

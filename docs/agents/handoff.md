@@ -79,7 +79,7 @@
 > equivocada** y ninguna pantalla de Retia te la va a mostrar. Si la creaste en `/30x/...`, está
 > bien. No lo puedo distinguir desde afuera: la decisión es tuya.
 >
-> ### El arreglo (`c267980`, ya en `main`)
+> ### El arreglo (`c267980`, ya en `main`) — 📐 escrito en [ADR-061](../adr/ADR-061-el-cockpit-se-nombra-no-se-adivina.md)
 >
 > `exigirTenant(zona, cliente, pipeline)` con los **dos obligatorios**. Un cockpit que falta pasó a
 > ser un **error de compilación** — no un default fail-closed que explota cuando alguien hace click.
@@ -99,6 +99,50 @@
 > el botón. **175 filas = 103,7 KB medidos**, y PostgREST las devuelve todas (no hay `db-max-rows`;
 > se comprobó pidiendo sin `limit`). El filtro **se queda en la query**: es lo que sostiene el
 > congelado de plan-cockpit §D6.4 sin tener que escribirlo.
+>
+> ### 🎙️ Y después, los 3 huecos de la pestaña **Transcribir** (`3e482c8`)
+>
+> Salieron de repasar la pantalla a pedido de Mani. Ninguno estaba anotado en ningún lado.
+>
+> | | El hueco | Cómo quedó |
+> |---|---|---|
+> | **1** | Una fila en `fallo` o `sin_transcript` **no se reintentaba nunca**: el procesador solo levanta `pendiente`, y volver a pegar el link tampoco servía porque el encolado lo descarta como duplicado. Quedaba clavada salvo borrarla por SQL — y con Supadata en **65% de transcripciones vacías** no es un caso raro | Botón **Reintentar** por fila. El guardia está en el servidor (`.in("estado", ["fallo","sin_transcript"])`), así que ni forzando el POST se reencola un `listo` y se paga de nuevo |
+> | **2** | **Doble pago.** La pantalla **arranca sola al cargar**, y `tomarPendientes` era un `select` puro: dos pestañas abiertas recibían **el mismo lote de 64** y lo pagaban dos veces. El comentario viejo lo minimizaba como *"pueden agarrar el mismo enlace"* — eran los 64 | El lote **se reclama** con un solo `UPDATE` cuyo `where` incluye la condición de libre, así que la segunda pasada se lleva **0 filas**. Sin lock ni tabla de colas |
+> | **3** | El único aviso de *"ya lo teníamos"* era un conteo **después** de encolar, sin decir cuáles, y **no miraba `processed_items`** — que era donde se pagaba de más en silencio | La pantalla **revisa antes** y ofrece quitarlos, separando *ya los pediste* de *ya los vio el motor*. Aceptar deja el campo con los que sí van y los manda |
+>
+> 🔑 **Por qué el reclamo vence a los 3 minutos, y no es un número prudente al azar:** la pantalla
+> declara `maxDuration = 60`, o sea que Vercel mata la función a los 60 s pase lo que pase. Con 3×
+> ese techo, **un reclamo vencido significa siempre que el trabajador murió**, nunca que está
+> tardando. Por eso tampoco hace falta un barrido: la condición del `where` es el barrido.
+>
+> ⚠️ **Un atajo deliberado, marcado con `ponytail:` en `lib/transcripciones.ts`:** el reclamo se
+> escribe en **`procesado_en`**, no en un estado `procesando` propio. Lo segundo pide un valor de
+> enum nuevo ⇒ migración en `core/schema/` ⇒ ADR, para un problema de **~USD 0,90** por cola
+> duplicada. Mientras la fila está `pendiente`, `procesado_en` significa *"reclamada en"*; al
+> terminar, `marcarResultado` lo pisa con la hora real. Nadie más lee esa columna (verificado: 3
+> referencias, las 3 en ese archivo; la pantalla muestra `creado_en`). **El día que haga falta
+> mostrar "procesando…" en la lista, eso ya es un estado de verdad y va con ADR.**
+>
+> 🔴 **Por qué NO se ofrece quitar los que vio el motor por default:** `processed_items` guarda todo
+> lo que el motor **consideró**, aunque el pre-trim o el gate lo hayan matado antes de transcribirlo.
+> O sea que *"el motor lo vio"* **no implica que exista el guion en ningún lado**, y quitarlo solo
+> escondería la única forma de conseguirlo. Por eso hay dos botones y no uno.
+>
+> ✅ Verificado contra prod **sin escribir nada**: el `PATCH` del reclamo (con `or` + `select` de
+> vuelta), el guardia de estado del reencolado y los dos lookups. **222/222** con 5 tests nuevos del
+> reparto — incluido el discriminante de que la clave lleva la plataforma adentro (el mismo id
+> numérico en IG y TikTok **no** es el mismo video).
+>
+> 🩸 **Y una sonda mía tocó una fila real, vale que quede escrito.** Probando el `PATCH` asumí "0
+> pendientes" de una lectura de minutos antes; Mani pegó un link a las 01:04:03 y la sonda lo
+> reclamó 3 segundos después. Sin consecuencias —la fila ya se había transcrito sola a las 01:04:20—
+> pero la lección es la de siempre en este repo: **contra prod se filtra por algo que no pueda
+> matchear nada real, no por lo que uno leyó hace un rato.**
+>
+> ⏳ **Lo que ningún agente pudo cerrar: la interacción de pantalla.** Requiere una sesión, y
+> generar un magic link de Majo o Jero es suplantarlas. Está escrito paso a paso en
+> [`verificaciones-humanas.md` §2-bis](../verificaciones-humanas.md), y **el punto del doble pago
+> necesita dos navegadores a la vez**.
 >
 > ### 🔓 Qué desbloquea, y qué falta
 >
@@ -441,7 +485,8 @@
 > | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ **arrastre del cierre 94**, el más viejo abierto. El CSV está verificado contra las 31 filas reales con un parser RFC 4180 independiente; lo que nadie hizo es **el clic**. 15 columnas, acentos derechos |
 > | 4 | 🟡 Que el tab **Entender** aparezca en el nav de un **operador** (`b8a3832`) | Jero o Alejo | ⬜ se ve solo, en su próximo login. La lógica tiene tests; falta el ojo. *No se probó desde una sesión de agente a propósito: habría requerido generar un magic link de la cuenta de otra persona* |
 > | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
-> | 5 | 🟡 Recorrer el **feed paginado** en `/curar/feed` (cierre 98) | Majo, Jero o Alejo | ⬜ **nuevo del 06/08**, y se despacha en el mismo login que el #2. Mirar tres cosas: que **Cargar más** traiga 25 sin repetir ni saltear, que los **chips digan el total real** (165, no 25) y que **abrir una tarjeta** traiga el guion. Calificar y después cargar más es el caso que el keyset existe para cubrir |
+> | 5 | 🟡 Recorrer el **feed** en `/curar/feed` | Majo, Jero o Alejo | ⬜ **reescrito el 07/08: el feed dejó de paginar**, así que los dos items sobre "Cargar más" y el keyset **ya no existen**. Quedan tres: que estén **todas de una** (170 al 07/08, el pie dice el número), que los **chips digan el total de cada filtro** sobre la tabla entera, y que **abrir una tarjeta** traiga el guion. Detalle en [`verificaciones-humanas.md` §2](../verificaciones-humanas.md) |
+> | 9 | 🔴 Los **3 arreglos de Transcribir** (reintento · reclamo de la cola · avisar antes de pagar) | Majo o Jero | ⬜ **nuevo del 07/08.** Lo único de esa sesión que no se pudo verificar solo: las queries se probaron contra prod y el dominio tiene tests, pero **nadie tocó la pantalla**. El punto del doble pago **necesita dos navegadores a la vez**. Pasos en [`verificaciones-humanas.md` §2-bis](../verificaciones-humanas.md) |
 > | 6 | 🔬 **La prueba que cierra §14.6**: RLS de LinkedIn con datos reales | quien tenga la cuenta de 2 empresas | 🟡 **La mitad de query está CERRADA el 06/08: `1 y 1`, y `42501` en la escritura cruzada** (tabla completa en el bloque 🅱️ y en §14.6). **Queda el clic, y las 2 filas ya están sembradas esperándolo** |
 > | 7 | 🔴 El **check #1 de la `021` contra PROD** | Mani o Alejo | ✅ **HECHO el 06/08: CERO FILAS**, sobre el corpus completo (con la `020` y la `024` aplicadas). No queda ninguna tabla con columna de tenant, RLS activado y cero policies |
 > | 8 | 🔴 **Un alta real por `ajustes/equipo`** | Mani (o cualquier `es_dueno`) | ⬜ **nuevo del 06/08**, y es lo único que le falta a B4. Todo el resto del runbook está contrastado contra el código y contra prod; **lo que ningún agente puede confirmar es que salga el mail.** Necesita un mail que no esté en el sistema (un alias sirve). Pasos en [`verificaciones-humanas.md` §11](../verificaciones-humanas.md) |
