@@ -1,17 +1,26 @@
 "use server";
 
 import { aCsv } from "@/domain/csv";
-import { comoRuta } from "@/domain/rutas";
+import { comoRuta, type CockpitEnRuta } from "@/domain/rutas";
 import { exigirTenant } from "@/lib/auth";
 import { leerAprobados, leerTodosLosAprobados, type Historico } from "@/lib/historicos";
 
 // Una página más del histórico. Solo lectura: acá no se edita nada — lo aprobado ya se archivó
 // y su verdad vive en `outputs` (ADR-014).
 
+// 🩸 **Por qué estas acciones reciben `enRuta`** (2026-08-06). Una server action no recibe los
+// `params` de la ruta, así que llamaban `exigirTenant(zona)` a secas y el cockpit se resolvía por
+// el default de `resolverContexto`: *el primero que alcance*. Con una sola instancia activa eso
+// acertaba siempre; desde que entraron las 3 de LinkedIn (03/08) el primero pasó a ser
+// `30x/linkedin`, y para todo `es_dueno` cada acción escribía en el tenant equivocado, sin error.
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles. El porqué largo está en `lib/auth.ts`.
+
 export async function cargarMas(
+  enRuta: CockpitEnRuta,
   pagina: number,
 ): Promise<{ ok: true; filas: Historico[]; hayMas: boolean } | { ok: false; mensaje: string }> {
-  const { ctx } = await exigirTenant("curar");
+  const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   if (!Number.isInteger(pagina) || pagina < 0 || pagina > 500) {
     return { ok: false, mensaje: "Página inválida." };
@@ -45,10 +54,10 @@ const COLUMNAS = [
  * nuevo, y así el export pasa por **la misma guardia de tenant** que la pantalla, sin una segunda
  * copia de esa lógica que se pueda atrasar.
  */
-export async function exportarCsv(): Promise<
+export async function exportarCsv(enRuta: CockpitEnRuta): Promise<
   { ok: true; csv: string; nombre: string; filas: number; truncado: boolean } | { ok: false; mensaje: string }
 > {
-  const { ctx, cockpit } = await exigirTenant("curar");
+  const { ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   try {
     const { filas, truncado } = await leerTodosLosAprobados(ctx);

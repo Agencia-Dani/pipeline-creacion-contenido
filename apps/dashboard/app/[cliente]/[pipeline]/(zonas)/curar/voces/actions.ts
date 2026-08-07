@@ -1,6 +1,6 @@
 "use server";
 
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import type { TenantContext } from "@/domain/tenant";
 import { revalidatePath } from "next/cache";
 import { motivoParaNoBorrar } from "@/domain/borrado";
@@ -43,8 +43,20 @@ export type FormProyecto = {
 // ofrecía.
 const vocesValidas = async (ctx: TenantContext) => new Set((await leerVoces(ctx)).map((v) => v.id));
 
-export async function guardarVoz(id: string, form: FormVoz): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+// 🩸 **Por qué estas acciones reciben `enRuta`** (2026-08-06). Una server action no recibe los
+// `params` de la ruta, así que llamaban `exigirTenant(zona)` a secas y el cockpit se resolvía por
+// el default de `resolverContexto`: *el primero que alcance*. Con una sola instancia activa eso
+// acertaba siempre; desde que entraron las 3 de LinkedIn (03/08) el primero pasó a ser
+// `30x/linkedin`, y para todo `es_dueno` cada acción escribía en el tenant equivocado, sin error.
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles. El porqué largo está en `lib/auth.ts`.
+
+export async function guardarVoz(
+  enRuta: CockpitEnRuta,
+  id: string,
+  form: FormVoz,
+): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   const validacion = validarVoz(form);
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
@@ -85,8 +97,8 @@ export async function guardarVoz(id: string, form: FormVoz): Promise<Resultado> 
   };
 }
 
-export async function crearVozNueva(form: FormVoz): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function crearVozNueva(enRuta: CockpitEnRuta, form: FormVoz): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   const validacion = validarVoz(form);
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
@@ -103,8 +115,12 @@ export async function crearVozNueva(form: FormVoz): Promise<Resultado> {
   return { ok: true, mensaje: "Voz creada. Agregale un proyecto para que empiece a traer videos." };
 }
 
-export async function guardarProyecto(id: string, form: FormProyecto): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function guardarProyecto(
+  enRuta: CockpitEnRuta,
+  id: string,
+  form: FormProyecto,
+): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   const validacion = validarProyecto(form, await vocesValidas(ctx));
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
@@ -143,8 +159,11 @@ export async function guardarProyecto(id: string, form: FormProyecto): Promise<R
   return { ok: true, mensaje: "Guardado. Aplica en la próxima corrida." };
 }
 
-export async function crearProyectoNuevo(form: FormProyecto): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function crearProyectoNuevo(
+  enRuta: CockpitEnRuta,
+  form: FormProyecto,
+): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   const validacion = validarProyecto(form, await vocesValidas(ctx));
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
@@ -168,8 +187,8 @@ export async function crearProyectoNuevo(form: FormProyecto): Promise<Resultado>
 // el rastro sobrevive). Si el DELETE falla, queda un evento de un borrado que no pasó — molesto,
 // pero mucho menos grave que un borrado sin rastro. Mismo criterio que `sugeridos/actions.ts`.
 
-export async function borrarProyecto(id: string): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function borrarProyecto(enRuta: CockpitEnRuta, id: string): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   let proyecto;
   try {
@@ -215,8 +234,8 @@ export async function borrarProyecto(id: string): Promise<Resultado> {
   };
 }
 
-export async function borrarVoz(id: string): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function borrarVoz(enRuta: CockpitEnRuta, id: string): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   let voz;
   try {

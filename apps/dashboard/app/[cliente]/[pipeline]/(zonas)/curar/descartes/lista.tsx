@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { VEREDICTOS, type DescarteFeed, type Veredicto } from "@/domain/feed";
 import { auditarDescarte } from "./actions";
+import { usarCockpit } from "../../usar-cockpit";
 
 // La auditoría del gate. El acto es binario: ¿la máquina hizo bien en matarlo?
 //
@@ -21,6 +22,7 @@ const ETIQUETA: Record<Veredicto, string> = {
 };
 
 export function Lista({ descartes }: { descartes: DescarteFeed[] }) {
+  const cockpit = usarCockpit();
   const [puestos, setPuestos] = useState<Record<string, Veredicto>>({});
   const [enviando, setEnviando] = useState<Set<string>>(new Set());
   const [errores, setErrores] = useState<Record<string, string>>({});
@@ -36,7 +38,7 @@ export function Lista({ descartes }: { descartes: DescarteFeed[] }) {
     setEnviando((e) => new Set(e).add(d.id));
 
     startTransition(async () => {
-      const r = await auditarDescarte(d.id, veredicto);
+      const r = await auditarDescarte(cockpit, d.id, veredicto);
       setEnviando((e) => {
         const s = new Set(e);
         s.delete(d.id);

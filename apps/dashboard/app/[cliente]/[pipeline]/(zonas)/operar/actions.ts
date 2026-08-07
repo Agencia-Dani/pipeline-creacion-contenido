@@ -1,6 +1,6 @@
 "use server";
 
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
 import { hayCorridaViva } from "@/domain/corrida";
 import { exigirTenant } from "@/lib/auth";
@@ -24,8 +24,17 @@ export type ResultadoDisparo = { ok: boolean; mensaje: string };
 // ▶ Correr ahora: señal al webhook del motor (ADR-023) con la instancia del cockpit abierto.
 // El header vive solo acá (BFF, único portador de secretos) y en n8n — jamás en el browser ni en
 // git. La instancia no es secreta: es un uuid del registro, y viaja en el body como el dispatcher.
-export async function correrAhora(): Promise<ResultadoDisparo> {
-  const { usuario, ctx, cockpit } = await exigirTenant("operar");
+//
+// 🩸 **Por qué estas acciones reciben `enRuta`** (2026-08-06). Una server action no recibe los
+// `params` de la ruta, así que llamaban `exigirTenant(zona)` a secas y el cockpit se resolvía por
+// el default de `resolverContexto`: *el primero que alcance*. Con una sola instancia activa eso
+// acertaba siempre; desde que entraron las 3 de LinkedIn (03/08) el primero pasó a ser
+// `30x/linkedin`, y para todo `es_dueno` cada acción escribía en el tenant equivocado, sin error.
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles. El porqué largo está en `lib/auth.ts`.
+
+export async function correrAhora(enRuta: CockpitEnRuta): Promise<ResultadoDisparo> {
+  const { usuario, ctx, cockpit } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
 
   const url = process.env.MOTOR_WEBHOOK_URL;
   const nombre = process.env.MOTOR_WEBHOOK_HEADER_NOMBRE;
@@ -100,8 +109,8 @@ export async function correrAhora(): Promise<ResultadoDisparo> {
 // El buscador de referentes perdió el cron de los lunes (enmienda de ADR-020) y pasó a ser este
 // botón. Misma forma que el ▶ del motor: la instancia en el body, el header solo acá y en n8n.
 
-export async function buscarAhora(): Promise<ResultadoDisparo> {
-  const { usuario, ctx, cockpit } = await exigirTenant("operar");
+export async function buscarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDisparo> {
+  const { usuario, ctx, cockpit } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
 
   const url = process.env.DESCUBRIMIENTO_WEBHOOK_URL;
   const nombre = process.env.DESCUBRIMIENTO_WEBHOOK_HEADER_NOMBRE;

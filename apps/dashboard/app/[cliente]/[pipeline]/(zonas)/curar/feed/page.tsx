@@ -25,8 +25,8 @@ export default async function FeedPage({
   const base = comoRuta(cockpit);
 
   // Los conteos van aparte de las filas a propósito: son cuatro `head` counts sobre la tabla
-  // entera, y es lo que deja que los chips digan el avance real y no el tamaño de la página.
-  const [primera, cuentas, descartesPendientes] = await Promise.all([
+  // entera, y es lo que deja que los chips digan el avance de CADA filtro y no solo del abierto.
+  const [candidatos, cuentas, descartesPendientes] = await Promise.all([
     leerFeed(ctx, FILTRO_INICIAL),
     contarFeed(ctx),
     contarDescartesPendientes(ctx),
@@ -60,8 +60,7 @@ export default async function FeedPage({
         </Alert>
       ) : (
         <Mazo
-          inicial={primera.candidatos}
-          hayMasInicial={primera.hayMas}
+          inicial={candidatos}
           cuentas={cuentas}
           descartesPendientes={descartesPendientes}
         />

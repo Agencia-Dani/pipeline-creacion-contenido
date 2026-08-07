@@ -1,6 +1,6 @@
 "use server";
 
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
 import { ajustesVisibles, validarAjuste } from "@/domain/ajustes";
 import { exigirTenant } from "@/lib/auth";
@@ -12,8 +12,21 @@ export type ResultadoGuardar = { ok: boolean; mensaje: string };
 // La autoridad está en el servidor (plan-cockpit §3.2): la pantalla ya esconde los knobs que
 // el rol no puede tocar, pero eso es cosmética. Acá se vuelve a leer la fila real y se vuelve
 // a filtrar por rol — un POST a mano no alcanza para mover un knob de dev.
-export async function guardar(clave: string, valor: string): Promise<ResultadoGuardar> {
-  const { usuario, ctx, cockpit, rol } = await exigirTenant("ajustes");
+//
+// 🩸 **Por qué estas acciones reciben `enRuta`** (2026-08-06). Una server action no recibe los
+// `params` de la ruta, así que llamaban `exigirTenant(zona)` a secas y el cockpit se resolvía por
+// el default de `resolverContexto`: *el primero que alcance*. Con una sola instancia activa eso
+// acertaba siempre; desde que entraron las 3 de LinkedIn (03/08) el primero pasó a ser
+// `30x/linkedin`, y para todo `es_dueno` cada acción escribía en el tenant equivocado, sin error.
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles. El porqué largo está en `lib/auth.ts`.
+
+export async function guardar(
+  enRuta: CockpitEnRuta,
+  clave: string,
+  valor: string,
+): Promise<ResultadoGuardar> {
+  const { usuario, ctx, cockpit, rol } = await exigirTenant("ajustes", enRuta.cliente, enRuta.pipeline);
 
   let filas;
   try {

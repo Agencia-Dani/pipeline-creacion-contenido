@@ -4,10 +4,12 @@ import { useState, useTransition } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { correrAhora, type ResultadoDisparo } from "./actions";
+import { usarCockpit } from "../usar-cockpit";
 
 // Correr cuesta créditos (Apify + transcripción) aunque no entregue nada nuevo:
 // por eso el click pide confirmación explícita (plan-cockpit §3.3).
 export function BotonCorrer({ deshabilitado }: { deshabilitado: boolean }) {
+  const cockpit = usarCockpit();
   const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDisparo | null>(null);
   const [enviando, startTransition] = useTransition();
@@ -15,7 +17,7 @@ export function BotonCorrer({ deshabilitado }: { deshabilitado: boolean }) {
   const disparar = () => {
     setConfirmando(false);
     startTransition(async () => {
-      setResultado(await correrAhora());
+      setResultado(await correrAhora(cockpit));
     });
   };
 

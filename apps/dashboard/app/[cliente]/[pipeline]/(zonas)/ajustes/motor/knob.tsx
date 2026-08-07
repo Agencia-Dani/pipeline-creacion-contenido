@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TipoAjuste } from "@/domain/ajustes";
 import { guardar, type ResultadoGuardar } from "./actions";
+import { usarCockpit } from "../../usar-cockpit";
 
 // Un knob = una fila editable. El botón Guardar aparece SOLO cuando el valor cambió: sin eso,
 // 18 botones siempre activos invitan a guardar sin querer y no se ve de un vistazo qué se tocó.
@@ -29,6 +30,7 @@ export function Knob({
   descripcion: string | null;
   tipo: TipoAjuste;
 }) {
+  const cockpit = usarCockpit();
   const guardado = valor === null ? "" : String(valor);
   const [texto, setTexto] = useState(guardado);
   const [resultado, setResultado] = useState<ResultadoGuardar | null>(null);
@@ -38,7 +40,7 @@ export function Knob({
   const id = `knob-${clave}`;
 
   const enviar = () => {
-    startTransition(async () => setResultado(await guardar(clave, texto)));
+    startTransition(async () => setResultado(await guardar(cockpit, clave, texto)));
   };
 
   return (

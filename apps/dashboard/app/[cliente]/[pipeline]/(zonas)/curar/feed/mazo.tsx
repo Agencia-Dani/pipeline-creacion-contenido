@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import {
   agrupar,
   ajustarCuentas,
-  cursorDe,
   ETIQUETA_FILTRO,
   FILTRO_INICIAL,
   FILTROS,
@@ -17,11 +16,11 @@ import {
   type CandidatoFeed,
   type Filtro,
 } from "@/domain/feed";
-import { calificarCandidato, cargarMasFeed } from "./actions";
+import { calificarCandidato, leerMazo } from "./actions";
 import { Detalle } from "./detalle";
 import { Tarjeta } from "./tarjeta";
 
-// El mazo: agrupado por proyecto, heat descendente adentro, filtro arriba, de a 25.
+// El mazo: agrupado por proyecto, heat descendente adentro, filtro arriba, **entero**.
 //
 // 🔑 **La regla sigue siendo la misma: una tarjeta calificada NO se va del mazo hasta que se
 // cambia de filtro o se recarga.** Lo que cambió es quién la sostiene. Antes había un congelado
@@ -31,28 +30,26 @@ import { Tarjeta } from "./tarjeta";
 // (plan-cockpit §D6.4).
 //
 // Desde que el filtro se aplica **en la query**, ese congelado quedó sin trabajo y se borró:
-// `cargados` solo cambia cuando se le pide algo al server (cambiar de filtro, o cargar más), y
-// calificar no le pide nada. O sea que la regla dejó de depender de que alguien mantenga un `Set`
-// sincronizado y pasó a ser **estructural**. Si algún día el filtro volviera al cliente, el
-// congelado tiene que volver con él.
+// `cargados` solo cambia cuando se le pide algo al server (cambiar de filtro), y calificar no le
+// pide nada. O sea que la regla dejó de depender de que alguien mantenga un `Set` sincronizado y
+// pasó a ser **estructural**. Si algún día el filtro volviera al cliente, el congelado tiene que
+// volver con él.
 //
-// Los contadores de los chips, en cambio, SÍ son vivos, y ahora sobre la tabla entera: salen de
-// los cuatro `head` counts del server más los cambios de esta sesión (`ajustarCuentas`).
+// Los contadores de los chips salen igual de los cuatro `head` counts del server más los cambios
+// de esta sesión (`ajustarCuentas`), y no de `cargados`: el chip de "🔥" tiene que decir cuántos
+// hay **en la tabla**, no cuántos hay en el filtro que está abierto.
 
 export function Mazo({
   inicial,
-  hayMasInicial,
   cuentas,
   descartesPendientes,
 }: {
   inicial: CandidatoFeed[];
-  hayMasInicial: boolean;
   cuentas: Record<Filtro, number>;
   descartesPendientes: number;
 }) {
   const cockpit = usarCockpit();
   const [cargados, setCargados] = useState(inicial);
-  const [hayMas, setHayMas] = useState(hayMasInicial);
   const [filtro, setFiltro] = useState<Filtro>(FILTRO_INICIAL);
   const [puestas, setPuestas] = useState<Record<string, Calificacion>>({});
   // La calificación que la fila tenía EN EL SERVER la primera vez que se la tocó en esta sesión.
@@ -86,43 +83,25 @@ export function Mazo({
   }
 
   /**
-   * Cambiar de filtro es pedirle al server la primera página de ESE filtro. No se puede resolver
-   * en el cliente: lo cargado son 25 de N, así que filtrar en memoria mostraría "los 🔥 de estas
-   * 25" en vez de "los primeros 25 🔥".
+   * Cambiar de filtro es pedirle al server el mazo de ESE filtro. Sigue yendo al server aunque ya
+   * no haya paginación, y es a propósito: es lo que mantiene el congelado sin escribirlo (ver la
+   * nota de arriba). Filtrar `cargados` en memoria haría desaparecer del mazo la tarjeta que
+   * alguien acaba de calificar.
    *
-   * El chip se marca recién cuando la página llegó. Si se marcara antes y la carga fallara, la
+   * El chip se marca recién cuando las filas llegaron. Si se marcara antes y la carga fallara, la
    * pantalla quedaría diciendo que el filtro es uno mientras muestra las tarjetas de otro.
    */
   function cambiarFiltro(nuevo: Filtro) {
     if (nuevo === filtro || cargando) return;
     setErrorLista(null);
     startCargar(async () => {
-      const r = await cargarMasFeed(nuevo, null);
+      const r = await leerMazo(cockpit, nuevo);
       if (!r.ok) {
         setErrorLista(r.mensaje);
         return;
       }
       setFiltro(nuevo);
       setCargados(r.candidatos);
-      setHayMas(r.hayMas);
-    });
-  }
-
-  /**
-   * La página siguiente, por cursor y no por offset: con el filtro "Sin calificar" activo, cada
-   * tarjeta que alguien califica sale del conjunto filtrado, y un `offset 25` se saltearía tantos
-   * candidatos como calificaciones se hicieron — sin que nadie los vea nunca (ver `despuesDe`).
-   */
-  function mas() {
-    setErrorLista(null);
-    startCargar(async () => {
-      const r = await cargarMasFeed(filtro, cursorDe(cargados));
-      if (!r.ok) {
-        setErrorLista(r.mensaje);
-        return;
-      }
-      setCargados((c) => [...c, ...r.candidatos]);
-      setHayMas(r.hayMas);
     });
   }
 
@@ -136,7 +115,7 @@ export function Mazo({
     setEnviando((e) => new Set(e).add(c.id));
 
     startTransition(async () => {
-      const r = await calificarCandidato(c.id, calificacion);
+      const r = await calificarCandidato(cockpit, c.id, calificacion);
       setEnviando((e) => {
         const s = new Set(e);
         s.delete(c.id);
@@ -157,7 +136,6 @@ export function Mazo({
   const grupos = agrupar(cargados);
   const abierto = cargados.find((c) => c.id === abiertoId) ?? null;
   const pendientes = ajustadas["sin-calificar"];
-  const total = ajustadas[filtro];
 
   return (
     <div className="space-y-6">
@@ -238,17 +216,13 @@ export function Mazo({
 
       {errorLista && <p className="text-sm text-destructive">{errorLista}</p>}
 
+      {/* El pie ya no ofrece cargar más: están todas. Sigue diciendo el número porque es lo que
+          contesta "¿cuánto me falta?" de un vistazo, y porque `cargados` y el chip pueden diferir
+          por un instante mientras una calificación viaja. */}
       {cargados.length > 0 && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-sm text-muted-foreground">
-            Mostrando {cargados.length} de {total}.
-          </p>
-          {hayMas && (
-            <Button variant="outline" onClick={mas} disabled={cargando}>
-              {cargando ? "Cargando…" : "Cargar más"}
-            </Button>
-          )}
-        </div>
+        <p className="text-center text-sm text-muted-foreground">
+          {cargados.length} {cargados.length === 1 ? "tarjeta" : "tarjetas"}.
+        </p>
       )}
 
       {/* El encadenamiento con los descartes. Va SIEMPRE al pie del mazo, no solo al terminar

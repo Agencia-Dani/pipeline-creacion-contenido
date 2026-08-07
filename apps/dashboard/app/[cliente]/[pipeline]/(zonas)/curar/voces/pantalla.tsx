@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { pausadoPorSuVoz } from "@/domain/proyectos";
+import { usarCockpit } from "../../usar-cockpit";
 import { guardarProyecto, guardarVoz } from "./actions";
 import {
   AltaProyecto,
@@ -49,6 +50,7 @@ export function Pantalla({
   resultadosPorCuenta: number;
   sugeridosPendientes: number;
 }) {
+  const cockpit = usarCockpit();
   const [abierto, setAbierto] = useState<Abierto>(null);
   const cerrar = () => setAbierto(null);
 
@@ -121,7 +123,7 @@ export function Pantalla({
                 <Interruptor
                   etiqueta="Activa"
                   puesto={voz.activo}
-                  onCambiar={(activo) => guardarVoz(voz.id, { ...formDeVoz(voz), activo })}
+                  onCambiar={(activo) => guardarVoz(cockpit, voz.id, { ...formDeVoz(voz), activo })}
                 />
                 <Button variant="ghost" size="sm" onClick={() => setAbierto({ tipo: "voz", id: voz.id })}>
                   Ver detalle
@@ -221,6 +223,7 @@ function FilaProyecto({
   pausadoPorSuVoz: boolean;
   onAbrir: () => void;
 }) {
+  const cockpit = usarCockpit();
   return (
     <div
       className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b py-2 last:border-b-0 ${
@@ -252,7 +255,7 @@ function FilaProyecto({
       <Interruptor
         etiqueta="Activo"
         puesto={proyecto.activo}
-        onCambiar={(activo) => guardarProyecto(proyecto.id, { ...formDeProyecto(proyecto), activo })}
+        onCambiar={(activo) => guardarProyecto(cockpit, proyecto.id, { ...formDeProyecto(proyecto), activo })}
       />
     </div>
   );

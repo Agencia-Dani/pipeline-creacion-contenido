@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { parsearEnlaces } from "@/domain/enlace";
 import { pegarEnlaces, type ResultadoPegar } from "./actions";
+import { usarCockpit } from "../usar-cockpit";
 
 // El preview corre el MISMO parseo que el servidor (dominio puro, sirve en los dos lados): el
 // equipo ve qué se entendió antes de gastar un peso. Transcribir cuesta (~USD 0.014 por link entre
 // Supadata y Haiku), así que se confirma explícito, igual que ▶ Correr ahora (plan-cockpit §3.3).
 export function PegarEnlaces() {
+  const cockpit = usarCockpit();
   const [texto, setTexto] = useState("");
   const [resultado, setResultado] = useState<ResultadoPegar | null>(null);
   const [enviando, startTransition] = useTransition();
@@ -19,7 +21,7 @@ export function PegarEnlaces() {
 
   const enviar = () => {
     startTransition(async () => {
-      const r = await pegarEnlaces(texto);
+      const r = await pegarEnlaces(cockpit, texto);
       setResultado(r);
       if (r.ok) setTexto("");
     });

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { buscarAhora, type ResultadoDisparo } from "@/app/[cliente]/[pipeline]/(zonas)/operar/actions";
+import { usarCockpit } from "@/app/[cliente]/[pipeline]/(zonas)/usar-cockpit";
 
 // Buscar cuesta créditos (Apify × 3 actores + el vetting con Haiku), así que el click pide
 // confirmación explícita — mismo criterio que el ▶ del motor (plan-cockpit §3.3: lo que no se
@@ -17,6 +18,7 @@ import { buscarAhora, type ResultadoDisparo } from "@/app/[cliente]/[pipeline]/(
 // conteo de pendientes entra por prop y no lo lee él — así la página que lo monta tiene que
 // decidir explícitamente qué mostrarle, y un botón huérfano no compila en silencio.)
 export function BotonBuscar({ pendientes }: { pendientes: number }) {
+  const cockpit = usarCockpit();
   const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoDisparo | null>(null);
   const [enviando, startTransition] = useTransition();
@@ -24,7 +26,7 @@ export function BotonBuscar({ pendientes }: { pendientes: number }) {
   const disparar = () => {
     setConfirmando(false);
     startTransition(async () => {
-      setResultado(await buscarAhora());
+      setResultado(await buscarAhora(cockpit));
     });
   };
 

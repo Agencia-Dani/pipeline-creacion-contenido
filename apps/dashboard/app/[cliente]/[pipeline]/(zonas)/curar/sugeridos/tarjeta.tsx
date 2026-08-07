@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { usarCockpit } from "../../usar-cockpit";
 import { aprobar, descartar, type Resultado } from "./actions";
 
 // Una propuesta = una fila compacta. Antes cada una desplegaba razón + bio + semillas + una
@@ -40,6 +41,7 @@ export function Tarjeta({
   propuesta: PropuestaVista;
   proyectos: ProyectoOpcion[];
 }) {
+  const cockpit = usarCockpit();
   const [elegidos, setElegidos] = useState(propuesta.proyectoIdsSugeridos);
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [abierto, setAbierto] = useState(false);
@@ -70,7 +72,7 @@ export function Tarjeta({
       <Button
         size="sm"
         disabled={enviando || elegidos.length === 0}
-        onClick={() => decidir(() => aprobar(propuesta.id, elegidos))}
+        onClick={() => decidir(() => aprobar(cockpit, propuesta.id, elegidos))}
       >
         {enviando ? "Guardando…" : "Aprobar"}
       </Button>
@@ -78,7 +80,7 @@ export function Tarjeta({
         size="sm"
         variant="ghost"
         disabled={enviando}
-        onClick={() => decidir(() => descartar(propuesta.id))}
+        onClick={() => decidir(() => descartar(cockpit, propuesta.id))}
       >
         Descartar
       </Button>

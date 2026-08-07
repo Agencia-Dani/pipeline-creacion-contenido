@@ -1,6 +1,6 @@
 "use server";
 
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
 import {
   esFuente,
@@ -38,10 +38,10 @@ export type Resultado = { ok: boolean; mensaje: string };
  * pregunta que falta es *"¿es esta instancia de este pipeline?"*, y solo la puede contestar el
  * registro. Es la misma disciplina de `exigirTenant`: la UI esconde, el servidor impide.
  */
-async function exigirCockpitLinkedin(): Promise<
+async function exigirCockpitLinkedin(enRuta: CockpitEnRuta): Promise<
   { ok: true; usuario: { id: string }; ctx: TenantContext; cockpit: Instancia } | { ok: false; mensaje: string }
 > {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
   if (cockpit.workflowId !== "linkedin") {
     return { ok: false, mensaje: "Este cockpit no es de LinkedIn." };
   }
@@ -87,8 +87,11 @@ async function aDatos(
   };
 }
 
-export async function crearLinkedin(form: FormReferenteLinkedin): Promise<Resultado> {
-  const sesion = await exigirCockpitLinkedin();
+export async function crearLinkedin(
+  enRuta: CockpitEnRuta,
+  form: FormReferenteLinkedin,
+): Promise<Resultado> {
+  const sesion = await exigirCockpitLinkedin(enRuta);
   if (!sesion.ok) return sesion;
   const { usuario, ctx, cockpit } = sesion;
 
@@ -109,8 +112,12 @@ export async function crearLinkedin(form: FormReferenteLinkedin): Promise<Result
   return { ok: true, mensaje: "Agregado, y apagado. Prendelo cuando lo hayas revisado." };
 }
 
-export async function guardarLinkedin(id: string, form: FormReferenteLinkedin): Promise<Resultado> {
-  const sesion = await exigirCockpitLinkedin();
+export async function guardarLinkedin(
+  enRuta: CockpitEnRuta,
+  id: string,
+  form: FormReferenteLinkedin,
+): Promise<Resultado> {
+  const sesion = await exigirCockpitLinkedin(enRuta);
   if (!sesion.ok) return sesion;
   const { usuario, ctx, cockpit } = sesion;
 
@@ -146,8 +153,12 @@ export async function guardarLinkedin(id: string, form: FormReferenteLinkedin): 
 }
 
 /** El interruptor. Es la acción que la lista existe para provocar, así que va sin confirmación. */
-export async function prenderLinkedin(id: string, activo: boolean): Promise<Resultado> {
-  const sesion = await exigirCockpitLinkedin();
+export async function prenderLinkedin(
+  enRuta: CockpitEnRuta,
+  id: string,
+  activo: boolean,
+): Promise<Resultado> {
+  const sesion = await exigirCockpitLinkedin(enRuta);
   if (!sesion.ok) return sesion;
   const { usuario, ctx, cockpit } = sesion;
 
@@ -163,8 +174,8 @@ export async function prenderLinkedin(id: string, activo: boolean): Promise<Resu
   return { ok: true, mensaje: activo ? "Prendido." : "Apagado." };
 }
 
-export async function borrarLinkedin(id: string): Promise<Resultado> {
-  const sesion = await exigirCockpitLinkedin();
+export async function borrarLinkedin(enRuta: CockpitEnRuta, id: string): Promise<Resultado> {
+  const sesion = await exigirCockpitLinkedin(enRuta);
   if (!sesion.ok) return sesion;
   const { usuario, ctx, cockpit } = sesion;
 

@@ -5,8 +5,6 @@ import {
   ajustarCuentas,
   camposDeCalificacion,
   condicionDeFiltro,
-  cursorDe,
-  despuesDe,
   esCalificacion,
   esFiltro,
   esVeredicto,
@@ -159,49 +157,13 @@ describe("ajustarCuentas — los contadores siguen siendo el avance, no la pági
   });
 });
 
-describe("el keyset del mazo", () => {
-  it("cursorDe toma la última fila en pantalla, o null si no hay ninguna", () => {
-    assert.deepEqual(cursorDe([{ heat: 0.9, id: "a" }, { heat: 0.4, id: "b" }]), {
-      heat: 0.4,
-      id: "b",
-    });
-    assert.equal(cursorDe([]), null);
-  });
-
-  it("pide lo que sigue en (heat desc, id asc): menor heat, o mismo heat con id mayor", () => {
-    const c = despuesDe({ heat: 0.4, id: "b" });
-    assert.ok(c.includes("heat_score.lt.0.4"));
-    assert.ok(c.includes("and(heat_score.eq.0.4,id.gt.b)"));
-  });
-
-  it("🩸 los nulos de heat quedan alcanzables: ordenan últimos, así que van SIEMPRE adelante", () => {
-    // Si faltara esta condición, la paginación cortaría antes de tiempo y sin error el día que
-    // aparezca un candidato con heat null (hoy: 0 de 165 en prod, pero la columna es nullable).
-    assert.ok(despuesDe({ heat: 0.4, id: "b" }).includes("heat_score.is.null"));
-  });
-
-  it("desde la cola de los nulos solo quedan nulos con id mayor", () => {
-    const c = despuesDe({ heat: null, id: "b" });
-    assert.equal(c, "and(heat_score.is.null,id.gt.b)");
-    // Y nada de `lt`: contra un null no hay comparación que devuelva true.
-    assert.ok(!c.includes("lt"));
-  });
-
-  it("un candidato calificado no corre el cursor de los que vienen atrás", () => {
-    // La razón de ser del keyset: con `offset`, calificar 3 tarjetas del filtro "sin calificar"
-    // hace que la página siguiente se saltee 3 candidatos que nadie vio. El cursor apunta a una
-    // fila concreta, así que sacar filas de adelante no lo mueve.
-    const pagina = [{ heat: 0.9, id: "a" }, { heat: 0.7, id: "b" }, { heat: 0.5, id: "c" }];
-    const antes = despuesDe(cursorDe(pagina)!);
-    const despues = despuesDe(cursorDe(pagina)!);
-    assert.equal(antes, despues);
-    assert.ok(antes.includes("0.5"));
-  });
-});
-
-// `contarPorFiltro` se borró con la paginación: contaba sobre la lista cargada, que ahora es una
-// página. Su invariante —el 🔥 se cuenta dos veces, en `fuego` y en `aprobados`— no se perdió:
-// lo sostienen `pasaFiltro` y el primer test de `ajustarCuentas`.
+// 🗑️ Acá vivían los 5 tests del keyset (`cursorDe`/`despuesDe`), borrados el 2026-08-06 con la
+// paginación: el mazo trae todo de una (ver `leerMazo`). No se pierde ningún invariante vivo —
+// probaban una función que ya no existe.
+//
+// `contarPorFiltro` se había borrado antes, por lo contrario: contaba sobre la lista cargada
+// cuando esa lista era una página. Su invariante —el 🔥 se cuenta dos veces, en `fuego` y en
+// `aprobados`— sí sigue vivo, y lo sostienen `pasaFiltro` y el primer test de `ajustarCuentas`.
 
 describe("agrupar", () => {
   it("agrupa por proyecto y ordena por heat descendente adentro", () => {

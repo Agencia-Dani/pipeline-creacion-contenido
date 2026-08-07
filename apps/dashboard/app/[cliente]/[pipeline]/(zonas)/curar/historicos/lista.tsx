@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { fecha } from "@/lib/fechas";
 import type { Historico } from "@/lib/historicos";
 import { miles } from "@/lib/utils";
+import { usarCockpit } from "../../usar-cockpit";
 import { cargarMas, exportarCsv } from "./actions";
 
 // Todo lo aprobado, de todas las semanas, de a 25. Sin miniatura: el thumbnail era un
@@ -27,6 +28,7 @@ export function Lista({
   const [filas, setFilas] = useState(inicial);
   const [hayMas, setHayMas] = useState(hayMasInicial);
   const [pagina, setPagina] = useState(0);
+  const cockpit = usarCockpit();
   const [error, setError] = useState<string | null>(null);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [cargando, startTransition] = useTransition();
@@ -38,7 +40,7 @@ export function Lista({
   function bajar() {
     setError(null);
     startBajar(async () => {
-      const r = await exportarCsv();
+      const r = await exportarCsv(cockpit);
       if (!r.ok) {
         setError(r.mensaje);
         return;
@@ -61,7 +63,7 @@ export function Lista({
   function mas() {
     setError(null);
     startTransition(async () => {
-      const r = await cargarMas(pagina + 1);
+      const r = await cargarMas(cockpit, pagina + 1);
       if (!r.ok) {
         setError(r.mensaje);
         return;

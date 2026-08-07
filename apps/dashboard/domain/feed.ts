@@ -260,48 +260,13 @@ export function agrupar<T extends { id: string; proyecto: string; heat: number |
     });
 }
 
-// ─────────────────────────── Paginar el mazo ───────────────────────────
-//
-// 🩸 Por qué keyset y no `offset`, que es lo que hace `/curar/historicos`: **acá las filas se
-// mueven mientras se pagina.** Con el filtro "Sin calificar" activo, cada tarjeta que alguien
-// califica sale del conjunto filtrado; si la página 2 fuera `offset 25`, esas N filas ya no están
-// adelante y el offset se salta N candidatos **que nadie vio nunca**. En el histórico no pasa
-// porque ahí no se edita nada (es `outputs`, ya archivado).
-//
-// El cursor es `(heat, id)`, que es exactamente el orden estable que `agrupar` ya documenta —
-// heat descendente, empates por id. "Traeme lo que va después de este" no se corre cuando una
-// fila desaparece del filtro.
-
-export type Cursor = { heat: number | null; id: string };
-
-/** El cursor para pedir la página siguiente: la última fila de la que ya está en pantalla. */
-export function cursorDe(candidatos: readonly { heat: number | null; id: string }[]): Cursor | null {
-  const ultimo = candidatos.at(-1);
-  return ultimo ? { heat: ultimo.heat, id: ultimo.id } : null;
-}
-
-/**
- * La condición PostgREST de "todo lo que va DESPUÉS de `cursor`" en `(heat desc, id asc)`, para
- * pasarle a `.or()`.
- *
- * ⚠️ Los `null` de `heat_score` van **últimos** (la query ordena con `nullsFirst: false`, y el
- * dominio hace lo mismo con `heat ?? 0` al agrupar). Hoy no hay ninguno en prod —medido: 0 de
- * 165— pero la columna es nullable, así que si no estuvieran contemplados el día que aparezca
- * uno la paginación cortaría antes de tiempo **sin error**, que es el modo de falla que este
- * repo persigue. De ahí las dos ramas.
- */
-export function despuesDe(cursor: Cursor): string {
-  if (cursor.heat === null) {
-    // Ya estamos en la cola de los nulos: solo quedan nulos con id mayor.
-    return `and(heat_score.is.null,id.gt.${cursor.id})`;
-  }
-  return [
-    `heat_score.lt.${cursor.heat}`,
-    `and(heat_score.eq.${cursor.heat},id.gt.${cursor.id})`,
-    // Los nulos ordenan después de cualquier número, así que siempre están "más adelante".
-    "heat_score.is.null",
-  ].join(",");
-}
+// 🗑️ **Acá vivía el cursor keyset del mazo** (`Cursor`, `cursorDe`, `despuesDe`), borrado el
+// 2026-08-06 junto con el botón de "Cargar más": el feed trae todo de una. La decisión y el techo
+// medido están en `leerMazo`. Si alguna vez vuelve la paginación, tiene que volver **keyset y no
+// `offset`**: con "Sin calificar" activo cada tarjeta que alguien califica sale del conjunto
+// filtrado, así que un `offset 25` se saltearía tantos candidatos como calificaciones se hicieron,
+// sin que nadie los vea nunca. (`/curar/historicos` sí puede usar `offset` porque ahí no se edita
+// nada: es `outputs`, ya archivado.)
 
 // ─────────────────────────── Auditar un Descarte del gate ───────────────────────────
 //

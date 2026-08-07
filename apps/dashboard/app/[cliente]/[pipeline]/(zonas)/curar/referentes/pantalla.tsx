@@ -248,6 +248,7 @@ function Fila({
 
 /** Rastrear guarda al toque: es la acción frecuente y no merece un botón intermedio. */
 function Interruptor({ referente }: { referente: ReferenteFila }) {
+  const cockpit = usarCockpit();
   const [optimista, setOptimista] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enviando, startTransition] = useTransition();
@@ -263,7 +264,7 @@ function Interruptor({ referente }: { referente: ReferenteFila }) {
           setOptimista(activo);
           setError(null);
           startTransition(async () => {
-            const r = await guardar(referente.id, { ...formDe(referente), activo });
+            const r = await guardar(cockpit, referente.id, { ...formDe(referente), activo });
             if (!r.ok) {
               setOptimista(null);
               setError(r.mensaje);
@@ -292,6 +293,7 @@ function Formulario({
   proyectos: ProyectoOpcion[];
   onListo: () => void;
 }) {
+  const cockpit = usarCockpit();
   const vacio: FormReferente = {
     handle: "",
     plataforma: "instagram",
@@ -324,7 +326,7 @@ function Formulario({
 
   const enviar = () =>
     startTransition(async () => {
-      const r = referente ? await guardar(referente.id, form) : await crear(form);
+      const r = referente ? await guardar(cockpit, referente.id, form) : await crear(cockpit, form);
       setResultado(r);
       if (r.ok) onListo();
     });
@@ -417,7 +419,7 @@ function Formulario({
               etiqueta="Borrar la cuenta"
               advertencia="Sale del banco; lo que ya trajo se queda. No se puede deshacer."
               deshabilitado={enviando}
-              onBorrar={() => borrar(referente.id)}
+              onBorrar={() => borrar(cockpit, referente.id)}
               onResultado={(r) => {
                 setResultado(r);
                 if (r.ok) onListo();

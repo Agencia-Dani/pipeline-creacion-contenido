@@ -1,6 +1,6 @@
 "use server";
 
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
 import { esPlataforma, validarReferente } from "@/domain/referentes";
 import { exigirTenant } from "@/lib/auth";
@@ -20,8 +20,20 @@ export type Resultado = { ok: boolean; mensaje: string };
 // banco" — molesto, pero nadie pierde una cuenta. Al revés, un referente aprobado se perdería
 // sin dejar rastro.
 
-export async function aprobar(id: string, proyectoIds: string[]): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+// 🩸 **Por qué estas acciones reciben `enRuta`** (2026-08-06). Una server action no recibe los
+// `params` de la ruta, así que llamaban `exigirTenant(zona)` a secas y el cockpit se resolvía por
+// el default de `resolverContexto`: *el primero que alcance*. Con una sola instancia activa eso
+// acertaba siempre; desde que entraron las 3 de LinkedIn (03/08) el primero pasó a ser
+// `30x/linkedin`, y para todo `es_dueno` cada acción escribía en el tenant equivocado, sin error.
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles. El porqué largo está en `lib/auth.ts`.
+
+export async function aprobar(
+  enRuta: CockpitEnRuta,
+  id: string,
+  proyectoIds: string[],
+): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   let sugerido;
   try {
@@ -73,8 +85,8 @@ export async function aprobar(id: string, proyectoIds: string[]): Promise<Result
   return { ok: true, mensaje: "Aprobada. Empieza a traer videos en la próxima corrida." };
 }
 
-export async function descartar(id: string): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function descartar(enRuta: CockpitEnRuta, id: string): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   try {
     await marcarResuelto(ctx, id, "descartado");

@@ -1,7 +1,6 @@
 "use server";
 
-import { z } from "zod";
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
 import {
   esCalificacion,
@@ -16,6 +15,18 @@ import { registrarEvento } from "@/lib/eventos";
 
 export type Resultado = { ok: boolean; mensaje: string };
 
+// 🩸 **Por qué todas estas acciones reciben `cockpit`** (2026-08-06). Una server action no recibe
+// los `params` de la ruta, así que hasta hoy llamaban `exigirTenant("curar")` a secas y el cockpit
+// se resolvía por el default de `resolverContexto`: *el primero que alcance*. Con `retia/reels`
+// como única instancia activa eso acertaba siempre; desde que entraron las 3 de LinkedIn (03/08)
+// el primero pasó a ser `30x/linkedin`, y para todo `es_dueno` **el feed de Retia escribía en el
+// tenant de 30X**. Calificar dejó de funcionar sin decir una palabra: 175 candidatos, 0
+// calificados, 0 eventos `candidatos.calificar` en 3 días.
+//
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles, así que pedir uno ajeno rebota a `/`.
+// El porqué largo está en `lib/auth.ts`.
+
 // Calificar un candidato. Escribe en Postgres, que desde D7 es el dueño de la tabla
 // (D6 cambia la superficie, no la propiedad).
 //
@@ -25,8 +36,12 @@ export type Resultado = { ok: boolean; mensaje: string };
 // algo irrecuperable desde la pantalla. El estado visible lo lleva el cliente; la verdad ya
 // está escrita.
 
-export async function calificarCandidato(id: string, calificacion: string): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function calificarCandidato(
+  enRuta: CockpitEnRuta,
+  id: string,
+  calificacion: string,
+): Promise<Resultado> {
+  const { usuario, ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   if (!esCalificacion(calificacion)) {
     return { ok: false, mensaje: "Esa calificación no existe." };
@@ -51,8 +66,12 @@ export async function calificarCandidato(id: string, calificacion: string): Prom
  * Las notas del equipo: la válvula de escape de ADR-034 para lo que el emoji ya no distingue
  * ("buen video, pero no ahora"). Sobreviven al archivado en `outputs.metadata`.
  */
-export async function guardarNotasCandidato(id: string, notas: string): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function guardarNotasCandidato(
+  enRuta: CockpitEnRuta,
+  id: string,
+  notas: string,
+): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   const limpias = notas.trim();
   if (limpias.length > 2000) {
@@ -72,40 +91,38 @@ export async function guardarNotasCandidato(id: string, notas: string): Promise<
 }
 
 /**
- * 🔒 El cursor da la vuelta por el browser, así que entra como **input no confiable** y termina
- * dentro de la condición `or()` que arma `despuesDe`. Validarlo acá no es ceremonia: sin el
- * `uuid()`, un `id` con una coma corta la condición y le agrega cláusulas a la query.
+ * El mazo entero de un filtro. **No pagina**, y eso es una decisión de producto de Mani (06/08):
+ * el feed se recorre completo en una sentada, así que un botón de "cargar más" solo agrega un
+ * click cada 25 tarjetas para llegar al mismo lugar.
  *
- * Lo que NO puede hacer, ni siquiera roto: salirse del tenant. El `.eq()` de `scoped` va como AND
- * al tope de la query y ningún `or` puede aflojarlo (ADR-047 Capa 1), y desde el flip las 17
- * policies lo evalúan otra vez contra la sesión (Capa 2). Esto cierra el escalón de arriba.
+ * Lo que se borró con la paginación: el cursor keyset (`Cursor`/`despuesDe`/`cursorDe`), su
+ * validación zod, `POR_PAGINA` y el `hayMas`. Nada de eso tenía otro consumidor.
+ *
+ * 📏 El techo, medido contra prod y no supuesto: la respuesta entera son **175 filas = 103,7 KB**
+ * (06/08), y PostgREST las devuelve todas — no hay `db-max-rows` puesto, se verificó pidiéndolas
+ * sin `limit`. Con un archivado que barre cada domingo el estado estacionario es una semana de
+ * supply (~145–175). El corte que hace que esto sea barato ya estaba hecho y es el que importa:
+ * `CandidatoFeed` no lleva `script` ni las dos razones, que eran **240 KB de los 337**. Si algún
+ * día el barrido se apaga o el supply se multiplica, el número a mirar es ese, no el de filas.
+ *
+ * 🔑 **El filtro sigue en la query, y por eso el mazo no necesita congelado.** `cargados` solo
+ * cambia cuando se le pide algo al server —o sea al cambiar de filtro— y calificar no le pide
+ * nada. Si el filtro volviera al cliente, una tarjeta recién calificada desaparecería de abajo del
+ * cursor y habría que reponer el congelado de plan-cockpit §D6.4.
  */
-const cursorSchema = z.object({
-  heat: z.number().finite().nullable(),
-  id: z.string().uuid(),
-});
-
-/** Una página más del mazo, con el filtro activo y el cursor de la última tarjeta en pantalla. */
-export async function cargarMasFeed(
+export async function leerMazo(
+  enRuta: CockpitEnRuta,
   filtro: string,
-  cursor: unknown,
-): Promise<
-  { ok: true; candidatos: CandidatoFeed[]; hayMas: boolean } | { ok: false; mensaje: string }
-> {
-  const { ctx } = await exigirTenant("curar");
+): Promise<{ ok: true; candidatos: CandidatoFeed[] } | { ok: false; mensaje: string }> {
+  const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   if (!esFiltro(filtro)) return { ok: false, mensaje: "Ese filtro no existe." };
 
-  // `null` es legítimo: es "dame la primera página", que es lo que pide un cambio de filtro.
-  const validado = cursor === null ? { success: true as const, data: null } : cursorSchema.safeParse(cursor);
-  if (!validado.success) return { ok: false, mensaje: "No se pudo continuar la lista. Recargá la página." };
-
   try {
-    const { candidatos, hayMas } = await leerFeed(ctx, filtro, validado.data);
-    return { ok: true, candidatos, hayMas };
+    return { ok: true, candidatos: await leerFeed(ctx, filtro) };
   } catch (e) {
-    console.error(`[feed] falló cargar más (${filtro}):`, e);
-    return { ok: false, mensaje: "No se pudo cargar más. Probá de nuevo." };
+    console.error(`[feed] falló leer el mazo (${filtro}):`, e);
+    return { ok: false, mensaje: "No se pudo cargar la lista. Probá de nuevo." };
   }
 }
 
@@ -117,9 +134,10 @@ export async function cargarMasFeed(
  * abrir ya era el gesto excepcional: *"abrí la tarjeta solo si el título no te alcanza"*.
  */
 export async function textosDeCandidato(
+  enRuta: CockpitEnRuta,
   id: string,
 ): Promise<{ ok: true; textos: TextosCandidato } | { ok: false; mensaje: string }> {
-  const { ctx } = await exigirTenant("curar");
+  const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   try {
     return { ok: true, textos: await leerTextos(ctx, id) };

@@ -2,12 +2,10 @@ import { z } from "zod";
 import {
   camposDeCalificacion,
   condicionDeFiltro,
-  despuesDe,
   esCalificacion,
   FILTROS,
   type Calificacion,
   type CandidatoFeed,
-  type Cursor,
   type Estado,
   type Filtro,
   type TextosCandidato,
@@ -63,67 +61,49 @@ const COLUMNAS =
   "calificacion, estado, proyectos(nombre), voces(nombre)";
 
 /**
- * Cuántas tarjetas trae una página.
+ * El feed **entero** de ESTE cockpit para un filtro, con el proyecto ya resuelto a nombre por la FK.
  *
- * 25 como el histórico, pero por otro motivo: allá es "nadie lee 500 tarjetas", acá es que el
- * mazo se recorre entero y lo que importa es que la primera pantalla llegue rápido. Con la grilla
- * de hasta 5 columnas, 25 son ~5 filas: más de un scroll de trabajo antes de tener que pedir más.
- */
-export const POR_PAGINA = 25;
-
-/**
- * Una página del feed de ESTE cockpit, con el proyecto ya resuelto a nombre por la FK.
+ * 🔑 **El filtro va en la query, no en el cliente**, y sigue así aunque ya no haya paginación: es
+ * lo que deja que `cargados` cambie solo cuando alguien le pide algo al server, y por lo tanto que
+ * una tarjeta recién calificada **no se mueva de su lugar** (plan-cockpit §D6.4) sin necesidad de
+ * un congelado que alguien tenga que mantener sincronizado.
  *
- * 🔑 **El filtro va en la query, no en el cliente.** Con paginación, filtrar en memoria mostraría
- * "los sin calificar *de estas 25*" en vez de "las 25 primeras sin calificar" — que es otra cosa,
- * y que con el mazo entero por calificar (165 de 165 al 06/08) se vería como una pantalla medio
- * vacía sin explicación.
+ * No pagina desde el 2026-08-06: el porqué, y el techo medido, están en `leerMazo`.
  *
- * El orden es el mismo que `agrupar` aplica adentro de cada grupo —heat desc, empates por id— y
- * eso no es una coincidencia: es lo que deja que el cursor de `despuesDe` sea estable.
+ * El orden —heat desc, empates por id— es el mismo que `agrupar` aplica adentro de cada grupo.
  */
 export async function leerFeed(
   ctx: TenantContext,
   filtro: Filtro,
-  cursor: Cursor | null = null,
-): Promise<{ candidatos: CandidatoFeed[]; hayMas: boolean }> {
-  let q = conFiltro((await scoped(ctx)).select("app.candidatos", COLUMNAS), filtro);
-  if (cursor) q = q.or(despuesDe(cursor));
-
-  // Se pide UNA de más para saber si hay página siguiente. Es más barato que un `count` aparte, y
-  // el count real de cada filtro ya lo da `contarFeed` para los chips.
-  const { data, error } = await q
+): Promise<CandidatoFeed[]> {
+  const { data, error } = await conFiltro(
+    (await scoped(ctx)).select("app.candidatos", COLUMNAS),
+    filtro,
+  )
     .order("heat_score", { ascending: false, nullsFirst: false })
-    .order("id", { ascending: true })
-    .limit(POR_PAGINA + 1);
+    .order("id", { ascending: true });
 
   if (error) throw new Error(`Supabase respondió con error leyendo el feed: ${error.message}`);
 
-  const filas = z.array(filaCandidato).parse(data ?? []);
-  const hayMas = filas.length > POR_PAGINA;
-
-  return {
-    hayMas,
-    candidatos: filas.slice(0, POR_PAGINA).map((r) => ({
-      id: r.id,
-      titulo: r.titulo,
-      thumbnail: r.thumbnail_url,
-      proyecto: r.proyectos?.nombre ?? "",
-      voz: r.voces?.nombre ?? null,
-      referente: r.referente,
-      urlReferente: r.url_referente,
-      heat: r.heat_score,
-      relevanciaScore: r.relevancia_score,
-      idioma: r.idioma,
-      views: r.views,
-      likes: r.likes,
-      seguidores: r.seguidores,
-      engagement: r.engagement,
-      viralPorTamano: r.viral_por_tamano,
-      calificacion: esCalificacion(r.calificacion) ? r.calificacion : null,
-      estado: (r.estado as Estado) ?? "nuevo",
-    } satisfies CandidatoFeed)),
-  };
+  return z.array(filaCandidato).parse(data ?? []).map((r) => ({
+    id: r.id,
+    titulo: r.titulo,
+    thumbnail: r.thumbnail_url,
+    proyecto: r.proyectos?.nombre ?? "",
+    voz: r.voces?.nombre ?? null,
+    referente: r.referente,
+    urlReferente: r.url_referente,
+    heat: r.heat_score,
+    relevanciaScore: r.relevancia_score,
+    idioma: r.idioma,
+    views: r.views,
+    likes: r.likes,
+    seguidores: r.seguidores,
+    engagement: r.engagement,
+    viralPorTamano: r.viral_por_tamano,
+    calificacion: esCalificacion(r.calificacion) ? r.calificacion : null,
+    estado: (r.estado as Estado) ?? "nuevo",
+  } satisfies CandidatoFeed));
 }
 
 /** El lado PostgREST de `condicionDeFiltro`, aplicado al builder. */

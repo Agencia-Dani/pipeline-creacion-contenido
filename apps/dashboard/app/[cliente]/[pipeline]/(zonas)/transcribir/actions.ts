@@ -1,6 +1,6 @@
 "use server";
 
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import type { TenantContext } from "@/domain/tenant";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -23,8 +23,19 @@ export type ResultadoPegar = { ok: boolean; mensaje: string };
 // (plan-cockpit §5): un textarea abierto es exactamente el borde que el plan nombra.
 const textoPegado = z.string().trim().min(1).max(20_000);
 
-export async function pegarEnlaces(texto: string): Promise<ResultadoPegar> {
-  const { usuario, ctx, cockpit } = await exigirTenant("transcribir");
+// 🩸 **Por qué estas acciones reciben `enRuta`** (2026-08-06). Una server action no recibe los
+// `params` de la ruta, así que llamaban `exigirTenant(zona)` a secas y el cockpit se resolvía por
+// el default de `resolverContexto`: *el primero que alcance*. Con una sola instancia activa eso
+// acertaba siempre; desde que entraron las 3 de LinkedIn (03/08) el primero pasó a ser
+// `30x/linkedin`, y para todo `es_dueno` cada acción escribía en el tenant equivocado, sin error.
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles. El porqué largo está en `lib/auth.ts`.
+
+export async function pegarEnlaces(
+  enRuta: CockpitEnRuta,
+  texto: string,
+): Promise<ResultadoPegar> {
+  const { usuario, ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
 
   const parseo = textoPegado.safeParse(texto);
   if (!parseo.success) {
@@ -75,8 +86,8 @@ const LOTE = 64;
 
 export type ResultadoProcesar = { procesados: number; quedan: number };
 
-export async function procesarPendientes(): Promise<ResultadoProcesar> {
-  const { ctx, cockpit } = await exigirTenant("transcribir");
+export async function procesarPendientes(enRuta: CockpitEnRuta): Promise<ResultadoProcesar> {
+  const { ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
 
   // Nota: dos personas procesando a la vez pueden agarrar el mismo enlace y pagarlo dos veces
   // (~USD 0.014). No vale un estado 'procesando' para eso: los writes ya son idempotentes.

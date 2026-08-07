@@ -69,12 +69,34 @@ export async function usuarioActual(): Promise<Usuario> {
  * siguen siendo ortogonales —el rol dice QUÉ zona ve, el tenant DE QUIÉN son los datos— pero ahora
  * se contestan juntas porque la primera depende de la segunda.
  *
- * `cliente` y `pipeline` son los segmentos de la URL.
+ * `cliente` y `pipeline` son los segmentos de la URL, y son **obligatorios**.
+ *
+ * 🩸 Fueron opcionales hasta el 2026-08-06, y esa opcionalidad era un bug latente que se activó
+ * solo cuando el sistema dejó de tener un solo cockpit. Sin segmentos, `resolverContexto` cae a
+ * *"el primero que alcance"* — un default sensato para la raíz (`/`), donde de verdad no hay URL
+ * que mirar, y **una adivinanza en cualquier otro lado**. Las ~30 server actions no reciben
+ * `params` (Next no se los pasa), así que todas llamaban sin segmentos y todas se comían el
+ * default.
+ *
+ * Mientras `retia/reels` fue la única instancia activa, adivinar acertaba siempre. El 2026-08-03
+ * entraron las 3 de LinkedIn y `leerInstancias()` ordena por `client_id, slug`, así que el primero
+ * pasó a ser `30x/linkedin` — y desde ese día, para todo `es_dueno`, **cada acción del cockpit de
+ * Retia leyó y escribió en el tenant de 30X**. Sin error: la tabla existe, la query es válida,
+ * devuelve cero filas. Nadie pudo calificar un candidato en 3 días y la pantalla no dijo nada.
+ *
+ * Por eso ahora son obligatorios y no un default fail-closed: **un parámetro que falta tiene que
+ * ser un error de compilación**, no una excepción en runtime que aparece cuando alguien hace
+ * click. Es la misma regla que `scoped()` ya aplica a las queries (ADR-047 Capa 1), un escalón más
+ * arriba: si no se puede nombrar el cockpit, no se puede construir la guardia.
+ *
+ * El caller siempre lo tiene: las páginas por `params`, las acciones por `usarCockpit()` — que lo
+ * lee de la URL, o sea de la misma fuente. Y no es un permiso: `resolverContexto` lo valida contra
+ * `instanciasVisibles`, así que un cockpit ajeno cae en el `redirect("/")` de abajo.
  */
 export async function exigirTenant(
   zona: Zona,
-  cliente?: string,
-  pipeline?: string,
+  cliente: string,
+  pipeline: string,
 ): Promise<{ usuario: Usuario; ctx: TenantContext; cockpit: Instancia; rol: Rol }> {
   const usuario = await usuarioActual();
   const sesion = await resolverContexto(usuario, cliente, pipeline);
@@ -122,8 +144,8 @@ export async function exigirTenant(
  */
 export async function exigirPantallaDeCurar(
   pantalla: PantallaCurar,
-  cliente?: string,
-  pipeline?: string,
+  cliente: string,
+  pipeline: string,
 ): Promise<{ usuario: Usuario; ctx: TenantContext; cockpit: Instancia; rol: Rol }> {
   const sesion = await exigirTenant("curar", cliente, pipeline);
 
@@ -149,8 +171,8 @@ export async function exigirPantallaDeCurar(
  */
 export async function exigirPantallaDeAjustes(
   pantalla: PantallaAjustes,
-  cliente?: string,
-  pipeline?: string,
+  cliente: string,
+  pipeline: string,
 ): Promise<{ usuario: Usuario; ctx: TenantContext; cockpit: Instancia; rol: Rol }> {
   const sesion = await exigirTenant("ajustes", cliente, pipeline);
   const aIndice = rutaDe(comoRuta(sesion.cockpit), "ajustes");

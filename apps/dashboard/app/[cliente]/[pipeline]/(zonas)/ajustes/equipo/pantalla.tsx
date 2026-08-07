@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Rol } from "@/domain/roles";
 import type { Miembro } from "@/lib/equipo";
+import { usarCockpit } from "../../usar-cockpit";
 import { cambiarRol, invitar, quitarAcceso, type Resultado } from "./actions";
 
 // La pantalla de equipo. **Todo lo que decide acá es cosmética**: el `<select>` no ofrece `dev` a
@@ -61,6 +62,7 @@ export function Equipo({
 }
 
 function Invitar({ otorgables }: { otorgables: readonly Rol[] }) {
+  const cockpit = usarCockpit();
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [rol, setRol] = useState<Rol>(otorgables[0] ?? "operador");
@@ -69,7 +71,7 @@ function Invitar({ otorgables }: { otorgables: readonly Rol[] }) {
 
   const enviar = () => {
     startTransition(async () => {
-      const r = await invitar({ nombre, email, rol });
+      const r = await invitar(cockpit, { nombre, email, rol });
       setResultado(r);
       if (r.ok) {
         setNombre("");
@@ -153,6 +155,7 @@ function Fila({
   otorgables: readonly Rol[];
   soyYo: boolean;
 }) {
+  const cockpit = usarCockpit();
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, startTransition] = useTransition();
@@ -188,7 +191,7 @@ function Fila({
         {puedoTocar && !soyYo ? (
           <select
             value={miembro.rol}
-            onChange={(e) => accion(() => cambiarRol(miembro.usuarioId, e.target.value))}
+            onChange={(e) => accion(() => cambiarRol(cockpit, miembro.usuarioId, e.target.value))}
             disabled={enviando}
             className="h-8 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-xs"
           >
@@ -210,7 +213,7 @@ function Fila({
                 variant="destructive"
                 size="sm"
                 disabled={enviando}
-                onClick={() => accion(() => quitarAcceso(miembro.usuarioId))}
+                onClick={() => accion(() => quitarAcceso(cockpit, miembro.usuarioId))}
               >
                 Confirmar
               </Button>

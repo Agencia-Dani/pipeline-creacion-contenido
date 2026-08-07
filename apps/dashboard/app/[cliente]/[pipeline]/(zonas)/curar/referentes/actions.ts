@@ -1,6 +1,6 @@
 "use server";
 
-import { comoRuta, rutaDe } from "@/domain/rutas";
+import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import type { TenantContext } from "@/domain/tenant";
 import { revalidatePath } from "next/cache";
 import { validarReferente } from "@/domain/referentes";
@@ -33,8 +33,20 @@ async function validar(ctx: TenantContext, form: FormReferente) {
   return validarReferente(form, new Set(proyectos.map((p) => p.id)));
 }
 
-export async function guardar(id: string, form: FormReferente): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+// 🩸 **Por qué estas acciones reciben `enRuta`** (2026-08-06). Una server action no recibe los
+// `params` de la ruta, así que llamaban `exigirTenant(zona)` a secas y el cockpit se resolvía por
+// el default de `resolverContexto`: *el primero que alcance*. Con una sola instancia activa eso
+// acertaba siempre; desde que entraron las 3 de LinkedIn (03/08) el primero pasó a ser
+// `30x/linkedin`, y para todo `es_dueno` cada acción escribía en el tenant equivocado, sin error.
+// El cockpit viaja desde el cliente (`usarCockpit()`, que lo lee de la URL) y **no es un permiso**:
+// `exigirTenant` lo valida contra las instancias visibles. El porqué largo está en `lib/auth.ts`.
+
+export async function guardar(
+  enRuta: CockpitEnRuta,
+  id: string,
+  form: FormReferente,
+): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   const validacion = await validar(ctx, form);
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
@@ -72,8 +84,8 @@ export async function guardar(id: string, form: FormReferente): Promise<Resultad
   return { ok: true, mensaje: "Guardado. Aplica en la próxima corrida." };
 }
 
-export async function crear(form: FormReferente): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function crear(enRuta: CockpitEnRuta, form: FormReferente): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   const validacion = await validar(ctx, form);
   if (!validacion.ok) return { ok: false, mensaje: validacion.error };
@@ -105,8 +117,8 @@ export async function crear(form: FormReferente): Promise<Resultado> {
  * El evento va antes del DELETE y con los proyectos adentro: es lo único que queda de a quién
  * alimentaba, y la fila puente se va con la cuenta.
  */
-export async function borrar(id: string): Promise<Resultado> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar");
+export async function borrar(enRuta: CockpitEnRuta, id: string): Promise<Resultado> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   let referente;
   try {

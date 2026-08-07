@@ -24,6 +24,7 @@ import {
   prenderLinkedin,
   type Resultado,
 } from "./actions-linkedin";
+import { usarCockpit } from "../../usar-cockpit";
 
 // El banco del carril copiable de LinkedIn (ADR-055). Es la primera pantalla del pipeline N+1.
 //
@@ -53,6 +54,7 @@ export function PantallaLinkedin({
   banco: ReferenteLinkedin[];
   proyectos: Proyecto[];
 }) {
+  const cockpit = usarCockpit();
   const [altaAbierta, setAltaAbierta] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
@@ -88,7 +90,7 @@ export function PantallaLinkedin({
           titulo="Nuevo referente"
           original={VACIO}
           proyectos={proyectos}
-          onEnviar={crearLinkedin}
+          onEnviar={(form) => crearLinkedin(cockpit, form)}
           onListo={() => setAltaAbierta(false)}
         />
       )}
@@ -117,9 +119,9 @@ export function PantallaLinkedin({
                     notas: r.notas ?? "",
                   }}
                   proyectos={proyectos}
-                  onEnviar={(form) => guardarLinkedin(r.id, form)}
+                  onEnviar={(form) => guardarLinkedin(cockpit, r.id, form)}
                   onListo={() => setEditandoId(null)}
-                  onBorrar={() => borrarLinkedin(r.id)}
+                  onBorrar={() => borrarLinkedin(cockpit, r.id)}
                 />
               </div>
             ) : (
@@ -175,6 +177,7 @@ function Fila({
  * confirmación y sin recargar: si falla, se revierte y muestra el error en su lugar.
  */
 function Interruptor({ referente }: { referente: ReferenteLinkedin }) {
+  const cockpit = usarCockpit();
   const [optimista, setOptimista] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enviando, startTransition] = useTransition();
@@ -194,7 +197,7 @@ function Interruptor({ referente }: { referente: ReferenteLinkedin }) {
           setOptimista(nuevo);
           setError(null);
           startTransition(async () => {
-            const r = await prenderLinkedin(referente.id, nuevo);
+            const r = await prenderLinkedin(cockpit, referente.id, nuevo);
             if (!r.ok) {
               setOptimista(null);
               setError(r.mensaje);

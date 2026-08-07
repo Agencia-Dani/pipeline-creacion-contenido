@@ -200,6 +200,7 @@ function CampoN({
 // ── El record de una voz ─────────────────────────────────────────────────────
 
 export function FormularioVoz({ voz, onListo }: { voz: VozFila; onListo: () => void }) {
+  const cockpit = usarCockpit();
   const original = formDeVoz(voz);
   const [form, setForm] = useState(original);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -212,7 +213,7 @@ export function FormularioVoz({ voz, onListo }: { voz: VozFila; onListo: () => v
 
   const enviar = () =>
     startTransition(async () => {
-      const r = await guardarVoz(voz.id, form);
+      const r = await guardarVoz(cockpit, voz.id, form);
       setResultado(r);
       if (r.ok) onListo();
     });
@@ -266,7 +267,7 @@ export function FormularioVoz({ voz, onListo }: { voz: VozFila; onListo: () => v
             etiqueta="Borrar la voz"
             advertencia="No se puede deshacer."
             deshabilitado={enviando}
-            onBorrar={() => borrarVoz(voz.id)}
+            onBorrar={() => borrarVoz(cockpit, voz.id)}
             onResultado={(r) => {
               setResultado(r);
               if (r.ok) onListo();
@@ -295,6 +296,7 @@ export function FormularioProyecto({
   resultadosPorCuenta: number;
   sugeridosPendientes: number;
 }) {
+  const cockpit = usarCockpit();
   const original = formDeProyecto(proyecto);
   const [form, setForm] = useState(original);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -309,7 +311,7 @@ export function FormularioProyecto({
 
   const enviar = () =>
     startTransition(async () => {
-      const r = await guardarProyecto(proyecto.id, form);
+      const r = await guardarProyecto(cockpit, proyecto.id, form);
       setResultado(r);
       if (r.ok) onListo();
     });
@@ -407,7 +409,7 @@ export function FormularioProyecto({
             etiqueta="Borrar el proyecto"
             advertencia="No se puede deshacer."
             deshabilitado={enviando}
-            onBorrar={() => borrarProyecto(proyecto.id)}
+            onBorrar={() => borrarProyecto(cockpit, proyecto.id)}
             onResultado={(r) => {
               setResultado(r);
               if (r.ok) onListo();
@@ -422,6 +424,7 @@ export function FormularioProyecto({
 // ── Las altas ────────────────────────────────────────────────────────────────
 
 export function AltaVoz({ onListo }: { onListo: () => void }) {
+  const cockpit = usarCockpit();
   const vacio: FormVoz = { nombre: "", descripcion: "", criterios_relevancia: "", activo: false };
   const [form, setForm] = useState(vacio);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -429,7 +432,7 @@ export function AltaVoz({ onListo }: { onListo: () => void }) {
 
   const enviar = () =>
     startTransition(async () => {
-      const r = await crearVozNueva(form);
+      const r = await crearVozNueva(cockpit, form);
       setResultado(r);
       if (r.ok) onListo();
     });
@@ -486,6 +489,7 @@ export function AltaProyecto({
   resultadosPorCuenta: number;
   sugeridosPendientes: number;
 }) {
+  const cockpit = usarCockpit();
   // Arranca con un número puesto, no vacío: el N es obligatorio y un campo en blanco haría
   // rebotar el alta por lo único que nadie espera tener que completar.
   const vacio: FormProyecto = {
@@ -502,7 +506,7 @@ export function AltaProyecto({
 
   const enviar = () =>
     startTransition(async () => {
-      const r = await crearProyectoNuevo(form);
+      const r = await crearProyectoNuevo(cockpit, form);
       setResultado(r);
       if (r.ok) onListo();
     });

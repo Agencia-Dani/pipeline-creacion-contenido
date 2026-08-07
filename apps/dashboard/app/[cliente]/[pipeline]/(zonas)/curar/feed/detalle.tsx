@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Calificacion, CandidatoFeed, TextosCandidato } from "@/domain/feed";
+import { usarCockpit } from "../../usar-cockpit";
 import { guardarNotasCandidato, textosDeCandidato } from "./actions";
 import { BotonesCalificar } from "./tarjeta";
 
@@ -76,6 +77,10 @@ export function Detalle({
 }
 
 function Contenido({ candidato }: { candidato: CandidatoFeed }) {
+  // El cockpit se lee acá y no baja por props: las dos acciones de este componente lo necesitan
+  // para no caer en el default de `resolverContexto` (ver la cabecera de `actions.ts`), y
+  // `usarCockpit` lo saca de la URL, que es de donde ya salía el de la página.
+  const { cliente, pipeline } = usarCockpit();
   const [textos, setTextos] = useState<TextosCandidato | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,7 +89,7 @@ function Contenido({ candidato }: { candidato: CandidatoFeed }) {
   // rápido: sin él, una respuesta que llega tarde escribiría estado de un modal ya desmontado.
   useEffect(() => {
     let vivo = true;
-    textosDeCandidato(candidato.id).then((r) => {
+    textosDeCandidato({ cliente, pipeline }, candidato.id).then((r) => {
       if (!vivo) return;
       if (r.ok) setTextos(r.textos);
       else setError(r.mensaje);
@@ -92,7 +97,7 @@ function Contenido({ candidato }: { candidato: CandidatoFeed }) {
     return () => {
       vivo = false;
     };
-  }, [candidato.id]);
+  }, [candidato.id, cliente, pipeline]);
 
   return (
     <>
@@ -175,6 +180,7 @@ function Esqueleto() {
  * clásico que pisa lo que el usuario ya empezó a escribir.
  */
 function Textos({ candidato, textos }: { candidato: CandidatoFeed; textos: TextosCandidato }) {
+  const cockpit = usarCockpit();
   const [notas, setNotas] = useState(textos.notas ?? "");
   const [aviso, setAviso] = useState<string | null>(null);
   const [guardando, startTransition] = useTransition();
@@ -221,7 +227,7 @@ function Textos({ candidato, textos }: { candidato: CandidatoFeed; textos: Texto
               disabled={guardando}
               onClick={() =>
                 startTransition(async () => {
-                  const r = await guardarNotasCandidato(candidato.id, notas);
+                  const r = await guardarNotasCandidato(cockpit, candidato.id, notas);
                   setAviso(r.mensaje);
                 })
               }
