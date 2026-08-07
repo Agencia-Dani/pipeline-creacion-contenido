@@ -22,6 +22,61 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 📏 2026-08-07 (cierre 100) · LA FOTO DE PROD CONTRA LO QUE DICEN LOS DOCS
+>
+> Sesión de repaso: en vez de leer el estado, se **midió** (PostgREST con `service_role` + la API de
+> n8n). Tres cosas estaban hechas y ningún doc las registraba, y cuatro que se daban por
+> encaminadas no habían pasado. **Nada de esto se dedujo del relato de una sesión anterior.**
+>
+> ### ✅ Hecho y sin registrar hasta hoy
+>
+> | | Medido |
+> |---|---|
+> | 🔑 **La `ANTHROPIC_API_KEY` del `.env` ya está repuesta** | Da **200** contra `/v1/models`. El cierre 98 la daba por revocada (401) y quedó viejo: **ese pendiente de seguridad está cerrado** |
+> | 📝 **Transcribir se usó de verdad, y a escala** | `app.transcripciones` pasó de **2 filas** (lo que dicen los docs) a **57**: 56 `listo` + 1 `sin_transcript`, en 3 tandas del 07/08 (01:04 · **03:19 con 52 links** · 03:38). Las dos últimas son **posteriores al commit `3e482c8`**, así que la pantalla nueva **está deployada y aguantó una carga real** |
+> | 👁️ **El feed** (item 5 de la tabla de abajo) | ✅ recorrido por Mani el 07/08 |
+>
+> 📌 **Y un número que corrige la alarma de Supadata:** esa tanda de 52 dio **1 vacía (2%)**, no 65%.
+> El 65% es del corpus del **motor** (videos de referentes, descubiertos por Apify); esto son links
+> pegados a mano. **Son fuentes distintas y el problema está más acotado de lo que decía el cierre
+> 98** — sigue valiendo mirarlo, pero no como si el supply entero estuviera en riesgo.
+>
+> ### ❌ Lo que se daba por encaminado y NO pasó (medido, no supuesto)
+>
+> | | Medido |
+> |---|---|
+> | **D2**, la mitad de la tabla | `workflows` sigue diciendo `short-form-content: draft` |
+> | **El alta real por `ajustes/equipo`** (item 8) | `usuarios` = **8** y `usuarios_clientes` = **9**, idénticos al 06/08 ⇒ **ningún alta nueva** |
+> | **La limpieza de la prueba de RLS** | las 2 filas `prueba rls` **siguen sembradas** (y el clic del item 6 sigue sin hacerse) |
+> | **Transcribir, sus dos arreglos de pantalla** | 🔬 **cero eventos `transcribir.reintentar`** ⇒ el reintento no se ejerció (y la fila `sin_transcript` del 03:19 sigue ahí, que es justo la que sirve). Y los 3 `pegar` tienen **`ya_estaban: 0`** ⇒ el panel de "quitar duplicados" **nunca apareció**, así que tampoco se ejerció. Los dos siguen abiertos en [`verificaciones-humanas.md` §2-bis](../verificaciones-humanas.md) |
+>
+> ### 🟡 La voz "Alejo": es un registro huérfano, no un problema de accesos
+>
+> El cierre 99 la marcó como *"fila sospechosa"* y quedaba abierta la duda de si alguien tenía acceso
+> a la empresa equivocada. **No es eso, y el diagnóstico cierra la duda:** `app.voces` no son personas
+> ni permisos, es la entidad de **reels** (la persona cuyo contenido busca el motor, con proyectos
+> colgando). Medido:
+>
+> | | |
+> |---|---|
+> | `client_id` · `activo` | `30x` · **`false`** |
+> | proyectos que cuelgan de ella | **cero** |
+> | instancias de `30x` | **solo `linkedin`** |
+> | quién lee `app.voces` | el plan de corrida de **short-form-content**. LinkedIn tiene su propia `app.voces_linkedin`, y es de grano **instancia** |
+>
+> ⇒ **Ninguna corrida la va a leer nunca** (30X no tiene cockpit de reels), y aunque estuviera en la
+> empresa correcta, **sin proyectos no produciría nada**. No molesta a nadie y no bloquea nada.
+> **Decisión de Mani, sin apuro:** moverla a `retia` y darle proyectos (si la quería como voz de
+> reels) o borrarla (si fue un click de prueba). *Que Alejo tenga acceso a 30X es otra cosa, y está
+> bien.*
+>
+> ### ✅ Y B1 quedó confirmado por su efecto, sin depender del relato
+>
+> **170 candidatos** (todos `nuevo`) · **93 `outputs`** · **48 descartes intactos** · el run
+> `execution_id 126` en `ok`. Los 5 calificados entraron a `outputs` y salieron del feed, que es
+> exactamente lo que el gate de la `023` pedía ver.
+> Y `n8n:diff` **verde en los 5**: el live sigue corriendo lo que dice el repo.
+
 > ## 🔥 2026-08-06 (cierre 99) · EL COCKPIT SE ADIVINABA, Y HACE 3 DÍAS ADIVINABA MAL
 >
 > **Leelo antes que nada: cambia lo que hay que hacer y desbloquea B1.** Salió buscando por qué el
@@ -485,7 +540,7 @@
 > | 2 | 🟡 El botón **Descargar CSV** de `/curar/historicos` (ADR-057) | Mani | ⬜ **arrastre del cierre 94**, el más viejo abierto. El CSV está verificado contra las 31 filas reales con un parser RFC 4180 independiente; lo que nadie hizo es **el clic**. 15 columnas, acentos derechos |
 > | 4 | 🟡 Que el tab **Entender** aparezca en el nav de un **operador** (`b8a3832`) | Jero o Alejo | ⬜ se ve solo, en su próximo login. La lógica tiene tests; falta el ojo. *No se probó desde una sesión de agente a propósito: habría requerido generar un magic link de la cuenta de otra persona* |
 > | 3 | 📐 El **ADR del `origen` en el `TenantContext`** | quien retome | ✅ **ESCRITO: [ADR-058](../adr/ADR-058-el-flip-de-la-capa-2.md)** — cubre el `origen`, la ventana de ADR-047 que se cerró sin suspender cockpits, y por qué `lib/tenant.ts` se queda en `service_role` |
-> | 5 | 🟡 Recorrer el **feed** en `/curar/feed` | Majo, Jero o Alejo | ⬜ **reescrito el 07/08: el feed dejó de paginar**, así que los dos items sobre "Cargar más" y el keyset **ya no existen**. Quedan tres: que estén **todas de una** (170 al 07/08, el pie dice el número), que los **chips digan el total de cada filtro** sobre la tabla entera, y que **abrir una tarjeta** traiga el guion. Detalle en [`verificaciones-humanas.md` §2](../verificaciones-humanas.md) |
+> | 5 | 🟡 Recorrer el **feed** en `/curar/feed` | Mani | ✅ **HECHO el 07/08.** Las 170 de una, los chips con el total real y la tarjeta abriendo con guion. *(Su enunciado envejeció dos veces: nació pidiendo "Cargar más" y el keyset, y el feed dejó de paginar el 07/08.)* |
 > | 9 | 🔴 Los **3 arreglos de Transcribir** (reintento · reclamo de la cola · avisar antes de pagar) | Majo o Jero | ⬜ **nuevo del 07/08.** Lo único de esa sesión que no se pudo verificar solo: las queries se probaron contra prod y el dominio tiene tests, pero **nadie tocó la pantalla**. El punto del doble pago **necesita dos navegadores a la vez**. Pasos en [`verificaciones-humanas.md` §2-bis](../verificaciones-humanas.md) |
 > | 6 | 🔬 **La prueba que cierra §14.6**: RLS de LinkedIn con datos reales | quien tenga la cuenta de 2 empresas | 🟡 **La mitad de query está CERRADA el 06/08: `1 y 1`, y `42501` en la escritura cruzada** (tabla completa en el bloque 🅱️ y en §14.6). **Queda el clic, y las 2 filas ya están sembradas esperándolo** |
 > | 7 | 🔴 El **check #1 de la `021` contra PROD** | Mani o Alejo | ✅ **HECHO el 06/08: CERO FILAS**, sobre el corpus completo (con la `020` y la `024` aplicadas). No queda ninguna tabla con columna de tenant, RLS activado y cero policies |

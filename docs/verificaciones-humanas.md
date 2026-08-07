@@ -80,29 +80,27 @@ contra la base, **con la query scopeada al cockpit** (`instance_id` de `retia/re
 
 **Quién:** Mani · **2 minutos** · *Es el arrastre abierto más viejo (cierre 94).*
 
+**Qué es:** el histórico de lo aprobado, bajado como planilla. Es lo que **reemplazó al Google
+Sheet** que el archivado escribía semana a semana ([ADR-057](./adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md));
+con él se fue la última dependencia de Google del pipeline. Sin este botón, lo aprobado solo se
+puede mirar en pantalla.
+
+**Dónde está el botón:** entrás a `/retia/reels/curar/historicos` (zona **Curar** → pestaña
+**Históricos**) y arriba de la tabla está **Descargar CSV**. Baja un archivo y se abre con Excel
+o Numbers.
+
 Su parte frágil está verificada contra las filas reales de prod con un parser RFC 4180
 independiente. Lo que nadie hizo es **el clic**.
-
-1. Entrar a `/retia/reels/curar/historicos`.
-2. Apretar **Descargar CSV** y abrir el archivo (Excel o Numbers).
 
 **Tiene que traer:** **15 columnas** · **31 filas** de datos + el encabezado · los **acentos
 derechos** (si ves `MÃ©tricas`, el BOM/encoding se rompió).
 **Si el archivo baja vacío o con 0 filas:** no es el CSV, es la lectura — mirá primero si la pantalla
 misma muestra las 31.
 
-## 2. 🟡 Recorrer el **feed entero**
+## 2. ✅ Recorrer el **feed entero** — CERRADO por Mani el 2026-08-07
 
-**Quién:** Majo, Jero o Alejo · **3 minutos** · *Reescrito el 07/08: el feed **dejó de paginar**, así
-que los dos items sobre "Cargar más" y el keyset ya no existen.*
-
-En `/retia/reels/curar/feed`, mirar **tres** cosas:
-
-1. **Están todas de una**, sin botón al pie. Al 07/08 son **170** (eran 175; el archivado se llevó
-   los 5 calificados). El pie dice el número.
-2. Los **chips dicen el total de cada filtro** sobre la tabla entera, no sobre lo que se ve.
-3. **Abrir una tarjeta trae el guion** (los 3 textos largos salieron del listado para que pese 16 KB
-   en vez de 405 KB — se cargan al abrir).
+Pasó. Está en el §Registro del final; el enunciado completo vive en git
+(`git log docs/verificaciones-humanas.md`) por si hay que repetirlo.
 
 ## 2-bis. 🔴 La pestaña **Transcribir**, sus tres arreglos *(nuevo del 07/08)*
 
@@ -294,6 +292,7 @@ cliente se administre solo, hay que nombrarle un `sponsor`**, y eso es una decis
 
 | # | Qué | Cuándo |
 |---|---|---|
+| **Recorrer el feed entero** | Sin paginar: las 170 de una, chips con el total real, y la tarjeta abre con guion | ✅ 2026-08-07, Mani |
 | Recorrer las 4 zonas con una cuenta **dueña** | Las 4 cargan con datos, `Entender` incluida — que era el riesgo concentrado del flip | ✅ 2026-08-05 |
 | Cuenta **no dueña**: 3 de 4 voces sin filtro de tenant | La mitad que prueba que RLS filtra de verdad | ✅ 2026-08-05 |
 | Que una cuenta `operador` entre y vea nombre + rol | El hecho-cuando de D0 | ✅ 2026-08-04, después de la `019` |
