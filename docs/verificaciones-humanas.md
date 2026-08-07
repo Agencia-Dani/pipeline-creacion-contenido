@@ -53,20 +53,24 @@ contra la base, **con la query scopeada al cockpit** (`instance_id` de `retia/re
 > `ajustes`, `candidatos`, `descartes`, `transcripciones`, `runs` y `outputs` van por **cockpit**
 > ([§2.B de plan-multi-tenant](./agents/plan-multi-tenant.md), el doble grano).
 
-### Los números buenos, medidos el 2026-08-06 (cockpit `/retia/reels`)
+### Los números buenos, **remedidos el 2026-08-07** (cockpit `/retia/reels`)
+
+⚠️ **Se remidieron enteros porque la corrida de V5 y las tandas de Transcribir movieron 5 filas.**
+Los de la tabla vieja (06/08) ya no son los de la pantalla, y usarlos habría disparado la falsa
+alarma de RLS que este mismo §0 previene. **Los que cambiaron van marcados.**
 
 | Pantalla | Tiene que mostrar |
 |---|---|
 | **`/entender`** | ⚠️ **Empezá por acá si estás verificando RLS**: son las **12 vistas `security_invoker`**, la zona de más riesgo |
-| `/operar` | **5** tarjetas de corrida, la más nueva del **2026-08-03** |
-| `/curar/feed` | **25** tarjetas y los chips diciendo **165** *(pagina de a 25 desde el cierre 98)* |
+| `/operar` | **5** tarjetas de corrida (el `limite` de `ultimasCorridasMotor`), la más nueva del **2026-08-07 07:51**, `ok`, 13.8 min 🔄 |
+| `/curar/feed` | **25** tarjetas y los chips diciendo **171** 🔄 *(eran 165; +5 del 06/08 y +1 de V5)* |
 | `/curar/voces` | **3** voces (las 3 activas) · **6** proyectos (5 activos) |
 | `/curar/referentes` | **16**, todos de Instagram |
 | `/curar/ajustes` | **18** si sos `dev` · **8** si sos `operador` |
-| `/curar/descartes` | **38** |
-| `/curar/sugeridos` | **6** |
-| `/curar/historicos` | **31** |
-| `/transcribir` | **2**, las dos en `listo` |
+| `/curar/descartes` | **50** 🔄 *(eran 38)* |
+| `/curar/sugeridos` | **6** *(de 8 filas: la pantalla filtra `estado = propuesto`, las otras 2 están `promovido`)* |
+| `/curar/historicos` | **32** 🔄 *(era 31; V5 entregó 1 output más)* |
+| `/transcribir` | **57** 🔄 *(eran 2): 56 en `listo` + **1 en `pendiente`**, que es el reintento del §2-bis esperando que alguien recargue la pantalla* |
 
 > 🔑 **Un dueño (`es_dueno`) NO bypassa RLS**, y es lo que hace que estas pruebas valgan: `es_dueno`
 > es un predicado *adentro* de `app.clientes_visibles()`, no un `BYPASSRLS`. Solo el `service_role`
