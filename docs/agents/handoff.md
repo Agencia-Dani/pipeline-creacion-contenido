@@ -22,6 +22,73 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🔥 2026-08-06 (cierre 99) · EL COCKPIT SE ADIVINABA, Y HACE 3 DÍAS ADIVINABA MAL
+>
+> **Leelo antes que nada: cambia lo que hay que hacer y desbloquea B1.** Salió buscando por qué el
+> botón "Cargar más" del feed no funcionaba, y el botón era el síntoma más chico.
+>
+> ### El bug
+>
+> Las **~30 server actions** llamaban `exigirTenant(zona)` **sin segmentos**, porque una server
+> action no recibe los `params` de la ruta. Sin segmentos, `resolverContexto` cae a *"el primero que
+> alcance"* — un default correcto para la raíz `/`, y **una adivinanza en todas las demás**.
+>
+> Con `retia/reels` como única instancia activa, adivinar acertaba siempre. El **2026-08-03 20:46**
+> entraron las 3 de LinkedIn; `leerInstancias()` ordena por `(client_id, slug)` y filtra
+> `estado = active`, así que el primero pasó a ser **`30x/linkedin`**. Desde ese momento, para todo
+> `es_dueno` (los 2 devs de la agencia) y para quien alcance 30X/EstadoX, **cada acción del cockpit
+> de Retia leyó y escribió en el tenant de 30X**. La tabla existe, la query es válida, devuelve cero
+> filas: **el fallo mudo otra vez**, y esta vez en producción durante 3 días.
+>
+> **La página nunca estuvo mal** — `page.tsx` sí recibe `params`. Solo las acciones. Por eso el feed
+> mostraba 175 en el chip (página, tenant bueno) y "Cargar más" traía 0 (acción, tenant malo) y
+> hacía desaparecer el botón sin decir nada.
+>
+> ### Medido contra prod, no deducido
+>
+> | | |
+> |---|---|
+> | `app.candidatos` de `retia/reels` | **175**, y **0 calificados** |
+> | `app.candidatos` de `30x/linkedin` | **0** — lo que leía "Cargar más" |
+> | último evento `candidatos.calificar` | **2026-08-01 17:39**. Nada en 3 días |
+> | último `outputs` escrito | 04/08, y sus 9 filas tienen `calificado_en` del **01/08** |
+>
+> 🩸 **Y una fila sospechosa que Mani tiene que mirar:** el evento `voces.crear` del **05/08 15:25**
+> quedó registrado en la instancia **`30x/linkedin`**, y en `app.voces` hay una voz **"Alejo" con
+> `client_id = 30x`**. Si la creaste parada en un cockpit de Retia, **está en la empresa
+> equivocada** y ninguna pantalla de Retia te la va a mostrar. Si la creaste en `/30x/...`, está
+> bien. No lo puedo distinguir desde afuera: la decisión es tuya.
+>
+> ### El arreglo (`c267980`, ya en `main`)
+>
+> `exigirTenant(zona, cliente, pipeline)` con los **dos obligatorios**. Un cockpit que falta pasó a
+> ser un **error de compilación** — no un default fail-closed que explota cuando alguien hace click.
+> Es la regla que `scoped()` ya aplica a las queries (ADR-047 Capa 1) un escalón más arriba: *si no
+> se puede nombrar el cockpit, no se puede construir la guardia.* tsc listó los 25 call sites; el
+> cockpit viaja desde el cliente con `usarCockpit()` (que lo lee de la URL, la misma fuente que
+> `params`) y **no es un permiso**: se valida contra `instanciasVisibles`.
+>
+> ⚠️ **A5 se salvó por no estar deployada.** `ajustes/equipo/actions.ts` documentaba que *"la empresa
+> no es un parámetro… sale del cockpit abierto"* como su defensa contra el modo de falla de ADR-051.
+> Era cierto salvo por el detalle de que el cockpit abierto estaba adivinado: **habría dado de alta
+> a la gente de Retia en 30X**, con el gate de rol evaluado contra el cockpit equivocado.
+>
+> ### El feed, además, dejó de paginar (decisión de Mani)
+>
+> Se van el cursor keyset (`Cursor`/`cursorDe`/`despuesDe` y sus 5 tests), `POR_PAGINA`, `hayMas` y
+> el botón. **175 filas = 103,7 KB medidos**, y PostgREST las devuelve todas (no hay `db-max-rows`;
+> se comprobó pidiendo sin `limit`). El filtro **se queda en la query**: es lo que sostiene el
+> congelado de plan-cockpit §D6.4 sin tener que escribirlo.
+>
+> ### 🔓 Qué desbloquea, y qué falta
+>
+> **B1 estaba esperando algo imposible.** Su condición 4 pide *un archivado verde que escriba
+> `outputs`*, y el archivado solo escribe si hay calificados — que es justo lo que este bug impedía.
+> El orden real es: **deployar → que el equipo califique → archivado → recién ahí la `023`.**
+>
+> 🚧 **Lo único que falta y no puedo hacer yo: el deploy a Vercel.** Arrastra también A5 y el gate de
+> costos del Carril 0, que seguían sin salir.
+
 > ## 🚦 2026-08-06 · RETIA ENTRA, Y HAY UN PLAN DE DOS CARRILES: [plan-multi-tenant §15](./plan-multi-tenant.md#15-el-cierre-del-producto-en-dos-carriles)
 >
 > **Leelo antes de tomar nada de la tabla de abajo.** Tres personas de Retia —empresa cliente, no la
@@ -128,7 +195,7 @@
 > | **B4** · runbooks + `core/templates/` | ✅ El criterio de F5 da **partido**: empresa 🟢, pipeline 🔴. **Y el paso 2 se corrigió contra A5 en prod: decía 5 cosas mal** |
 > | **B5** · checklist de ojo humano | ✅ [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), **11 items** |
 > | **B6** · deuda de docs | ✅ Eran **21 links rotos**, no 4, y la lista era más larga |
-> | **B1** · gate de la `023` | ⏳ **Bloqueado por calendario, remedido el 06/08 a las 15:39**: el último run del **motor** sigue siendo el del **2026-08-03** (el del 04/08 21:12 era el archivado). Archivado domingo 18:00, motor lunes 08:00. **Lo que sí se hizo: que la verificación del lunes no pueda mentir** — ver abajo |
+> | **B1** · gate de la `023` | ⏳ **2 de sus 4 condiciones firmadas (cierre 99). Ya no es calendario: es el deploy.** Ver el bloque de abajo y el 🔥 de arriba |
 >
 > ### ✅ B3 cerrada sin browser, y el discriminante es lo que la hace valer
 >
@@ -160,7 +227,33 @@
 > persona real. Generarle un magic link y entrar como él es suplantarlo, y eso no lo hace un agente
 > aunque tenga la `service_role` para hacerlo.
 >
-> ### ✅ B1 no se puede cerrar, pero su verificación ya no puede mentir
+> ### 🔄 B1, remedido el 06/08 de noche: Mani corrió el motor a mano y el gate avanzó a 2 de 4
+>
+> La corrida existe y es la primera del motor **después** de que la mitad de escritura de la `023`
+> entrara al live el 05/08: **`2026-08-06 21:24 → 21:40`, `ok`, `execution_id 125`**, embudo
+> `colectados=538 → asignados=880 → pretrim=710 → filtrados=80 → gate=17 → outputs=10`.
+>
+> Las 4 condiciones del §0 de la [`023`](../../core/schema/023_poda_write_only.sql), una por una:
+>
+> | # | Condición | |
+> |---|---|---|
+> | 1 | `n8n:diff` limpio en los 5 | ✅ **verificado hoy** — los 5 corren lo que dice el repo |
+> | 2 | el deploy de Vercel con `lib/transcripciones.ts` en prod | ❓ **no lo puedo medir desde acá.** Lo confirma Mani |
+> | 3 | corrida del motor verde **que escribió memoria de dedup** | ✅ **`intersección: 0 ✓`, contando por `run_id`** (48 filas la del 06/08, 121 la del 03/08). El `⛔ NO CUENTA` que se le puso ayer **no disparó**, o sea que el ∅ es de un dedup que funciona y no de una tabla vacía |
+> | 4 | archivado verde **que escribió `outputs`** | ❌ **el último es del 04/08**, anterior al push. Y no podía llegar solo — ver abajo |
+>
+> 🔴 **La 4 estaba esperando algo que el bug del cockpit hacía imposible.** El archivado solo escribe
+> `outputs` si hay candidatos calificados, y desde el 03/08 **nadie podía calificar**: las 175 filas
+> siguen en `sin calificar`. El propio §0 lo anticipa (*"si esa semana no hubo calificados, el
+> archivado cierra con 0 y NO sirve de prueba"*), pero atribuía el 0 a que nadie hubiera trabajado.
+> Era que la pantalla no dejaba. **Con `c267980` deployado, la 4 se consigue calificando y esperando
+> el archivado** (o disparándolo a mano).
+>
+> 📌 **Dato de calidad, aparte del gate:** la corrida avisó *"65% de transcripciones vacías"* (31 de
+> 48), contra un baseline del 23/07 de 41% y un 54% en la del 03/08. **Tres corridas subiendo.** No
+> bloquea nada, pero si Supadata sigue así el `sin_guion` se come el supply.
+>
+> ### ✅ B1: su verificación ya no puede mentir (del cierre anterior)
 >
 > `verificar-corrida.mjs` imprimía **`intersección: 0 ✓ (∅, el dedup funciona)`** también cuando las
 > dos corridas no habían escrito **ninguna** fila — o sea que el ∅ de un dedup perfecto y el ∅ de una
