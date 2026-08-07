@@ -22,6 +22,86 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🏁 2026-08-07 (cierre 101) · CAYERON V6, V5 Y D2. LAS CORRIDAS DE FUEGO QUEDAN EN OJO HUMANO
+>
+> **Leelo antes que el cierre 100: le cierra dos filas.** De las 6 corridas de fuego + activación que
+> seguían abiertas, quedan **tres, y las tres son de mirar con los ojos**: V2 (la traducción), V4 y
+> **D3**. Ninguna es de agente.
+>
+> ### 🩸 Dos enunciados que envejecieron, y el patrón es el mismo
+>
+> **V6 y V2 pedían mirar a ojo algo que el sistema ya garantiza por construcción, y pedían romper o
+> muestrear algo que ya no se puede.** Los dos se cerraron (uno entero, el otro a mitad) **midiendo el
+> código**, no ejecutándolo.
+>
+> | | Lo que pedía | Lo que resultó ser |
+> |---|---|---|
+> | **V6** | romper la credencial de Supabase → el workflow IGUAL entrega | 🩸 **El simulacro es immontable**: los **31 nodos HTTP** de los 5 workflows comparten `Config.supabase_url`, así que **no hay palanca** que rompa el registro sin romper la entrega. Pero el invariante #1 **ya está declarado nodo por nodo en los `onError`** ⇒ es una **propiedad estructural que se lee del JSON** |
+> | **V2** | muestrear uno en español (script == transcripción tal cual) | 🔑 **No es una muestra, es el código.** En `Traducir` un video `es` nunca entra al `order`, y el reparto es `script: (cache[id] \|\| transcript)` ⇒ con el cache vacío **el script ES el transcript**. Ya tenía test verde. Y **no hay material igual**: los 170 candidatos eran **169 `en` + 1 `otro`, cero español** |
+>
+> ### ✅ V6 cerrada por auditoría: el check #6
+>
+> `Workflows/auditar-workflows.mjs` ahora exige `onError: continueRegularOutput` en todo nodo
+> `httpRequest`, con la constante **`FAIL_CLOSED`** como única excepción: **9 nodos, cada uno con su
+> porqué escrito** (los 4 de fachada/ADR-028, `Leer procesados`/ADR-029 exc. 1, las 3 entregas, y
+> `Borrar candidatos`).
+>
+> 🔑 **El default es "sos sumidero"**, y esa es la decisión entera: un nodo HTTP nuevo entra **pidiendo**
+> su `onError`, y quien lo quiera fail-closed tiene que escribir por qué — una línea de diff que se lee
+> en el review, no algo que se decide en silencio.
+>
+> 🔴 **Se verificó poniéndolo ROJO, no verde**, con 3 mutaciones sobre una copia: `onError` sacado de un
+> nodo de registro · dado a uno de `FAIL_CLOSED` (lista vieja) · un nodo de la lista renombrado (lista
+> fantasma). **Los 3 disparan, exit 1**, y el repo quedó intacto. *Un check que solo sabe decir ✓ no
+> prueba nada.*
+>
+> ### ✅ V5 corrida y verde — y con ventana de 3 días, no de 1
+>
+> **Corrida real `on_demand`, `ok`, 13.8 min, ~$0.24.** El enunciado pedía `dias_recencia = 1` y **se
+> corrió con 3 a propósito**: con 1, si Apify no traía nada, la intersección daba **0 por vacío y no
+> por dedup** ⇒ se habría marcado como cerrada una prueba que no probó nada. Con 3 la ventana cubre
+> entera la corrida del 06/08, o sea **máximo solape**.
+>
+> | | |
+> |---|---|
+> | Apify volvió a traer | **69** videos |
+> | Sobrevivieron al dedup | **4** |
+> | Se le pagó a Supadata | **4** transcripciones, **no 69** |
+> | `processed_items` nuevos | **4**, contra las **48** del 06/08 |
+> | Intersección entre las 2 últimas | **`0 ✓`, por `run_id`** · `registro_dedup: ok` en las dos |
+> | Feed | **171** · 0 sin-guion · 171/171 `external_id` · 0 urls duplicadas |
+>
+> ⇒ **El ∅ es de un dedup que filtra, no de una tabla vacía.** `Días de recencia` **restaurado a 100**
+> y verificado en `app.ajustes` **y por la fachada**, que es lo que el motor lee el lunes 08:00.
+> Base después: `processed_items` 874→**878** · `runs` 43→**44** · `candidatos` 170→**171**.
+>
+> 🩸 **Y por poco se hace algo destructivo, que vale más que la prueba:** se evaluó bajar
+> **`Videos a transcribir por corrida`** (250) como tope de gasto de la corrida. **Habría quemado
+> videos.** Ese presupuesto corre **después** del `POST processed_items` (ADR-044): lo capado ya está
+> en la memoria de dedup, vuelve sin transcript, el gate lo descarta `sin_guion` **y no se reintenta
+> nunca**. Quedó en 250. *La red de seguridad de una prueba puede ser el daño — y desde la pantalla de
+> Ajustes se ve igual que `cap_top_n`, que sí postergaría.*
+>
+> ### ✅ D2 cerrada entera — la fila que el cierre 100 dejó en ❌
+>
+> `update workflows set estado = 'active' where id = 'short-form-content'`, **aplicado y leído de
+> vuelta**: `short-form-content: active` · `linkedin: draft` (a propósito, ADR-055) ·
+> `substack: inactive`. Con la mitad del manifest que ya estaba del 06/08, **D2 no tiene mitades**.
+>
+> ### ⬜ Lo que queda de las corridas de fuego: 3, todas de ojo
+>
+> | | Qué | Quién | Cuánto |
+> |---|---|---|---|
+> | **V2** | solo la mitad de la **traducción**: abrir un candidato, abrir el video, juzgar si el guion dice lo mismo | Majo o Jero | 5 min |
+> | **V4** | filtrar por *aprobados* en `/curar/feed`: solo aprobados, caliente→frío | Majo o Jero | 2 min |
+> | **D3** | la **demo de 10 min**. Es de lo más viejo abierto de todo el repo | Mani + Majo + Jero | 10 min |
+>
+> 🩸 **Y el hallazgo que hace a V2 irrepetible después de la corrida:** el **transcript original no se
+> persiste en ningún lado**. `app.candidatos` guarda el `script` ya traducido y nada más, y hay **cero
+> solape** entre las 57 `transcripciones` y las URLs de los 170 candidatos. **Comparar traducción
+> contra fuente después de la corrida es imposible sin volver a pagarle a Supadata** — por eso la forma
+> barata es contra el **video**, no contra el transcript.
+
 > ## 📏 2026-08-07 (cierre 100) · LA FOTO DE PROD CONTRA LO QUE DICEN LOS DOCS
 >
 > Sesión de repaso: en vez de leer el estado, se **midió** (PostgREST con `service_role` + la API de
@@ -1877,6 +1957,21 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-07 (cierre 101) — Dos de las tres corridas de fuego que faltaban se cerraron sin correrlas, y la tercera se corrió por $0.24 (Claude, pedido de Mani).**
+**Qué se hizo:** **V6, V5 y D2**. El ROADMAP §3 pasa de 6 items abiertos a **3, y los 3 son de ojo humano** (V2 a mitad, V4, D3). Commits `957172e` · `8290a87` · `038487a`.
+
+**🩸 El patrón de la sesión: dos enunciados pedían ejercitar algo que el sistema ya garantiza, y pedían romper o muestrear algo que ya no existe.** No es que estuvieran mal escritos: envejecieron con D7 y con el refactor. **V6** pedía romper la credencial de Supabase para ver que el workflow igual entregara — se listaron los **31 nodos HTTP** de los 5 workflows y **comparten `Config.supabase_url`**, así que no hay palanca: romper el registro rompe la entrega. Pero el reparto de `onError` **es** el invariante, declarado nodo por nodo. **V2** pedía muestrear un candidato español para ver que el script fuera la transcripción tal cual — en `Traducir` un `es` nunca entra al `order` y el reparto es `script: (cache[id] || transcript)`, o sea **el script ES el transcript por construcción**, con test verde desde antes. Y no había material igual: **169 `en` + 1 `otro`, cero español** en los 170 candidatos. *Cuando una verificación pide mirar algo que un `===` ya prueba, el enunciado envejeció.*
+
+**🛡️ V6 cerró como check, no como simulacro: el #6 de `auditar-workflows.mjs`.** Exige `onError: continueRegularOutput` en todo `httpRequest`, con `FAIL_CLOSED` como única excepción — **9 nodos con su porqué escrito**. Lo que importa es la dirección: **el default es "sos sumidero"**, así que un nodo HTTP nuevo entra pidiendo su `onError` y quien lo quiera fail-closed escribe por qué en una línea que se lee en el review. **Se verificó poniéndolo rojo con 3 mutaciones sobre una copia** (onError sacado de un nodo de registro · dado a uno de la lista · un nodo de la lista renombrado): los 3 disparan, exit 1. *Un check que solo sabe decir ✓ no prueba nada — y este se escribió justamente porque el simulacro que reemplaza no se podía montar.*
+
+**✅ V5 se corrió con ventana de 3 días y no de 1, y la diferencia era pasar en falso.** Con `dias=1`, si Apify no traía nada la intersección daba **0 por vacío, no por dedup**. Con 3 la ventana cubre entera la corrida del 06/08: **Apify volvió a traer 69 videos, sobrevivieron 4, y se le pagó a Supadata por 4 y no por 69.** `intersección: 0 ✓` por `run_id` (4 filas nuevas contra 48), feed en 171 con 0 sin-guion y 0 urls duplicadas. Corrida `ok`, 13.8 min, **~$0.24**. `Días de recencia` restaurado a 100 y verificado **por la fachada**, no solo en la tabla.
+
+**🩸 El gotcha que casi cuesta datos, y es el más reutilizable de la sesión:** se evaluó bajar **`Videos a transcribir por corrida`** (250) como tope de gasto de la prueba. **Habría quemado videos.** Ese presupuesto corre **después** del `POST processed_items` (ADR-044), así que lo capado ya está en la memoria de dedup, vuelve sin transcript y el gate lo descarta `sin_guion` para siempre. Quedó en 250. *La red de seguridad de una prueba puede ser el daño, y desde Ajustes se ve idéntica a `cap_top_n`, que sí postergaría.*
+
+**Qué quedó a medias:** **V2, solo la mitad de la traducción** — y se descubrió por qué no se puede cerrar desde la base: el **transcript original no se persiste en ningún lado** (`app.candidatos` guarda solo el script traducido, y hay **cero solape** entre las 57 `transcripciones` y las URLs de los candidatos). Compararlo después de la corrida pide volver a pagarle a Supadata, así que la forma barata es juzgar contra **el video**, no contra el transcript.
+
+**Qué sigue:** las 3 verificaciones de ojo (**V2 · V4 · D3**, en [verificaciones-humanas.md](../verificaciones-humanas.md)) más los arrastres del cierre 100 que no se tocaron: el clic al CSV, el alta por `ajustes/equipo`, el reintento de Transcribir (su fila **sigue en `pendiente`**, nadie recargó la pantalla) y la prueba de RLS de LinkedIn con filas. **Nada de eso lo puede hacer un agente.** Lo que sí queda de agente es la voz huérfana *"Alejo"* (decisión de Mani: moverla a `retia` o borrarla) y las 2 filas `prueba rls` sin limpiar. **Skills sugeridas:** `/diagnose` si el reintento de Transcribir no arranca solo al recargar; `/grill-with-docs` si se retoma **D7.5** (que la app escriba `outputs` al calificar y muera el archivado), que es enmienda de ADR-014 y toca `core/`.
 
 **2026-08-06 (cierre 98) — El feed pagina, y el 71% de su payload eran tres campos que nadie dibujaba (Claude, con Alejo).**
 **Qué se hizo:** el **#7 de [plan-multi-tenant §12](./plan-multi-tenant.md)**, el último item numerado antes de LinkedIn. La pantalla del feed pasó de **~405 KB a ~16 KB** por carga.
