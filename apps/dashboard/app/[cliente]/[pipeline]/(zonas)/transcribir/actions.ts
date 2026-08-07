@@ -8,7 +8,7 @@ import { parsearEnlaces, repartirEnlaces } from "@/domain/enlace";
 import { exigirTenant } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import { transcribir, traducir } from "@/lib/transcribir";
-import { abrirRunTranscriptor, cerrarRunTranscriptor } from "@/lib/runs";
+import { abrirRunTranscriptor, barrerRunsZombieTranscriptor, cerrarRunTranscriptor } from "@/lib/runs";
 import { registrarEnHistorico } from "@/lib/historicos";
 import {
   abandonar,
@@ -214,6 +214,10 @@ export type ResultadoProcesar = { procesados: number; quedan: number };
 
 export async function procesarPendientes(enRuta: CockpitEnRuta): Promise<ResultadoProcesar> {
   const { ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
+
+  // El barrido va PRIMERO, igual que en el motor: limpia los runs que quedaron `en_curso` porque su
+  // pasada murió antes de cerrarlos. No puede depender de la que está por empezar.
+  await barrerRunsZombieTranscriptor(ctx);
 
   // 🔑 Reclama en vez de solo leer: dos pestañas abiertas (y la pantalla arranca sola) recibían el
   // MISMO lote de 64 y lo pagaban dos veces. El porqué y el vencimiento, en `reclamarPendientes`.

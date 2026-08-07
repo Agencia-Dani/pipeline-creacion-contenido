@@ -73,3 +73,41 @@ export async function cerrarRunTranscriptor(
     .eq("id", runId);
   if (error) console.error("[transcriptor] no se pudo cerrar el run:", error.message);
 }
+
+/**
+ * Marca como `fallo` los runs del transcriptor que quedaron `en_curso` para siempre.
+ *
+ * 🩸 **El agujero que tapa, y es de ADR-062:** `procesarPendientes` abre el run al empezar y lo
+ * cierra al final. Si la pasada muere en el medio —la función de Vercel se corta a los 60 s, o la
+ * persona cierra la pestaña— el cierre **nunca corre** y el run queda `en_curso` de por vida. Medido
+ * en prod el 2026-08-07, a la hora de deployar: **5 de 10 runs quedaron colgados**. No rompe nada
+ * (nadie los lee todavía), pero ensucia Operar y hace contar mal a la primera métrica que los mire.
+ *
+ * Es el mismo barrido que el nodo `Barrer runs zombie` del motor, con su misma forma (`fallo` + `fin`
+ * + un `error` que dice por qué), y corre **antes** de abrir el run nuevo por la misma razón que
+ * allá: el barrido no puede depender de la corrida que está por empezar.
+ *
+ * ⏱️ **La ventana es fija y no un knob**, al revés que la del motor. Ahí es config porque una
+ * corrida puede durar de minutos a media hora; acá el techo es el `maxDuration = 60` de la zona, o
+ * sea que una pasada no puede pasar de 60 segundos ni queriendo. **5 minutos es 5× ese techo**: un
+ * run más viejo está muerto, no lento. Un ajuste por instancia para esto sería una perilla que nadie
+ * va a mover y una fila más en `app.ajustes` por cockpit.
+ */
+const ZOMBIE_TRANSCRIPTOR_MS = 5 * 60_000;
+
+export async function barrerRunsZombieTranscriptor(ctx: TenantContext): Promise<void> {
+  const limite = new Date(Date.now() - ZOMBIE_TRANSCRIPTOR_MS).toISOString();
+
+  const { error } = await (await scoped(ctx))
+    .update("public.runs", {
+      estado: "fallo",
+      fin: new Date().toISOString(),
+      error: "pasada del transcriptor sin cerrar (la función se cortó o cerraron la pestaña); barrida por una posterior",
+    })
+    .eq("params->>workflow", "transcriptor")
+    .eq("estado", "en_curso")
+    .lt("inicio", limite);
+
+  // Sumidero como el resto del registro: si el barrido falla, la tanda se transcribe igual.
+  if (error) console.error("[transcriptor] no se pudieron barrer los runs zombie:", error.message);
+}
