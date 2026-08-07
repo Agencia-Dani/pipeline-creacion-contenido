@@ -245,6 +245,15 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       *(✅ cierre 17/19: embudo verificado + `processed_items` 10→30 sin dup.)*
 - [ ] **V2. Literalidad:** muestrear 2–3: uno en español (script == transcripción tal cual) y
       uno en otro idioma (traducción literal, sin reescritura). El link abre y coincide.
+      *(🟡 **La mitad española está cerrada, y no por muestreo: por construcción** (medido 07/08).
+      En `Traducir (Claude Haiku)` un video `es` nunca entra al `order`, y el reparto es
+      `script: (cache[id] || transcript)` ⇒ con el cache vacío el script **es** el transcript. Tiene
+      test verde en `test-nodos.mjs`. Y no hay material que mirar igual: los **170 candidatos son
+      169 `en` + 1 `otro`, cero español**.
+      ⬜ **Queda la traducción, y hay que verla en caliente:** el transcript original **no se persiste
+      en ningún lado** (cero solape entre las 57 `transcripciones` y las URLs de los candidatos), así
+      que comparar después de la corrida es imposible sin volver a pagar. La forma barata es abrir el
+      video y juzgar contra la fuente — [verificaciones-humanas §6](./docs/verificaciones-humanas.md).)*
 - [x] **V3. Curación + histórico:** Majo/Jero califican (🔥/👍/👎 + estado) → archivado corre →
       el aprobado queda en `outputs` y se ve en `/curar/historicos` · sale de la lista de candidatos.
       *(✅ cierre 19 (run `687027e2`, archivados:14) y **re-verificado el 04/08** con la ejecución 124
@@ -263,7 +272,15 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       entrega de registro — las tumba a las dos. **La prueba sigue teniendo sentido en su mitad
       medible**: un fallo real deja el `run` en `fallo`, y eso ya pasa solo — **12 de las 41 corridas
       están en `fallo`** y el error handler de ADR-054 las marca. Lo que hay que decidir antes de
-      correr V6 es qué credencial se rompe ahora que el invariante #1 cambió de forma.)*
+      correr V6 es qué credencial se rompe ahora que el invariante #1 cambió de forma.
+      🩸 **Y la respuesta, medida el 07/08: ninguna, porque la palanca no existe.** Los **20 nodos
+      HTTP** del motor y el archivado comparten `Config.supabase_url` ⇒ no hay forma de tumbar el
+      registro sin tumbar la entrega. Pero el invariante **ya está declarado nodo por nodo**: los 11
+      de registro llevan `onError: continueRegularOutput` y los 5 fail-closed (`POST Candidatos`,
+      `Leer plan`, `Leer procesados`, `Leer Candidatos calificados`, `Borrar candidatos`) lo son cada
+      uno con su ADR. **Es una propiedad estructural, no una conducta que se descubre rompiendo algo.**
+      Las 3 salidas y la recomendación, en
+      [verificaciones-humanas §8](./docs/verificaciones-humanas.md).)*
 
 ### Activación
 

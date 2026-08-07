@@ -225,17 +225,46 @@ pedido —punto 5 del norte— sigue igual y hoy lo sirve el Feed:
 En `/curar/feed`, filtrar por **aprobados**: tienen que salir **solo aprobados**, ordenados
 **caliente → frío** por `heat_score`.
 
-## 6. ⬜ **V2 — literalidad** *(ROADMAP §3)*
+## 6. 🟡 **V2 — literalidad: la mitad española NO es una muestra, y la otra mitad no tiene con qué compararse** *(ROADMAP §3)*
 
-**Quién:** Majo o Jero (son quienes saben si un guion sirve) · **10 minutos.**
+**Quién:** Majo o Jero (son quienes saben si un guion sirve) · **5 minutos** (era 10).
 
-Es la única verificación de la lista que mide **calidad**, no funcionamiento. Muestrear **2 o 3**
-candidatos del feed:
+Es la única verificación de la lista que mide **calidad**, no funcionamiento. El enunciado pedía
+muestrear 2 o 3 candidatos, uno en español y uno en otro idioma. **Medido el 2026-08-07, las dos
+mitades resultaron ser cosas distintas de lo que decía.**
 
-- **Uno en español:** el script tiene que ser **la transcripción tal cual**. Si está "mejorado",
-  reescrito o resumido, el gate de ADR-009 se rompió.
-- **Uno en otro idioma:** traducción **literal**, sin embellecer.
-- **En los dos:** el link abre el video original y **coincide** con el guion.
+### ✅ La mitad española está CERRADA, y no por el ojo: por construcción
+
+**Un video en español nunca pasa por Claude.** En `Traducir (Claude Haiku)`, el `order` de traducción
+solo admite `idioma !== 'es'`, y el reparto final es `script: (cache[id] || transcript)` — para un
+video español el `cache` está vacío, así que **el script ES el transcript, byte por byte**. No hay
+camino por donde entre una reescritura.
+
+Ya tenía test desde antes y **está verde**: `test-nodos.mjs` → *"el español no gasta una llamada"* +
+*"y su script queda como el transcript original"*. **Mirarlo a ojo no agrega evidencia** sobre lo que
+un `===` ya prueba.
+
+📏 **Y aunque quisieras mirarlo, no hay material:** los **170 candidatos** del feed son **169 `en` +
+1 `otro`**. **Cero en español.** Los referentes son casi todos ingleses (ya lo decía el comentario del
+nodo: 170 traducciones sobre 191 transcritos). El español del sistema vive en `app.transcripciones`
+(51 de 57 filas), que es **otro camino** (Transcribir, ADR-031) y tampoco traduce.
+
+### ⬜ Lo que queda: la traducción, y hay que mirarla EN CALIENTE
+
+Que la traducción sea literal y no embellecida **sí** es juicio humano, y ningún test lo cubre: el
+prompt pide fidelidad, pero que Haiku la respete solo lo dice alguien que lea los dos textos.
+
+🩸 **El problema: el transcript original NO se guarda en ningún lado.** `app.candidatos` tiene el
+`script` ya traducido y nada más; no hay columna con el texto fuente. Medido el 07/08:
+**cero solape** entre las 57 `transcripciones` y las URLs de los 170 candidatos, así que tampoco se
+puede cruzar por ahí. **Comparar después de la corrida es imposible sin volver a pagarle a Supadata.**
+
+⇒ **Dos formas de cerrarla, las dos legítimas:**
+1. **La barata (recomendada):** abrir un candidato en `/curar/feed`, abrir su link, **ver el video** y
+   juzgar si el guion dice lo mismo. No compara contra el transcript sino contra la fuente, que es lo
+   que al equipo le importa igual.
+2. **La cara:** leer los logs de la corrida en n8n mientras corre (el nodo loguea, no persiste), o
+   pegar la misma URL en **Transcribir** para obtener el transcript y compararlo a mano. Paga.
 
 ## 7. ⬜ **V5 — corrida incremental + dedup** *(ROADMAP §3)*
 
@@ -262,9 +291,44 @@ entrega de registro: **las tumba a las dos**. La prueba, tal cual está escrita,
 
 **El invariante sigue vivo; lo que cambió es cómo se ejercita.** Su forma honesta hoy es: *si fallan
 los writes del **registro** (`runs` / `outputs` / `processed_items`), ¿los candidatos igual llegan a
-`app.candidatos`?* Son nodos distintos con `onError: continue`, así que la respuesta debería ser sí —
-pero **no se puede provocar rompiendo una credencial compartida**. Habría que apuntar solo esos nodos
-a una URL inválida, o aceptar que este invariante ya no es verificable de un golpe y partirlo.
+`app.candidatos`?*
+
+### 📏 Medido el 2026-08-07: el invariante ya está escrito en el workflow, nodo por nodo
+
+Se listaron los **11 nodos HTTP del motor** y los **9 del archivado** con su `onError`. El reparto
+no es casual: **es exactamente el invariante**, declarado.
+
+| | Nodos | `onError` |
+|---|---|---|
+| **Registro** (sumidero) | `Abrir run` · `Cerrar run` · `Barrer runs zombie` · `Leer corridas vivas` · `POST processed_items` · `POST Descartes` · `Leer señal selección` · `Leer feed vivo` · `Registrar outputs` · `Barrer candidatos` · `PATCH Proyectos criterios` | **`continueRegularOutput`** — si se caen, la corrida sigue |
+| **Entrega y sus insumos** (dependencia real) | `POST Candidatos` · `Leer plan (fachada)` (ADR-028) · `Leer procesados` (ADR-029 exc. 1) · `Leer Candidatos calificados` · `Borrar candidatos` | **sin `onError`** — fail-closed **a propósito**, cada uno con su ADR |
+
+⇒ **El invariante #1 no es una conducta que se descubre rompiendo algo: es una propiedad estructural
+que se lee del `workflow.json`.** Y `onError: continueRegularOutput` no es documentación, es el
+mecanismo de n8n: el que lo tiene, sigue.
+
+### 🩸 Y por eso el simulacro, tal como está escrito, es IMPOSIBLE de montar
+
+**Los 20 nodos comparten `Config.supabase_url`.** No hay forma de romper el registro sin romper la
+entrega, porque salen de la misma perilla. El simulacro no es "difícil": no existe la palanca.
+
+### → La decisión que queda (de Mani, sin apuro)
+
+1. 🟢 **Declarar V6 cerrada por auditoría + lo ya medido, y agregar el check al auditor.** El invariante
+   se verifica en `Workflows/auditar-workflows.mjs` (que ya corre en cada cambio de conexiones):
+   *"todo nodo de registro lleva `onError: continue`; los 5 fail-closed son una lista explícita con su
+   ADR"*. Se rompe en rojo el día que alguien le saque el `onError` a un nodo de registro — que es
+   **antes** de que llegue a producción, no después. La otra mitad ya está medida: un fallo real deja
+   el `run` en `fallo` (**12 de 41 corridas**, error handler de ADR-054).
+   *Es la opción barata y permanente; cuesta ~30 líneas y ningún crédito.*
+2. 🟡 **Hacer el simulacro posible:** partir `Config.supabase_url` en `supabase_url` (entrega) +
+   `supabase_url_registro`, para poder apuntar solo el registro a un host inválido y correr el drill de
+   verdad. Cuesta una perilla nueva, un `n8n:push` y **una corrida real** (paga). Prueba la conducta,
+   no la declaración.
+3. ⬜ **No hacer nada** y aceptar que el invariante vive en el código y en los ADRs.
+
+**Recomendación: la 1.** La 2 prueba en una corrida lo que la 1 prueba en cada commit, y la parte que
+un simulacro agregaría —que n8n honre su propio `onError`— no es algo que este repo tenga que verificar.
 
 ✅ **La mitad que sí se puede dar por buena, y ya está medida:** un fallo real deja el `run` en
 `fallo`. **12 de las 41 corridas** están así, y el error handler de
