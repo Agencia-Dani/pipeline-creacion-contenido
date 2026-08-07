@@ -35,10 +35,30 @@
 >
 > Con `retia/reels` como única instancia activa, adivinar acertaba siempre. El **2026-08-03 20:46**
 > entraron las 3 de LinkedIn; `leerInstancias()` ordena por `(client_id, slug)` y filtra
-> `estado = active`, así que el primero pasó a ser **`30x/linkedin`**. Desde ese momento, para todo
-> `es_dueno` (los 2 devs de la agencia) y para quien alcance 30X/EstadoX, **cada acción del cockpit
-> de Retia leyó y escribió en el tenant de 30X**. La tabla existe, la query es válida, devuelve cero
-> filas: **el fallo mudo otra vez**, y esta vez en producción durante 3 días.
+> `estado = active`, así que el primero pasó a ser **`30x/linkedin`**. Desde ese momento, cada acción
+> del cockpit de Retia leyó y escribió en el tenant de 30X para quien tuviera la mala suerte de
+> alcanzarlo. La tabla existe, la query es válida, devuelve cero filas: **el fallo mudo otra vez**,
+> y esta vez en producción durante 3 días.
+>
+> ### 🎯 A quién le rompía: 3 de 8, y son exactamente los tres que no son del equipo de redes
+>
+> Calculado sobre las membresías reales y el orden de `leerInstancias()`. `retia/linkedin` es
+> `draft`, así que no cuenta — por eso un operador de Retia veía **una sola** instancia y acertaba.
+>
+> | | `suyas[0]` | |
+> |---|---|---|
+> | **Manuel Mejia** y **Alejandro Dávila** (`es_dueno`) | `30x/linkedin` | 🔴 roto |
+> | **Alejandro 30X** (`30x` + `estadox`) | `30x/linkedin` | 🔴 roto |
+> | Majo, Jero, Alejo, Juan José, Manuel 30X (solo `retia`) | `retia/reels` | 🟢 andaba |
+>
+> 🩸 **O sea: el equipo de redes podía calificar y los dos devs no.** Que no haya un solo evento
+> `candidatos.calificar` desde el 01/08 **no lo explica este bug** para Majo y Jero: a ellos la
+> pantalla les funcionaba. Vale la pena preguntarles si intentaron y algo más los frenó, porque esa
+> sería otra falla y no está diagnosticada.
+>
+> 📌 **Y corrige un dato del bloque 🅱️ de más abajo:** ahí dice *"Majo (`30x`+`estadox`)"*. En prod
+> **Majo Duarte es solo `retia`**; la cuenta con doble membresía es **Alejandro 30X**. Los números
+> de la prueba de B3 no cambian (se corrieron con sesiones reales), pero el nombre estaba cruzado.
 >
 > **La página nunca estuvo mal** — `page.tsx` sí recibe `params`. Solo las acciones. Por eso el feed
 > mostraba 175 en el chip (página, tenant bueno) y "Cargar más" traía 0 (acción, tenant malo) y
@@ -50,7 +70,7 @@
 > |---|---|
 > | `app.candidatos` de `retia/reels` | **175**, y **0 calificados** |
 > | `app.candidatos` de `30x/linkedin` | **0** — lo que leía "Cargar más" |
-> | último evento `candidatos.calificar` | **2026-08-01 17:39**. Nada en 3 días |
+> | último evento `candidatos.calificar` | **2026-08-01 17:39**. Nada en 3 días (ver el matiz de abajo: al equipo de redes la pantalla le andaba) |
 > | último `outputs` escrito | 04/08, y sus 9 filas tienen `calificado_en` del **01/08** |
 >
 > 🩸 **Y una fila sospechosa que Mani tiene que mirar:** el evento `voces.crear` del **05/08 15:25**
@@ -242,12 +262,11 @@
 > | 3 | corrida del motor verde **que escribió memoria de dedup** | ✅ **`intersección: 0 ✓`, contando por `run_id`** (48 filas la del 06/08, 121 la del 03/08). El `⛔ NO CUENTA` que se le puso ayer **no disparó**, o sea que el ∅ es de un dedup que funciona y no de una tabla vacía |
 > | 4 | archivado verde **que escribió `outputs`** | ❌ **el último es del 04/08**, anterior al push. Y no podía llegar solo — ver abajo |
 >
-> 🔴 **La 4 estaba esperando algo que el bug del cockpit hacía imposible.** El archivado solo escribe
-> `outputs` si hay candidatos calificados, y desde el 03/08 **nadie podía calificar**: las 175 filas
-> siguen en `sin calificar`. El propio §0 lo anticipa (*"si esa semana no hubo calificados, el
-> archivado cierra con 0 y NO sirve de prueba"*), pero atribuía el 0 a que nadie hubiera trabajado.
-> Era que la pantalla no dejaba. **Con `c267980` deployado, la 4 se consigue calificando y esperando
-> el archivado** (o disparándolo a mano).
+> 🔴 **La 4 no puede llegar sola.** El archivado toma `estado=neq.nuevo` —o sea que **cualquier**
+> calificación sirve, 🔥 👍 o 👎— y hoy hay **0 de 175**. El propio §0 lo anticipa (*"si esa semana
+> no hubo calificados, el archivado cierra con 0 y NO sirve de prueba"*). Para los dos devs esto
+> era imposible por el bug del cockpit; para el equipo de redes, simplemente no pasó. **El camino es
+> calificar aunque sea un puñado y después correr el archivado**, no esperar al domingo.
 >
 > 📌 **Dato de calidad, aparte del gate:** la corrida avisó *"65% de transcripciones vacías"* (31 de
 > 48), contra un baseline del 23/07 de 41% y un 54% en la del 03/08. **Tres corridas subiendo.** No
