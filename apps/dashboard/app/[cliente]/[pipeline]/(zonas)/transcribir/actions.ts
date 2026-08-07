@@ -11,6 +11,7 @@ import { transcribir, traducir } from "@/lib/transcribir";
 import {
   contarPendientes,
   cualesEnCola,
+  cualesFallidas,
   cualesVistosPorElMotor,
   encolarEnlaces,
   marcarResultado,
@@ -82,6 +83,8 @@ export type Revision = {
   /** Los que se van a transcribir, en su forma canónica: es lo que queda en el campo al aceptar. */
   nuevos: string[];
   yaEnCola: number;
+  /** Están en la cola pero terminaron mal: el guion NO viene, hay que reintentarlos desde la lista. */
+  fallados: number;
   yaVistosPorElMotor: number;
   noReconocidos: number;
 };
@@ -119,17 +122,19 @@ export async function revisarPegote(
 
   try {
     const ids = validos.map((e) => e.external_id);
-    const [enCola, vistos] = await Promise.all([
+    const [enCola, vistos, fallados] = await Promise.all([
       cualesEnCola(ctx, ids),
       cualesVistosPorElMotor(ctx, ids),
+      cualesFallidas(ctx, ids),
     ]);
-    const reparto = repartirEnlaces(validos, enCola, vistos);
+    const reparto = repartirEnlaces(validos, enCola, vistos, fallados);
 
     return {
       ok: true,
       revision: {
         nuevos: reparto.nuevos.map((e) => e.url),
         yaEnCola: reparto.enCola.length,
+        fallados: reparto.fallados.length,
         yaVistosPorElMotor: reparto.vistosPorElMotor.length,
         noReconocidos: invalidos.length,
       },

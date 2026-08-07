@@ -63,17 +63,22 @@
 > B **4**, A **0**. Nunca se llamó a Supadata y las 4 filas se borraron — la tabla quedó en **57** y
 > `processed_items` sin una sola fila de prueba.
 >
-> ⬜ **Queda el reintento**, y el primer intento se fue por el camino equivocado: se probó **pegando
-> el link de vuelta en el campo** en lugar de apretar **Reintentar** en la fila. Hay exactamente una
-> fila que sirve (`instagram.com/p/DAOqPTANXG-/`, en *Sin voz*).
+> ### 🩸 Y el reintento destapó TRES bugs, todos de la mitad de pantalla
 >
-> 🩸 **Y ese camino equivocado lo indujo la pantalla, que es el hallazgo de la sesión.**
-> `cualesEnCola` pregunta *"¿está en `app.transcripciones`?"* **sin mirar el estado**, así que un link
-> en `fallo`/`sin_transcript` se reporta como *"ya lo pediste — el guion está o **viene en camino**"*.
-> **Para una fila fallada es falso: no viene nada**, y el mensaje manda a esperar en vez de mandar al
-> botón que la destraba. No pierde plata (el error es hacia *no* cobrar), pero es un **fallo mudo**:
-> la pantalla dice que está todo bien y no lo está. Sin arreglar; anotado en
-> [`verificaciones-humanas.md` §2-bis](../verificaciones-humanas.md).
+> El botón se apretó a las 07:24 y **la mitad de servidor estaba perfecta**: evento escrito, fila de
+> vuelta en `pendiente` con `error`/`script`/`procesado_en` limpios. Desde la pantalla, en cambio,
+> *"no pasó nada"* — y era cierto. Los tres salieron de que una persona apretara un botón; **ninguno
+> se ve en una query ni en un test de dominio.**
+>
+> | | El bug | El arreglo |
+> |---|---|---|
+> | 1 | 🔴 **La fila fallada no se podía encontrar.** La lista trae las **últimas 50** por `creado_en`; una tanda de 52 links pegados juntos comparte el timestamp **al segundo**, y la única fallada cayó en la **posición 49 de 50** entre 49 `Listo`. Y el desempate entre timestamps iguales es **arbitrario** ⇒ el pegote siguiente la empuja **fuera de la ventana** y el botón se vuelve inalcanzable: **la fila queda clavada, que es el bug que ese botón existe para matar** | `leerFallidas`, sin ventana, en su propia tarjeta arriba de todo |
+> | 2 | 🔴 **El botón dejaba la fila en la cola y nadie la levantaba** (`pendiente` + `procesado_en: null`). `revalidatePath` invalida el cache del server, pero lo que dispara el `Procesador` es el prop `pendientes`, y eso pide re-render **del cliente**. El pegote no lo notaba porque su `setResultado`/`setTexto` ya provocaban uno | `router.refresh()` en el botón |
+> | 3 | 🟡 **El panel decía "viene en camino" sobre un link que falló.** `cualesEnCola` preguntaba *"¿está en la tabla?"* **sin mirar el estado**. Es lo que indujo el intento por el camino equivocado (pegar el link de vuelta, que **nunca** puede arreglarlo: el `ignoreDuplicates` lo descarta) | `fallados` es su propio montón en `repartirEnlaces`, con 2 tests |
+>
+> ⏳ **Lo único que queda del punto 2 de §2-bis:** ver que ahora el reintento arranque solo. La fila
+> quedó **en `pendiente`** esperando; con recargar la pantalla se procesa.
+> Verde sobre el árbol: `typecheck` · **224/224** · `build` · `validate` (2152 checks).
 >
 > ### 🟡 La voz "Alejo": es un registro huérfano, no un problema de accesos
 >

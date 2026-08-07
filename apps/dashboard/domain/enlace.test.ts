@@ -204,7 +204,26 @@ describe("repartirEnlaces", () => {
     assert.deepEqual(repartirEnlaces([], new Set(), new Set()), {
       nuevos: [],
       enCola: [],
+      fallados: [],
       vistosPorElMotor: [],
     });
+  });
+
+  it("🩸 un fallado NO se cuenta como 'viene en camino': va a su propio montón", () => {
+    // El bug del 07/08: `enCola` no miraba el estado, así que un link en `fallo`/`sin_transcript`
+    // se anunciaba como "el guion está o viene en camino". No viene nada, y el operador se queda
+    // esperando en vez de apretar Reintentar.
+    const e = ig("9");
+    const r = repartirEnlaces([e], new Set([claveDe(e)]), new Set(), new Set([claveDe(e)]));
+    assert.deepEqual(r.fallados.map((x) => x.external_id), ["9"]);
+    assert.deepEqual(r.enCola, []);
+  });
+
+  it("🔒 un fallado tampoco vuelve a 'nuevos': volver a pegarlo no lo arregla", () => {
+    // Tentaría contarlo como nuevo para que se reencole solo, pero el `ignoreDuplicates` del upsert
+    // lo descarta igual: la pantalla anunciaría "1 en cola" y no se encolaría nada.
+    const e = ig("10");
+    const r = repartirEnlaces([e], new Set([claveDe(e)]), new Set(), new Set([claveDe(e)]));
+    assert.deepEqual(r.nuevos, []);
   });
 });

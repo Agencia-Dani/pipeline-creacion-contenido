@@ -55,7 +55,7 @@ export function PegarEnlaces() {
         setResultado({ ok: false, mensaje: r.mensaje });
         return;
       }
-      const sobra = r.revision.yaEnCola + r.revision.yaVistosPorElMotor;
+      const sobra = r.revision.yaEnCola + r.revision.fallados + r.revision.yaVistosPorElMotor;
       if (sobra === 0) {
         const enviado = await pegarEnlaces(cockpit, texto);
         setResultado(enviado);
@@ -113,14 +113,24 @@ export function PegarEnlaces() {
         <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
           <div>
             <p className="font-medium">
-              {revision.yaEnCola + revision.yaVistosPorElMotor} de estos {validos.length} no hace
-              falta transcribirlos.
+              {revision.yaEnCola + revision.fallados + revision.yaVistosPorElMotor} de estos{" "}
+              {validos.length} no hace falta transcribirlos.
             </p>
             <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
               {revision.yaEnCola > 0 && (
                 <li>
                   <strong>{revision.yaEnCola}</strong> ya los pediste antes — el guion está o viene
                   en camino, abajo en la lista.
+                </li>
+              )}
+              {/* Separado de `yaEnCola` a propósito: decirle "viene en camino" a un link que falló
+                  manda a esperar algo que no va a pasar. Volver a pegarlo tampoco lo arregla (el
+                  upsert lo descarta), así que el único camino es el botón. */}
+              {revision.fallados > 0 && (
+                <li>
+                  <strong>{revision.fallados}</strong> los pediste y <strong>fallaron</strong>. El
+                  guion no viene: reintentalos con su botón <em>Reintentar</em>, en la lista de
+                  abajo. Volver a pegarlos acá no los destraba.
                 </li>
               )}
               {revision.yaVistosPorElMotor > 0 && (

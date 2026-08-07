@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { haceCuanto } from "@/domain/corrida";
 import { exigirTenant } from "@/lib/auth";
-import { leerTranscripciones, type Transcripcion } from "@/lib/transcripciones";
+import { leerFallidas, leerTranscripciones, type Transcripcion } from "@/lib/transcripciones";
 import { Copiar } from "./copiar";
 import { PegarEnlaces } from "./pegar-enlaces";
 import { Procesador } from "./procesador";
@@ -37,6 +37,47 @@ const BADGE_POR_ESTADO: Record<
   fallo: "destructive",
 };
 
+function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
+  return (
+    <li className="space-y-2 border-b pb-4 last:border-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <Badge variant={BADGE_POR_ESTADO[t.estado]}>{ESTADO_LEGIBLE[t.estado]}</Badge>
+        <a
+          href={t.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="break-all underline underline-offset-4"
+        >
+          {t.url}
+        </a>
+        <span className="text-muted-foreground">
+          {haceCuanto(t.creado_en, ahora)}
+          {t.idioma && t.idioma !== "es" && ` · original en ${t.idioma}`}
+        </span>
+      </div>
+
+      {t.script && (
+        <details className="space-y-2">
+          <summary className="cursor-pointer text-sm text-muted-foreground">
+            Ver el script ({t.script.length} caracteres)
+          </summary>
+          <p className="mt-2 whitespace-pre-wrap text-sm">{t.script}</p>
+          <div className="mt-2">
+            <Copiar texto={t.script} />
+          </div>
+        </details>
+      )}
+
+      {t.error && <p className="text-xs text-muted-foreground">{t.error}</p>}
+
+      {/* Sin esto un enlace que falló quedaba clavado para siempre: el procesador solo levanta
+          `pendiente`, y volver a pegar el link tampoco servía porque el encolado lo descarta como
+          duplicado. Con Supadata devolviendo transcripciones vacías, no es un caso raro. */}
+      {(t.estado === "fallo" || t.estado === "sin_transcript") && <Reintentar id={t.id} />}
+    </li>
+  );
+}
+
 export default async function TranscribirPage({
   params,
 }: {
@@ -49,6 +90,17 @@ export default async function TranscribirPage({
     console.error("[transcribir] no se pudo leer la lista:", e);
     return null;
   });
+
+  // 🩸 Las fallidas se traen aparte porque en la lista no se encuentran (medido el 2026-08-07): una
+  // tanda de 52 links pegados juntos comparte `creado_en` al segundo, y la única fallada del día
+  // cayó en la posición 49 de 50, indistinguible entre 49 `Listo`. El desempate entre timestamps
+  // iguales es arbitrario, así que el pegote siguiente la empuja fuera de la ventana y el botón
+  // `Reintentar` se vuelve inalcanzable: la fila queda clavada, que es el bug que ese botón mata.
+  const fallidas = await leerFallidas(ctx).catch((e) => {
+    console.error("[transcribir] no se pudieron leer las fallidas:", e);
+    return [];
+  });
+  const enLista = new Set(fallidas.map((f) => f.id));
 
   const pendientes = lista?.filter((t) => t.estado === "pendiente").length ?? 0;
   const ahora = new Date();
@@ -77,6 +129,29 @@ export default async function TranscribirPage({
         </CardContent>
       </Card>
 
+      {fallidas.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {fallidas.length === 1
+                ? "1 no salió"
+                : `${fallidas.length} no salieron`}
+            </CardTitle>
+            <CardDescription>
+              Estas se quedan acá hasta que las reintentes: el guion no existe todavía y volver a
+              pegar el link no las destraba. Reintentar no cuesta nada si vuelve a fallar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {fallidas.map((t) => (
+                <Fila key={t.id} t={t} ahora={ahora} />
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Transcripciones</CardTitle>
@@ -100,49 +175,13 @@ export default async function TranscribirPage({
             </p>
           ) : (
             <ul className="space-y-4">
-              {lista.map((t) => (
-                <li key={t.id} className="space-y-2 border-b pb-4 last:border-0 last:pb-0">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                    <Badge variant={BADGE_POR_ESTADO[t.estado]}>
-                      {ESTADO_LEGIBLE[t.estado]}
-                    </Badge>
-                    <a
-                      href={t.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="break-all underline underline-offset-4"
-                    >
-                      {t.url}
-                    </a>
-                    <span className="text-muted-foreground">
-                      {haceCuanto(t.creado_en, ahora)}
-                      {t.idioma && t.idioma !== "es" && ` · original en ${t.idioma}`}
-                    </span>
-                  </div>
-
-                  {t.script && (
-                    <details className="space-y-2">
-                      <summary className="cursor-pointer text-sm text-muted-foreground">
-                        Ver el script ({t.script.length} caracteres)
-                      </summary>
-                      <p className="mt-2 whitespace-pre-wrap text-sm">{t.script}</p>
-                      <div className="mt-2">
-                        <Copiar texto={t.script} />
-                      </div>
-                    </details>
-                  )}
-
-                  {t.error && <p className="text-xs text-muted-foreground">{t.error}</p>}
-
-                  {/* Sin esto un enlace que falló quedaba clavado para siempre: el procesador solo
-                      levanta `pendiente`, y volver a pegar el link tampoco servía porque el
-                      encolado lo descarta como duplicado. Con Supadata devolviendo 65% de
-                      transcripciones vacías, no es un caso raro. */}
-                  {(t.estado === "fallo" || t.estado === "sin_transcript") && (
-                    <Reintentar id={t.id} />
-                  )}
-                </li>
-              ))}
+              {/* Las fallidas ya tienen su tarjeta arriba: repetirlas acá pondría dos botones
+                  `Reintentar` para la misma fila. */}
+              {lista
+                .filter((t) => !enLista.has(t.id))
+                .map((t) => (
+                  <Fila key={t.id} t={t} ahora={ahora} />
+                ))}
             </ul>
           )}
         </CardContent>

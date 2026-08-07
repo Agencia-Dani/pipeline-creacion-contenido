@@ -154,11 +154,23 @@ export function parsearEnlaces(texto: string): LoteDeEnlaces {
  *    que *consideró*, aunque el pre-trim o el gate lo hayan matado antes de transcribirlo, así que
  *    puede no existir el guion en ningún lado. Por eso se ofrece quitarlos y no se quitan solos.
  *
- * Precedencia: estar en la cola gana, porque es el montón donde el guion o está o viene en camino.
+ *  · `fallados` — está en la cola, pero terminó en `fallo` o `sin_transcript`. Es un montón aparte
+ *    desde el 2026-08-07 y no es cosmético: contarlo junto con `enCola` hacía que la pantalla
+ *    dijera *"el guion está o viene en camino"* sobre un link que **no viene**, y mandara a esperar
+ *    en vez de mandar al botón *Reintentar*, que es lo único que lo destraba. Encontrado probando
+ *    el reintento: el operador pegó el link de vuelta porque la pantalla le dijo que ya estaba.
+ *
+ * 🔒 **Un fallado NO puede volver a `nuevos`**, aunque tentaría: el `ignoreDuplicates` del upsert lo
+ * descartaría igual, así que la pantalla anunciaría *"1 en cola"* y no se encolaría nada. Volver a
+ * pegar el link **nunca** puede arreglar una fila fallada; solo el botón puede.
+ *
+ * Precedencia: primero fallado, después en cola. Las dos son "ya está en la tabla", pero solo una
+ * termina en un guion.
  */
 export type Reparto = {
   nuevos: EnlaceVideo[];
   enCola: EnlaceVideo[];
+  fallados: EnlaceVideo[];
   vistosPorElMotor: EnlaceVideo[];
 };
 
@@ -166,11 +178,13 @@ export function repartirEnlaces(
   validos: readonly EnlaceVideo[],
   enCola: ReadonlySet<string>,
   vistosPorElMotor: ReadonlySet<string>,
+  fallados: ReadonlySet<string> = new Set(),
 ): Reparto {
-  const reparto: Reparto = { nuevos: [], enCola: [], vistosPorElMotor: [] };
+  const reparto: Reparto = { nuevos: [], enCola: [], fallados: [], vistosPorElMotor: [] };
   for (const e of validos) {
     const clave = claveDe(e);
-    if (enCola.has(clave)) reparto.enCola.push(e);
+    if (fallados.has(clave)) reparto.fallados.push(e);
+    else if (enCola.has(clave)) reparto.enCola.push(e);
     else if (vistosPorElMotor.has(clave)) reparto.vistosPorElMotor.push(e);
     else reparto.nuevos.push(e);
   }

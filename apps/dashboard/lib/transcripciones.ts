@@ -32,6 +32,9 @@ export type Transcripcion = z.infer<typeof filaTranscripcion>;
 const COLUMNAS =
   "id, plataforma, external_id, url, estado, script, idioma, error, creado_en, procesado_en";
 
+/** Los dos estados de los que solo se sale por el botón `Reintentar`. */
+export const ESTADOS_FALLIDOS = ["fallo", "sin_transcript"] as const;
+
 export async function leerTranscripciones(
   ctx: TenantContext,
   limite = 50,
@@ -42,6 +45,30 @@ export async function leerTranscripciones(
     .limit(limite);
   if (error)
     throw new Error(`Supabase respondió con error leyendo transcripciones: ${error.message}`);
+  return z.array(filaTranscripcion).parse(data);
+}
+
+/**
+ * Las que fallaron, aparte y sin límite de ventana.
+ *
+ * 🩸 **Por qué no alcanza con filtrar la lista de arriba** (medido el 2026-08-07): esa lista trae
+ * las últimas 50 por `creado_en`, y una tanda de 52 links pegados de una sola vez comparte el mismo
+ * timestamp al segundo. La única fila fallada del día cayó en la posición **49 de 50**, indistinguible
+ * a simple vista entre 49 `Listo` — el operador no la encontró. Y el desempate entre timestamps
+ * iguales es arbitrario, así que **el siguiente pegote la empuja fuera de la ventana**: el botón
+ * `Reintentar` se vuelve inalcanzable y la fila queda clavada, que es exactamente el bug que ese
+ * botón existe para matar.
+ *
+ * Son pocas por definición (las que fallaron y nadie reintentó todavía), así que traerlas enteras
+ * es más barato que paginar la lista.
+ */
+export async function leerFallidas(ctx: TenantContext): Promise<Transcripcion[]> {
+  const { data, error } = await (await scoped(ctx))
+    .select("app.transcripciones", COLUMNAS)
+    .in("estado", [...ESTADOS_FALLIDOS])
+    .order("creado_en", { ascending: false });
+  if (error)
+    throw new Error(`Supabase respondió con error leyendo las fallidas: ${error.message}`);
   return z.array(filaTranscripcion).parse(data);
 }
 
@@ -231,6 +258,33 @@ async function clavesConocidas(
 
 export async function cualesEnCola(ctx: TenantContext, ids: string[]): Promise<Set<string>> {
   return ids.length === 0 ? new Set() : clavesConocidas(ctx, "app.transcripciones", ids);
+}
+
+/**
+ * Cuáles de esos links están en la cola **pero terminaron mal**.
+ *
+ * Es un subconjunto de `cualesEnCola`, no una alternativa: los dos se consultan y `repartirEnlaces`
+ * les da precedencia a estos. Sin esta pregunta, la pantalla anuncia *"viene en camino"* sobre un
+ * link que no viene.
+ */
+export async function cualesFallidas(ctx: TenantContext, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const s = await scoped(ctx);
+  const claves = new Set<string>();
+
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await s
+      .select("app.transcripciones", "plataforma, external_id")
+      .in("external_id", ids.slice(i, i + 200))
+      .in("estado", [...ESTADOS_FALLIDOS]);
+    if (error)
+      throw new Error(`Supabase respondió con error consultando las fallidas: ${error.message}`);
+    for (const fila of z
+      .array(z.object({ plataforma: z.string(), external_id: z.string() }))
+      .parse(data ?? []))
+      claves.add(`${fila.plataforma}:${fila.external_id}`);
+  }
+  return claves;
 }
 
 export async function cualesVistosPorElMotor(

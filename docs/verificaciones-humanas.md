@@ -112,17 +112,19 @@ Pasó. Está en el §Registro del final; el enunciado completo vive en git
    camino corta antes de `pegarEnlaces`, así que **no escribe `transcribir.pegar`**. El código viejo
    avisaba *después* de encolar ⇒ habría dejado un evento con `ya_estaban: 2`. **Cero eventos nuevos
    en `app.eventos` ⇒ el deploy nuevo está vivo y el aviso llega antes de pagar.**
-2. ⬜ **El reintento — SIGUE ABIERTO, y el primer intento se fue por el camino equivocado.**
-   Se probó **pegando el link de vuelta en el campo**, y ahí la pantalla contesta *"ya lo pediste"*:
-   correcto, pero no es esto. **El botón está en la lista de abajo, en la fila misma**
-   (`page.tsx:141` lo dibuja solo si el estado es `fallo` o `sin_transcript`).
-   Al 07/08 hay **exactamente una fila** que sirve: `instagram.com/p/DAOqPTANXG-/`, en **Sin voz**.
-   Apretar **Reintentar** ⇒ vuelve a **En cola** y se procesa sola, sin recargar.
+2. 🟡 **El reintento — el botón anda; lo que no andaba es lo de después.** Apretado el 07/08 a las
+   07:24: evento `transcribir.reintentar` escrito, y la fila volvió a `pendiente` con el `error`, el
+   `script` y el `procesado_en` limpios. **`reencolar` hace exactamente lo que dice.**
+   🩸 **Pero desde la pantalla "no pasó nada", y era cierto:** la fila se quedó en `pendiente` con
+   `procesado_en` en `null`, o sea que **el `Procesador` nunca arrancó**. Arreglado el mismo día con
+   un `router.refresh()` en el botón — el porqué está en `reintentar.tsx`. **Falta ver que ahora sí
+   arranque solo**, que es lo único que queda de este punto.
    ✅ **Que vuelva a dar "Sin voz" TAMBIÉN es un pase**: lo que se prueba es la transición de estado,
-   no que Supadata acierte. El fallo sería que el botón no haga nada.
+   no que Supadata acierte.
    ⚠️ **En un `Listo` no tiene que haber botón**: reintentarlo sería pagar de nuevo un guion que ya
    tenemos. El servidor lo rechaza igual, pero el botón no debería estar.
-   🩸 **Y el camino equivocado lo indujo la pantalla** — ver el hallazgo de abajo.
+   📌 **Y el botón ya no hay que buscarlo:** las fallidas tienen su propia tarjeta arriba de todo
+   (*"N no salieron"*), por lo que se explica abajo.
 3. ✅ **El doble pago — CERRADO el 07/08 por medición, sin browser y sin pagar.** El reclamo y la
    transcripción son dos pasos separados, así que se ejerció **solo el reclamo** contra prod:
    4 filas sembradas, dos trabajadores, y las dos formas del choque:
@@ -136,7 +138,22 @@ Pasó. Está en el §Registro del final; el enunciado completo vive en git
    en 57 y `processed_items` sin una sola fila de prueba. Lo único que no cubre es la UX de dos
    pestañas, que es la mitad menos riesgosa.
 
-### 🩸 Hallazgo del 07/08: el panel miente sobre los links que fallaron
+### 🩸 Tres hallazgos del 07/08, y los tres salieron de probar UN botón
+
+**1. La fila fallada no se podía encontrar.** *"No encuentro eso de reintentar"* no era un despiste:
+la lista trae **las últimas 50** por `creado_en`, una tanda de 52 links pegados juntos comparte el
+timestamp **al segundo**, y la única fallada del día cayó en la **posición 49 de 50**, indistinguible
+entre 49 `Listo`. Peor: el desempate entre timestamps iguales es **arbitrario**, así que el pegote
+siguiente la empujaba fuera de la ventana y el botón se volvía **inalcanzable** — la fila quedaba
+clavada, que es *exactamente* el bug que ese botón existe para matar. Ahora las fallidas se traen
+aparte, sin ventana, en su propia tarjeta arriba de todo.
+
+**2. El botón dejaba la fila en la cola y nadie la procesaba.** Medido: `pendiente` con
+`procesado_en` en `null`. `revalidatePath` invalida el cache del server, pero lo que dispara el
+`Procesador` es el prop `pendientes`, y eso pide un re-render del cliente. El pegote no lo notaba
+porque ahí el `setResultado`/`setTexto` ya provocaban uno. Un `router.refresh()` lo cierra.
+
+**3. El panel miente sobre los links que fallaron**
 
 `cualesEnCola` pregunta *"¿está en `app.transcripciones`?"* **sin mirar el estado**. Entonces, si
 pegás de vuelta un link que quedó en `fallo` o `sin_transcript`, el panel lo cuenta como
@@ -145,7 +162,12 @@ no viene nada**, y el mensaje manda al usuario a esperar algo que no va a pasar 
 botón **Reintentar**, que es lo único que lo destraba.
 
 No hace perder plata (el error es hacia *no* cobrar) y por eso no bloquea nada. Pero es un fallo
-mudo de los que este repo persigue: **la pantalla dice que está todo bien y no lo está.**
+mudo de los que este repo persigue: **la pantalla dice que está todo bien y no lo está.** Arreglado
+el mismo día: `fallados` es su propio montón en `repartirEnlaces`, con dos tests.
+
+🔑 **Lo que enseñan los tres juntos:** el arreglo del 06/08 estaba bien **en su mitad de servidor** y
+sin estrenar en la de pantalla. Ninguno de los tres se ve en una query ni en un test de dominio —
+salieron de que una persona apretara el botón. Es el argumento entero de este documento.
 
 
 
