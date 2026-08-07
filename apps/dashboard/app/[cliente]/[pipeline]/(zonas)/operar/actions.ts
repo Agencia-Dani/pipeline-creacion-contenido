@@ -147,3 +147,52 @@ export async function buscarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDispa
   revalidatePath(rutaDe(comoRuta(cockpit), "curar/sugeridos"));
   return { ok: true, mensaje: "Buscando. En unos minutos aparecen las propuestas nuevas en Curar → Sugeridos." };
 }
+
+// ── Archivar ahora ───────────────────────────────────────────────────────────
+//
+// El archivado corre solo los domingos 18:00 (cron del dispatcher). Este botón es para cuando el
+// equipo calificó y quiere el CSV **hoy**: ADR-062 lo eligió sobre D7.5 (que la app escriba
+// `outputs` al calificar) porque es lo mínimo que resuelve el pedido sin abrir el refactor.
+//
+// 🔑 **Reusa las env vars del motor y no es descuido:** el webhook del archivado usa la MISMA
+// credencial de n8n (`Webhook Motor Header`, verificado en los dos `workflow.json`), así que lo
+// único que cambia es la URL. Inventarle un par propio de env vars sería pedir que alguien cargue
+// dos valores que tienen que ser idénticos, y el día que difieran el fallo es un 403 silencioso.
+export async function archivarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDisparo> {
+  const { usuario, ctx, cockpit } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
+
+  const url = process.env.ARCHIVADO_WEBHOOK_URL;
+  const nombre = process.env.MOTOR_WEBHOOK_HEADER_NOMBRE;
+  const valor = process.env.MOTOR_WEBHOOK_HEADER_VALOR;
+  if (!url || !nombre || !valor) {
+    return {
+      ok: false,
+      mensaje: "Falta configurar el webhook del archivado (ARCHIVADO_WEBHOOK_URL). Avisale a un dev.",
+    };
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { [nombre]: valor, "content-type": "application/json" },
+      body: JSON.stringify({ instancia: ctx.instanceId }),
+    });
+    if (res.status === 403) {
+      return {
+        ok: false,
+        mensaje: "El archivador rechazó la señal (403): el header no coincide con el de n8n. Avisale a un dev.",
+      };
+    }
+    if (!res.ok) return { ok: false, mensaje: `El archivador respondió ${res.status}. Avisale a un dev.` };
+  } catch {
+    return { ok: false, mensaje: "No se pudo llegar al archivador. ¿n8n está caído? Avisale a un dev." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "operar.archivar", {});
+  revalidatePath(rutaDe(comoRuta(cockpit), "operar"));
+  revalidatePath(rutaDe(comoRuta(cockpit), "curar/historicos"));
+  return {
+    ok: true,
+    mensaje: "Archivando. En un minuto los aprobados aparecen en Curar → Históricos y salen del feed.",
+  };
+}

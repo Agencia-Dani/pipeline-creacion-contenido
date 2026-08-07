@@ -33,6 +33,7 @@ import { ultimasCorridasMotor } from "@/lib/runs";
 import { leerPendientes } from "@/lib/sugeridos";
 import { AutoRefresh } from "./auto-refresh";
 import { BotonCorrer } from "./boton-correr";
+import { BotonArchivar } from "./boton-archivar";
 
 export const dynamic = "force-dynamic";
 
@@ -264,6 +265,19 @@ export default async function OperarPage({
         </CardHeader>
         <CardContent>
           <BotonBuscar pendientes={pendientes} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Archivar lo calificado</CardTitle>
+          <CardDescription>
+            El archivador corre solo los domingos a las 18:00 y es el que manda lo aprobado a
+            Históricos. Apretalo si querés el CSV hoy, sin esperar al domingo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BotonArchivar />
         </CardContent>
       </Card>
 

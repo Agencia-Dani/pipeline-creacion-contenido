@@ -14,6 +14,7 @@ import { Copiar } from "./copiar";
 import { PegarEnlaces } from "./pegar-enlaces";
 import { Procesador } from "./procesador";
 import { Reintentar } from "./reintentar";
+import { Abandonar } from "./abandonar";
 
 export const dynamic = "force-dynamic";
 // Aplica a las Server Actions de esta página (docs de Next, route-segment-config). Alcanza de
@@ -32,6 +33,9 @@ const ESTADO_LEGIBLE: Record<Transcripcion["estado"], string> = {
   listo: "Listo",
   sin_transcript: "Sin transcripción",
   fallo: "Falló",
+  // No dice "Descartado" a propósito: en esta app descartar es un juicio de mérito (el gate rechazó
+  // el video, o el equipo le puso 👎). Esto dice que el insumo está roto (ADR-062 §4).
+  abandonado: "Abandonado",
 };
 
 const BADGE_POR_ESTADO: Record<
@@ -42,6 +46,7 @@ const BADGE_POR_ESTADO: Record<
   listo: "secondary",
   sin_transcript: "outline",
   fallo: "destructive",
+  abandonado: "outline",
 };
 
 function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
@@ -79,8 +84,16 @@ function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
 
       {/* Sin esto un enlace que falló quedaba clavado para siempre: el procesador solo levanta
           `pendiente`, y volver a pegar el link tampoco servía porque el encolado lo descarta como
-          duplicado. Con Supadata devolviendo transcripciones vacías, no es un caso raro. */}
-      {(t.estado === "fallo" || t.estado === "sin_transcript") && <Reintentar id={t.id} />}
+          duplicado. Con Supadata devolviendo transcripciones vacías, no es un caso raro.
+          Las dos salidas van juntas a propósito: reintentar sirve cuando el fallo
+          fue transitorio, y abandonar cuando no puede ganar nunca (un video sin voz). Con una sola
+          de las dos, la fila queda ofreciendo un botón que pierde siempre (ADR-062 §4). */}
+      {(t.estado === "fallo" || t.estado === "sin_transcript") && (
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <Reintentar id={t.id} />
+          <Abandonar id={t.id} />
+        </span>
+      )}
     </li>
   );
 }
@@ -145,8 +158,9 @@ export default async function TranscribirPage({
                 : `${fallidas.length} no salieron`}
             </CardTitle>
             <CardDescription>
-              Estas se quedan acá hasta que las reintentes: el guion no existe todavía y volver a
-              pegar el link no las destraba. Reintentar no cuesta nada si vuelve a fallar.
+              Estas se quedan acá hasta que hagas algo: el guion no existe todavía y volver a
+              pegar el link no las destraba. Reintentar no cuesta nada si vuelve a fallar; si el
+              video no tiene voz, reintentar no va a servir nunca y lo que corresponde es abandonarlo.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -30,9 +30,11 @@ export default async function HistoricosPage({
           ← Curar
         </Link>
         <h1 className="mt-1 text-2xl font-semibold">Históricos</h1>
+        {/* El texto cambió con ADR-062: dejó de decir "todo lo que el equipo aprobó" porque una
+            transcripción a pedido nunca se calificó, y desde entonces también vive acá. */}
         <p className="text-muted-foreground">
-          Todo lo que el equipo aprobó, de todas las semanas, con su transcripción. El feed se
-          vacía cada domingo; esto no.
+          Todo guion que el equipo quiso guardar, de todas las semanas: lo que aprobó en el feed y
+          lo que transcribió pegando un enlace. El feed se vacía cada domingo; esto no.
         </p>
       </div>
 

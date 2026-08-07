@@ -34,6 +34,8 @@ export type Historico = {
   relevanciaScore: number | null;
   relevanciaRazon: string | null;
   notas: string | null;
+  /** De dónde vino el guion: el feed de calificación o un enlace pegado (ADR-062). */
+  origen: "feed" | "transcribir";
 };
 
 const texto = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
@@ -94,6 +96,10 @@ export async function leerAprobados(
       relevanciaScore: numero(m.relevancia_score),
       relevanciaRazon: texto(m.relevancia_razon),
       notas: texto(m.notas_equipo),
+      // Se deriva de `metadata.origen` y no de `tipo`, que no se lee en esta query. Lo que escribe
+      // el archivado no trae la marca, y su ausencia significa "vino del feed": es el caso viejo y
+      // el mayoritario, así que el default correcto es ese y no un "(desconocido)".
+      origen: m.origen === "transcribir" ? "transcribir" : "feed",
     } satisfies Historico;
   });
 
@@ -123,4 +129,51 @@ export async function leerTodosLosAprobados(
   }
 
   return { filas: todas.slice(0, TOPE_EXPORT), truncado: true };
+}
+
+// ── Lo que el transcriptor manda al histórico (ADR-062) ──────────────────────
+//
+// 🔑 **Histórico dejó de ser "lo que el equipo aprobó" y pasó a ser "lo que el equipo quiso
+// guardar".** Una transcripción a pedido nunca se calificó —el glosario es explícito: *no es un
+// Candidato*— así que meterla bajo la palabra *aprobó* habría sido mentir con el término. El
+// significado nuevo es el que hace que esta función no sea un parche.
+//
+// Entra sola al quedar `listo`, sin botón de confirmación: si el histórico es lo que el equipo
+// quiso guardar, **pegar el link ya es quererlo**.
+//
+// `estado: 'aprobado'` no dice que alguien lo aprobó: es el valor que `leerAprobados` filtra, o sea
+// "está en el histórico". El origen real lo dice `tipo`, que es lo que separa estas filas de las
+// del feed en las métricas — y `v_metricas_calidad` y las 5 vistas de `016` filtran por
+// `tipo = 'guion_reel'`, así que **nada de esto ensucia una sola métrica**. Fue el hallazgo que
+// volvió barata toda la decisión.
+export const TIPO_TRANSCRIPCION = "transcripcion_a_pedido";
+
+export async function registrarEnHistorico(
+  ctx: TenantContext,
+  runId: string,
+  fila: { url: string; script: string; idioma: string; externalId: string; plataforma: string },
+): Promise<void> {
+  const { error } = await (await scoped(ctx)).upsert(
+    "public.outputs",
+    [
+      {
+        run_id: runId,
+        tipo: TIPO_TRANSCRIPCION,
+        // El título de un enlace pegado es su URL: nadie le puso nombre, y el video no trae uno
+        // que podamos leer sin pagarle a alguien. Mejor la URL que un "(sin título)" que no ayuda.
+        titulo: fila.url,
+        contenido_o_link: fila.script,
+        estado: "aprobado",
+        external_id: fila.externalId,
+        calificado_en: new Date().toISOString(),
+        metadata: { origen: "transcribir", url_referente: fila.url, idioma: fila.idioma, plataforma: fila.plataforma },
+      },
+    ],
+    // El mismo arbiter que usa el archivado (`016`): si alguien vuelve a transcribir el mismo link
+    // en otra tanda, el histórico no gana una fila duplicada.
+    { onConflict: "instance_id,external_id", ignoreDuplicates: true },
+  );
+  // Sumidero: si esto falla, el guion existe igual en `app.transcripciones` y lo único que se
+  // pierde es su copia en el histórico. No se tira la transcripción por la que ya se pagó.
+  if (error) console.error("[transcriptor] no se pudo registrar en el histórico:", error.message);
 }

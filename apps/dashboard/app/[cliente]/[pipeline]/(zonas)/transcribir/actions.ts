@@ -8,7 +8,10 @@ import { parsearEnlaces, repartirEnlaces } from "@/domain/enlace";
 import { exigirTenant } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import { transcribir, traducir } from "@/lib/transcribir";
+import { abrirRunTranscriptor, cerrarRunTranscriptor } from "@/lib/runs";
+import { registrarEnHistorico } from "@/lib/historicos";
 import {
+  abandonar,
   contarPendientes,
   cualesEnCola,
   cualesFallidas,
@@ -169,6 +172,35 @@ export async function reintentarTranscripcion(
   return { ok: true, mensaje: "De vuelta en la cola." };
 }
 
+/**
+ * La otra salida de una fila fallada, y la que faltaba: cerrarla para siempre.
+ *
+ * El reintento sirve cuando el fallo fue transitorio. Cuando el video **no tiene voz**, reintentar
+ * no puede ganar nunca y la fila queda ofreciendo un botón que no gana. Esto la cierra (ADR-062 §4).
+ */
+export async function abandonarTranscripcion(
+  enRuta: CockpitEnRuta,
+  id: string,
+): Promise<ResultadoPegar> {
+  const { usuario, ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
+
+  let abandonada: boolean;
+  try {
+    abandonada = await abandonar(ctx, id);
+  } catch (e) {
+    console.error(`[transcribir] falló abandonar ${id}:`, e);
+    return { ok: false, mensaje: "No se pudo abandonar. Probá de nuevo." };
+  }
+
+  if (!abandonada) {
+    return { ok: false, mensaje: "Ese enlace ya no se puede abandonar. Recargá la página." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "transcribir.abandonar", { transcripcion: id });
+  revalidatePath(rutaDe(comoRuta(cockpit), "transcribir"));
+  return { ok: true, mensaje: "Listo, no se vuelve a intentar. El enlace queda registrado." };
+}
+
 // Pool de 8 en paralelo con presupuesto de tiempo, misma idea que el nodo `Transcribir (Supadata)`
 // del motor: no se ARRANCAN videos nuevos pasado el límite, los en vuelo terminan. Cada enlace se
 // marca apenas vuelve, así que si Vercel corta la función a mitad no se pierde nada — la pasada
@@ -189,15 +221,26 @@ export async function procesarPendientes(enRuta: CockpitEnRuta): Promise<Resulta
   const pendientes = await reclamarPendientes(ctx, LOTE);
   if (pendientes.length === 0) return { procesados: 0, quedan: await contarPendientes(ctx) };
 
+  // 🔑 Una tanda de enlaces pegados **es** una corrida del transcriptor (ADR-062 §3). Se abre acá y
+  // no por enlace: es la unidad que la persona dispara, y es lo que hace que el gasto de Supadata
+  // aparezca en Entender agrupado como el de las otras tres máquinas.
+  //
+  // `null` es un estado legítimo, no un error: si no se pudo abrir, la tanda se transcribe igual y
+  // lo único que se pierde es que sus guiones lleguen al histórico. El registro es sumidero, jamás
+  // dependencia de ejecución (invariante #1 de PLAN §2.5) — el mismo que audita el check #6.
+  const runId = await abrirRunTranscriptor(ctx);
+
   const inicio = Date.now();
   let siguiente = 0;
   let procesados = 0;
+  const cuenta = { listos: 0, sin_transcript: 0, fallos: 0 };
 
   const trabajador = async () => {
     while (Date.now() - inicio < PRESUPUESTO_MS) {
       const i = siguiente++;
       if (i >= pendientes.length) return;
-      await procesarUno(ctx, pendientes[i]);
+      const salida = await procesarUno(ctx, pendientes[i], runId);
+      cuenta[salida]++;
       procesados++;
     }
   };
@@ -206,11 +249,19 @@ export async function procesarPendientes(enRuta: CockpitEnRuta): Promise<Resulta
     Array.from({ length: Math.min(CONCURRENCIA, pendientes.length) }, trabajador),
   );
 
+  if (runId) await cerrarRunTranscriptor(ctx, runId, { pedidos: procesados, ...cuenta });
+
   revalidatePath(rutaDe(comoRuta(cockpit), "transcribir"));
   return { procesados, quedan: await contarPendientes(ctx) };
 }
 
-async function procesarUno(ctx: TenantContext, fila: Transcripcion): Promise<void> {
+type Salida = "listos" | "sin_transcript" | "fallos";
+
+async function procesarUno(
+  ctx: TenantContext,
+  fila: Transcripcion,
+  runId: string | null,
+): Promise<Salida> {
   try {
     const { texto, idioma } = await transcribir(fila.url);
 
@@ -222,7 +273,7 @@ async function procesarUno(ctx: TenantContext, fila: Transcripcion): Promise<voi
         estado: "sin_transcript",
         error: "No se pudo sacar el texto: el video no tiene habla, o Supadata no lo consiguió.",
       });
-      return;
+      return "sin_transcript";
     }
 
     // Script literal (ADR-009): el transcript tal cual, traducido solo si no venía en español.
@@ -236,9 +287,24 @@ async function procesarUno(ctx: TenantContext, fila: Transcripcion): Promise<voi
       external_id: fila.external_id,
       url: fila.url,
     });
+
+    // Y al histórico, que es lo que ADR-062 vino a arreglar: hasta hoy el guion se quedaba en
+    // `app.transcripciones` y no llegaba al CSV que lee el jefe. Va después del dedup y no antes
+    // porque el dedup es la razón de ser de la herramienta; el histórico es la copia.
+    if (runId) {
+      await registrarEnHistorico(ctx, runId, {
+        url: fila.url,
+        script,
+        idioma: idioma || "es",
+        externalId: fila.external_id,
+        plataforma: fila.plataforma,
+      });
+    }
+    return "listos";
   } catch (e) {
     const mensaje = e instanceof Error ? e.message : String(e);
     console.error(`[transcribir] falló ${fila.url}:`, mensaje);
     await marcarResultado(ctx, fila.id, { estado: "fallo", error: mensaje }).catch(() => {});
+    return "fallos";
   }
 }

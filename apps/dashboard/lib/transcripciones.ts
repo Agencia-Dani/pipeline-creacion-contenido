@@ -20,7 +20,7 @@ const filaTranscripcion = z.object({
   plataforma: z.enum(["instagram", "tiktok"]),
   external_id: z.string(),
   url: z.string(),
-  estado: z.enum(["pendiente", "listo", "sin_transcript", "fallo"]),
+  estado: z.enum(["pendiente", "listo", "sin_transcript", "fallo", "abandonado"]),
   script: z.string().nullable(),
   idioma: z.string().nullable(),
   error: z.string().nullable(),
@@ -341,4 +341,30 @@ export async function registrarEnDedup(ctx: TenantContext, enlace: EnlaceVideo):
   );
   if (error)
     throw new Error(`Supabase respondió con error registrando el dedup: ${error.message}`);
+}
+
+/**
+ * Cierra un enlace que **nunca va a dar un script** — el caso que la pidió es un video sin voz.
+ *
+ * 🔑 **Abandonar no es descartar** (ADR-062 §4). En este dominio *descartar* es siempre un juicio de
+ * mérito: el gate rechazó el video, o el equipo le puso 👎. Esto dice que el **insumo está roto**, y
+ * por eso no alimenta ningún aprendizaje.
+ *
+ * 🩸 **La fila queda, y ese es el punto.** Es la memoria de que el link ya se pidió: sin ella, el
+ * `ignoreDuplicates` de `encolarEnlaces` no tiene contra qué chocar y el mismo link se vuelve a
+ * colar, se vuelve a pagar y vuelve a fallar.
+ *
+ * 🔒 El `.in("estado", ESTADOS_FALLIDOS)` es el mismo guardia que `reencolar`, y por el mismo
+ * motivo: sin él, un POST a mano abandona un `listo` y **borra del histórico un guion que ya se
+ * pagó**. La pantalla solo dibuja el botón en los dos estados malos; la pantalla esconde y el
+ * servidor impide.
+ */
+export async function abandonar(ctx: TenantContext, id: string): Promise<boolean> {
+  const { data, error } = await (await scoped(ctx))
+    .update("app.transcripciones", { estado: "abandonado" })
+    .eq("id", id)
+    .in("estado", [...ESTADOS_FALLIDOS])
+    .select("id");
+  if (error) throw new Error(`Supabase respondió con error abandonando: ${error.message}`);
+  return (data?.length ?? 0) > 0;
 }

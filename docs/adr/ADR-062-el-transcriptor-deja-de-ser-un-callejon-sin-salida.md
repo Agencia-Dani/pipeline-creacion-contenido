@@ -53,8 +53,24 @@ registrar algo que la persona ya decidió al pegarlo.
 
 `outputs.run_id` es `not null` y referencia `runs`. Una tanda de enlaces pegados abre un `run` con
 `params.workflow = 'transcriptor'` y `trigger_type = 'manual'` — **los dos valores ya existen**, así
-que ni el check de `trigger_type` ni el catálogo de `outputs.tipo` (que ADR-001 dejó sin check duro
-a propósito) necesitan tocarse.
+que el check de `trigger_type` no se toca.
+
+> 🩸 **Corrección del 2026-08-07, sobre esta misma ADR.** Acá decía que el catálogo de `outputs.tipo`
+> tampoco se tocaba, *"porque la `001` lo dejó sin check duro a propósito"*. **Falso.** Esa frase de
+> la `001` sigue: *"cuando se selle, se agrega el check en 002"* — y **la `002` lo selló**
+> (`outputs_tipo_chk`). Leer media frase y no la otra media es lo que produjo el error.
+> Lo cazó un sondeo contra prod **sin escribir nada**: el POST con la forma exacta de la app dio
+> **23514**, y el mismo POST con `tipo = 'guion_reel'` dio **23503** (pasó el schema, abortó por el
+> `run_id` falso) — o sea que el resto de la fila ya estaba bien. La migración `026` extiende el
+> catálogo. *Es la cuarta vez que este repo se equivoca por leer una nota de diseño sin verificar su
+> estado actual.*
+
+**Y el `tipo` propio es load-bearing, no cosmético.** Por forma, un enlace pegado produce el mismo
+artefacto que el motor (un guion literal de un reel), así que podría ser `guion_reel`. Pero en este
+esquema **`tipo` es el discriminador que usan las vistas**: `v_metricas_calidad` y las cinco de la
+`016` filtran `tipo = 'guion_reel'`. Compartir el valor metería transcripciones a mano dentro de la
+precisión de entrega y de la señal por referente, que miden el juicio del equipo **sobre lo que trajo
+el motor**. Un tipo propio las deja fuera por construcción, sin un `where` nuevo en ningún lado.
 
 ### 4. Abandonar ≠ descartar
 

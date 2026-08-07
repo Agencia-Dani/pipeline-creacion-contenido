@@ -41,10 +41,15 @@ export async function cargarMas(
 //
 // `ESTADO` va aunque acá siempre valga `aprobado`: la columna existía en el Sheet, y una columna
 // que desaparece rompe la planilla de quien la esté leyendo por posición.
+//
+// **`ORIGEN` se agrega AL FINAL, y eso no es estética** (ADR-062): las 15 de arriba conservan su
+// posición exacta, así que una planilla armada sobre el export viejo —que lee por posición— sigue
+// funcionando. Meterla en el medio habría corrido 12 columnas de lugar sin que nadie se entere
+// hasta que los números de otro se movieran solos.
 const COLUMNAS = [
   "FECHA CALIFICACION", "PROYECTO", "VOZ", "TITULO", "URL ORIGINAL", "SCRIPT", "IDIOMA",
   "VIEWS", "LIKES", "SEGUIDORES", "HEAT SCORE", "CALIFICACION", "ESTADO",
-  "RELEVANCIA SCORE", "RELEVANCIA RAZON",
+  "RELEVANCIA SCORE", "RELEVANCIA RAZON", "ORIGEN",
 ] as const;
 
 /**
@@ -67,7 +72,7 @@ export async function exportarCsv(enRuta: CockpitEnRuta): Promise<
       filas.map((h) => [
         h.calificadoEn, h.proyecto, h.voz, h.titulo, h.urlReferente, h.script, h.idioma,
         h.views, h.likes, h.seguidores, h.heat, h.calificacion, "aprobado",
-        h.relevanciaScore, h.relevanciaRazon,
+        h.relevanciaScore, h.relevanciaRazon, h.origen,
       ]),
     );
 
