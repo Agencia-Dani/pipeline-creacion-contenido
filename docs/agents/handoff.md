@@ -48,7 +48,32 @@
 > | **D2**, la mitad de la tabla | `workflows` sigue diciendo `short-form-content: draft` |
 > | **El alta real por `ajustes/equipo`** (item 8) | `usuarios` = **8** y `usuarios_clientes` = **9**, idénticos al 06/08 ⇒ **ningún alta nueva** |
 > | **La limpieza de la prueba de RLS** | las 2 filas `prueba rls` **siguen sembradas** (y el clic del item 6 sigue sin hacerse) |
-> | **Transcribir, sus dos arreglos de pantalla** | 🔬 **cero eventos `transcribir.reintentar`** ⇒ el reintento no se ejerció (y la fila `sin_transcript` del 03:19 sigue ahí, que es justo la que sirve). Y los 3 `pegar` tienen **`ya_estaban: 0`** ⇒ el panel de "quitar duplicados" **nunca apareció**, así que tampoco se ejerció. Los dos siguen abiertos en [`verificaciones-humanas.md` §2-bis](../verificaciones-humanas.md) |
+> | **Transcribir, sus dos arreglos de pantalla** | *(Se cerraron **2 de 3** el mismo día — ver el bloque de abajo.)* |
+>
+> ### ✅ Transcribir: 2 de 3 cerrados el 07/08, y el que queda es un clic
+>
+> **El panel de "no hace falta transcribirlos" PASÓ, y la prueba no fue el ojo sino la ausencia de un
+> evento.** Ese camino corta antes de `pegarEnlaces`, así que **no escribe `transcribir.pegar`**; el
+> código viejo avisaba *después* de encolar y habría dejado un evento con `ya_estaban: 2`. **Cero
+> eventos nuevos ⇒ el deploy de `3e482c8` está vivo en prod y el aviso llega antes de pagar.**
+>
+> **El doble pago se cerró sin browser y sin gastar un centavo.** El reclamo y la transcripción son
+> dos pasos separados, así que se ejerció **solo el reclamo** contra prod: 4 filas sembradas, dos
+> trabajadores. Secuencial: A se llevó **4**, B **0**. **Simultáneo** (los dos `PATCH` a la vez):
+> B **4**, A **0**. Nunca se llamó a Supadata y las 4 filas se borraron — la tabla quedó en **57** y
+> `processed_items` sin una sola fila de prueba.
+>
+> ⬜ **Queda el reintento**, y el primer intento se fue por el camino equivocado: se probó **pegando
+> el link de vuelta en el campo** en lugar de apretar **Reintentar** en la fila. Hay exactamente una
+> fila que sirve (`instagram.com/p/DAOqPTANXG-/`, en *Sin voz*).
+>
+> 🩸 **Y ese camino equivocado lo indujo la pantalla, que es el hallazgo de la sesión.**
+> `cualesEnCola` pregunta *"¿está en `app.transcripciones`?"* **sin mirar el estado**, así que un link
+> en `fallo`/`sin_transcript` se reporta como *"ya lo pediste — el guion está o **viene en camino**"*.
+> **Para una fila fallada es falso: no viene nada**, y el mensaje manda a esperar en vez de mandar al
+> botón que la destraba. No pierde plata (el error es hacia *no* cobrar), pero es un **fallo mudo**:
+> la pantalla dice que está todo bien y no lo está. Sin arreglar; anotado en
+> [`verificaciones-humanas.md` §2-bis](../verificaciones-humanas.md).
 >
 > ### 🟡 La voz "Alejo": es un registro huérfano, no un problema de accesos
 >

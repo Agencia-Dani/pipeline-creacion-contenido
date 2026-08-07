@@ -102,31 +102,52 @@ misma muestra las 31.
 Pasó. Está en el §Registro del final; el enunciado completo vive en git
 (`git log docs/verificaciones-humanas.md`) por si hay que repetirlo.
 
-## 2-bis. 🔴 La pestaña **Transcribir**, sus tres arreglos *(nuevo del 07/08)*
+## 2-bis. 🟡 La pestaña **Transcribir** — **2 de 3 cerrados el 07/08. Queda el reintento.**
 
-**Quién:** Majo o Jero · **10 minutos** · El punto 3 necesita **dos navegadores a la vez**.
+**Quién:** Mani · **2 minutos.**
 
-Esto es lo único de la sesión que no se pudo verificar solo: las queries se probaron contra prod y
-el dominio tiene tests, pero **la interacción de pantalla no la tocó nadie**.
-
-1. **La oferta de quitar.** Pegar un puñado de links **mezclando** algunos nuevos con alguno que ya
-   esté en la lista de abajo. Tiene que aparecer el panel *"N de estos M no hace falta
-   transcribirlos"*, separando *ya los pediste* de *ya los vio el motor*, con el costo estimado.
-   Al apretar **Quitarlos y transcribir N**, el campo tiene que quedar **solo con los que van**, uno
-   por línea, y arrancar.
-   · El otro botón, **Transcribir los M igual**, manda todo — existe porque *"el motor lo vio"* no
-   garantiza que exista el guion.
-   · Y pegando **solo links nuevos** el panel **no** tiene que aparecer: un click, como antes.
-2. **El reintento.** Buscar una fila en **Falló** o **Sin voz** y apretar **Reintentar**. Vuelve a
-   **En cola** y se procesa sola, sin recargar.
+1. ✅ **La oferta de quitar — PASÓ el 07/08.** Pegados los 2 links ya transcritos, la pantalla los
+   detectó **antes de encolar** y ofreció quitarlos.
+   🔬 **Y la prueba de que corrió el código NUEVO no fue el ojo, fue la ausencia de un evento:** ese
+   camino corta antes de `pegarEnlaces`, así que **no escribe `transcribir.pegar`**. El código viejo
+   avisaba *después* de encolar ⇒ habría dejado un evento con `ya_estaban: 2`. **Cero eventos nuevos
+   en `app.eventos` ⇒ el deploy nuevo está vivo y el aviso llega antes de pagar.**
+2. ⬜ **El reintento — SIGUE ABIERTO, y el primer intento se fue por el camino equivocado.**
+   Se probó **pegando el link de vuelta en el campo**, y ahí la pantalla contesta *"ya lo pediste"*:
+   correcto, pero no es esto. **El botón está en la lista de abajo, en la fila misma**
+   (`page.tsx:141` lo dibuja solo si el estado es `fallo` o `sin_transcript`).
+   Al 07/08 hay **exactamente una fila** que sirve: `instagram.com/p/DAOqPTANXG-/`, en **Sin voz**.
+   Apretar **Reintentar** ⇒ vuelve a **En cola** y se procesa sola, sin recargar.
+   ✅ **Que vuelva a dar "Sin voz" TAMBIÉN es un pase**: lo que se prueba es la transición de estado,
+   no que Supadata acierte. El fallo sería que el botón no haga nada.
    ⚠️ **En un `Listo` no tiene que haber botón**: reintentarlo sería pagar de nuevo un guion que ya
    tenemos. El servidor lo rechaza igual, pero el botón no debería estar.
-3. 🔑 **El que importa, y necesita dos:** abrir `/retia/reels/transcribir` en **dos navegadores a la
-   vez** con la cola llena. Antes los dos se llevaban el mismo lote de 64 y se pagaba todo dos
-   veces. Ahora el segundo tiene que **no procesar nada**.
-   **Cómo se comprueba sin adivinar:** cada fila tiene que pasar a `listo` **una sola vez**; y si
-   hace falta la cuenta fina, el gasto de Supadata del día contra las filas nuevas tiene que dar
-   **1 a 1, no 2 a 1**.
+   🩸 **Y el camino equivocado lo indujo la pantalla** — ver el hallazgo de abajo.
+3. ✅ **El doble pago — CERRADO el 07/08 por medición, sin browser y sin pagar.** El reclamo y la
+   transcripción son dos pasos separados, así que se ejerció **solo el reclamo** contra prod:
+   4 filas sembradas, dos trabajadores, y las dos formas del choque:
+
+   | | |
+   |---|---|
+   | secuencial | A se llevó **4**, B se llevó **0** |
+   | **simultáneo** (los dos `PATCH` a la vez) | B se llevó **4**, A se llevó **0** |
+
+   **Nunca se llamó a Supadata** (el procesador no corrió) y las 4 filas se borraron: la tabla quedó
+   en 57 y `processed_items` sin una sola fila de prueba. Lo único que no cubre es la UX de dos
+   pestañas, que es la mitad menos riesgosa.
+
+### 🩸 Hallazgo del 07/08: el panel miente sobre los links que fallaron
+
+`cualesEnCola` pregunta *"¿está en `app.transcripciones`?"* **sin mirar el estado**. Entonces, si
+pegás de vuelta un link que quedó en `fallo` o `sin_transcript`, el panel lo cuenta como
+*"ya los pediste antes — el guion está o **viene en camino**"*. **Para una fila fallada eso es falso:
+no viene nada**, y el mensaje manda al usuario a esperar algo que no va a pasar en vez de mandarlo al
+botón **Reintentar**, que es lo único que lo destraba.
+
+No hace perder plata (el error es hacia *no* cobrar) y por eso no bloquea nada. Pero es un fallo
+mudo de los que este repo persigue: **la pantalla dice que está todo bien y no lo está.**
+
+
 
 ## 3. 🟡 Que el tab **Entender** aparezca en el nav de un **operador**
 
