@@ -35,17 +35,44 @@ const COLUMNAS =
 /** Los dos estados de los que solo se sale por el botón `Reintentar`. */
 export const ESTADOS_FALLIDOS = ["fallo", "sin_transcript"] as const;
 
-export async function leerTranscripciones(
+/**
+ * Las filas de UNA tanda. Es lo que baja cuando alguien la abre (ADR-064 §3).
+ *
+ * 🩸 **Reemplaza a `leerTranscripciones(limite = 50)`, y el límite era el bug.** Esa función traía
+ * las últimas 50 filas **con sus `script`** y no había nada en la pantalla que dijera que había más:
+ * al 2026-08-07, con 110 en la base, **ocultaba más de la mitad de lo que existe**. Sin ventana acá
+ * porque el recorte ya lo hace la tanda: se paga el `script` de lo que alguien abrió a propósito.
+ */
+export async function leerFilasDeTanda(
   ctx: TenantContext,
-  limite = 50,
+  tandaId: string,
 ): Promise<Transcripcion[]> {
   const { data, error } = await (await scoped(ctx))
     .select("app.transcripciones", COLUMNAS)
-    .order("creado_en", { ascending: false })
-    .limit(limite);
+    .eq("tanda_id", tandaId)
+    .order("creado_en", { ascending: false });
   if (error)
-    throw new Error(`Supabase respondió con error leyendo transcripciones: ${error.message}`);
-  return z.array(filaTranscripcion).parse(data);
+    throw new Error(`Supabase respondió con error leyendo la tanda: ${error.message}`);
+  return z.array(filaTranscripcion).parse(data ?? []);
+}
+
+/**
+ * Las que no quedaron en ninguna tanda. **Es un canario, no una categoría.**
+ *
+ * Tiene que dar siempre cero: el backfill de la `027` metió las 110 viejas en sus 9 tandas y el
+ * encolado asigna la suya. Pero `asignarTanda` es best-effort a propósito (el registro es sumidero,
+ * invariante #1), así que un fallo suyo dejaría filas fuera de toda cabecera — o sea **guiones ya
+ * pagados invisibles en la pantalla**, que es peor que el techo de 50 que esto vino a arreglar.
+ * La tarjeta solo se dibuja si aparece alguna.
+ */
+export async function leerSueltas(ctx: TenantContext): Promise<Transcripcion[]> {
+  const { data, error } = await (await scoped(ctx))
+    .select("app.transcripciones", COLUMNAS)
+    .is("tanda_id", null)
+    .order("creado_en", { ascending: false });
+  if (error)
+    throw new Error(`Supabase respondió con error leyendo las sueltas: ${error.message}`);
+  return z.array(filaTranscripcion).parse(data ?? []);
 }
 
 /**
@@ -72,7 +99,12 @@ export async function leerFallidas(ctx: TenantContext): Promise<Transcripcion[]>
   return z.array(filaTranscripcion).parse(data);
 }
 
-export type ResultadoEncolar = { nuevos: number; yaEstaban: number };
+/**
+ * `ids` son **los que de verdad entraron**, no los que se mandaron: el `ignoreDuplicates` decide, y
+ * hasta que Postgres no responde nadie sabe cuántos eran nuevos. Los usa `asignarTanda` para
+ * ponerles su pegote — ver ahí por qué la tanda se crea después y no antes.
+ */
+export type ResultadoEncolar = { nuevos: number; yaEstaban: number; ids: string[] };
 
 // Inserta los enlaces como pendientes. El unique hace el trabajo: `ignoreDuplicates` deja pasar los
 // que ya se pidieron antes en vez de volver a pagarlos.
@@ -87,7 +119,7 @@ export async function encolarEnlaces(
   ctx: TenantContext,
   enlaces: EnlaceVideo[],
 ): Promise<ResultadoEncolar> {
-  if (enlaces.length === 0) return { nuevos: 0, yaEstaban: 0 };
+  if (enlaces.length === 0) return { nuevos: 0, yaEstaban: 0, ids: [] };
   const { data, error } = await (await scoped(ctx))
     .upsert(
       "app.transcripciones",
@@ -101,8 +133,8 @@ export async function encolarEnlaces(
     .select("id");
   if (error)
     throw new Error(`Supabase respondió con error encolando transcripciones: ${error.message}`);
-  const nuevos = data?.length ?? 0;
-  return { nuevos, yaEstaban: enlaces.length - nuevos };
+  const ids = z.array(z.object({ id: z.string() })).parse(data ?? []).map((f) => f.id);
+  return { nuevos: ids.length, yaEstaban: enlaces.length - ids.length, ids };
 }
 
 /**

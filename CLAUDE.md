@@ -33,9 +33,24 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–026; se aplican a mano en el SQL Editor,
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–027; se aplican a mano en el SQL Editor,
   en orden). Al 2026-08-07, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
-  **las 26 de 26 aplicadas**. No queda ninguna pendiente.
+  **las 27 de 27 aplicadas**. No queda ninguna pendiente.
+  ✅ **La [`027`](core/schema/027_tandas.sql) (ADR-064) entró el 2026-08-07 y se verificó por su
+  efecto**: `app.v_tandas` devuelve **9 tandas** con el reparto **52·48·2·2·2·1·1·1·1** (suma 110) y
+  `transcripciones?tanda_id=is.null` da **0** — el backfill no dejó huérfanas y el caso `null` no
+  quedó vivo. `app.autores_de_tandas()` existe con sus grants ajustados: llamarla con `service_role`
+  da **`42501`** (permiso), no `PGRST202` (no existe), que es la respuesta correcta — el `grant` es
+  solo para `authenticated`, que es el rol con el que entra la app. Trae tabla + `tanda_id` + la
+  vista de cabeceras + policy + esa función.
+  🧪 **Se corrió entera contra un Postgres local con la forma de prod antes de tocar nada**
+  (110 filas / 9 grupos): produce las 9 tandas con el reparto exacto **52·48·2·2·2·1·1·1·1**, cero
+  huérfanas, cero grupos fusionados, es **idempotente** (segunda corrida = mismo estado) y su policy
+  aísla —una sesión que alcanza otra empresa ve 0 tandas y el `with check` le rechaza el insert—.
+  🔴 Ese ensayo **encontró una guarda que faltaba**: `app.v_tandas` es `security_invoker` y cruza
+  `app.transcripciones`, así que sin `select` sobre ella la pantalla entera muere con `42501` (el
+  modo de falla que documenta la `021` §4). En prod el grant está desde la `021`, pero el §0 ahora lo
+  afirma en vez de asumirlo — y la guarda se verificó **poniéndola roja**.
   🆕 **La `026` (ADR-062) metió al transcriptor en el sistema**: el estado `abandonado` en
   `app.transcripciones` y `transcripcion_a_pedido` en el catálogo de `outputs.tipo`. **Ese segundo
   cambio no estaba previsto y lo cazó un sondeo, no un review:** la ADR afirmaba que `outputs.tipo`

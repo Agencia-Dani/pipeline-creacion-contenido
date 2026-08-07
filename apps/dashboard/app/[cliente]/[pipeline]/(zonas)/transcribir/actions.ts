@@ -10,9 +10,12 @@ import { registrarEvento } from "@/lib/eventos";
 import { transcribir, traducir } from "@/lib/transcribir";
 import { abrirRunTranscriptor, barrerRunsZombieTranscriptor, cerrarRunTranscriptor } from "@/lib/runs";
 import { registrarEnHistorico } from "@/lib/historicos";
+import { asignarTanda, crearTanda, renombrarTanda } from "@/lib/tandas";
+import { LARGO_MAX_TITULO, tituloParaGuardar } from "@/domain/tanda";
 import {
   abandonar,
   contarPendientes,
+  leerFilasDeTanda,
   cualesEnCola,
   cualesFallidas,
   cualesVistosPorElMotor,
@@ -67,11 +70,25 @@ export async function pegarEnlaces(
     return { ok: false, mensaje: "No se pudo guardar la lista. Probá de nuevo; si sigue, avisale a un dev." };
   }
 
+  // 🔑 **La tanda nace acá: este es el momento en que alguien apretó el botón** (ADR-064 §1). Y nace
+  // DESPUÉS del encolado y solo si entró algo, porque el `ignoreDuplicates` es el que decide cuántos
+  // eran nuevos: un pegote entero de repetidos dejaría si no una tanda vacía, y sin `delete` en el
+  // grant de la `027` ahí se quedaría.
+  //
+  // Los dos pasos son best-effort (invariante #1 de PLAN §2.5): si fallan, los enlaces se
+  // transcriben igual y lo único que se pierde es el agrupado. `leerSueltas` es el canario.
+  let tandaId: string | null = null;
+  if (encolados.ids.length > 0) {
+    tandaId = await crearTanda(ctx, usuario.id);
+    if (tandaId) await asignarTanda(ctx, tandaId, encolados.ids);
+  }
+
   await registrarEvento(ctx, usuario.id, "transcribir.pegar", {
     detectados: validos.length,
     nuevos: encolados.nuevos,
     ya_estaban: encolados.yaEstaban,
     no_reconocidos: invalidos.length,
+    tanda: tandaId,
   });
 
   revalidatePath(rutaDe(comoRuta(cockpit), "transcribir"));
@@ -146,6 +163,63 @@ export async function revisarPegote(
     console.error("[transcribir] falló la revisión previa:", e);
     return { ok: false, mensaje: "No se pudo revisar la lista. Probá de nuevo." };
   }
+}
+
+/**
+ * Las filas de una tanda, cuando alguien la abre.
+ *
+ * 🔑 **Este es el otro lado del arreglo del techo de 50** (ADR-064 §3): la página carga cabeceras
+ * —título y contadores, una fila por tanda— y los `script`, que son el peso, bajan solo cuando
+ * alguien mira. Una tanda colapsada no necesita sus guiones. Es la misma forma con la que el feed
+ * pasó de 405 KB a 16 KB en el cierre 98.
+ */
+export async function cargarTanda(
+  enRuta: CockpitEnRuta,
+  tandaId: string,
+): Promise<{ ok: true; filas: Transcripcion[] } | { ok: false; mensaje: string }> {
+  const { ctx } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
+  try {
+    return { ok: true, filas: await leerFilasDeTanda(ctx, tandaId) };
+  } catch (e) {
+    console.error(`[transcribir] no se pudo cargar la tanda ${tandaId}:`, e);
+    return { ok: false, mensaje: "No se pudieron cargar los enlaces. Probá de nuevo." };
+  }
+}
+
+/**
+ * Le pone nombre a una tanda. Vaciar el campo la devuelve al nombre por defecto.
+ *
+ * El título es opcional y aparece cuando la persona está apurada pegando 50 links, así que casi
+ * toda tanda nace con el automático: **renombrar después es donde vive el valor** (ADR-064 §2).
+ */
+export async function ponerTituloATanda(
+  enRuta: CockpitEnRuta,
+  tandaId: string,
+  texto: string,
+): Promise<ResultadoPegar> {
+  const { usuario, ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
+
+  const parseo = z.string().max(LARGO_MAX_TITULO).safeParse(texto);
+  if (!parseo.success) {
+    return { ok: false, mensaje: `El nombre no puede pasar de ${LARGO_MAX_TITULO} caracteres.` };
+  }
+  const titulo = tituloParaGuardar(parseo.data);
+
+  let renombrada: boolean;
+  try {
+    renombrada = await renombrarTanda(ctx, tandaId, titulo);
+  } catch (e) {
+    console.error(`[transcribir] falló renombrar la tanda ${tandaId}:`, e);
+    return { ok: false, mensaje: "No se pudo guardar el nombre. Probá de nuevo." };
+  }
+
+  if (!renombrada) {
+    return { ok: false, mensaje: "Esa tanda ya no existe. Recargá la página." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "transcribir.renombrar_tanda", { tanda: tandaId, titulo });
+  revalidatePath(rutaDe(comoRuta(cockpit), "transcribir"));
+  return { ok: true, mensaje: titulo ? "Nombre guardado." : "Volvió al nombre por defecto." };
 }
 
 /** Devuelve a la cola un enlace que falló o volvió sin transcripción. El servidor comprueba el estado. */

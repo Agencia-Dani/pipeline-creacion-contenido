@@ -81,6 +81,11 @@ const TABLAS = {
   "app.referentes_propuestos": { esquema: "app", grano: "instancia" },
   "app.eventos": { esquema: "app", grano: "instancia" },
   "app.transcripciones": { esquema: "app", grano: "instancia" },
+  // La tanda es del cockpit, como las transcripciones que agrupa (ADR-064). `v_tandas` es su
+  // cabecera con los contadores: la pantalla carga ESO y no las filas, que es lo que mató el techo
+  // de 50 (la lista vieja traía 50 de 110 y no lo decía).
+  "app.tandas": { esquema: "app", grano: "instancia" },
+  "app.v_tandas": { esquema: "app", grano: "instancia" },
   "app.v_metricas_calidad": { esquema: "app", grano: "instancia" },
   "app.v_embudo_semana": { esquema: "app", grano: "instancia" },
   "app.v_embudo_descubrimiento": { esquema: "app", grano: "instancia" },

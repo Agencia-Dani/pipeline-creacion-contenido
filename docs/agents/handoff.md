@@ -32,10 +32,10 @@
 >
 > | | |
 > |---|---|
-> | 🔨 **[ADR-064](../adr/ADR-064-la-tanda-es-el-pegote-no-el-procesamiento.md), escrita y sin una línea de código** | **Es el próximo task, y está decidida entera.** Migración (tabla `app.tandas` + columna `tanda_id` + su policy), backfill de 9 tandas, pantalla nueva y renombrar |
+> | ✅ **[ADR-064](../adr/ADR-064-la-tanda-es-el-pegote-no-el-procesamiento.md) CONSTRUIDA y la [`027`](../../core/schema/027_tandas.sql) APLICADA** (07/08) | Verificada por su efecto contra prod: **9 tandas**, reparto **52·48·2·2·2·1·1·1·1** (suma 110), **cero huérfanas**, y `autores_de_tandas()` da `42501` con `service_role` (existe, con el grant solo para `authenticated`). ⏳ Lo único que queda es **abrir una tanda con un clic** y renombrarla: pide login por magic link |
 > | ⬜ **D3 — la demo de 10 min** con Majo y Jero | **El ÚNICO item sin marcar del ROADMAP §3.** No depende de código y es de lo más viejo abierto del repo |
 > | 🔬 RLS de LinkedIn con filas | Necesita alguien con cuenta en 2 empresas. Si no existe, **se puede descartar**: las 4 tablas están vacías y su workflow no existe (ADR-055) |
-> | 🟡 Dos clics sueltos | El tab **Entender** en el nav de un `operador`, y **A7** (que dos personas en Operar se vean) |
+> | 🟡 Un clic suelto | ~~El tab **Entender** en el nav de un `operador`~~ ✅ **cerrado por Mani el 07/08: *"el operador ve todo excepto los costos"***, que es exactamente el reparto que ADR-052 pidió y la `025` §3 puso en la base (un `operador` obtiene **0 tarifas**, un `dev` las 8). Queda **A7** (que dos personas en Operar se vean) |
 >
 > ### ✅ Lo que cerró hoy — cinco corridas de fuego y tres ADRs
 >
@@ -2029,6 +2029,23 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-07 (cierre 103) — ADR-064 construida, y ensayarla contra un Postgres real corrigió dos cosas de la ADR y encontró una guarda que faltaba (Claude, con Mani).**
+**Qué se hizo:** la `027` (tabla `app.tandas`, `transcripciones.tanda_id`, la vista de cabeceras `app.v_tandas`, policy, `app.autores_de_tandas()` y el backfill de las 9 tandas), `domain/tanda.ts` (+11 tests), `lib/tandas.ts`, y la pantalla de Transcribir reescrita alrededor de la tanda. **La migración queda SIN aplicar y va antes del deploy.**
+
+**🩸 El patrón, otra vez: construir una ADR la corrige.** Dos cosas del texto no sobrevivieron a escribirlas. (1) *"el título es opcional, **con default**"* se leía como *guardar* ese texto en la fila; es una **proyección de dos columnas que ya están ahí** (cuántos links y cuándo), guardarla la congela —ADR-041 ya contestó esta pregunta al revés— y obligaba a que el formato de fecha existiera dos veces, un `to_char` en SQL y `lib/fechas.ts`, que es de donde salió la hora corrida 5 h de Entender. Ahora `titulo` es nullable y el default lo dibuja `tituloDeTanda`. (2) El §1 nombraba **"quién"** en una lista de columnas, y esa palabra escondía dos decisiones: ver abajo.
+
+**⚖️ `creada_por` existe porque la pantalla la muestra, y mostrarla abrió una excepción a ADR-051 §3.** La `023` había dropeado `transcripciones.pedido_por` tres días antes justamente por write-only, así que la columna solo se justifica si se lee. **Decisión de Mani: se muestra** — *"sería bueno saber de quién es la tanda"*, y no es auditoría, es a quién preguntarle por esos 50 links. Pero la policy de la `025` esconde a los dueños, así que las tandas de Mani habrían dicho *"(sin acceso a la ficha)"*. Mani lo resolvió de frente: **"no importa si es dueño, sponsor u operador"**. La excepción se hizo **angosta y en la base**: `app.autores_de_tandas()` **no lista personas**, resuelve el nombre de quien **firmó un trabajo que la sesión ya ve** — nadie aparece por existir. `usuarios_visibles()` queda intacta y la pantalla de equipo sigue sin la agencia. *La línea está en la palabra listar: un directorio no es una firma.*
+
+**🧪 Y lo más reutilizable de la sesión: la migración se ensayó ENTERA contra un Postgres local antes de tocar prod.** Un fixture de ~30 líneas con la forma medida de prod (110 filas, 9 grupos). Resultado: las **9 tandas** con el reparto exacto **52·48·2·2·2·1·1·1·1**, **cero huérfanas**, cero grupos fusionados, **idempotente** (segunda corrida = mismo estado), y la policy aislando de verdad (una sesión de otra empresa ve 0 tandas y el `with check` le rechaza el insert). 🔴 **Y encontró una guarda que faltaba**: `app.v_tandas` es `security_invoker` y cruza `app.transcripciones`, así que sin `select` sobre ella la pantalla muere con `42501` — el modo de falla que la `021` §4 documenta y que el fixture reprodujo solo. En prod el grant está desde la `021`, pero el §0 ahora **lo afirma en vez de asumirlo**, y la guarda se verificó **poniéndola roja** (corre sin el grant → aborta y no deja basura). *El SQL Editor no es el lugar donde uno se entera de un error de sintaxis, y resulta que no hacía falta que lo fuera.*
+
+**✅ La `027` la aplicó Mani el mismo día, y se verificó por su efecto contra prod** (la lección de la `019`, no la de "corrió sin error"): `v_tandas` da **9 tandas** con el reparto **52·48·2·2·2·1·1·1·1**, suma **110**, y `tanda_id=is.null` da **0**. `autores_de_tandas()` contesta **`42501`** con `service_role` y no `PGRST202`: existe, y el `grant` quedó solo para `authenticated`, que es el rol con el que entra la app. *El ensayo local predijo el resultado de prod fila por fila.*
+
+**✅ Y Mani cerró el tab Entender:** *"el operador ve todo excepto los costos"*. Es el reparto de ADR-052, y desde la `025` §3 lo sostiene la base y no la UI (un `operador` obtiene 0 tarifas, un `dev` las 8). De los "dos clics" queda **A7**.
+
+**Verde:** `typecheck` · **238 tests** (+11) · `build` · `validate` **2197 checks**.
+**Qué quedó a medias:** ⏳ **nadie hizo clic** — la pantalla está verificada a nivel query, dominio, build y ahora contra el dato real de prod, pero abrirla pide un login por magic link. Mismo hueco que arrastran el CSV y el feed paginado.
+**Qué sigue:** abrir una tanda y renombrarla. Y **D3** (la demo), que sigue siendo el único item sin marcar del ROADMAP §3 y no depende de código.
 
 **2026-08-07 (cierre 102) — El transcriptor entra al sistema, el sponsor pasa a operar, y el checklist del MVP queda con un solo item (Claude, sesión larga con Mani).**
 **Qué se hizo:** tres ADRs (**062, 063, 064**), dos construidas y deployadas, una decidida y sin código. Migración `026` aplicada. **V2 y V4 cerradas por el ojo de Mani**, más el CSV y el alta por `ajustes/equipo` ⇒ **B4 completa** y el ROADMAP §3 queda con **D3 solo**. Commits `041ad27` · `9e6ef6c` · `66c3691` · `5983156` · `d7e156f`.

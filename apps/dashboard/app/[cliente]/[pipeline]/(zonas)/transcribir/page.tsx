@@ -1,5 +1,4 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -7,96 +6,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { haceCuanto } from "@/domain/corrida";
 import { exigirTenant } from "@/lib/auth";
-import { leerFallidas, leerTranscripciones, type Transcripcion } from "@/lib/transcripciones";
-import { Copiar } from "./copiar";
+import { fechaHora } from "@/lib/fechas";
+import { leerAutores, leerCabeceras } from "@/lib/tandas";
+import { leerFallidas, leerSueltas } from "@/lib/transcripciones";
+import { Fila } from "./fila";
 import { PegarEnlaces } from "./pegar-enlaces";
 import { Procesador } from "./procesador";
-import { Reintentar } from "./reintentar";
-import { Abandonar } from "./abandonar";
+import { Tanda } from "./tanda";
 
 export const dynamic = "force-dynamic";
 // Aplica a las Server Actions de esta página (docs de Next, route-segment-config). Alcanza de
 // sobra: cada pasada se corta sola a los 45s y lo que quede lo agarra la siguiente.
 export const maxDuration = 60;
-
-// 🩸 `sin_transcript` decía **"Sin voz"** hasta el 2026-08-07, y **"Voz" ya significa otra cosa en
-// este sistema**: el personaje o marca para quien se cura contenido (context.md). La misma app usa
-// las dos acepciones en dos pantallas — `operar/page.tsx` dice *"su voz está apagada o sin voz"*
-// hablando de la entidad. Un operador leyó "Sin voz" en Transcribir y preguntó si la herramienta
-// devolvía una Voz: la ambigüedad es real y la cazó un humano leyendo la pantalla.
-// "Sin transcripción" además es más honesto: el estado no distingue *"el video no tiene habla"* de
-// *"Supadata no pudo"*, y el nombre viejo afirmaba lo primero.
-const ESTADO_LEGIBLE: Record<Transcripcion["estado"], string> = {
-  pendiente: "En cola",
-  listo: "Listo",
-  sin_transcript: "Sin transcripción",
-  fallo: "Falló",
-  // No dice "Descartado" a propósito: en esta app descartar es un juicio de mérito (el gate rechazó
-  // el video, o el equipo le puso 👎). Esto dice que el insumo está roto (ADR-062 §4).
-  abandonado: "Abandonado",
-};
-
-const BADGE_POR_ESTADO: Record<
-  Transcripcion["estado"],
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  pendiente: "default",
-  listo: "secondary",
-  sin_transcript: "outline",
-  fallo: "destructive",
-  abandonado: "outline",
-};
-
-function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
-  return (
-    <li className="space-y-2 border-b pb-4 last:border-0 last:pb-0">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-        <Badge variant={BADGE_POR_ESTADO[t.estado]}>{ESTADO_LEGIBLE[t.estado]}</Badge>
-        <a
-          href={t.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="break-all underline underline-offset-4"
-        >
-          {t.url}
-        </a>
-        <span className="text-muted-foreground">
-          {haceCuanto(t.creado_en, ahora)}
-          {t.idioma && t.idioma !== "es" && ` · original en ${t.idioma}`}
-        </span>
-      </div>
-
-      {t.script && (
-        <details className="space-y-2">
-          <summary className="cursor-pointer text-sm text-muted-foreground">
-            Ver el script ({t.script.length} caracteres)
-          </summary>
-          <p className="mt-2 whitespace-pre-wrap text-sm">{t.script}</p>
-          <div className="mt-2">
-            <Copiar texto={t.script} />
-          </div>
-        </details>
-      )}
-
-      {t.error && <p className="text-xs text-muted-foreground">{t.error}</p>}
-
-      {/* Sin esto un enlace que falló quedaba clavado para siempre: el procesador solo levanta
-          `pendiente`, y volver a pegar el link tampoco servía porque el encolado lo descarta como
-          duplicado. Con Supadata devolviendo transcripciones vacías, no es un caso raro.
-          Las dos salidas van juntas a propósito: reintentar sirve cuando el fallo
-          fue transitorio, y abandonar cuando no puede ganar nunca (un video sin voz). Con una sola
-          de las dos, la fila queda ofreciendo un botón que pierde siempre (ADR-062 §4). */}
-      {(t.estado === "fallo" || t.estado === "sin_transcript") && (
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <Reintentar id={t.id} />
-          <Abandonar id={t.id} />
-        </span>
-      )}
-    </li>
-  );
-}
 
 export default async function TranscribirPage({
   params,
@@ -106,23 +28,38 @@ export default async function TranscribirPage({
   const { cliente, pipeline } = await params;
   const { ctx } = await exigirTenant("transcribir", cliente, pipeline);
 
-  const lista = await leerTranscripciones(ctx).catch((e) => {
-    console.error("[transcribir] no se pudo leer la lista:", e);
+  // 🔑 **La página carga CABECERAS, no filas** (ADR-064 §3), y eso es lo que mató el techo de 50:
+  // hasta el 2026-08-07 pedía las últimas 50 transcripciones **con sus `script`** sobre 110 en la
+  // base, o sea que ocultaba más de la mitad sin que nada en la pantalla lo dijera. Ahora se ven
+  // **todas** las tandas —una cabecera es título + contadores— y los guiones bajan al expandir.
+  const tandas = await leerCabeceras(ctx).catch((e) => {
+    console.error("[transcribir] no se pudieron leer las tandas:", e);
     return null;
   });
 
-  // 🩸 Las fallidas se traen aparte porque en la lista no se encuentran (medido el 2026-08-07): una
-  // tanda de 52 links pegados juntos comparte `creado_en` al segundo, y la única fallada del día
-  // cayó en la posición 49 de 50, indistinguible entre 49 `Listo`. El desempate entre timestamps
-  // iguales es arbitrario, así que el pegote siguiente la empuja fuera de la ventana y el botón
-  // `Reintentar` se vuelve inalcanzable: la fila queda clavada, que es el bug que ese botón mata.
+  // 🩸 Las fallidas se traen aparte y **cruzando tandas a propósito**: son "lo que necesita tu
+  // atención". Agruparlas por pegote las volvería a esconder, que es el bug del que salieron
+  // (medido el 2026-08-07: la única fallada del día cayó en la posición 49 de 50, indistinguible
+  // entre 49 `Listo`, y el pegote siguiente la habría empujado fuera de la ventana dejando su botón
+  // `Reintentar` inalcanzable).
   const fallidas = await leerFallidas(ctx).catch((e) => {
     console.error("[transcribir] no se pudieron leer las fallidas:", e);
     return [];
   });
-  const enLista = new Set(fallidas.map((f) => f.id));
 
-  const pendientes = lista?.filter((t) => t.estado === "pendiente").length ?? 0;
+  // El canario: tiene que dar cero siempre. Ver `leerSueltas`.
+  const sueltas = await leerSueltas(ctx).catch((e) => {
+    console.error("[transcribir] no se pudieron leer las sueltas:", e);
+    return [];
+  });
+
+  const autores = await leerAutores();
+
+  // Las sueltas se suman: si `asignarTanda` falló, sus pendientes no están en ninguna cabecera y el
+  // `Procesador` —que arranca solo cuando este número es > 0— nunca los levantaría.
+  const pendientes =
+    (tandas?.reduce((n, t) => n + t.pendientes, 0) ?? 0) +
+    sueltas.filter((t) => t.estado === "pendiente").length;
   const ahora = new Date();
 
   return (
@@ -153,9 +90,7 @@ export default async function TranscribirPage({
         <Card>
           <CardHeader>
             <CardTitle>
-              {fallidas.length === 1
-                ? "1 no salió"
-                : `${fallidas.length} no salieron`}
+              {fallidas.length === 1 ? "1 no salió" : `${fallidas.length} no salieron`}
             </CardTitle>
             <CardDescription>
               Estas se quedan acá hasta que hagas algo: el guion no existe todavía y volver a
@@ -175,38 +110,61 @@ export default async function TranscribirPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Transcripciones</CardTitle>
+          <CardTitle>Tus tandas</CardTitle>
           <CardDescription>
             {pendientes > 0
               ? `Trabajando en ${pendientes} — esto se actualiza solo, podés quedarte mirando.`
-              : "Las últimas 50, de la más nueva a la más vieja."}
+              : "Cada vez que pegás links se arma una tanda. Abrí una para ver sus guiones, y ponele nombre si querés reconocerla después."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!lista ? (
+          {!tandas ? (
             <Alert variant="destructive">
-              <AlertTitle>No se pudo leer la lista</AlertTitle>
+              <AlertTitle>No se pudieron leer las tandas</AlertTitle>
               <AlertDescription>
                 Supabase no respondió. Recargá en un rato; si persiste, avisale a un dev.
               </AlertDescription>
             </Alert>
-          ) : lista.length === 0 ? (
+          ) : tandas.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Todavía no pediste ninguna transcripción.
             </p>
           ) : (
-            <ul className="space-y-4">
-              {/* Las fallidas ya tienen su tarjeta arriba: repetirlas acá pondría dos botones
-                  `Reintentar` para la misma fila. */}
-              {lista
-                .filter((t) => !enLista.has(t.id))
-                .map((t) => (
-                  <Fila key={t.id} t={t} ahora={ahora} />
-                ))}
+            <ul className="space-y-2">
+              {tandas.map((t) => (
+                <Tanda
+                  key={t.id}
+                  cabecera={t}
+                  autor={t.creadaPor ? autores.get(t.creadaPor) ?? null : null}
+                  cuando={fechaHora(t.creadoEn)}
+                  ahora={ahora}
+                />
+              ))}
             </ul>
           )}
         </CardContent>
       </Card>
+
+      {/* No debería dibujarse nunca. Si aparece, `asignarTanda` falló y estas filas no están en
+          ninguna cabecera: son guiones ya pagados que la pantalla no mostraría. */}
+      {sueltas.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{sueltas.length} sin tanda</CardTitle>
+            <CardDescription>
+              Estas quedaron fuera de todo pegote. No es normal: avisale a un dev. Los guiones están
+              y se pueden copiar igual.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {sueltas.map((t) => (
+                <Fila key={t.id} t={t} ahora={ahora} />
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
