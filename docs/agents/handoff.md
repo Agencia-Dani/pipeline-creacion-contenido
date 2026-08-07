@@ -22,6 +22,56 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🔑 2026-08-07 (cierre 104) · LA PUERTA SE ABRE CON CONTRASEÑA, Y ESO DESTRABA LAS DOS VERIFICACIONES QUE FALTAN
+>
+> **[ADR-065](../adr/ADR-065-la-puerta-se-abre-con-contrasena.md) construida, deployada y verificada
+> en prod** (`15bfec4`). El magic link costaba un correo por entrada — y **dos cada vez que había que
+> alternar entre dos cuentas**, que es exactamente lo que pedían las dos verificaciones que llevaban
+> días abiertas.
+>
+> ### 🩸 Medir cambió el diagnóstico, y esto es lo que hay que recordar
+>
+> El síntoma era *"me pide un correo cada vez que quiero entrar"*, y la lectura obvia —la sesión
+> vence— **era falsa**: la cookie dura **400 días** (`DEFAULT_COOKIE_OPTIONS` de `@supabase/ssr`
+> 0.12.3) y el proxy refresca bien. El re-login era **la cuenta B pisando la de A**: la sesión es
+> **una sola cookie por dominio y por perfil de navegador**. ⇒ Sin medir, el arreglo natural habría
+> sido alargar una sesión que ya duraba 400 días, y el problema seguía intacto.
+>
+> ### ⬜ Lo que queda, y es todo de Mani (nada de código)
+>
+> | | |
+> |---|---|
+> | 📣 **Avisarle al grupo** | El mensaje quedó redactado en la sesión. Sin aviso, el equipo se encuentra un campo de contraseña que todavía no tiene (pueden entrar igual: el link está plegado bajo *"No tengo contraseña"*) |
+> | ⚙️ **4 ajustes en Supabase** | *Password Requirements* al mismo mínimo que valida `domain/credenciales.ts` (si la base es más laxa, la constante de la app es decorativa) · **cerrar el signup** del provider Email · confirmar que **no hay session timebox ni inactivity timeout** — si los hubiera, explican el re-login y **nada de la ADR lo evita** |
+> | 🔓 **A7 + el clic a la tanda** | Los dos estaban trabados por el login. Con contraseña y **dos perfiles de Chrome** (no incógnito) caen en una sentada |
+>
+> ### 📏 El estado real de las cuentas, medido con la Admin API
+>
+> **10 en `auth.users` · 9 con mail confirmado · 9 fichas en `app.usuarios`.** Tres cosas salen de ahí:
+>
+> - **No hay que re-invitar a nadie, y re-invitar ni siquiera funciona**: `inviteUserByEmail` falla si
+>   el mail ya existe (lo documenta `lib/equipo.ts`). El camino es entrar una vez por link y ponerse
+>   la contraseña en **`/mi-cuenta`**.
+> - **Hay 1 cuenta sin confirmar.** Ponerle contraseña **no le alcanza**: entrar le va a seguir
+>   fallando con *"mail o contraseña incorrectos"* —mentira a propósito, la puerta no revela quién
+>   existe— y el motivo real (`email_not_confirmed`) solo aparece en el log de Vercel. **El link se lo
+>   confirma solo al usarlo**, así que el mismo camino de todos la arregla.
+> - **10 cuentas contra 9 fichas:** alguien quedó con el alta a medias y hoy caería en `/sin-rol`. No
+>   es urgente, pero está ahí.
+>
+> ### 🔒 Dos decisiones que salieron de construir, no del plan
+>
+> **1. El largo se valida al ELEGIR la contraseña, nunca al entrar.** Reusar `LARGO_MINIMO` en los dos
+> lados es la tentación obvia y es un **bug con fecha de activación**: el día que el mínimo suba, todo
+> el que tenga una más corta queda afuera —con *"contraseña incorrecta"*, que además le miente— sin
+> que nadie haya tocado su cuenta. Hay un test que sostiene la propiedad.
+>
+> **2. El error devuelve un ESTADO, no un texto.** El estado viaja en el query string, así que darle
+> mensaje propio a `email_not_confirmed` —tentador, porque es accionable— **habría publicado la
+> diferencia en la URL igual**, y el login se vuelve un oráculo de enumeración. Verificado contra
+> prod **sin escribir nada**: un mail que no existe y un mail real con contraseña incorrecta devuelven
+> la **misma** respuesta (`400 invalid_credentials`).
+
 > ## 🚀 2026-08-07 (cierre 102) · EL CHECKLIST DEL MVP QUEDA CON UN SOLO ITEM, Y HAY UNA ADR SIN CONSTRUIR
 >
 > **Leelo antes que el 101 y que el 100: cierra la mitad de los dos.** Sesión larga. Lo que hay que
@@ -2029,6 +2079,17 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-07 (cierre 104) — El login se abre con contraseña, y medir el síntoma dio vuelta el diagnóstico (Claude, pedido de Mani).**
+**Qué se hizo:** [ADR-065](../adr/ADR-065-la-puerta-se-abre-con-contrasena.md) entera — `domain/credenciales.ts` (+10 tests), `entrarConContrasena` en `app/login/actions.ts` (`enviarMagicLink` sin tocar), `/login` rehecho con el link plegado como repuesto, y **`/mi-cuenta`** para que cada uno se ponga la suya sin depender de un admin. Docs: ADR + índice, README de la app (§stack, mapa y un paso `3-bis` de setup), `verificaciones-humanas` §4-bis y el rango de ADRs del CLAUDE.md. Commit `15bfec4`, pusheado.
+
+**🩸 El aprendizaje de la sesión es de diagnóstico, no de código.** El pedido era *"me toca mandar un correo cada vez que quiero acceder"*, y la lectura obvia —la sesión vence— **estaba mal**: la cookie dura 400 días y el proxy refresca bien. Lo que pasaba es que **la sesión es una sola cookie por dominio y perfil**, así que entrar con la segunda cuenta borraba la primera. *Arreglar el síntoma sin medirlo habría sido alargar una sesión que ya duraba más de un año.*
+
+**🔒 Y dos decisiones que solo aparecieron al construir:** (1) el largo mínimo se valida **al elegir** la contraseña y nunca al entrar —reusar la constante en los dos lados es un bug con fecha de activación: el día que suba, el que tenga una más corta queda afuera sin que nadie toque su cuenta—; (2) el mapeo de errores devuelve un **estado y no un texto**, porque el estado viaja en la URL y un mensaje propio para `email_not_confirmed` habría publicado ahí la diferencia que la función existe para esconder.
+
+**Verde:** `typecheck` · **248 tests** (+10) · `build` · `validate` **2206 checks**. Deployado y **verificado por su contenido, no solo por su status**: `/login` en prod ya sirve el campo de contraseña, `/` da 307 y `/mi-cuenta` sin sesión da 307 al login. Sondeo contra prod sin escribir nada: mail inexistente y mail real con contraseña mal ⇒ **misma respuesta** (`400 invalid_credentials`).
+**Qué quedó a medias:** ⏳ **nadie hizo clic todavía** — el camino feliz (entrar con una contraseña correcta) no se puede probar desde un agente sin setear una, que es escritura en prod. Y los 4 ajustes de Supabase son de Mani.
+**Qué sigue:** avisarle al grupo, los ajustes de Supabase, y **A7 + el clic a la tanda** con dos perfiles de Chrome. **D3 sigue siendo el único item sin marcar del ROADMAP §3.**
 
 **2026-08-07 (cierre 103) — ADR-064 construida, y ensayarla contra un Postgres real corrigió dos cosas de la ADR y encontró una guarda que faltaba (Claude, con Mani).**
 **Qué se hizo:** la `027` (tabla `app.tandas`, `transcripciones.tanda_id`, la vista de cabeceras `app.v_tandas`, policy, `app.autores_de_tandas()` y el backfill de las 9 tandas), `domain/tanda.ts` (+11 tests), `lib/tandas.ts`, y la pantalla de Transcribir reescrita alrededor de la tanda. **La migración queda SIN aplicar y va antes del deploy.**
