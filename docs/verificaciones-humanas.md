@@ -53,24 +53,25 @@ contra la base, **con la query scopeada al cockpit** (`instance_id` de `retia/re
 > `ajustes`, `candidatos`, `descartes`, `transcripciones`, `runs` y `outputs` van por **cockpit**
 > ([§2.B de plan-multi-tenant](./agents/plan-multi-tenant.md), el doble grano).
 
-### Los números buenos, **remedidos el 2026-08-07** (cockpit `/retia/reels`)
+### Los números buenos, **remedidos el 2026-08-07 a las 18:00** (cockpit `/retia/reels`)
 
-⚠️ **Se remidieron enteros porque la corrida de V5 y las tandas de Transcribir movieron 5 filas.**
-Los de la tabla vieja (06/08) ya no son los de la pantalla, y usarlos habría disparado la falsa
-alarma de RLS que este mismo §0 previene. **Los que cambiaron van marcados.**
+⚠️ **Esta tabla envejece rápido y hay que remedirla antes de usarla.** Se remidió **dos veces el
+mismo día**: la corrida de V5 movió unas, y después el backfill de ADR-062 + una tanda del equipo
+movieron otras. Un número viejo acá dispara exactamente la falsa alarma de RLS que este §0 previene,
+así que **si pasaron días, medí de nuevo** (las queries están en el §0 de arriba).
 
 | Pantalla | Tiene que mostrar |
 |---|---|
 | **`/entender`** | ⚠️ **Empezá por acá si estás verificando RLS**: son las **12 vistas `security_invoker`**, la zona de más riesgo |
-| `/operar` | **5** tarjetas de corrida (el `limite` de `ultimasCorridasMotor`), la más nueva del **2026-08-07 07:51**, `ok`, 13.8 min 🔄 |
-| `/curar/feed` | **25** tarjetas y los chips diciendo **171** 🔄 *(eran 165; +5 del 06/08 y +1 de V5)* |
+| `/operar` | **5** tarjetas de corrida (el `limite` de `ultimasCorridasMotor`), la más nueva del **2026-08-07 07:51**, `ok`, 13.8 min |
+| `/curar/feed` | **25** tarjetas y los chips diciendo **171** |
 | `/curar/voces` | **3** voces (las 3 activas) · **6** proyectos (5 activos) |
 | `/curar/referentes` | **16**, todos de Instagram |
-| `/curar/ajustes` | **18** si sos `dev` · **8** si sos `operador` |
-| `/curar/descartes` | **50** 🔄 *(eran 38)* |
+| `/curar/ajustes` | **18** si sos `dev` · **8** si sos `operador` o `sponsor` *(el sponsor los ve desde ADR-063)* |
+| `/curar/descartes` | **50** |
 | `/curar/sugeridos` | **6** *(de 8 filas: la pantalla filtra `estado = propuesto`, las otras 2 están `promovido`)* |
-| `/curar/historicos` | **32** 🔄 *(era 31; V5 entregó 1 output más)* |
-| `/transcribir` | **57** 🔄 *(eran 2): 56 en `listo` + **1 en `pendiente`**, que es el reintento del §2-bis esperando que alguien recargue la pantalla* |
+| `/curar/historicos` | **140** 🔄 *(era 31 ayer). El salto NO es un bug: ADR-062 metió las transcripciones a pedido en el histórico. Son **32 del feed + 108 pegadas a mano***  |
+| `/transcribir` | **110** filas en la base, pero la pantalla **muestra 50** — techo duro sin paginar, que es justo lo que ADR-064 viene a arreglar. 108 `listo` · 1 `fallo` · 1 `sin_transcript` |
 
 > 🔑 **Un dueño (`es_dueno`) NO bypassa RLS**, y es lo que hace que estas pruebas valgan: `es_dueno`
 > es un predicado *adentro* de `app.clientes_visibles()`, no un `BYPASSRLS`. Solo el `service_role`
@@ -80,7 +81,14 @@ alarma de RLS que este mismo §0 previene. **Los que cambiaron van marcados.**
 
 ---
 
-## 1. 🔴 El clic al **Descargar CSV** de `/curar/historicos`
+## 1. ✅ El clic al **Descargar CSV** — CERRADO por Mani el 2026-08-07
+
+*"Ya descargué el CSV y sale perfecto, todos aparecen con sus respectivas columnas."* Era el arrastre
+más viejo abierto de la lista (venía del cierre 94). **Ojo para la próxima descarga:** el CSV ahora
+trae **16 columnas, no 15** — `ORIGEN` se sumó al final (ADR-062), y las 15 de siempre conservan su
+posición exacta para no romper una planilla que lea por número de columna.
+
+<details><summary>El enunciado original</summary>
 
 **Quién:** Mani · **2 minutos** · *Es el arrastre abierto más viejo (cierre 94).*
 
@@ -101,12 +109,24 @@ derechos** (si ves `MÃ©tricas`, el BOM/encoding se rompió).
 **Si el archivo baja vacío o con 0 filas:** no es el CSV, es la lectura — mirá primero si la pantalla
 misma muestra las 31.
 
+</details>
+
 ## 2. ✅ Recorrer el **feed entero** — CERRADO por Mani el 2026-08-07
 
 Pasó. Está en el §Registro del final; el enunciado completo vive en git
 (`git log docs/verificaciones-humanas.md`) por si hay que repetirlo.
 
-## 2-bis. 🟡 La pestaña **Transcribir** — **2 de 3 cerrados el 07/08. Queda el reintento.**
+## 2-bis. ✅ La pestaña **Transcribir** — LOS 3 CERRADOS el 2026-08-07
+
+El tercero se cerró **sin que nadie lo mirara a propósito**: la fila que había quedado en `pendiente`
+esperando el reintento apareció después en `sin_transcript`, o sea que **el reintento arrancó solo al
+recargar** y volvió a fallar — que es lo correcto, porque ese video no tiene voz (solo música).
+Mani: *"el reintento se ve bien ahí, no sirvió porque el video no tiene voz"*.
+
+🔑 **Y ese caso produjo un feature:** un enlace que nunca va a dar un script ahora se puede
+**abandonar** (ADR-062 §4), en vez de quedar ofreciendo un botón que no puede ganar nunca.
+
+<details><summary>El enunciado original y los 3 hallazgos</summary>
 
 **Quién:** Mani · **2 minutos.**
 
@@ -178,6 +198,8 @@ salieron de que una persona apretara el botón. Es el argumento entero de este d
 
 
 
+</details>
+
 ## 3. 🟡 Que el tab **Entender** aparezca en el nav de un **operador**
 
 **Quién:** Jero o Alejo · **10 segundos, en su próximo login.**
@@ -219,7 +241,11 @@ no una a propósito.
 🔑 **Lo que NO prueba:** dos clicks **simultáneos** siguen pasando los dos. Es la race de 1-2 s de
 ADR-023 C.3.3, aceptada y argumentada — la corta el guard de n8n, no la pantalla.
 
-## 5. ⬜ **V4 — el re-rank** *(ROADMAP §3)*
+## 5. ✅ **V4 — el re-rank: CERRADO por Mani el 2026-08-07**
+
+*"Filtrar por aprobados en curar/feed sirve de maravilla."*
+
+<details><summary>El enunciado original</summary>
 
 **Quién:** Majo o Jero · **2 minutos.**
 
@@ -229,7 +255,14 @@ pedido —punto 5 del norte— sigue igual y hoy lo sirve el Feed:
 En `/curar/feed`, filtrar por **aprobados**: tienen que salir **solo aprobados**, ordenados
 **caliente → frío** por `heat_score`.
 
-## 6. 🟡 **V2 — literalidad: la mitad española NO es una muestra, y la otra mitad no tiene con qué compararse** *(ROADMAP §3)*
+</details>
+
+## 6. ✅ **V2 — literalidad: CERRADA el 2026-08-07**
+
+La mitad española estaba probada **por construcción** (ver abajo) y la de la traducción la cerró
+Mani con el ojo: *"la traducción de los videos es perfecta"*.
+
+<details><summary>El análisis completo, que sigue valiendo</summary>
 
 **Quién:** Majo o Jero (son quienes saben si un guion sirve) · **5 minutos** (era 10).
 
@@ -269,6 +302,8 @@ puede cruzar por ahí. **Comparar después de la corrida es imposible sin volver
    que al equipo le importa igual.
 2. **La cara:** leer los logs de la corrida en n8n mientras corre (el nodo loguea, no persiste), o
    pegar la misma URL en **Transcribir** para obtener el transcript y compararlo a mano. Paga.
+
+</details>
 
 ## 7. ✅ **V5 — corrida incremental + dedup: CORRIDA Y VERDE el 2026-08-07**
 
@@ -408,7 +443,12 @@ así que su resultado es indistinguible del de RLS apagado. Por diseño.
 
 ---
 
-## 11. 🔴 **Un alta real por la pantalla de equipo** *(nuevo del 06/08 — cierra B4)*
+## 11. ✅ **Un alta real por la pantalla de equipo — CERRADA el 2026-08-07. B4 completa.**
+
+Mani dio de alta a una persona nueva y **el mail llegó**, que era lo único que ningún agente podía
+confirmar. Medido por su efecto: `app.usuarios` pasó de **8 a 9**.
+
+<details><summary>El enunciado original</summary>
 
 **Quién:** Mani (o cualquier `es_dueno`). **Cuánto:** 5 minutos, y **hace falta un mail que no esté
 en el sistema** (un alias tuyo sirve: `manuel.mejia+prueba@30x.com`).
@@ -432,6 +472,8 @@ administran equipo son los devs de la agencia. `30x` y `estadox` tienen **una pe
 cliente se administre solo, hay que nombrarle un `sponsor`**, y eso es una decisión que nadie tomó.
 
 ---
+
+</details>
 
 ## Registro — lo que ya se cerró, para no repetirlo
 

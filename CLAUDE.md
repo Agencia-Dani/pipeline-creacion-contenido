@@ -25,7 +25,7 @@ en §Agent skills; acá solo se ubican.
   que reemplazó a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–061, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–064, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -33,9 +33,16 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–025; se aplican a mano en el SQL Editor,
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–026; se aplican a mano en el SQL Editor,
   en orden). Al 2026-08-07, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
-  **las 25 de 25 aplicadas**. No queda ninguna pendiente.
+  **las 26 de 26 aplicadas**. No queda ninguna pendiente.
+  🆕 **La `026` (ADR-062) metió al transcriptor en el sistema**: el estado `abandonado` en
+  `app.transcripciones` y `transcripcion_a_pedido` en el catálogo de `outputs.tipo`. **Ese segundo
+  cambio no estaba previsto y lo cazó un sondeo, no un review:** la ADR afirmaba que `outputs.tipo`
+  no tenía check duro, citando media frase de la `001` — la otra media dice *"cuando se selle, se
+  agrega el check en 002"*, y la `002` lo selló. El POST con la forma exacta de la app devolvió
+  **23514**, y el mismo con `tipo = 'guion_reel'` devolvió **23503**. *Regla que sale de ahí: una
+  nota de diseño de una migración vieja describe una intención, no el estado — verificalo.*
   🧹 **La `022` (ADR-059) podó la "balde 2"**: 5 vistas sin consumidor, `outputs.publicado_en`,
   `runs.costo_estimado`, `instances.config_ref` y las 6 `airtable_id`.
   ✅ **Y la `023` cerró la otra mitad el 2026-08-07** (las 4 columnas write-only de
@@ -130,7 +137,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..061).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..064).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

@@ -121,8 +121,9 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
 >
 > Lo de abajo se midió, no se dedujo: conteos por PostgREST y `pg_policies` contra la base de prod,
 > y los 5 `workflow.json` traídos por la API de n8n. **Cada `✅ medido` dice qué número lo prueba.**
-> Lo que sigue sin marcar es lo que sigue sin hacerse — y son **V2, V4 y D3**.
-> *(El 07/08 cayeron tres. **V6** no corriéndola: su simulacro era immontable —los 31 nodos HTTP
+> Lo que sigue sin marcar es lo que sigue sin hacerse — y es **D3**, la demo de 10 minutos con
+> Majo y Jero, que es de las cosas más viejas abiertas del repo y la única que no depende de código.
+> *(El 07/08 cayeron **cinco**: V6, V5 y D2 por sesión de agente, y V2 y V4 por el ojo de Mani. **V6** no corriéndola: su simulacro era immontable —los 31 nodos HTTP
 > comparten `Config.supabase_url`— y el invariante resultó ser una propiedad estructural que ahora
 > verifica el check #6 del auditor. **V5** sí con una corrida real (~$0.24): 69 videos vueltos a
 > traer, 4 sobrevivieron, intersección ∅. **D2** con el UPDATE en prod.
@@ -250,7 +251,7 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
 - [x] **V1. Backfill:** `dias_recencia=180` → candidatos en Airtable con script en español,
       `idioma`, `thumbnail` y la razón de relevancia · `runs` ok · `processed_items` poblada.
       *(✅ cierre 17/19: embudo verificado + `processed_items` 10→30 sin dup.)*
-- [ ] **V2. Literalidad:** muestrear 2–3: uno en español (script == transcripción tal cual) y
+- [x] **V2. Literalidad:** muestrear 2–3: uno en español (script == transcripción tal cual) y
       uno en otro idioma (traducción literal, sin reescritura). El link abre y coincide.
       *(🟡 **La mitad española está cerrada, y no por muestreo: por construcción** (medido 07/08).
       En `Traducir (Claude Haiku)` un video `es` nunca entra al `order`, y el reparto es
@@ -260,15 +261,18 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       ⬜ **Queda la traducción, y hay que verla en caliente:** el transcript original **no se persiste
       en ningún lado** (cero solape entre las 57 `transcripciones` y las URLs de los candidatos), así
       que comparar después de la corrida es imposible sin volver a pagar. La forma barata es abrir el
-      video y juzgar contra la fuente — [verificaciones-humanas §6](./docs/verificaciones-humanas.md).)*
+      video y juzgar contra la fuente — [verificaciones-humanas §6](./docs/verificaciones-humanas.md).
+      ✅ **CERRADA POR MANI el 07/08**: *"la traducción de los videos es perfecta"*. Con la mitad
+      española probada por construcción, V2 queda completa.)*
 - [x] **V3. Curación + histórico:** Majo/Jero califican (🔥/👍/👎 + estado) → archivado corre →
       el aprobado queda en `outputs` y se ve en `/curar/historicos` · sale de la lista de candidatos.
       *(✅ cierre 19 (run `687027e2`, archivados:14) y **re-verificado el 04/08** con la ejecución 124
       después de arreglar el IF que llevaba desde D7 archivando cero: `outputs` 79→88.)*
-- [ ] **V4. Re-rank:** el filtro *aprobados* de `/curar/feed` muestra solo aprobados, caliente→frío.
+- [x] **V4. Re-rank:** el filtro *aprobados* de `/curar/feed` muestra solo aprobados, caliente→frío.
       *(Era "la vista 🔥 Seleccionados", que era de Airtable y murió con él. Lo pedido —punto 5 del
       norte— sigue igual y hoy lo sirve el Feed, que ya ordena por `heat_score` desc. **Falta el ojo:**
-      está en el checklist de B5, [plan-multi-tenant §15.B](./docs/agents/plan-multi-tenant.md).)*
+      está en el checklist de B5, [plan-multi-tenant §15.B](./docs/agents/plan-multi-tenant.md).
+      ✅ **CERRADA POR MANI el 07/08**: *"filtrar por aprobados en curar/feed sirve de maravilla"*.)*
 - [x] **V5. Incremental + dedup:** correr con `dias_recencia=1` → no reaparece lo ya procesado.
       *(✅ **CORRIDA el 07/08 con ventana de 3 días, `ok`, 13.8 min, ~$0.24.** Se usó 3 y no 1 a
       propósito: con 1 el riesgo era que Apify trajera cero y **la prueba pasara en falso**.

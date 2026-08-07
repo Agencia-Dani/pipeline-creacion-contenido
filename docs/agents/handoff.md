@@ -22,6 +22,78 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🚀 2026-08-07 (cierre 102) · EL CHECKLIST DEL MVP QUEDA CON UN SOLO ITEM, Y HAY UNA ADR SIN CONSTRUIR
+>
+> **Leelo antes que el 101 y que el 100: cierra la mitad de los dos.** Sesión larga. Lo que hay que
+> saber para retomar está en tres bloques: **lo que se cerró**, **lo único que queda por construir**,
+> y **los tres errores que valen más que el código**.
+>
+> ### 🎯 Lo primero: qué queda abierto
+>
+> | | |
+> |---|---|
+> | 🔨 **[ADR-064](../adr/ADR-064-la-tanda-es-el-pegote-no-el-procesamiento.md), escrita y sin una línea de código** | **Es el próximo task, y está decidida entera.** Migración (tabla `app.tandas` + columna `tanda_id` + su policy), backfill de 9 tandas, pantalla nueva y renombrar |
+> | ⬜ **D3 — la demo de 10 min** con Majo y Jero | **El ÚNICO item sin marcar del ROADMAP §3.** No depende de código y es de lo más viejo abierto del repo |
+> | 🔬 RLS de LinkedIn con filas | Necesita alguien con cuenta en 2 empresas. Si no existe, **se puede descartar**: las 4 tablas están vacías y su workflow no existe (ADR-055) |
+> | 🟡 Dos clics sueltos | El tab **Entender** en el nav de un `operador`, y **A7** (que dos personas en Operar se vean) |
+>
+> ### ✅ Lo que cerró hoy — cinco corridas de fuego y tres ADRs
+>
+> **V6 · V5 · D2** por sesión de agente, **V2 · V4** por tu ojo. El detalle de las tres primeras está
+> en el cierre 101; V2 y V4 las cerraste con *"la traducción es perfecta"* y *"filtrar por aprobados
+> sirve de maravilla"*. **El clic al CSV y el alta por `ajustes/equipo` también cayeron** (`usuarios`
+> 8 → 9, medido), así que **B4 cierra**.
+>
+> | ADR | Qué decidió | Estado |
+> |---|---|---|
+> | **[062](../adr/ADR-062-el-transcriptor-deja-de-ser-un-callejon-sin-salida.md)** | El transcriptor entra al sistema: sus guiones van al Histórico, abre sus propias corridas, y un enlace que nunca va a servir se **abandona** | ✅ **construida, deployada y verificada en prod** |
+> | **[063](../adr/ADR-063-el-sponsor-es-el-jefe-del-equipo-no-el-que-mira.md)** | El sponsor **opera** (había **cero** en las 3 empresas: la figura no servía). Ve Actividad, **no** Costos. Y **solo toca operadores** | ✅ construida · **Jero es sponsor de Retia** |
+> | **[064](../adr/ADR-064-la-tanda-es-el-pegote-no-el-procesamiento.md)** | La tanda es el **pegote**, no el procesamiento | 📐 **decidida, sin construir** |
+>
+> **Migración [`026`](../../core/schema/026_transcripcion_abandonada.sql) aplicada y verificada por su
+> efecto** (23514 → 23503 en los dos sondeos, y un `tipo` inventado **sigue** dando 23514: se le
+> agregó un valor, no se le sacó la puerta).
+>
+> 🔁 **Backfill corrido:** las transcripciones viejas entraron al histórico. Verificado por
+> correspondencia **uno a uno** y no por un total, a propósito: el equipo estaba transcribiendo
+> mientras corría. Quedó **105 ↔ 105, 0 faltantes y 0 sobrantes**.
+>
+> 🗑️ La voz de prueba **"Alejo" se borró** (0 proyectos, 0 candidatos, 0 descartes colgando).
+>
+> ### 🩸 Los tres errores de la sesión, que valen más que lo que se construyó
+>
+> **1. Media frase de un comentario viejo mandó una ADR al error.** ADR-062 afirmaba que
+> `outputs.tipo` no tenía check duro, citando el header de la `001`: *"queda SIN check duro a
+> propósito"*. **La frase sigue:** *"cuando se selle, se agrega el check en 002"* — y la `002` lo
+> selló. Lo cazó **un sondeo contra prod sin escribir nada** (23514 vs. 23503 cambiando un solo
+> campo), no un review ni un test. La ADR quedó corregida **en su propio texto**, marcada.
+> ⇒ **Una nota de diseño de una migración vieja describe una intención, no el estado.** Es la cuarta
+> vez que este repo se equivoca así.
+>
+> **2. Casi meto una "red de seguridad" que destruía datos.** Para acotar el gasto de V5 iba a bajar
+> `Videos a transcribir por corrida`. Ese presupuesto **quema** (ADR-044): corre después del
+> `POST processed_items`, así que lo capado ya está en la memoria de dedup, vuelve sin transcript y
+> el gate lo descarta `sin_guion` **para siempre**. Desde la pantalla de Ajustes se ve idéntico a
+> `cap_top_n`, que sí postergaría. ⇒ **Antes de tocar un techo, preguntá si POSTERGA o si QUEMA.**
+>
+> **3. Introduje un agujero y lo encontré midiendo, no probando.** ADR-062 abre un `run` por pasada
+> y lo cierra al final; si la pasada muere (Vercel corta a los 60 s, cierran la pestaña) **el cierre
+> nunca corre**. Medido a la hora: **5 de 10 runs colgados en `en_curso`**. Ya está arreglado (barrido
+> espejo del nodo del motor, ventana fija de 5 min = 5× el `maxDuration`) y **el barrido a mano barrió
+> 3 de 5, no 5** — los otros dos estaban vivos de verdad. *Que no mate corridas vivas era lo que había
+> que comprobar.*
+>
+> ### ⚠️ Dos cosas que van a confundir a quien mire la base
+>
+> - **`/curar/historicos` saltó de 31 a 140, y no es un bug:** ADR-062 metió las transcripciones a
+>   pedido ahí. Son **32 del feed + 108 pegadas a mano**. El CSV tiene **16 columnas** ahora
+>   (`ORIGEN` al final).
+> - **`/transcribir` muestra 50 de 110.** Techo duro sin paginar, y es exactamente lo que ADR-064
+>   viene a arreglar. **La pantalla ya oculta más de la mitad de lo que existe.**
+>
+> 🔥 **Y el dato de operación: el equipo está usando Transcribir de verdad y a escala.** Pasó de 57 a
+> **110** durante la sesión, con tandas de ~50. Cualquier deploy toca gente trabajando.
+
 > ## 🏁 2026-08-07 (cierre 101) · CAYERON V6, V5 Y D2. LAS CORRIDAS DE FUEGO QUEDAN EN OJO HUMANO
 >
 > **Leelo antes que el cierre 100: le cierra dos filas.** De las 6 corridas de fuego + activación que
@@ -1957,6 +2029,23 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-07 (cierre 102) — El transcriptor entra al sistema, el sponsor pasa a operar, y el checklist del MVP queda con un solo item (Claude, sesión larga con Mani).**
+**Qué se hizo:** tres ADRs (**062, 063, 064**), dos construidas y deployadas, una decidida y sin código. Migración `026` aplicada. **V2 y V4 cerradas por el ojo de Mani**, más el CSV y el alta por `ajustes/equipo` ⇒ **B4 completa** y el ROADMAP §3 queda con **D3 solo**. Commits `041ad27` · `9e6ef6c` · `66c3691` · `5983156` · `d7e156f`.
+
+**🩸 El patrón de la sesión, y es el mismo de la anterior: el pedido llega como una cosa y medirlo lo parte en dos.** *"Que las transcripciones pasen a Históricos"* topó con que el glosario define **Transcripción a pedido** como *"no es un Candidato"* — meterla en una lista llamada *"todo lo que el equipo aprobó"* era mentir con la palabra *aprobó*, así que lo primero que se decidió fue el **término**, no el código. Y *"agrupar visualmente los links, es puramente visual"* topó con que `leerTranscripciones` trae **las últimas 50 y punto** sobre 110 filas: **la pantalla ya oculta más de la mitad sin avisar**. Las dos veces, lo que parecía cosmético tenía debajo algo que no lo era.
+
+**🎯 La trampa que casi me lleva puesto, y quedó escrita en ADR-064 para que nadie la repita:** reusar el `run` que ADR-062 acababa de crear como si fuera la tanda. **No lo es.** Ese run es el *procesamiento* (de a 64, corte a los 45 s); la tanda es el *pegote*. 100 enlaces dan 2-3 runs, un run puede tocar varias tandas, y una tanda procesada en dos sesiones da runs de días distintos. Agrupar por él le habría mostrado al equipo **los pedazos en que la máquina decidió trabajar**, no sus pegotes. *Dos entidades que se parecen no son la misma, y la que importa es la del usuario.*
+
+**🔬 Lo que hay que copiar de esta sesión: el sondeo que escribe cero filas.** Se usó tres veces y cazó dos errores que ningún test tenía. La forma: mandar el POST **con la forma exacta que usa la app** y un solo campo deliberadamente inválido (un `run_id` o un `instance_id` inexistente). Si vuelve **`23503`** (FK), pasó la validación de schema entera y lo único mal es lo que pusiste mal. Si vuelve **`23514`** o **`PGRST204`**, hay un check o una columna que no sabías. Así se descubrió que `outputs.tipo` **sí** tiene check duro (media frase del comentario de la `001` decía que no; la otra media decía que la `002` lo sellaría, y lo selló) y así se verificó la `026` después.
+
+**🧨 Y lo que casi sale mal:** para acotar el gasto de V5 iba a bajar `Videos a transcribir por corrida` como tope. **Habría quemado videos** — ese presupuesto corre después del `POST processed_items`, así que lo capado queda en la memoria de dedup y se pierde para siempre (ADR-044). *La red de seguridad de una prueba puede ser el daño, y desde Ajustes se ve idéntica a `cap_top_n`, que sí postergaría.*
+
+**Qué quedó a medias:** **ADR-064 sin construir**, decidida entera (migración + backfill de 9 tandas + pantalla + renombrar). Es el próximo task y no necesita más grill.
+
+**Gotchas nuevos:** un `run` que abre la app necesita **quién lo cierre si la pasada muere** — el transcriptor dejó 5 de 10 colgados en `en_curso` a la hora de deployar, y ahora tiene su barrido (espejo del nodo del motor, ventana fija de 5 min porque el `maxDuration` de la zona es 60 s). · **RLS es por membresía de empresa, no por rol**, así que darle zonas nuevas a un rol **no pide migración**: si te pide una, el modelo está mal repartido. · **`/curar/historicos` saltó de 31 a 140 y no es un bug** (ADR-062 metió las transcripciones ahí; 32 del feed + 108 a mano) y el CSV tiene **16 columnas**, con `ORIGEN` al final para no correr las 15 de ADR-057.
+
+**Qué sigue:** construir **ADR-064**, y **D3** (la demo), que es el último item del checklist y no depende de código. **Skills sugeridas:** `/tdd` para la tanda (el backfill de 9 grupos y el default del título se prestan a test-first); `/diagnose` si algún run del transcriptor vuelve a quedar colgado pese al barrido.
 
 **2026-08-07 (cierre 101) — Dos de las tres corridas de fuego que faltaban se cerraron sin correrlas, y la tercera se corrió por $0.24 (Claude, pedido de Mani).**
 **Qué se hizo:** **V6, V5 y D2**. El ROADMAP §3 pasa de 6 items abiertos a **3, y los 3 son de ojo humano** (V2 a mitad, V4, D3). Commits `957172e` · `8290a87` · `038487a`.
