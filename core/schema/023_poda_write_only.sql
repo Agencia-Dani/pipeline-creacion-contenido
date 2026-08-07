@@ -129,6 +129,29 @@ alter table app.transcripciones drop column pedido_por;
 
 
 -- ═════════════════════════════ §4 · Verificación ═════════════════════════════
+--
+-- ✅✅ **APLICADA EL 2026-08-07 POR MANI, Y VERIFICADA POR SU EFECTO CONTRA PROD.** No hace falta
+--     correr las dos queries de abajo: ya se midió lo mismo por PostgREST, que además prueba que
+--     su schema cache se refrescó (si no, seguiría sirviendo las columnas viejas).
+--
+--       · `select=url` · `seguidores` · `flag_viral` · `idioma` · `outputs.source_items`
+--         · `transcripciones.pedido_por`  →  **`42703` en las 6.**
+--       · `select=external_id,platform,run_id,primera_vez`  →  **200 con dato.** Las 2 que se
+--         quedan siguen ahí, que es la mitad de la verificación que se olvida.
+--
+-- 🔬 **Y se sondeó el camino de escritura sin escribir una sola fila**, que es lo que este gate
+--    protegía y lo que ninguna de las queries de abajo contesta:
+--
+--       POST /processed_items  con la forma EXACTA del motor
+--       ({instance_id, run_id, platform, external_id}) y un instance_id inexistente
+--         → **23503** (FK). Pasó la validación de schema: con una instancia real, entra.
+--
+--       el mismo POST + "url"
+--         → **PGRST204**. O sea que el modo de falla sigue siendo real y detectable — lo que
+--           cambió es que ya nadie manda esa columna.
+--
+--    Nada quedó escrito: la FK aborta el insert antes de tocar la tabla.
+--
 -- Las dos primeras tienen que dar CERO filas:
 --
 --   select table_name, column_name from information_schema.columns

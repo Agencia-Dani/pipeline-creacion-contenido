@@ -34,14 +34,22 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
 - [core/schema/](core/schema/) — migraciones SQL de Supabase (001–025; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-06, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
-  **24 de 25 aplicadas**. **La única que falta es la `023`**, y es la de abajo.
+  en orden). Al 2026-08-07, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
+  **las 25 de 25 aplicadas**. No queda ninguna pendiente.
   🧹 **La `022` (ADR-059) podó la "balde 2"**: 5 vistas sin consumidor, `outputs.publicado_en`,
-  `runs.costo_estimado`, `instances.config_ref` y las 6 `airtable_id`. Su hermana, la `023` (las 5
-  columnas write-only de `processed_items` + `outputs.source_items` + `transcripciones.pedido_por`),
-  **va después del `n8n:push` que deja de escribirlas** y lleva gate humano: PostgREST rechaza el
-  insert entero con `PGRST204` y esos POST son `onError: continue`, así que el 400 se traga y deja
-  al motor cerrando en verde **sin memoria de dedup**.
+  `runs.costo_estimado`, `instances.config_ref` y las 6 `airtable_id`.
+  ✅ **Y la `023` cerró la otra mitad el 2026-08-07** (las 4 columnas write-only de
+  `processed_items` + `outputs.source_items` + `transcripciones.pedido_por`). Llevaba gate humano
+  porque el modo de falla es mudo: PostgREST rechaza el **insert entero** con `PGRST204` si el body
+  trae una columna que no existe, y esos POST son `onError: continue`, así que el 400 se traga y
+  deja al motor cerrando **en verde y sin memoria de dedup**.
+  🔬 **Se firmó midiendo, no afirmando, y el §0 del archivo estaba equivocado sobre eso.** Decía que
+  una corrida que ya no manda las columnas escribe filas *"idénticas"* a una que sí: **no, las deja
+  en NULL**, y ese contraste (run del 03/08 con dato vs. las 48 filas del 06/08 en NULL) es
+  exactamente la prueba que se creía imposible. Después de aplicarla se sondeó el camino de
+  escritura **sin escribir nada**: el POST con la forma exacta del motor y un `instance_id`
+  inexistente devuelve **`23503`** (pasó la validación de schema, aborta por FK), y el mismo POST
+  con `url` agregada devuelve **`PGRST204`**. El camino está sano.
   ✅ **La ventana del expand se cerró**: la `019` mató `usuarios.rol` y `usuarios.client_id`, y el
   acceso vive solo en `app.usuarios_clientes` (**9 filas** al 06/08 — `retia` 5 operadores + 2 devs,
   `30x` y `estadox` 1 operador cada uno, sobre 8 usuarios, 2 de ellos `es_dueno`) + el flag

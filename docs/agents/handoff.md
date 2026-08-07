@@ -215,7 +215,7 @@
 > | **B4** · runbooks + `core/templates/` | ✅ El criterio de F5 da **partido**: empresa 🟢, pipeline 🔴. **Y el paso 2 se corrigió contra A5 en prod: decía 5 cosas mal** |
 > | **B5** · checklist de ojo humano | ✅ [`docs/verificaciones-humanas.md`](../verificaciones-humanas.md), **11 items** |
 > | **B6** · deuda de docs | ✅ Eran **21 links rotos**, no 4, y la lista era más larga |
-> | **B1** · gate de la `023` | ✅ **Las 4 condiciones firmadas el 07/08, medidas contra prod. El `insert` del §0 está descomentado.** Falta un solo acto humano: pegar la `023` en el SQL Editor. Ver abajo |
+> | **B1** · gate de la `023` | ✅✅ **CERRADA DEL TODO: la `023` está aplicada (07/08) y verificada por su efecto.** Con eso **el carril B queda 6 de 6** y las migraciones **25 de 25**. Ver abajo |
 >
 > ### ✅ B3 cerrada sin browser, y el discriminante es lo que la hace valer
 >
@@ -268,9 +268,26 @@
 > de Transcribir y nadie la usó desde el deploy. Se apoya en la condición 2, que sí quedó probada
 > por otra vía (las 5 calificaciones aterrizaron en `retia/reels`, cosa imposible antes del deploy).
 >
-> 🚧 **Lo único que queda: pegar [`023_poda_write_only.sql`](../../core/schema/023_poda_write_only.sql)
-> en el SQL Editor.** El `insert into _cierre_poda` ya está descomentado con la tabla de evidencia
-> al lado. Después, correr su §4 y `verificar-corrida.mjs 2` en la corrida del lunes.
+> ### ✅✅ Y la `023` se aplicó (07/08). **Migraciones: 25 de 25. Carril B: 6 de 6.**
+>
+> Mani la corrió en el SQL Editor. Verificada por su efecto, no por haber corrido — que es la
+> lección de la `019`:
+>
+> | | |
+> |---|---|
+> | las 6 columnas | **`42703` en las 6** por PostgREST, que de paso prueba que su schema cache se refrescó |
+> | las 2 que se quedan (`run_id`, `primera_vez`) | **200 con dato** — la mitad de la verificación que se olvida |
+>
+> 🔬 **Y se sondeó el camino de escritura sin escribir una fila**, que es lo que el gate protegía y
+> lo que el §4 no contestaba: `POST /processed_items` con la forma exacta del motor y un
+> `instance_id` inexistente da **`23503`** (pasó la validación de schema, aborta por FK, con una
+> instancia real entra); el mismo POST con `url` agregada da **`PGRST204`**. La FK aborta antes de
+> tocar la tabla, así que no quedó nada. **El camino está sano y el lunes no va a cerrar en verde
+> sin memoria.**
+>
+> ⏳ Lo que queda es mirar la corrida del lunes con
+> `node Workflows/workflow-short-form-content/verificar-corrida.mjs 2`: tiene que decir
+> `intersección: 0 ✓` **contando por `run_id`**.
 >
 > ### 🔄 Cómo llegó hasta acá (06/08 de noche): la corrida a mano y las 2 primeras condiciones
 >
