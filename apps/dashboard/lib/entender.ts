@@ -110,11 +110,36 @@ const filaEvento = z.object({
 });
 export type FilaEvento = z.infer<typeof filaEvento>;
 
-export async function leerEventos(ctx: TenantContext, limite = 50): Promise<FilaEvento[]> {
+/** Cuántos eventos por tanda. 20 y no 50: es un log, se lee de arriba y casi nunca hasta el final. */
+export const EVENTOS_POR_PAGINA = 20;
+
+/**
+ * Una página del log de actividad, de a `EVENTOS_POR_PAGINA`.
+ *
+ * Traía 50 de una y sin paginar, sobre una tabla que solo crece (107 filas al 07/08): la tarjeta
+ * se volvía una pared que empujaba el resto de Entender fuera de la pantalla.
+ *
+ * El desempate por `id` es el mismo de `leerAprobados` y por la misma razón: 7 Server Actions
+ * escriben acá, y dos eventos de la misma tanda comparten `creado_en` al segundo. Sin desempate,
+ * dos filas con el mismo timestamp pueden repetirse o saltearse entre páginas — que es exactamente
+ * el bug que la lista de Transcribir tuvo con los 52 links pegados juntos.
+ */
+export async function leerEventos(
+  ctx: TenantContext,
+  pagina = 0,
+): Promise<{ filas: FilaEvento[]; hayMas: boolean }> {
+  const desde = pagina * EVENTOS_POR_PAGINA;
+
+  // Se pide UNA de más en vez de un `count: "exact"`: lo único que hay que decidir es si dibujar
+  // el botón, y un count exacto sobre una tabla que solo crece cuesta un scan por carga de página.
   const { data, error } = await (await scoped(ctx))
-    .select("app.eventos", "creado_en, tipo, detalle, usuarios(nombre)")
+    .select("app.eventos", "id, creado_en, tipo, detalle, usuarios(nombre)")
     .order("creado_en", { ascending: false })
-    .limit(limite);
+    .order("id", { ascending: true })
+    .range(desde, desde + EVENTOS_POR_PAGINA);
+
   if (error) throw new Error(`Supabase respondió con error leyendo los eventos: ${error.message}`);
-  return z.array(filaEvento).parse(data);
+
+  const filas = z.array(filaEvento).parse(data ?? []);
+  return { filas: filas.slice(0, EVENTOS_POR_PAGINA), hayMas: filas.length > EVENTOS_POR_PAGINA };
 }

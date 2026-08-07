@@ -109,7 +109,10 @@ describe("ajustesVisibles", () => {
     assert.equal(ajustesVisibles(filas, "dev").some((f) => f.clave === "Knob viejo de Airtable"), false);
   });
 
-  it("el sponsor no ve config: su zona es Entender", () => {
-    assert.deepEqual(ajustesVisibles(filas, "sponsor"), []);
+  it("el sponsor ve los mismos knobs que el operador: ahora opera", () => {
+    // Cambió el 2026-08-07 con las zonas. Los avanzados (los que mueven plata y techos del motor)
+    // siguen siendo solo de dev — lo que se le abre son las 8 de `visibilidad: equipo`.
+    assert.deepEqual(ajustesVisibles(filas, "sponsor"), ajustesVisibles(filas, "operador"));
+    assert.equal(ajustesVisibles(filas, "sponsor").every((f) => f.visibilidad === "equipo"), true);
   });
 });

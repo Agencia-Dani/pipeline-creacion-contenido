@@ -16,7 +16,8 @@ import {
   leerEmbudo,
   leerEventos,
 } from "@/lib/entender";
-import { Actividad, Auditoria, Calidad, Costos, Descubrimiento, Embudo, ErrorLectura } from "./secciones";
+import { Auditoria, Calidad, Costos, Descubrimiento, Embudo, ErrorLectura } from "./secciones";
+import { ActividadConMas } from "./actividad-con-mas";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function EntenderPage({
       leerAuditoria(ctx),
       leerDescubrimiento(ctx),
       puedeVerCostos ? leerCostos(ctx) : Promise.resolve([]),
-      esDev ? leerEventos(ctx) : Promise.resolve([]),
+      esDev ? leerEventos(ctx) : Promise.resolve({ filas: [], hayMas: false }),
       leerProyectos(ctx),
     ]);
 
@@ -163,7 +164,7 @@ export default async function EntenderPage({
           </CardHeader>
           <CardContent>
             {eventos.status === "fulfilled" ? (
-              <Actividad filas={eventos.value} />
+              <ActividadConMas inicial={eventos.value.filas} hayMasInicial={eventos.value.hayMas} />
             ) : (
               <ErrorLectura que="la actividad" />
             )}

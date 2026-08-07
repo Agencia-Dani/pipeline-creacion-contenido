@@ -57,11 +57,12 @@ test("🔒 la intersección exige las DOS condiciones: el rol alcanza y el pipel
   ]);
 });
 
-test("el sponsor ve entender y ajustes en los dos pipelines, y nada más", () => {
-  // `ajustes` entró para el sponsor porque es quien administra el equipo de su empresa (ADR-060).
-  // Sigue sin ver operar, curar ni transcribir: la zona nueva no le abrió el resto.
-  assert.deepEqual(zonasVisibles(zonasDe("sponsor"), "short-form-content"), ["entender", "ajustes"]);
-  assert.deepEqual(zonasVisibles(zonasDe("sponsor"), "linkedin"), ["entender", "ajustes"]);
+test("el sponsor ve lo mismo que el dev en los dos pipelines, y pierde transcribir en LinkedIn igual", () => {
+  // Desde el 2026-08-07 el sponsor opera. Lo que sigue recortando su nav no es el rol sino el
+  // pipeline: LinkedIn ya es texto, así que `transcribir` no existe ahí (ADR-055 §3). Que la
+  // intersección de ADR-056 siga mandando es justo lo que este test cuida.
+  assert.deepEqual(zonasVisibles(zonasDe("sponsor"), "short-form-content"), zonasVisibles(zonasDe("dev"), "short-form-content"));
+  assert.deepEqual(zonasVisibles(zonasDe("sponsor"), "linkedin"), ["operar", "curar", "entender", "ajustes"]);
 });
 
 test("el dev pierde transcribir en LinkedIn y conserva el resto", () => {
@@ -74,10 +75,11 @@ test("el dev pierde transcribir en LinkedIn y conserva el resto", () => {
 });
 
 test("el orden lo pone el rol, no el pipeline — es lo que hace que la zona inicial no se re-decida", () => {
-  // `zonasDe` viene ordenada por prioridad y la intersección la respeta; si se filtrara al revés,
-  // el sponsor podría caer en `operar` por venir antes en la lista del pipeline.
+  // `zonasDe` viene ordenada por prioridad y la intersección la respeta. El caso que lo prueba es
+  // `substack`, cuyo array de pipeline empieza por una zona que el rol tiene más abajo: si se
+  // filtrara al revés, la inicial saldría del pipeline y no del rol.
   assert.equal(zonaInicialEn(zonasDe("operador"), "linkedin"), "operar");
-  assert.equal(zonaInicialEn(zonasDe("sponsor"), "linkedin"), "entender");
+  assert.equal(zonaInicialEn(zonasDe("sponsor"), "linkedin"), "operar");
   assert.equal(zonaInicialEn(zonasDe("dev"), "short-form-content"), "operar");
 });
 

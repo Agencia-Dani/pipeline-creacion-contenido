@@ -34,10 +34,29 @@ export const ZONAS: readonly Zona[] = ["operar", "curar", "transcribir", "entend
 // Medido contra prod el 2026-08-06, no razonado.
 //
 // Va **última** en los tres arrays, por lo mismo que `entender`: `zonaInicial` devuelve el primero.
+// 🔑 **El `sponsor` pasó a operar el 2026-08-07, y no es un permiso de más: es el modelo que había
+// fallando en la práctica.** Nació como "el jefe que mira" (solo `entender`), y eso dejaba a cada
+// empresa cliente con un agujero: el `operador` no invita gente, el `dev` es de la agencia y no
+// puede estar de guardia, y el `sponsor` —el único que sí administra su propio equipo— no podía
+// usar la herramienta que administra. Medido el 06/08: **cero `sponsor` en las 3 empresas**, o sea
+// que la figura existía y nadie la usaba, porque no servía para nada.
+//
+// Ahora el `sponsor` es **el jefe del equipo de su empresa**: hace todo lo que hace un `operador`
+// y además da y quita accesos (`domain/permisos.ts`, que ya lo contemplaba).
+//
+// 💰 **Lo que NO se movió, y es a propósito: `veCostos` sigue siendo solo `dev`.** El sponsor es de
+// la empresa cliente, y `v_costos_semana` es consumo × `app.tarifas`, o sea **el margen de la
+// agencia**. "Ver métricas" y "ver lo que le cuesta a la agencia" son dos cosas distintas, y la
+// segunda no se le da a un cliente sin decidirlo explícitamente. La `025` lo sostiene también en la
+// base (`app.tarifas` pregunta `app.ve_costos()`), así que ni cambiando este archivo se filtraría.
+//
+// ⚠️ **Su zona inicial cambia de `entender` a `operar`**, porque el primer elemento del array es a
+// dónde cae al entrar. Es coherente con que ahora opere, pero un sponsor que ya estaba acostumbrado
+// a caer en Entender lo va a notar.
 const ZONAS_POR_ROL: Record<Rol, readonly Zona[]> = {
   operador: ["operar", "curar", "transcribir", "entender", "ajustes"],
   dev: ["operar", "curar", "transcribir", "entender", "ajustes"],
-  sponsor: ["entender", "ajustes"],
+  sponsor: ["operar", "curar", "transcribir", "entender", "ajustes"],
 };
 
 export function puedeVerZona(rol: Rol, zona: Zona): boolean {

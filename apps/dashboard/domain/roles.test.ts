@@ -37,13 +37,24 @@ test("⚙️ el operador SÍ ve la zona ajustes — ahí viven 8 de los 18 knobs
   assert.equal(puedeVerZona("sponsor", "ajustes"), true);
 });
 
-test("el sponsor entiende y administra su equipo, nada más", () => {
-  assert.deepEqual(zonasDe("sponsor"), ["entender", "ajustes"]);
-  assert.equal(zonaInicial("sponsor"), "entender");
-  assert.equal(puedeVerZona("sponsor", "operar"), false);
-  assert.equal(puedeVerZona("sponsor", "curar"), false);
-  // Transcribir es una herramienta del equipo, no un reporte: el sponsor no la ve (ADR-031).
-  assert.equal(puedeVerZona("sponsor", "transcribir"), false);
+test("el sponsor opera Y administra su equipo: es el jefe del equipo de su empresa", () => {
+  // Cambió el 2026-08-07. Antes era "el jefe que mira" (solo entender+ajustes) y eso dejaba a cada
+  // empresa sin nadie que pudiera usar la herramienta Y dar accesos: el operador no invita, el dev
+  // es de la agencia. Medido el 06/08: cero sponsors en las 3 empresas — la figura no servía.
+  assert.deepEqual(zonasDe("sponsor"), ZONAS);
+  assert.equal(zonaInicial("sponsor"), "operar");
+  assert.equal(puedeVerZona("sponsor", "operar"), true);
+  assert.equal(puedeVerZona("sponsor", "curar"), true);
+  assert.equal(puedeVerZona("sponsor", "transcribir"), true);
+});
+
+test("💰 pero el sponsor NO ve costos: es de la empresa cliente y eso es el margen de la agencia", () => {
+  // La línea que no se movió al darle las zonas. `v_costos_semana` es consumo × `app.tarifas`;
+  // "ver métricas" y "ver lo que le cuesta a la agencia" son cosas distintas. La `025` lo sostiene
+  // también en la base, así que este test cuida la mitad de UI de una regla que tiene dos.
+  assert.equal(veCostos("sponsor"), false);
+  assert.equal(veCostos("operador"), false);
+  assert.equal(veCostos("dev"), true);
 });
 
 test("el dev ve las cuatro zonas", () => {

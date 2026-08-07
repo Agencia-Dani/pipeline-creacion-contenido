@@ -94,8 +94,9 @@ export function ajustesVisibles<T extends { clave: string; visibilidad: string }
   rol: "operador" | "dev" | "sponsor",
 ): T[] {
   if (rol === "dev") return filas.filter((f) => f.clave in CATALOGO);
-  if (rol === "operador") {
-    return filas.filter((f) => f.clave in CATALOGO && f.visibilidad === "equipo");
-  }
-  return []; // el sponsor no toca config: su zona es Entender
+  // El `sponsor` ve lo mismo que el `operador` desde el 2026-08-07: ahora opera, así que necesita
+  // las 8 perillas de `visibilidad: equipo` que el trabajo diario usa (mínimos de likes/vistas,
+  // propuestas por corrida, los 4 toggles de IG/TikTok, afinidad mínima). Lo que sigue siendo solo
+  // de `dev` son los knobs avanzados — los que mueven plata y techos del motor. Ver `domain/roles.ts`.
+  return filas.filter((f) => f.clave in CATALOGO && f.visibilidad === "equipo");
 }

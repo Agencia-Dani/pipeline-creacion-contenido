@@ -16,7 +16,7 @@ import { cambiarRol, invitar, quitarAcceso, type Resultado } from "./actions";
 
 const ETIQUETA: Record<Rol, string> = {
   operador: "Operador — califica el feed y opera el motor",
-  sponsor: "Sponsor — solo mira resultados y administra el equipo",
+  sponsor: "Sponsor — todo lo del operador, y además da y quita accesos",
   dev: "Dev — todo, incluidos los costos de proveedor",
 };
 
