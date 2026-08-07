@@ -180,6 +180,13 @@ módulos), `/handoff` (compactar una sesión).
   dejó el dedup de ADR-029 sin efecto durante 3 corridas: en n8n el orden de las ramas lo decide la
   posición en el canvas, no el array de conexiones), `jsCode` que compile como AsyncFunction, e
   inventario de placeholders del re-import. **Corrélo si tocaste conexiones o posiciones.** Solo lee.
+  🛡️ **Desde el 2026-08-07 también verifica el invariante #1** (el registro es sumidero, jamás
+  dependencia de ejecución): los **31 nodos HTTP** llevan `onError: continueRegularOutput` salvo los
+  **9** de la constante `FAIL_CLOSED`, cada uno con su porqué escrito. **El default es "sos
+  sumidero"**, así que un nodo HTTP nuevo entra pidiendo su `onError`. *Esto **es** V6 del ROADMAP:
+  el simulacro que pedía romper una credencial no se puede montar —los 31 comparten
+  `Config.supabase_url`, así que romper el registro rompe la entrega— y lo que quería probar se lee
+  del JSON en cada commit.* **Corrélo también si agregaste o tocaste un nodo HTTP.**
 - **Test de los code nodes del motor:** `node Workflows/workflow-short-form-content/test-nodos.mjs` —
   ejercita `Armar plan de corrida`, `Armar candidato`, `Heat-score v1`, `Preparar procesados` y los dos
   nodos caros (`Transcribir`, `Traducir`) fuera de n8n, con `$` y `this.helpers` mockeados: N por

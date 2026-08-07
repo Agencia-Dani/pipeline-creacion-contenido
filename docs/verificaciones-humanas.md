@@ -312,23 +312,34 @@ mecanismo de n8n: el que lo tiene, sigue.
 **Los 20 nodos comparten `Config.supabase_url`.** No hay forma de romper el registro sin romper la
 entrega, porque salen de la misma perilla. El simulacro no es "difícil": no existe la palanca.
 
-### → La decisión que queda (de Mani, sin apuro)
+### ✅ Lo que se hizo el 2026-08-07: el check #6 del auditor
 
-1. 🟢 **Declarar V6 cerrada por auditoría + lo ya medido, y agregar el check al auditor.** El invariante
-   se verifica en `Workflows/auditar-workflows.mjs` (que ya corre en cada cambio de conexiones):
-   *"todo nodo de registro lleva `onError: continue`; los 5 fail-closed son una lista explícita con su
-   ADR"*. Se rompe en rojo el día que alguien le saque el `onError` a un nodo de registro — que es
-   **antes** de que llegue a producción, no después. La otra mitad ya está medida: un fallo real deja
-   el `run` en `fallo` (**12 de 41 corridas**, error handler de ADR-054).
-   *Es la opción barata y permanente; cuesta ~30 líneas y ningún crédito.*
-2. 🟡 **Hacer el simulacro posible:** partir `Config.supabase_url` en `supabase_url` (entrega) +
-   `supabase_url_registro`, para poder apuntar solo el registro a un host inválido y correr el drill de
-   verdad. Cuesta una perilla nueva, un `n8n:push` y **una corrida real** (paga). Prueba la conducta,
-   no la declaración.
-3. ⬜ **No hacer nada** y aceptar que el invariante vive en el código y en los ADRs.
+`Workflows/auditar-workflows.mjs` ahora verifica el invariante en cada corrida, sobre los **31 nodos
+HTTP de los 5 workflows**:
 
-**Recomendación: la 1.** La 2 prueba en una corrida lo que la 1 prueba en cada commit, y la parte que
-un simulacro agregaría —que n8n honre su propio `onError`— no es algo que este repo tenga que verificar.
+> Todo nodo `httpRequest` lleva `onError: continueRegularOutput`. Las excepciones son la constante
+> `FAIL_CLOSED`, **nombre por nombre y cada una con su porqué escrito**.
+
+**El default es "sos sumidero".** Un nodo HTTP nuevo entra pidiendo su `onError`; quien lo quiera
+fail-closed tiene que escribir en la lista por qué, y eso es una línea de diff que se lee en el
+review. Hoy son **9**: los 4 `Leer plan (fachada)`/`Leer instancias` (ADR-028), `Leer procesados`
+(ADR-029 exc. 1), las 3 entregas (`POST Candidatos`, `POST Propuestos`, `Leer Candidatos
+calificados`) y `Borrar candidatos` (reintenta 3× y corta; el upsert lo hace idempotente).
+
+🔴 **Se verificó poniéndolo rojo, no verde.** Con los 3 modos de falla inyectados en una copia:
+sacarle el `onError` a un nodo de registro · dárselo a uno de `FAIL_CLOSED` (lista vieja) · renombrar
+un nodo que la lista nombra (lista fantasma). **Los 3 disparan y el auditor sale con exit 1.**
+
+⇒ **V6 queda cerrada por auditoría.** La otra mitad ya estaba medida: un fallo real deja el `run` en
+`fallo` (**12 de 41 corridas**, error handler de ADR-054).
+
+### 🟡 Lo que NO se hizo, y queda como opción de Mani
+
+**Montar el simulacro de verdad** pediría partir `Config.supabase_url` en `supabase_url` (entrega) +
+`supabase_url_registro`, para poder apuntar solo el registro a un host inválido. Cuesta una perilla
+nueva, un `n8n:push` y **una corrida real que paga** — y prueba en una corrida lo que el check prueba
+en cada commit. Lo único que agregaría es *"n8n honra su propio `onError`"*, que no es algo que este
+repo tenga que verificar. **Se deja sin hacer a propósito.**
 
 ✅ **La mitad que sí se puede dar por buena, y ya está medida:** un fallo real deja el `run` en
 `fallo`. **12 de las 41 corridas** están así, y el error handler de

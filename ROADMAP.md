@@ -121,7 +121,11 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
 >
 > Lo de abajo se midió, no se dedujo: conteos por PostgREST y `pg_policies` contra la base de prod,
 > y los 5 `workflow.json` traídos por la API de n8n. **Cada `✅ medido` dice qué número lo prueba.**
-> Lo que sigue sin marcar es lo que sigue sin hacerse — y son **V2, V4, V5, V6, D2 y D3**.
+> Lo que sigue sin marcar es lo que sigue sin hacerse — y son **V2, V4, V5, D2 y D3**.
+> *(**V6 cerró el 07/08**, y no corriéndola: su simulacro era immontable —los 31 nodos HTTP comparten
+> `Config.supabase_url`— y el invariante resultó ser una propiedad estructural que ahora verifica el
+> check #6 del auditor. **V2 quedó a mitad por la misma clase de hallazgo:** su mitad española es una
+> garantía del código con test verde, no una muestra.)*
 
 ### M0 — Arranque (½ día) · los 3
 
@@ -264,7 +268,7 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       está en el checklist de B5, [plan-multi-tenant §15.B](./docs/agents/plan-multi-tenant.md).)*
 - [ ] **V5. Incremental + dedup:** correr con `dias_recencia=1` → no reaparece lo ya procesado.
       *(parcial: el dedup quedó verificado en vivo, falta la corrida incremental `dias=1` completa.)*
-- [ ] **V6. Resiliencia:** romper la credencial Supabase a propósito → el workflow IGUAL entrega
+- [x] **V6. Resiliencia:** romper la credencial Supabase a propósito → el workflow IGUAL entrega
       (el registro es sumidero, no dependencia — invariante #1 de PLAN). Restaurar. Un fallo real
       queda como `run` estado `fallo`.
       *(⚠️ **El enunciado envejeció con D7.** Decía "IGUAL escribe a Airtable", y Airtable ya no
@@ -279,7 +283,12 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       de registro llevan `onError: continueRegularOutput` y los 5 fail-closed (`POST Candidatos`,
       `Leer plan`, `Leer procesados`, `Leer Candidatos calificados`, `Borrar candidatos`) lo son cada
       uno con su ADR. **Es una propiedad estructural, no una conducta que se descubre rompiendo algo.**
-      Las 3 salidas y la recomendación, en
+      ✅ **CERRADA POR AUDITORÍA el 07/08:** el **check #6** de
+      [`auditar-workflows.mjs`](./Workflows/auditar-workflows.mjs) exige `onError:
+      continueRegularOutput` en los 31 nodos HTTP, con `FAIL_CLOSED` como única excepción —
+      **9 nodos, cada uno con su porqué escrito**. Verificado **poniéndolo rojo** con los 3 modos de
+      falla (onError sacado · lista vieja · lista fantasma): los 3 disparan, exit 1. Detalle y lo que
+      se dejó sin hacer a propósito, en
       [verificaciones-humanas §8](./docs/verificaciones-humanas.md).)*
 
 ### Activación

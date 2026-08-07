@@ -17,6 +17,8 @@
 //   4. Code nodes            — compilan como AsyncFunction (los `await` de nivel superior hacen
 //                              que un `new Function()` pelado dé falsos positivos).
 //   5. Placeholders          — inventario de lo que hay que rellenar tras cada re-import (informativo).
+//   6. Invariante #1         — todo nodo HTTP de registro lleva `onError: continueRegularOutput`; los
+//                              fail-closed son una lista explícita (FAIL_CLOSED) con su porqué.
 //
 // ⚠️ Límite conocido del #3: "ancestro" es alcanzabilidad en el grafo, o sea ancestro POSIBLE, no
 // garantizado. Una rama de IF que no se toma sigue contando como ancestro. Eso es a propósito: el
@@ -27,6 +29,32 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Los únicos nodos HTTP que PUEDEN tumbar una corrida. Todo lo demás es registro y va
+// continue-on-fail (invariante #1 de PLAN §2.5). La lista es explícita a propósito: el default es
+// "sos sumidero", así que un nodo HTTP nuevo entra pidiendo su `onError` y quien lo quiera
+// fail-closed tiene que escribir acá por qué. Es el reemplazo de V6 — el simulacro que pedía romper
+// una credencial NO se puede montar: los 31 nodos comparten `Config.supabase_url`, así que romper el
+// registro rompe también la entrega. Lo que V6 quería probar se lee del JSON, y se lee en cada commit.
+const FAIL_CLOSED = {
+  "workflow-short-form-content": {
+    "Leer plan (fachada)": "sin config el run tiene que abortar (ADR-028)",
+    "Leer procesados": "sin memoria de dedup el run aborta en vez de re-entregar todo (ADR-029 exc. 1)",
+    "POST Candidatos": "es LA entrega, no el registro",
+  },
+  "workflow-archivado": {
+    "Leer plan (fachada)": "sin config el run tiene que abortar (ADR-028)",
+    "Leer Candidatos calificados": "es el insumo de la entrega, no un sumidero",
+    "Borrar candidatos": "reintenta 3× y si igual falla corta: el candidato queda y la corrida siguiente lo re-toma sin duplicar (upsert por instance_id+external_id)",
+  },
+  "workflow-descubrimiento-referentes": {
+    "Leer plan (fachada)": "sin config el run tiene que abortar (ADR-028)",
+    "POST Propuestos": "es LA entrega del descubrimiento",
+  },
+  "workflow-dispatcher": {
+    "Leer instancias (fachada)": "sin la lista de instancias no hay a quién disparar (ADR-028 + ADR-050)",
+  },
+};
 
 const WF_ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
 const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
@@ -118,6 +146,25 @@ function auditar(dir) {
   // 5. Placeholders (informativo: no son hallazgos, son la checklist del re-import)
   const ph = [...new Set(readFileSync(ruta, "utf8").match(/<<?[A-ZÁÉÍÓÚÑ][^>"]*>>?/g) || [])].sort();
   if (ph.length) console.log(`  · placeholders a rellenar tras el re-import: ${ph.join(" ")}`);
+
+  // 6. Invariante #1 — el registro es sumidero, jamás dependencia de ejecución
+  const excepciones = FAIL_CLOSED[dir] ?? {};
+  let sumidero = 0;
+  for (const nodo of wf.nodes) {
+    if (nodo.type !== "n8n-nodes-base.httpRequest") continue;
+    const declarado = nodo.onError === "continueRegularOutput";
+    const exceptuado = Object.hasOwn(excepciones, nodo.name);
+    if (exceptuado && declarado) {
+      fail(dir, `${nodo.name} está en FAIL_CLOSED pero tiene onError: continue — la lista quedó vieja, sacalo de ahí`);
+    } else if (!exceptuado && !declarado) {
+      fail(dir, `${nodo.name} no tiene onError: continueRegularOutput — si es registro, es el invariante #1 roto; si de verdad tiene que abortar la corrida, agregalo a FAIL_CLOSED con su porqué`);
+    }
+    if (!exceptuado) sumidero++;
+  }
+  for (const nombre of Object.keys(excepciones)) {
+    if (!nombres.has(nombre)) fail(dir, `FAIL_CLOSED nombra "${nombre}", que ya no existe en el workflow`);
+  }
+  console.log(`  · invariante #1: ${sumidero} nodos de registro continue-on-fail · ${Object.keys(excepciones).length} fail-closed con porqué`);
 }
 
 console.log("═══ AUDIT ESTRUCTURAL DE LOS WORKFLOWS ═══");
