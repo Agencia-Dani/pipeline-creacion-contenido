@@ -100,7 +100,7 @@ al mail (no hay contraseña que recordar).
 | Zona del cockpit | Para qué | Qué hacen ahí |
 |---|---|---|
 | **Curar → Feed** | El tablero de trabajo | Leen los videos y los califican. Es donde viven el 95% del tiempo. |
-| **Curar → Históricos** | El archivo de lo ya elegido | Solo lo consultan. Hay un botón **Descargar CSV** que se abre en Excel o en Sheets. |
+| **Curar → Históricos** | El archivo de lo ya elegido | Solo lo consultan. Hay un botón **Descargar CSV** que abre en Excel (y en Numbers), con cada columna en su celda. |
 | **Operar** | Disparar una corrida | El botón **▶ Correr ahora** y el estado de lo que está corriendo. |
 
 > ☠️ **Airtable ya no existe en este sistema, y el Google Sheet "Histórico" tampoco.** Si alguien les

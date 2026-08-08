@@ -2080,6 +2080,30 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 
 ## Log de avance (más reciente arriba)
 
+**2026-08-08 (cierre 105) — El histórico abre bien en Excel, y la receta que todo el mundo cita era la equivocada (Claude, pedido de Mani).**
+**Qué se hizo:** el CSV pasó de **UTF-8 + coma** a **UTF-16LE + TAB**. `domain/csv.ts` (delimitador + `aUtf16le` nueva, +4 tests), el `Blob` de `historicos/lista.tsx`, y las docs que lo afirmaban ([ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) §consecuencias y [verificaciones-humanas](../verificaciones-humanas.md) §1). Commit `2e6a906`, pusheado y deployado.
+
+**El síntoma:** *"se ve muy bien en Numbers, pero en Excel pierde el formato y es texto sucio"*. **No era la codificación** —el BOM estaba desde el día 1 y los acentos llegaban bien—: **Excel no detecta el delimitador**, lo toma del ajuste regional. La Mac de Mani está en región **Colombia**, donde el separador de lista es `;`, así que un archivo con comas le cae **entero en la columna A**, con las comillas de escape a la vista y el `SCRIPT` multilínea partiendo la fila en dos. Numbers lo abría bien porque **sí** sniffea el delimitador: la diferencia estaba en el lector, no en el archivo, que era RFC 4180 impecable.
+
+**🩸 El aprendizaje, y es el que hay que llevarse: la receta correcta según internet estaba mal, y solo se cayó al abrir Excel de verdad.** `sep=,` como primera línea es lo que recomienda todo el mundo, se implementó, **y arregla el delimitador rompiendo los acentos**: cuando Excel lee esa directiva **deja de mirar el BOM** y cae a MacRoman ⇒ *M√©tricas*. Se probaron las cuatro combinaciones en el Excel real:
+
+| | columnas | acentos |
+|---|---|---|
+| BOM UTF-8 + coma (lo que había) | ❌ | ✅ |
+| BOM UTF-8 + `sep=,` | ✅ | ❌ *M√©tricas* |
+| BOM UTF-8 + tab | ❌ | ✅ |
+| **UTF-16LE + tab** | ✅ | ✅ |
+
+*Un archivo UTF-16 Excel lo trata como tab-delimited sin preguntarle al locale, y por eso es la única que pasa las dos.* **Lo generalizable:** cuando el bug vive en cómo un programa ajeno lee el archivo, ni el test ni el hexdump alcanzan — hay que abrir el programa. El test verde y los bytes correctos convivían con un archivo ilegible.
+
+**⚖️ El costo, elegido y escrito:** ya no es un CSV de manual. Se sigue llamando `.csv` y el botón sigue diciendo *Descargar CSV* (es el nombre del entregable, ADR-057), pero pesa el doble y un parser necesitaría `encoding="utf-16"` y `sep="\t"`. Se acepta porque **el consumidor declarado es Excel** (Majo y Jero) y hoy no hay ningún consumidor máquina. **Numbers no paga nada** — se verificó. *Con `sep=,` habría quedado Numbers con una fila basura arriba **y** Excel con los acentos rotos: la opción "barata" era peor en los dos lados.*
+
+**🧬 `aUtf16le` existe porque no hay forma nativa:** `TextEncoder` solo emite UTF-8, así que un `new Blob([texto])` mandaría UTF-8 y perdería lo único que hace que el archivo abra bien. Recorre **unidades de código** y no caracteres, y eso es lo que preserva los emoji de calificación (pares suplentes) que ADR-057 verificó contra prod.
+
+**Verde:** `typecheck` · **253 tests** (+4) · `build` · `validate` **2206 checks**.
+**✅ Y esto cierra medio hueco viejo:** el *"nadie hizo clic al CSV"* que arrastraban los cierres 101–103. El archivo **se abrió con los ojos en Excel y en Numbers**: 7 columnas cada una en su celda, acentos y emoji intactos, el guion multilínea dentro de **una** celda. ⚠️ **Pero el archivo se generó llamando a las funciones, no apretando el botón en prod** — el tramo Server Action → `Blob` → descarga sigue sin ojo humano. Es lo mismo que faltaba antes, más chico.
+**Qué sigue:** **D3** (la demo de 10 min con Majo y Jero), que sigue siendo el único item sin marcar del ROADMAP §3 y ahora tiene el histórico verificado en el Excel donde ellos lo van a abrir. **Skills sugeridas:** `/diagnose` si aparece cualquier otro *"se ve mal en X"* — el método de esta sesión (reproducir el síntoma en el programa real, tabla de variantes, control incluido) es exactamente su loop.
+
 **2026-08-07 (cierre 104) — El login se abre con contraseña, y medir el síntoma dio vuelta el diagnóstico (Claude, pedido de Mani).**
 **Qué se hizo:** [ADR-065](../adr/ADR-065-la-puerta-se-abre-con-contrasena.md) entera — `domain/credenciales.ts` (+10 tests), `entrarConContrasena` en `app/login/actions.ts` (`enviarMagicLink` sin tocar), `/login` rehecho con el link plegado como repuesto, y **`/mi-cuenta`** para que cada uno se ponga la suya sin depender de un admin. Docs: ADR + índice, README de la app (§stack, mapa y un paso `3-bis` de setup), `verificaciones-humanas` §4-bis y el rango de ADRs del CLAUDE.md. Commit `15bfec4`, pusheado.
 

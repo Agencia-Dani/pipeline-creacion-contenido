@@ -99,6 +99,12 @@ las columnas caen cada una en su celda, los acentos y los emoji de calificación
 Python), ahora necesita `encoding="utf-16"` y `sep="\t"`. Hoy no hay nadie haciendo eso; si
 aparece, es el momento de discutir un `.xlsx` de verdad.
 
+⬜ **Y queda un lector sin probar: Google Sheets** (*Archivo → Importar*). El onboarding decía "Excel
+o Sheets" y ahora dice Excel, porque Excel y Numbers están verificados con los ojos y Sheets no.
+**Si alguien del equipo lo usa ahí, es 1 minuto:** subir el archivo y mirar si las columnas caen
+separadas y los acentos están derechos. Si sale mal, no se vuelve atrás —volver a la coma rompe
+Excel, que es el destinatario— sino que se discute el `.xlsx`.
+
 <details><summary>El enunciado original</summary>
 
 **Quién:** Mani · **2 minutos** · *Es el arrastre abierto más viejo (cierre 94).*
