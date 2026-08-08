@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
+import { aUtf16le } from "@/domain/csv";
 import { fecha } from "@/lib/fechas";
 import type { Historico } from "@/lib/historicos";
 import { miles } from "@/lib/utils";
@@ -46,8 +47,9 @@ export function Lista({
         return;
       }
       // `text/csv` a secas y no `application/octet-stream`: en el móvil decide si se puede abrir
-      // en vez de solo guardar.
-      const url = URL.createObjectURL(new Blob([r.csv], { type: "text/csv;charset=utf-8" }));
+      // en vez de solo guardar. El `charset` acompaña a los bytes de `aUtf16le` — mandar el string
+      // pelado acá lo codificaría en UTF-8 y Excel volvería a partir mal el archivo (ver domain/csv.ts).
+      const url = URL.createObjectURL(new Blob([aUtf16le(r.csv)], { type: "text/csv;charset=utf-16le" }));
       const a = document.createElement("a");
       a.href = url;
       a.download = r.nombre;

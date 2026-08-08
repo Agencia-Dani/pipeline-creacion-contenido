@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { aCsv, celda } from "./csv.ts";
+import { aCsv, aUtf16le, celda } from "./csv.ts";
 
 // El CSV reemplaza al Google Sheet Histórico (ADR-057), así que lo que se prueba acá no es
 // "serializa bien" en abstracto: es que **un guion real no rompa el archivo**. Un script trae
@@ -36,9 +36,9 @@ describe("aCsv", () => {
     assert.ok(aCsv(["A"], []).startsWith("﻿"));
   });
 
-  it("separa filas con CRLF, que es lo que pide RFC 4180", () => {
+  it("separa columnas con TAB y no con coma — con coma, Excel en región CO lo mete todo en la columna A", () => {
     const csv = aCsv(["A", "B"], [["1", "2"]]);
-    assert.equal(csv, '﻿"A","B"\r\n"1","2"\r\n');
+    assert.equal(csv, '﻿"A"\t"B"\r\n"1"\t"2"\r\n');
   });
 
   it("un guion con saltos y comillas NO corre las columnas", () => {
@@ -54,6 +54,37 @@ describe("aCsv", () => {
   });
 
   it("sin filas devuelve solo los encabezados — un CSV vacío sigue siendo un CSV válido", () => {
-    assert.equal(aCsv(["A", "B"], []), '﻿"A","B"\r\n');
+    assert.equal(aCsv(["A", "B"], []), '﻿"A"\t"B"\r\n');
+  });
+});
+
+describe("aUtf16le", () => {
+  // Es la mitad de la decisión que `aCsv` documenta: sin estos bytes, Excel no reconoce el archivo
+  // como UTF-16, vuelve a preguntarle el delimitador al locale y todo cae en la columna A.
+
+  it("abre con ff fe — el BOM que le dice a Excel 'esto es UTF-16'", () => {
+    const b = aUtf16le(aCsv(["A"], []));
+    assert.equal(b[0], 0xff);
+    assert.equal(b[1], 0xfe);
+  });
+
+  it("es little-endian: la 'A' es 41 00 y no 00 41", () => {
+    assert.deepEqual([...aUtf16le("A")], [0x41, 0x00]);
+  });
+
+  it("un acento sobrevive — es la mitad que rompía sep=,", () => {
+    // é = U+00E9 ⇒ e9 00 en UTF-16LE. Si esto sale como c3 a9 (UTF-8), Excel muestra M√©tricas.
+    assert.deepEqual([...aUtf16le("é")], [0xe9, 0x00]);
+  });
+
+  it("un emoji NO se mutila — ADR-057 los verificó contra prod", () => {
+    // 🔥 = U+1F525, fuera del BMP: son DOS unidades de código (par suplente), y recorrerlas de a
+    // una es justo lo que las preserva. Un bucle por "carácter" habría escrito basura.
+    assert.deepEqual([...aUtf16le("🔥")], [0x3d, 0xd8, 0x25, 0xdd]);
+  });
+
+  it("da la vuelta completa: los bytes releídos como utf16le son el texto original", () => {
+    const csv = aCsv(["TÍTULO"], [["Comunicación 🔥"]]);
+    assert.equal(Buffer.from(aUtf16le(csv)).toString("utf16le"), csv);
   });
 });

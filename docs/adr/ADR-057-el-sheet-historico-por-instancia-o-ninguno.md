@@ -114,10 +114,31 @@
     export pasa por **la misma guardia de tenant** que la pantalla (`exigirTenant`), sin una segunda
     copia de esa lógica que se pueda atrasar — que es exactamente el modo de falla que ADR-047 pone
     en la Capa 1.
-  - **Dos detalles que deciden si se siente igual de bueno que el Sheet, y cuestan poco:** BOM al
-    principio (sin él Excel abre *ComunicaciÃ³n*) y **citar siempre**, no solo cuando hace falta —
+  - **Tres detalles que deciden si se siente igual de bueno que el Sheet, y cuestan poco:** BOM al
+    principio (sin él Excel abre *ComunicaciÃ³n*); **citar siempre**, no solo cuando hace falta —
     la columna que importa es `SCRIPT`, que trae transcripciones con saltos de línea y comillas, y
-    un escapado condicional acierta en las 14 fáciles y falla justo en la que corre las columnas.
+    un escapado condicional acierta en las 14 fáciles y falla justo en la que corre las columnas;
+    y **UTF-16LE + TAB en vez de UTF-8 + coma** (2026-08-08, después de que Mani lo abriera en
+    Excel y viera "texto sucio"). Excel **no detecta el delimitador**: lo toma del ajuste regional,
+    y en región Colombia —la de Majo y Jero, que son quienes lo abren— el separador de lista es
+    `;`, así que el CSV con comas le caía **entero en la columna A**, con las comillas de escape a
+    la vista y el `SCRIPT` partiendo la fila en dos. Se probaron las cuatro combinaciones **en el
+    Excel real**, no en teoría:
+
+    | | columnas | acentos |
+    |---|---|---|
+    | BOM UTF-8 + coma (lo que había) | ❌ | ✅ |
+    | BOM UTF-8 + `sep=,` | ✅ | ❌ *M√©tricas* |
+    | BOM UTF-8 + tab | ❌ | ✅ |
+    | **UTF-16LE + tab** | ✅ | ✅ |
+
+    La fila que sorprende es la segunda: `sep=,` es la receta que todo el mundo cita, y **funciona
+    a medias** — cuando Excel lee esa directiva deja de mirar el BOM y cae a MacRoman, así que
+    arregla las columnas y rompe los acentos. Era la opción elegida hasta que se midió.
+    **El costo de la que quedó, aceptado:** el archivo ya no es un CSV de manual (un parser que
+    asuma coma y UTF-8 necesita `encoding="utf-16"` y `sep="\t"`) y pesa el doble. Se acepta porque
+    el consumidor declarado es Excel y hoy no hay ningún consumidor máquina. **Numbers no paga
+    nada:** se verificó que abre igual de bien que antes.
   - **Tope de 5.000 filas**, que corta y avisa en vez de tumbar el request. Con ~60 aprobados por
     semana son ~18 meses; cuando muerda, la respuesta es paginar por fecha, no subir el número.
   - **Verificado contra prod:** las 31 filas aprobadas reales, releídas con un parser RFC 4180

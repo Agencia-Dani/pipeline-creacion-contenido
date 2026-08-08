@@ -88,6 +88,17 @@ más viejo abierto de la lista (venía del cierre 94). **Ojo para la próxima de
 trae **16 columnas, no 15** — `ORIGEN` se sumó al final (ADR-062), y las 15 de siempre conservan su
 posición exacta para no romper una planilla que lea por número de columna.
 
+**Y desde el 2026-08-08 el archivo va en UTF-16LE y separado por TAB**, no en UTF-8 con comas
+(ADR-057, §consecuencias). Es porque Mani lo abrió en **Excel** y salía todo amontonado en la
+columna A: Excel le pregunta el delimitador al ajuste regional, y en región Colombia ese
+delimitador es `;`. Verificado el mismo día abriendo el archivo real en **Excel y en Numbers**:
+las columnas caen cada una en su celda, los acentos y los emoji de calificación intactos, y el
+`SCRIPT` multilínea dentro de **una** celda en vez de partir la fila. Sigue llamándose `.csv`.
+
+⚠️ **Lo que esto le hace a un tercero:** si alguien lo levanta con un script (pandas, `csv` de
+Python), ahora necesita `encoding="utf-16"` y `sep="\t"`. Hoy no hay nadie haciendo eso; si
+aparece, es el momento de discutir un `.xlsx` de verdad.
+
 <details><summary>El enunciado original</summary>
 
 **Quién:** Mani · **2 minutos** · *Es el arrastre abierto más viejo (cierre 94).*
