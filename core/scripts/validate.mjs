@@ -127,6 +127,30 @@ for (const dir of wfDirs) {
   for (const f of ["setup", "start", "stop", "test"]) {
     check(where, !!m.runbook?.[f], `runbook sin '${f}'`);
   }
+
+  // El artefacto del motor: ¿el manifest tiene con qué correr?
+  //
+  // 🩸 Esto faltaba, y por eso `workflow-linkedin` pasaba en verde sin tener motor: el validador
+  // solo miraba el manifest, que es el DISEÑO. Un manifest sin `workflow.json` es perfectamente
+  // legítimo mientras diga que no corre — `draft` (todavía no se construyó, LinkedIn) o
+  // `inactive`/`retired` (corrió y se bajó, Substack). Lo que no puede existir es un manifest que se
+  // declare vivo en n8n sin el archivo que define qué es lo que está vivo: ahí `n8n:diff` no tiene
+  // contra qué comparar y el repo deja de ser la forma del live (ADR-053).
+  if (m.engine === "n8n") {
+    const declaraQueCorre = ["active", "paused"].includes(m.status);
+    const tieneJson = existsSync(join(wfRoot, dir, "workflow.json"));
+    check(where, !declaraQueCorre || tieneJson,
+      `status '${m.status}' (o sea, importado en n8n) pero no hay workflow.json — o falta el archivo, o el status miente`);
+    if (tieneJson) {
+      try {
+        const wf = JSON.parse(readFileSync(join(wfRoot, dir, "workflow.json"), "utf8"));
+        check(where, Array.isArray(wf?.nodes) && wf.nodes.length > 0,
+          "workflow.json sin nodos (un motor vacío se importa igual y no hace nada)");
+      } catch (e) {
+        fail(where, `workflow.json no parsea: ${e.message}`);
+      }
+    }
+  }
 }
 
 // ---------- 2. Configs de clientes ----------

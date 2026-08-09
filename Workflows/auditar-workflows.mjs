@@ -168,8 +168,18 @@ function auditar(dir) {
 }
 
 console.log("═══ AUDIT ESTRUCTURAL DE LOS WORKFLOWS ═══");
-for (const dir of readdirSync(WF_ROOT).sort()) {
-  if (dir.startsWith("workflow-") && existsSync(join(WF_ROOT, dir, "workflow.json"))) auditar(dir);
+const dirs = readdirSync(WF_ROOT).sort().filter((d) => d.startsWith("workflow-"));
+const conMotor = dirs.filter((d) => existsSync(join(WF_ROOT, d, "workflow.json")));
+for (const dir of conMotor) auditar(dir);
+
+// Los que no tienen `workflow.json` se saltean —no hay nada que auditar— pero **se nombran**.
+// Un audit que termina en "✓ Sin hallazgos" habiendo mirado 5 de 7 dice algo más fuerte de lo que
+// midió, y es el mismo modo de falla que el validador tenía con `linkedin`: verde por ausencia.
+// El cuántos-de-cuántos es lo único que distingue "está todo bien" de "no había nada que mirar".
+const salteados = dirs.filter((d) => !conMotor.includes(d));
+console.log(`\n▸ auditados ${conMotor.length} de ${dirs.length} workflows del repo`);
+if (salteados.length) {
+  console.log(`  · sin workflow.json, nada que auditar: ${salteados.join(" · ")}`);
 }
 
 console.log(hallazgos === 0 ? "\n✓ Sin hallazgos.\n" : `\n✗ ${hallazgos} hallazgo(s).\n`);

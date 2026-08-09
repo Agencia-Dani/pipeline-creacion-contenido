@@ -88,6 +88,41 @@ export function mostrarConsulta(fuente: Fuente, consulta: string): string {
   return fuente === "linkedin" ? `@${consulta}` : consulta;
 }
 
+/**
+ * El banco → los registros `{id, fields}` del plan de corrida de LinkedIn (ADR-068).
+ *
+ * Dos decisiones de forma que **no** copian a reels, y las dos a conciencia:
+ *
+ *   · **`carril` viaja resuelto.** Sale de `carrilDeFuente`, o sea que ya se puede derivar del
+ *     `fuente` que va al lado. Se manda igual porque es lo que decide **qué umbral se le aplica a la
+ *     pieza** (ADR-055 §2) y esa regla no puede vivir duplicada en un code node de n8n: el día que
+ *     una fuente cambie de carril, el JSON del workflow no se entera y el umbral se aplica al revés,
+ *     en verde.
+ *   · **`proyecto_id` es un string o `null`, NO un array de un elemento.** En reels
+ *     `referentes[].fields.proyecto` es un array porque un referente alimenta N proyectos (ADR-032)
+ *     y porque venía de un campo *link* de Airtable. Acá la `020` §2 declara un `proyecto_id`
+ *     nullable simple: envolverlo en un array sería arrastrar la forma heredada de una base que ya
+ *     no existe a un contrato que todavía no tiene un solo consumidor que romper.
+ */
+export function aRegistrosDeBancoLinkedin(
+  banco: readonly ReferenteLinkedin[],
+  ambito: "motor" | "completo",
+): { id: string; fields: Record<string, unknown> }[] {
+  return banco
+    .filter((r) => ambito === "completo" || r.activo)
+    .map((r) => ({
+      id: r.id,
+      fields: {
+        fuente: r.fuente,
+        carril: carrilDeFuente(r.fuente),
+        consulta: r.consulta,
+        idioma: r.idioma,
+        proyecto_id: r.proyectoId,
+        activo: r.activo,
+      },
+    }));
+}
+
 export type FormReferenteLinkedin = {
   fuente: string;
   consulta: string;

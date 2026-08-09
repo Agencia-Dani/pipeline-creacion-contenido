@@ -1,8 +1,12 @@
 import type { Proyecto, Voz } from "@/domain/corrida";
+import { aRegistrosDeBancoLinkedin } from "@/domain/linkedin";
+import { aRegistrosDeVocesLinkedin } from "@/domain/linkedin-voz";
 import type { TenantContext } from "@/domain/tenant";
 import { leerAjustes, leerAjustesComoRegistros } from "@/lib/ajustes";
 import { leerProyectos, leerProyectosComoRegistros, leerVoces, leerVocesComoRegistros } from "@/lib/proyectos";
 import { leerReferentesComoRegistros } from "@/lib/referentes";
+import { leerBancoLinkedin } from "@/lib/referentes-linkedin";
+import { leerVocesConPerfil } from "@/lib/voces-linkedin";
 
 // La costura del corte de D5: acá, y solo acá, se decide de qué almacenamiento sale cada
 // dominio de la config. Con el corte 3/4, los CUATRO dominios del contrato salen de Postgres:
@@ -24,6 +28,34 @@ export async function leerRunPlanCrudo(ctx: TenantContext, ambito: "motor" | "co
     leerReferentesComoRegistros(ctx, ambito), // ← Postgres (D5, corte 2/4)
   ]);
   return { voces, proyectos, ajustes, referentes };
+}
+
+/**
+ * El mismo corte, para el pipeline de LinkedIn (ADR-068).
+ *
+ * 🔑 **Son OTRAS tablas, no las mismas filtradas**, y por eso es una función hermana y no un `if`
+ * adentro de la de arriba. `app.voces_linkedin` y `app.referentes_linkedin` son de grano INSTANCIA
+ * (ADR-049), mientras que las de reels son de grano empresa: los dos ejes los aplica `scoped()`
+ * solo, sin un `.eq()` a mano que se pueda olvidar, pero son ejes distintos.
+ *
+ * 🩸 **El modo de falla que esta separación evita es el caro**, y estuvo vivo hasta hoy: sin rama
+ * por pipeline, un motor de LinkedIn pidiendo su plan recibía el de **reels** — las voces, los
+ * proyectos y el banco de Instagram/TikTok de esa misma empresa. No un vacío ni un 500: filas de
+ * verdad, con la forma correcta y el contenido de otro pipeline. En Retia, que es la única con los
+ * dos cockpits, eso son 3 voces reales.
+ *
+ * `leerVocesConPerfil` cruza las dos tablas en memoria (ver ahí por qué no es un embed de
+ * PostgREST), así que las voces sin perfil llegan igual y el filtro de `motor` lo aplica el mapper.
+ */
+export async function leerRunPlanCrudoLinkedin(
+  ctx: TenantContext,
+  ambito: "motor" | "completo" = "motor",
+) {
+  const [voces, banco] = await Promise.all([leerVocesConPerfil(ctx), leerBancoLinkedin(ctx)]);
+  return {
+    voces: aRegistrosDeVocesLinkedin(voces, ambito),
+    referentes: aRegistrosDeBancoLinkedin(banco, ambito),
+  };
 }
 
 /**

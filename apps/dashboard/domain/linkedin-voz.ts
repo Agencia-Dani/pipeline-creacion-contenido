@@ -214,6 +214,47 @@ export function validarPerfil(
   return errores;
 }
 
+// ─────────────────────────── La forma del contrato (ADR-068) ───────────────────────────
+
+/**
+ * Las voces → los registros `{id, fields}` del plan de corrida de LinkedIn.
+ *
+ * 🔴 **El filtro de `motor` es `estaActivaEnLinkedin`, o sea la EXISTENCIA DEL PERFIL, y jamás
+ * `voces.activo`.** Es la regla de ADR-067 aplicada al único consumidor que todavía no existía
+ * cuando se escribió, y acá se paga cara en las dos direcciones: filtrar por `activo` le daría al
+ * motor **cero voces** en las tres marcas (la pantalla de LinkedIn las crea con `activo: false` a
+ * propósito, para no meterlas en el plan de reels), y sería cero **sin un solo error** — una corrida
+ * verde que no produce nada.
+ *
+ * En `completo` viajan todas, con los campos del perfil en `null` y `configurada: false`. La forma
+ * se mantiene idéntica a propósito: un registro al que le faltan claves según el caso obliga a quien
+ * lo lee a chequear cada una, y ese es el `undefined` que se cuela en un template de prompt.
+ *
+ * `id` es el uuid de `app.voces` — el mismo que ya usa el plan de reels, porque la voz es de la
+ * EMPRESA y es la misma fila en los dos pipelines. Lo que cambia es lo que se dice de ella.
+ */
+export function aRegistrosDeVocesLinkedin(
+  voces: readonly VozConPerfil[],
+  ambito: "motor" | "completo",
+): { id: string; fields: Record<string, unknown> }[] {
+  return voces
+    .filter((v) => ambito === "completo" || estaActivaEnLinkedin(v))
+    .map((v) => ({
+      id: v.id,
+      fields: {
+        nombre: v.nombre,
+        configurada: estaActivaEnLinkedin(v),
+        perfil: v.perfil?.perfil ?? null,
+        firma: v.perfil?.firma ?? null,
+        espaciado: v.perfil?.espaciado ?? null,
+        separacion_h: v.perfil?.separacionH ?? null,
+        franjas: v.perfil?.franjas ?? [],
+        dias: v.perfil?.dias ?? null,
+        lineas_rojas: v.perfil?.lineasRojas ?? null,
+      },
+    }));
+}
+
 // ─────────────────────────── Cómo se dibuja la lista ───────────────────────────
 
 /**

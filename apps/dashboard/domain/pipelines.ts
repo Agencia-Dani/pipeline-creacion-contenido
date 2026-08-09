@@ -17,6 +17,19 @@ import { ZONAS, type Zona } from "./roles.ts";
 /** El `workflows.id` del registro central, que es también el `id` del manifest. */
 export type Pipeline = string;
 
+/**
+ * Los dos pipelines que existen hoy, por su `workflows.id`.
+ *
+ * Están acá y no en cada archivo que los necesita porque desde ADR-068 el id del pipeline **decide
+ * qué plan de corrida sirve la fachada**, o sea que dejó de ser solo la key de las tablas de este
+ * archivo. Un string literal repetido en `route.ts`, en `lib/config.ts` y acá es la clase de typo
+ * que no rompe nada: cae en el `default`, que en la fachada significa 400 y en las tablas de abajo
+ * significa "un cockpit sin nav" — ruidoso, pero descubierto tarde. El test los ata a que estén
+ * declarados.
+ */
+export const PIPELINE_REELS: Pipeline = "short-form-content";
+export const PIPELINE_LINKEDIN: Pipeline = "linkedin";
+
 // Qué zonas tiene sentido dibujar en cada pipeline. La tabla es corta a propósito: sumar un
 // pipeline es una línea acá, no tocar el layout ni las guardias.
 //

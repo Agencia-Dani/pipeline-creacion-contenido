@@ -38,11 +38,24 @@ triggers:
 
 inputs:
   # La config NO se edita en el nodo: se lee por la fachada (ADR-035, "n8n lee su config por la
-  # fachada, escribe sus resultados por PostgREST"). El `client_config` queda declarado por contrato.
-  client_config: "clients/{cliente}/linkedin.yaml"
+  # fachada, escribe sus resultados por PostgREST").
+  #
+  # ⚠️ `client_config` decía `clients/{cliente}/linkedin.yaml` y ese archivo **no existe ni va a
+  # existir**: desde ADR-035 la config de una instancia sale de Postgres por la fachada, y un yaml
+  # por cliente sería una segunda fuente de verdad para lo mismo. Se declara `n/a`, como ya hacen el
+  # dispatcher y el registro de fallos. (Los manifests de `short-form-content`,
+  # `descubrimiento-referentes` y `archivado` siguen declarando el suyo y tampoco existe — misma
+  # herencia del diseño pre-fachada, sin consecuencia porque nadie los lee.)
+  client_config: "n/a — la config sale de la fachada (ADR-035); no hay yaml por cliente"
   config_node: "Nodo 'Config': supabase_url, dashboard_url. instance_id sale del payload (ADR-048)."
-  run_plan: "GET /api/engine/run-plan?instancia=<uuid>&ambito=linkedin — voces, sus perfiles de LinkedIn (firma, espaciado, separación) y el banco de referentes."
+  # 🔴 Decía `&ambito=linkedin` y eso daba **400**: `ambito` es motor|completo y nada más. El
+  # pipeline NO se pide, lo DERIVA la fachada de la instancia (ADR-068) — son dos ejes: qué pipeline
+  # (lo sabe la base) y cuán filtrado (lo pide quien llama).
+  run_plan: "GET /api/engine/run-plan?instancia=<uuid> — devuelve `pipeline: linkedin`, las voces CON PERFIL (ADR-067: el perfil es el interruptor, no `voces.activo`) y el banco de referentes prendido. Sin `proyectos` y sin `ajustes`: ver ADR-068."
   filters:
+    # ⚠️ NINGUNA de estas perillas existe todavía en `app.ajustes` (es de grano instancia y LinkedIn
+    # no tiene filas), y por eso el plan de corrida NO trae `ajustes`. Las crea la Fase 4 con su
+    # migración `028`; hasta entonces viven acá como diseño y el motor las lleva en su `Config`.
     # El umbral es POR CARRIL, y esa es la diferencia estructural con reels (ADR-055 §2).
     - { key: umbral_reacciones, type: number, scope: client, desc: "Carril copiable, fuente LinkedIn: piso de reacciones. NO aplica al carril personal, que no compite con nadie" }
     - { key: pins_por_consulta, type: number, scope: client, default: 20, desc: "Carril copiable, fuente Pinterest: cuántos pins traer por filtro. Acá el umbral es de pertinencia y formato, no de viralidad — un pin no tiene reacciones que comparar" }

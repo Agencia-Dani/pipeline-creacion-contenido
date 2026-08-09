@@ -145,3 +145,68 @@ Un solo endpoint y una sola credencial; el query param elige el filtro:
   **descubrimiento** (no respeta `activo` a propósito — despensa para voces pausadas, cierre 49).
   Cada workflow aplica su propia lógica sobre el total, exactamente como hoy.
 - Un `ambito` desconocido responde **400** (un typo en n8n no puede degradar en silencio al default).
+
+## Los dos ejes: qué pipeline × cuán filtrado (ADR-068)
+
+Desde que hay un segundo pipeline, este endpoint sirve **dos planes distintos** — y el eje nuevo
+**no es `ambito`**:
+
+| Eje | Quién contesta | Qué decide |
+|---|---|---|
+| **Qué pipeline** | la **instancia**: `instances.workflow_id`, derivado server-side | qué tablas se leen y qué plan se arma |
+| **Cuán filtrado** (`?ambito`) | **el que llama** | `motor` vs `completo`, lo de arriba |
+
+> 🔴 **El pipeline NO se pide, y esa es la decisión.** `?instancia` ya dice de quién es la corrida, y
+> de esa fila sale su pipeline. Un `?ambito=linkedin` —que es lo que el manifest de LinkedIn declaró
+> hasta el 09/08, y daba 400— dejaría que el llamante **contradiga a la base** sobre algo que la base
+> sabe. Ese desacuerdo **no falla**: devuelve 200 con el plan del *otro* pipeline.
+>
+> 📏 Medido contra prod el 09/08, antes de este cambio: `30x/linkedin` y `estadox/linkedin` daban
+> **200 con el plan de reels vacío** (las dos empresas tienen 0 voces / 0 proyectos / 0 referentes), y
+> `retia/linkedin` daba 403 por estar en `draft`. El día que se prenda, la misma llamada devolvería
+> **3 voces, 6 proyectos y 17 referentes de reels** — son de grano empresa y los comparten los dos
+> pipelines. Mismo modo mudo que cerró ADR-066.
+>
+> **Una instancia de un pipeline sin plan responde 400**, con `motivo: "pipeline_sin_plan"` y el
+> pipeline nombrado — fail-closed como todo lo demás acá.
+
+**Todo plan trae `pipeline`** (`"short-form-content"` | `"linkedin"`). Es **aditivo**: nada cambió de
+forma, `version` sigue en `2` y ningún workflow de reels se entera. Está para que el motor pueda
+**afirmar** en una línea de su `Config` que le contestaron el plan que pidió — es el único chequeo
+posible contra un fallo cuyo síntoma es un documento correcto. ⚠️ Sacarlo después sí sería un cambio
+de forma y costaría el bump.
+
+### El plan de `linkedin`
+
+**No es el de reels con campos de menos.** Mismo `{id, fields}`, misma credencial, mismo fail-closed:
+
+```json
+{
+  "version": 2,
+  "pipeline": "linkedin",
+  "generado_en": "2026-08-09T08:00:00.000Z",
+  "voces":      [{ "id": "uuid de app.voces", "fields": { "nombre": "…", "configurada": true, "perfil": "…", "firma": "…", "espaciado": 2, "separacion_h": 4, "franjas": ["08:00"], "dias": null, "lineas_rojas": null } }],
+  "referentes": [{ "id": "uuid…", "fields": { "fuente": "pinterest", "carril": "copiable", "consulta": "mindset", "idioma": "en", "proyecto_id": null, "activo": true } }]
+}
+```
+
+- 🔴 **El filtro de `motor` sobre las voces es LA EXISTENCIA DEL PERFIL, jamás `voces.activo`**
+  ([ADR-067](../../docs/adr/ADR-067-el-perfil-de-voz-de-linkedin-es-una-capa-sobre-las-voces-de-la-empresa.md)).
+  Ese flag significa de facto *"corre en reels"*, y la pantalla de LinkedIn crea las voces con
+  `activo: false` **a propósito** para no meterlas en el plan del motor de reels ⇒ filtrar por él
+  daría **cero voces en las tres marcas**, en verde. En `completo` viajan todas, con los campos del
+  perfil en `null` y `configurada: false`: **las mismas claves siempre**, para que nadie tenga que
+  chequear cuáles vinieron.
+- **`carril` viaja resuelto** desde `fuente` (`archivo` ⇒ `personal`, el resto ⇒ `copiable`). Es
+  derivable, y se manda igual porque decide **qué umbral se le aplica a la pieza** (ADR-055 §2): esa
+  regla duplicada en un code node se desincroniza en silencio.
+- **`proyecto_id` es un string o `null`, NO un array de un elemento.** En reels
+  `referentes[].fields.proyecto` es array por ADR-032 y por herencia de un campo *link* de Airtable;
+  la `020` §2 declara un FK nullable simple y el contrato nuevo no arrastra la forma de una base
+  muerta.
+- **No trae `proyectos`:** en LinkedIn la unidad de config es la **voz**, no el proyecto — no hay
+  corte por proyecto ni `N` que resolver.
+- **No trae `ajustes`, y la ausencia es deliberada:** `app.ajustes` es de grano instancia y LinkedIn
+  no tiene una sola fila (por eso su cockpit tampoco declara la pantalla `motor`, ADR-066). Servir
+  `ajustes: []` sería la lista siempre vacía que se lee como *"todavía no lo configuraron"*. Las
+  perillas del manifest llegan con la Fase 4 y su migración `028`.

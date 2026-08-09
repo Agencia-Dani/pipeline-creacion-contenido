@@ -28,13 +28,37 @@ const SNAPS = path.join(RAIZ, '.n8n-snapshots');
 
 // alias → carpeta del repo. El id de n8n NO vive acá: va al .env como N8N_WF_<ALIAS>,
 // por la convención del repo (ni credenciales ni IDs en git).
-const ALIAS = {
+//
+// Los cinco de abajo son APODOS y por eso se escriben: `motor` no se deriva de
+// `workflow-short-form-content`, y renombrarlos rompería la memoria muscular de quien los usa
+// todos los días.
+const APODOS = {
   motor: 'workflow-short-form-content',
   descubrimiento: 'workflow-descubrimiento-referentes',
   dispatcher: 'workflow-dispatcher',
   archivado: 'workflow-archivado',
   errores: 'workflow-registro-fallos',
 };
+
+// 🩸 **Y el resto se descubre solo, que es lo que faltaba.** Con la lista literal, un pipeline nuevo
+// era invisible para `n8n:diff` y `n8n:push` hasta que alguien se acordara de agregarlo acá — y el
+// síntoma de olvidarse no es un error, es que el comando pasa en verde sin haber mirado ese
+// workflow. Un dir con `workflow.json` ya tiene, por definición, algo que comparar contra el live.
+//
+// Se pide el `workflow.json` y no el manifest a propósito: `workflow-linkedin` y `workflow-substack`
+// tienen `workflow.yaml` y ningún motor, así que aparecer acá solo produciría un alias que muere al
+// leerlo. Entran el día que tengan el archivo, sin que nadie toque este script.
+function descubrirAlias() {
+  const dirs = fs.readdirSync(path.join(RAIZ, 'Workflows'))
+    .filter((d) => d.startsWith('workflow-')
+      && fs.existsSync(path.join(RAIZ, 'Workflows', d, 'workflow.json')));
+  const mapa = { ...APODOS };
+  const conApodo = new Set(Object.values(APODOS));
+  for (const d of dirs) if (!conApodo.has(d)) mapa[d.replace(/^workflow-/, '')] = d;
+  return mapa;
+}
+
+const ALIAS = descubrirAlias();
 
 // Un placeholder es <<ASI>> o <ASI>. Se exige mayúsculas y ≥3 caracteres para no confundirlo
 // con un `<div>` o un genérico dentro de un jsCode.
@@ -62,8 +86,14 @@ async function api(method, ruta, body) {
   return json;
 }
 
-const idDe = (alias) => process.env[`N8N_WF_${alias.toUpperCase()}`]
+const idDe = (alias) => idDeOpcional(alias)
   || die(`falta N8N_WF_${alias.toUpperCase()} en el .env (el id del workflow en n8n).`);
+
+// La versión que NO mata el proceso, para los barridos. Un alias descubierto puede tener su
+// `workflow.json` en el repo y todavía no estar importado en n8n: eso no es un error del barrido, es
+// el estado normal el día que alguien empieza a construir un pipeline. Se saltea con aviso —
+// silenciarlo sería el "verde sin haber mirado" que este descubrimiento existe para evitar.
+const idDeOpcional = (alias) => process.env[`N8N_WF_${alias.toUpperCase()}`];
 
 const repoDe = (alias) => {
   const f = ALIAS[alias] || die(`alias desconocido: "${alias}". Conocidos: ${Object.keys(ALIAS).join(', ')}`);
@@ -141,8 +171,10 @@ function alinear(a, b, mapa, conflictos) {
 async function aprenderMapa() {
   const mapa = new Map(), conflictos = new Set();
   for (const alias of Object.keys(ALIAS)) {
+    const id = idDeOpcional(alias);
+    if (!id) continue;                                // no importado todavía: cmdDiff ya lo avisa
     let repo, live;
-    try { repo = repoDe(alias); live = await api('GET', `/workflows/${idDe(alias)}`); } catch { continue; }
+    try { repo = repoDe(alias); live = await api('GET', `/workflows/${id}`); } catch { continue; }
     for (const rn of repo.nodes || []) {
       const ln = (live.nodes || []).find((x) => x.name === rn.name);
       if (ln) alinear(rn.parameters, ln.parameters, mapa, conflictos);
@@ -259,7 +291,15 @@ async function cmdDiff(alias, opts) {
   if (conflictos.size) console.log(`${c.amar}⚠ con valores distintos entre workflows (no se usan): ${[...conflictos].join(' ')}${c.off}`);
 
   let accionables = 0;
-  const revisados = alias ? [alias] : Object.keys(ALIAS);
+  // Con alias explícito se revisa ese y `idDe` muere si no está en el .env (lo pediste por nombre).
+  // En el barrido, en cambio, un alias descubierto sin id todavía no existe en n8n: se saltea CON
+  // AVISO, porque un barrido que dice "✓ todo bien" habiendo mirado 5 de 6 es peor que uno que grita.
+  const todos = alias ? [alias] : Object.keys(ALIAS);
+  const revisados = alias ? todos : todos.filter((a) => idDeOpcional(a));
+  const salteados = todos.filter((a) => !revisados.includes(a));
+  if (salteados.length) {
+    console.log(`${c.amar}⚠ sin revisar (hay workflow.json en el repo pero falta N8N_WF_<ALIAS> en el .env, o sea que no está importado): ${salteados.join(' ')}${c.off}`);
+  }
   for (const a of revisados) {
     const repo = repoDe(a), live = await api('GET', `/workflows/${idDe(a)}`);
     const hall = comparar(repo, live, mapa);

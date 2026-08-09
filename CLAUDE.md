@@ -25,7 +25,7 @@ en §Agent skills; acá solo se ubican.
   que reemplazó a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–067, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–068, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -152,7 +152,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..067).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..068).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del
@@ -183,7 +183,11 @@ módulos), `/handoff` (compactar una sesión).
   con los placeholders resueltos; jamás toca credenciales, ids, posiciones ni `settings`. Snapshotea
   antes (`.n8n-snapshots/`, gitignored) y verifica contra la instancia después; el rollback es
   `npm run n8n:restore -- <alias> <snapshot> --apply`. Alias: `motor · descubrimiento · dispatcher ·
-  archivado · errores`. **Cambios de topología (nodos o conexiones nuevas) siguen siendo re-import
+  archivado · errores`, **más los que se descubren solos** — desde ADR-068 los 5 apodos se escriben
+  (`motor` no se deriva de `workflow-short-form-content`) y cualquier otro dir con `workflow.json`
+  entra por su id, sin tocar el script. Un alias descubierto sin su `N8N_WF_<ALIAS>` en el `.env`
+  todavía no está importado: el barrido lo **saltea con aviso**, nunca en silencio.
+  **Cambios de topología (nodos o conexiones nuevas) siguen siendo re-import
   completo: el push los detecta y se niega.** Su test: `npm run n8n:test` (⚠️ crea y borra un
   workflow desechable e inactivo en n8n; corrélo si tocaste `n8n-sync.mjs`).
   🟡 *La topología es el **único ritual manual que queda**, y ya no por un límite de la API:

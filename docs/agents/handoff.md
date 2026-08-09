@@ -22,6 +22,90 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🔌 2026-08-09 (cierre 107) · LA FACHADA YA SABE QUE LINKEDIN EXISTE, Y EL 400 QUE LA TAPABA NO PROTEGÍA NADA
+>
+> **Leelo antes de prender `retia/linkedin`.** El cierre 106 dejó 8 huecos de tooling medidos entre
+> el cockpit de LinkedIn y su motor en n8n. Esta sesión cerró los que no dependen de que el workflow
+> exista, y el primero resultó ser más grande de lo que decía el renglón.
+>
+> ### 🩸 El 400 era el síntoma barato; abajo había un 200
+>
+> El handoff decía: *"`?ambito=linkedin` da 400 hoy, es lo primero que se va a chocar"*. Cierto, y
+> **arreglarlo de la forma obvia —agregar `linkedin` a la lista de ámbitos— habría empeorado la
+> cosa**, porque el otro renglón (*"`leerRunPlanCrudo` no tiene rama por pipeline"*) es el que muerde:
+> el plan se llena siempre desde las tablas de reels.
+>
+> 🔴 **Y el 400 no protege de nada aunque lo parezca: SACAR el parámetro devuelve 200.** Un nodo
+> copiado de reels no manda `ambito`, así que cae en el default `motor` y recibe el plan de reels.
+>
+> 📏 **Medido contra prod, sin escribir nada:**
+>
+> | | Hoy | Cuando se prenda `retia/linkedin` |
+> |---|---|---|
+> | `30x/linkedin` · `estadox/linkedin` | **200 con el plan de reels VACÍO** (las dos empresas tienen 0 voces / 0 proyectos / 0 referentes) | igual |
+> | `retia/linkedin` | **403** — está en `draft`, y `leerInstancias()` solo trae las `active` | **200 con 3 voces, 6 proyectos y 17 referentes de REELS** |
+>
+> **El vacío de hoy es el peor de los dos**: una corrida que termina en verde sin entregar nada se
+> lee como *"todavía no cargamos referentes"*. Y la ventana con datos **la abre el paso 2 de la lista
+> de abajo**, o sea lo próximo que se iba a hacer.
+>
+> ⚠️ **Orden que importa: este deploy va ANTES de prender `retia/linkedin`.** Al revés se abre esa
+> ventana por el tiempo que tarde Vercel.
+>
+> ### ✅ Lo que entró — [ADR-068](../adr/ADR-068-el-pipeline-lo-dice-la-instancia-no-el-que-pregunta.md)
+>
+> **Son dos ejes y se separaron: QUÉ pipeline lo deriva la fachada de `instances.workflow_id` (nunca
+> se pide), CUÁN filtrado (`?ambito=motor|completo`) lo sigue pidiendo quien llama.** Dejar que el
+> llamante declare su pipeline habilita que contradiga a la base sobre algo que la base sabe, y ese
+> desacuerdo devuelve **200**.
+>
+> | Hueco del cierre 106 | Estado |
+> |---|---|
+> | `run-plan?ambito=linkedin` daba 400 | ✅ el pipeline sale de la instancia; un pipeline sin plan da **400 fail-closed** con su nombre en la respuesta |
+> | `leerRunPlanCrudo` sin rama por pipeline | ✅ `leerRunPlanCrudoLinkedin` + `armarRunPlanLinkedin` |
+> | `validate.mjs` no exigía `workflow.json` | ✅ lo exige si el manifest se declara `active`/`paused` con `engine: n8n`. `draft` (LinkedIn) e `inactive` (Substack) siguen legítimos — **la guarda se verificó poniéndola roja** |
+> | `n8n-sync.mjs` con la lista de 5 hardcodeada | ✅ los 5 apodos se escriben (`motor` no se deriva de `workflow-short-form-content`), el resto **se descubre** de los dirs con `workflow.json`. Verificado: con un `workflow.json` de prueba, `linkedin` aparece solo |
+> | `auditar-workflows.mjs` salteaba en silencio | ✅ dice **"auditados 5 de 7"** y nombra los saltados. *"✓ Sin hallazgos"* habiendo mirado 5 de 7 afirma más de lo que midió |
+> | `clients/<cliente>/linkedin.yaml` declarado y sin existir | ✅ el manifest decía la verdad al revés: **ese archivo no va a existir** (desde ADR-035 la config sale de la fachada). Queda `n/a`, como el dispatcher y errores |
+> | cron en el dispatcher | ⬜ **no se puede**: necesita el workflow en n8n |
+>
+> ⚠️ **`short-form-content`, `descubrimiento-referentes` y `archivado` declaran un `client_config` que
+> tampoco existe.** Misma herencia pre-fachada, sin consecuencia (nadie los lee) y **no se tocaron**.
+>
+> ### 🔑 Tres cosas del plan de LinkedIn que no son obvias
+>
+> 1. 🔴 **Filtra las voces por LA EXISTENCIA DEL PERFIL, jamás por `voces.activo`** (ADR-067). Ese
+>    flag significa de facto *"corre en reels"* y la pantalla de LinkedIn crea las voces con
+>    `activo: false` **a propósito** ⇒ filtrar por él le daría al motor **cero voces en las 3 marcas**,
+>    en verde. Que `VozConPerfil` ni siquiera tenga un campo `activo` es la mitad estructural de la
+>    garantía: el filtro equivocado **no compila**. El test cubre la otra mitad.
+> 2. **No trae `proyectos` ni `ajustes`, y la segunda ausencia es la decisión.** `app.ajustes` es de
+>    grano instancia y LinkedIn no tiene una sola fila; `ajustes: []` sería la lista siempre vacía que
+>    se lee como *"todavía no lo configuraron"* (la familia de la `015`). Llega con la Fase 4 y su `028`.
+> 3. **Todo plan trae ahora `pipeline`** (aditivo ⇒ `version` sigue en **2**, reels no se entera). Es
+>    lo único que el motor puede **afirmar** contra un fallo cuyo síntoma es un documento bien formado.
+>    ⚠️ **Y es la única prueba observable de que esto hizo algo** hasta que haya filas: las listas
+>    siguen vacías, lo que cambia es que `pipeline` dice `linkedin`.
+>
+> ### 🧪 Verde
+>
+> **289 tests** (280 antes) · typecheck · build · `validate` **2244 checks / 7 workflows** ·
+> `auditar-workflows` sin hallazgos · `test-nodos` del motor verde · **`n8n:test` 15/15** ·
+> **`n8n:diff`: los 5 workflows corren lo que dice el repo** (esto no toca n8n: para reels la
+> respuesta es byte-idéntica salvo el campo agregado).
+>
+> ### ⬜ Lo que sigue, sin cambios de orden salvo el de arriba
+>
+> 1️⃣ **D3** (Mani + Majo + Jero) — sigue siendo el único item sin marcar del ROADMAP §3.
+> 2️⃣ **Deploy de esto** y recién ahí **prender `retia/linkedin`**.
+> 3️⃣ **Cargar la primera voz y el banco semilla** (Alejandro) — no es código y nada lo destraba.
+> 4️⃣ **Fase 4 (ajustes)**, parada por entorno: su `028` pide ensayo contra un Postgres local y Docker
+> no responde en esta máquina.
+>
+> 🔴 **Los 3 bloqueos NO técnicos del motor siguen intactos** (ADR-055 §Consecuencias): no hay
+> definición de *"funcionó"*, no existe el banco de referentes, faltan los few-shot. Esto les sacó
+> del camino la primera piedra técnica, nada más.
+
 > ## 🔗 2026-08-09 (cierre 106) · EL COCKPIT DE LINKEDIN ESTÁ LISTO PARA CONFIGURAR, Y EL BOTÓN ▶ DISPARABA LA MÁQUINA EQUIVOCADA
 >
 > **Leelo antes que nada si vas a tocar LinkedIn.** Alejandro toma el pipeline de LinkedIn de acá en

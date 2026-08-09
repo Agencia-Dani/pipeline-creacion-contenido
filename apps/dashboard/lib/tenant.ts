@@ -143,9 +143,17 @@ export async function empresasDe(usuario: Alcance): Promise<string[]> {
   return usuario.esDueno ? leerEmpresas() : usuario.membresias.map((m) => m.clientId);
 }
 
-/** Lo que puede salir mal al resolver el tenant de la fachada. Cada caso tiene su status. */
+/**
+ * Lo que puede salir mal al resolver el tenant de la fachada. Cada caso tiene su status.
+ *
+ * **`pipeline` viaja al lado del `ctx` desde ADR-068** y no adentro de él: el `TenantContext` es
+ * *"de quién es este dato"* y lo consume `scoped()` para armar un `.eq()`, mientras que el pipeline
+ * es *"qué máquina pregunta"* y decide **qué plan se sirve**. Meterlo en el contexto lo haría
+ * viajar por las ~40 funciones de `lib/` que no lo necesitan, y le pediría un valor a
+ * `armarContexto`, que arma contextos de pantalla donde la pregunta ni se hace.
+ */
 export type ResultadoFachada =
-  | { ok: true; ctx: TenantContext }
+  | { ok: true; ctx: TenantContext; pipeline: string }
   | { ok: false; motivo: "instancia_ausente" | "instancia_desconocida" };
 
 /**
@@ -172,7 +180,16 @@ export async function contextoDeFachada(instanciaPedida?: string): Promise<Resul
   // escrituras de n8n van con `service_role`), dicho ahora en un lugar donde `scoped()` puede verlo.
   // El aislamiento de este camino es la Capa 1 —el `.eq()` que `scoped` inyecta— más el 403 de
   // `contextoDeFachada` cuando la instancia pedida no existe.
-  return { ok: true, ctx: { clientId: elegida.clientId, instanceId: elegida.id, origen: "fachada" } };
+  //
+  // 🔑 **El pipeline sale de la instancia y NUNCA de un query param** (ADR-068). El motor ya declara
+  // de quién es la corrida; volver a preguntarle de qué pipeline es sería pedirle que confirme algo
+  // que la base sabe mejor, y habilitar que las dos respuestas difieran. Ese desacuerdo no falla:
+  // devuelve el plan del otro pipeline, bien formado y lleno de filas ajenas.
+  return {
+    ok: true,
+    ctx: { clientId: elegida.clientId, instanceId: elegida.id, origen: "fachada" },
+    pipeline: elegida.workflowId,
+  };
 }
 
 /**

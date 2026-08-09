@@ -1,6 +1,7 @@
 import { autenticar, rechazar } from "@/app/api/engine/auth";
-import { armarRunPlan, armarRunPlanCompleto } from "@/domain/run-plan";
-import { leerRunPlanCrudo } from "@/lib/config";
+import { PIPELINE_LINKEDIN, PIPELINE_REELS } from "@/domain/pipelines";
+import { armarRunPlan, armarRunPlanCompleto, armarRunPlanLinkedin } from "@/domain/run-plan";
+import { leerRunPlanCrudo, leerRunPlanCrudoLinkedin } from "@/lib/config";
 import { contextoDeFachada } from "@/lib/tenant";
 
 // La fachada de ADR-028: el motor pregunta qué correr ANTES de gastar créditos.
@@ -11,6 +12,16 @@ import { contextoDeFachada } from "@/lib/tenant";
 // Fail-closed a propósito: cualquier problema responde ≠200 y la corrida NO arranca
 // (una corrida sin config entrega ruido; no entregar es mejor). Auth por header
 // compartido, mismo patrón y mismo gestor que el webhook del motor.
+//
+// 🔀 **Desde ADR-068 esto sirve a DOS pipelines, y son dos EJES, no uno** — la confusión que el
+// `workflow.yaml` de LinkedIn tenía escrita (`?ambito=linkedin`, que daba 400):
+//
+//   · **QUÉ pipeline** → sale de la INSTANCIA, no del que pregunta. Decide qué tablas se leen.
+//   · **CUÁN filtrado** (`?ambito`) → sigue siendo del que pregunta, porque es suyo: el mismo
+//     pipeline lo pide filtrado desde el motor y completo desde el archivado.
+//
+// Colapsarlos en `ambito` habría dejado que el llamante contradiga a la base sobre algo que la base
+// sabe. Ese desacuerdo NO falla: devuelve el plan del otro pipeline, bien formado.
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +52,24 @@ export async function GET(request: Request) {
     return Response.json({ error: "instancia no resuelta", motivo: tenant.motivo }, { status });
   }
 
+  // Un pipeline sin plan que servir aborta la corrida, como todo lo demás acá. Pasa si alguien crea
+  // una instancia de un pipeline que existe en `workflows` pero al que nadie le escribió su rama —
+  // hoy, cualquiera que no sea reels o LinkedIn. Se nombra en la respuesta porque el diagnóstico
+  // desde n8n es imposible si el 400 no dice qué pipeline creyó que era.
+  if (tenant.pipeline !== PIPELINE_REELS && tenant.pipeline !== PIPELINE_LINKEDIN) {
+    console.error(`[run-plan] la instancia es del pipeline '${tenant.pipeline}', que no tiene plan`);
+    return Response.json(
+      { error: "pipeline sin plan de corrida", motivo: "pipeline_sin_plan", pipeline: tenant.pipeline },
+      { status: 400 },
+    );
+  }
+
   try {
+    if (tenant.pipeline === PIPELINE_LINKEDIN) {
+      const crudo = await leerRunPlanCrudoLinkedin(tenant.ctx, ambito);
+      return Response.json(armarRunPlanLinkedin(crudo, new Date()));
+    }
+
     const crudo = await leerRunPlanCrudo(tenant.ctx, ambito);
     const plan =
       ambito === "motor" ? armarRunPlan(crudo, new Date()) : armarRunPlanCompleto(crudo, new Date());
