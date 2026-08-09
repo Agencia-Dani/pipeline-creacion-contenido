@@ -150,6 +150,21 @@
 > ⛔ **NO se activó, y no se activa todavía.** Un workflow activo con webhook vivo y sin etapas abre
 > runs que no entregan nada. Tampoco tiene cron en el dispatcher, por lo mismo.
 >
+> 🕐 **Y le faltaba la `timezone`, que salió de compararlo contra sus hermanos en vez de darlo por
+> bueno:** nacía heredando la del servidor mientras motor y archivado tienen `America/Bogota`
+> explícita. Se la puso por API (`PUT` devolviendo lo mismo que vino + el campo), `n8n:diff` verde
+> después. Hoy es casi inofensivo —`$now.toISO()` lleva offset y `timestamptz` normaliza— pero este
+> repo ya se comió un incidente de TZ, y **el día que tenga cron pasa a ser semántico**. La
+> `timezone` vive solo en el live, igual que en los otros 5: el `settings` del repo no la trae.
+>
+> ### ⬜ Lo que le falta al workflow, además de las 8 etapas
+>
+> | | |
+> |---|---|
+> | **Cron en el dispatcher** | Los crons no viven en el workflow (ADR-050): el dispatcher tiene **2** (motor lunes 8:00, archivado domingo 18:00) y falta el tercero. ⚠️ **Esto SÍ es tocar topología de un workflow vivo y activo** — el caso de riesgo que sigue pendiente en plan-multi-tenant §14.2, y que **no** es lo mismo que crear uno nuevo |
+> | **El botón ▶** | No existe: ADR-066 le sacó `operar` a LinkedIn. El día que vuelva, **la guarda por pipeline de `operar/actions.ts` NO se saca** (está escrito ahí el porqué), y hace falta una `LINKEDIN_WEBHOOK_URL` en Vercel, hermana de las otras tres |
+> | **`workflows.estado`** | Sigue en `draft` en la base. Según la nota de la `020` pasa a `active` cuando esté importado **y activo** en n8n: hoy es lo primero, no lo segundo |
+>
 > ⬜ **Lo que falta para que sea un motor:** las 8 etapas. `normalizar`, `filtrar_scorear`, `entregar`
 > y el validador `calidad` (R-1 + R-2, que ya tiene su insumo: la `firma` viaja en el plan) son
 > construibles hoy. `colectar` pide elegir actor de Apify para Pinterest. **`generar` sigue bloqueada
