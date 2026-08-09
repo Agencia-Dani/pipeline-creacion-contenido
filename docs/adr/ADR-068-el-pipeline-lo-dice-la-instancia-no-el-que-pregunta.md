@@ -2,8 +2,12 @@
 
 - **Estado:** aceptada — 2026-08-09. **Extiende [ADR-028](./ADR-028-contrato-motor-run-plan.md)**
   (la fachada) y **[ADR-048](./ADR-048-run-plan-v2-motor-por-instancia.md)** (`?instancia` obligatorio),
-  y le da a [ADR-055](./ADR-055-linkedin-es-un-pipeline-de-este-repo.md) la primera pieza de motor que
-  existe de verdad. **Toca `core/`:** [`core/contracts/run-plan.md`](../../core/contracts/run-plan.md).
+  y prepara la fachada para el motor de
+  [ADR-055](./ADR-055-linkedin-es-un-pipeline-de-este-repo.md).
+  ⚠️ **Esto NO es una pieza del motor: el motor de LinkedIn sigue sin existir** — no hay
+  `Workflows/workflow-linkedin/workflow.json` ni nada en n8n. Es el lado del cual el motor va a leer,
+  arreglado antes de que exista para que el día 1 no reciba una respuesta equivocada.
+  **Toca `core/`:** [`core/contracts/run-plan.md`](../../core/contracts/run-plan.md).
 
 - **Contexto.** El cockpit de LinkedIn quedó completo el 08/08 (ADR-066, ADR-067) y lo que sigue es el
   motor en n8n. Al inventariar qué le falta al tooling apareció esto, medido y escrito en el handoff
