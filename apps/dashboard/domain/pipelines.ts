@@ -27,8 +27,20 @@ export type Pipeline = string;
 // (ADR-060 §1). Qué pantallas tiene adentro sí cambia por pipeline: ver `AJUSTES_POR_PIPELINE`.
 const ZONAS_POR_PIPELINE: Record<Pipeline, readonly Zona[]> = {
   "short-form-content": ["operar", "curar", "transcribir", "entender", "ajustes"],
-  // Sin `transcribir`: no hay nada que transcribir cuando la pieza ya nació texto.
-  linkedin: ["operar", "curar", "entender", "ajustes"],
+  // 🩸 **LinkedIn tenía cuatro y se quedó con dos el 2026-08-08 (ADR-066).** `transcribir` nunca la
+  // tuvo (ya es texto, su etapa `enriquecer` es `n/a`, ADR-055 §3). Las otras dos salieron porque
+  // **declararlas sin tener pantalla propia no era mostrar poco: era mostrar las de reels.**
+  //
+  //   · `entender` leía las 5 vistas de reels filtradas por su `instance_id` ⇒ ceros mudos, la
+  //     familia de la `015` que este archivo entero existe para evitar.
+  //   · `operar` era peor y por eso fue urgente: trae los TRES botones que disparan los workflows
+  //     de reels (`correrAhora`/`buscarAhora`/`archivarAhora`), y ninguno miraba el pipeline. Con
+  //     `30x/linkedin` y `estadox/linkedin` en `active`, el ▶ estaba vivo apuntando al motor
+  //     equivocado. Medido antes de cerrarlo: cero `runs`, cero `outputs` — nadie llegó a apretarlo.
+  //
+  // Vuelven cuando tengan pantalla propia, que es cuando exista el motor de LinkedIn. **La guarda
+  // de `operar/actions.ts` NO se saca ese día**: la zona no es la pregunta correcta (ver ahí).
+  linkedin: ["curar", "ajustes"],
 };
 
 /**

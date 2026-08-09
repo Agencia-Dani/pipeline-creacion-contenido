@@ -21,6 +21,38 @@ import { ultimasCorridasMotor } from "@/lib/runs";
 
 export type ResultadoDisparo = { ok: boolean; mensaje: string };
 
+// ── La guarda de pipeline ────────────────────────────────────────────────────
+//
+// 🩸 **Las tres acciones de este archivo disparan workflows de REELS y ninguna miraba el pipeline**
+// (encontrado el 2026-08-08, ADR-066). `exigirTenant("operar", …)` autoriza **la zona**, y `operar`
+// la declaraban los dos pipelines: desde un cockpit de LinkedIn el ▶ mandaba `{ instancia }` con un
+// uuid de LinkedIn al motor de reels. No falla — el motor arranca, pide su plan a la fachada y
+// trabaja sobre un tenant que no es el suyo. Medido antes de cerrarlo: cero `runs` y cero `outputs`
+// contra las 3 instancias de LinkedIn, o sea que nadie llegó a apretarlo.
+//
+// 🔑 **Por qué esto vive acá y no alcanzaba con sacarle la zona a LinkedIn** (que también se hizo).
+// La pregunta correcta no es *"¿este cockpit tiene la zona Operar?"* sino **"¿el pipeline de este
+// cockpit es el dueño del webhook que estoy por llamar?"**. Son distintas, y la diferencia se cobra
+// el día que LinkedIn recupere `operar` con su motor propio: ahí la guardia de zona vuelve a dejar
+// pasar el POST al motor de reels, en silencio, y nadie va a estar mirando este archivo. Es la
+// misma lección de `curar/referentes/actions-linkedin.ts` (`exigirCockpitLinkedin`), del otro lado.
+//
+// Las URLs viven en env vars sueltas (`MOTOR_WEBHOOK_URL`, `DESCUBRIMIENTO_…`, `ARCHIVADO_…`), una
+// sola para todo el sistema: no hay forma de derivar el dueño del webhook desde el cockpit, así que
+// se escribe. Cuando LinkedIn tenga los suyos, esta constante se vuelve un mapa.
+const DUENO_DE_ESTOS_WEBHOOKS = "short-form-content";
+
+function noEsSuMaquina(workflowId: string): ResultadoDisparo | null {
+  if (workflowId === DUENO_DE_ESTOS_WEBHOOKS) return null;
+  return {
+    ok: false,
+    // Explícito a propósito: el modo de falla que esto reemplaza era mudo (200 y una corrida en el
+    // tenant equivocado). Que diga qué máquina es la dueña evita que se lea como un bug del botón.
+    mensaje:
+      "Este cockpit no es el dueño de esta máquina: estos botones disparan el pipeline de reels. Si hacía falta correr algo acá, avisale a un dev.",
+  };
+}
+
 // ▶ Correr ahora: señal al webhook del motor (ADR-023) con la instancia del cockpit abierto.
 // El header vive solo acá (BFF, único portador de secretos) y en n8n — jamás en el browser ni en
 // git. La instancia no es secreta: es un uuid del registro, y viaja en el body como el dispatcher.
@@ -35,6 +67,9 @@ export type ResultadoDisparo = { ok: boolean; mensaje: string };
 
 export async function correrAhora(enRuta: CockpitEnRuta): Promise<ResultadoDisparo> {
   const { usuario, ctx, cockpit } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
+
+  const ajeno = noEsSuMaquina(cockpit.workflowId);
+  if (ajeno) return ajeno;
 
   const url = process.env.MOTOR_WEBHOOK_URL;
   const nombre = process.env.MOTOR_WEBHOOK_HEADER_NOMBRE;
@@ -112,6 +147,9 @@ export async function correrAhora(enRuta: CockpitEnRuta): Promise<ResultadoDispa
 export async function buscarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDisparo> {
   const { usuario, ctx, cockpit } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
 
+  const ajeno = noEsSuMaquina(cockpit.workflowId);
+  if (ajeno) return ajeno;
+
   const url = process.env.DESCUBRIMIENTO_WEBHOOK_URL;
   const nombre = process.env.DESCUBRIMIENTO_WEBHOOK_HEADER_NOMBRE;
   const valor = process.env.DESCUBRIMIENTO_WEBHOOK_HEADER_VALOR;
@@ -160,6 +198,9 @@ export async function buscarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDispa
 // dos valores que tienen que ser idénticos, y el día que difieran el fallo es un 403 silencioso.
 export async function archivarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDisparo> {
   const { usuario, ctx, cockpit } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
+
+  const ajeno = noEsSuMaquina(cockpit.workflowId);
+  if (ajeno) return ajeno;
 
   const url = process.env.ARCHIVADO_WEBHOOK_URL;
   const nombre = process.env.MOTOR_WEBHOOK_HEADER_NOMBRE;

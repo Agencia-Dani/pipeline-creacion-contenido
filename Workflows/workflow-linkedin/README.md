@@ -4,15 +4,22 @@ Detecta contenido que ya funcionó —incluido el de otros idiomas—, lo cura u
 en la voz de la cuenta con su firma, y lo deja en una cola para que **una persona lo apruebe y
 publique**.
 
-> ## ⚠️ Estado al 2026-08-03: hay diseño, tablas y cockpit. **No hay `workflow.json`.**
+> ## ⚠️ Estado al 2026-08-08: hay diseño, tablas, RLS y cockpit. **No hay `workflow.json`.**
 >
 > | Pieza | Estado |
 > |---|---|
-> | Las decisiones | ✅ [ADR-055](../../docs/adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md) (la forma) · [ADR-056](../../docs/adr/ADR-056-las-zonas-son-rol-interseccion-pipeline.md) (la superficie) |
-> | Las tablas | ✅ escritas en [`020_pipeline_linkedin.sql`](../../core/schema/020_pipeline_linkedin.sql) · ⏳ **sin aplicar** |
-> | El cockpit | ✅ el pipeline declara sus zonas y las guardias lo respetan · ⏳ sin instancia, así que todavía no se puede abrir |
+> | Las decisiones | ✅ [ADR-055](../../docs/adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md) (la forma) · [ADR-056](../../docs/adr/ADR-056-las-zonas-son-rol-interseccion-pipeline.md) (la superficie) · [ADR-066](../../docs/adr/ADR-066-un-cockpit-sin-motor-solo-muestra-lo-que-se-configura.md) (qué se dibuja sin motor) |
+> | Las tablas | ✅ [`020`](../../core/schema/020_pipeline_linkedin.sql) **aplicada**, y [`024`](../../core/schema/024_rls_linkedin.sql) le puso las policies (grano **instancia**) · ⬜ **las 4 con 0 filas** |
+> | El cockpit | ✅ **3 instancias**: `30x/linkedin` y `estadox/linkedin` en `active`, `retia/linkedin` en `draft` (o sea que todavía no existe como cockpit) · 🔧 **1 de 6** pantallas de `curar`: Referentes |
 > | El manifest | ✅ [`workflow.yaml`](workflow.yaml), válido contra el contrato |
-> | El motor en n8n | ❌ **no existe** |
+> | El motor en n8n | ❌ **no existe** — 0 nodos, ni cron en el dispatcher |
+>
+> 🩸 **Lo que se cerró el 08/08 (ADR-066), y vale como advertencia para el próximo pipeline:**
+> declarar una zona que no tenés **no es mostrar de menos, es mostrar la del otro**. LinkedIn
+> declaraba `operar` y `entender` sin pantalla propia: `entender` dibujaba las 5 vistas de reels en
+> ceros, y `operar` traía **los tres botones que disparan los workflows de reels** — vivos, porque
+> dos de sus cockpits están `active`. Medido antes de cerrarlo: cero `runs` y cero `outputs`, nadie
+> llegó a apretarlo. Hoy el nav es **`curar` + `ajustes`** y vuelven cuando tengan pantalla propia.
 >
 > **Y lo que lo bloquea no es técnico.** Son tres cosas y ninguna se resuelve programando — están
 > en ADR-055 §Consecuencias con su detalle:

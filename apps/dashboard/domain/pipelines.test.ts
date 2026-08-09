@@ -18,13 +18,29 @@ import {
 } from "./pipelines.ts";
 import { zonasDe, ZONAS } from "./roles.ts";
 
-test("reels implementa las cinco zonas y LinkedIn todas menos transcribir", () => {
+test("reels implementa las cinco zonas y LinkedIn solo las dos que puede dibujar", () => {
   assert.deepEqual(zonasDePipeline("short-form-content"), ZONAS);
-  // La razón no es que falte construirla: LinkedIn ya es texto, así que su etapa `enriquecer` es
-  // `n/a` (ADR-055 §3) y la zona de ADR-031 no tiene qué hacer.
-  // `ajustes` sí la tiene: el equipo es de la EMPRESA, existe con o sin motor (ADR-060).
-  assert.deepEqual(zonasDePipeline("linkedin"), ["operar", "curar", "entender", "ajustes"]);
+  // `transcribir` nunca la tuvo: LinkedIn ya es texto, su etapa `enriquecer` es `n/a` (ADR-055 §3).
+  // `operar` y `entender` salieron el 2026-08-08 (ADR-066) — ver el test de abajo, que es el que
+  // guarda el porqué. `ajustes` sí: el equipo es de la EMPRESA, existe con o sin motor (ADR-060).
+  assert.deepEqual(zonasDePipeline("linkedin"), ["curar", "ajustes"]);
   assert.equal(zonasDePipeline("linkedin").includes("transcribir"), false);
+});
+
+test("🔴 LinkedIn NO declara `operar`, y esto es lo que impide disparar el motor de reels", () => {
+  // Las tres acciones de `operar/actions.ts` (correr · buscar · archivar) hacen POST a los webhooks
+  // de los workflows de REELS con el `instance_id` del cockpit abierto. Su única guardia era
+  // `exigirTenant("operar", …)`, que autoriza la ZONA — y LinkedIn la declaraba. Con dos cockpits
+  // de LinkedIn en `active`, el ▶ estaba vivo apuntando a la máquina equivocada.
+  //
+  // ⚠️ Este test es la mitad barata de la defensa, no toda: sacar la zona cierra la puerta HOY, pero
+  // la guardia que sobrevive al día que LinkedIn recupere `operar` con su motor propio vive en
+  // `noEsSuMaquina()`, dentro de esas acciones. Si alguien vuelve a poner `operar` acá, este test se
+  // pone rojo y ese comentario es lo que tiene que leer antes de borrarlo.
+  assert.equal(zonasDePipeline("linkedin").includes("operar"), false);
+  // Y `entender` por la razón hermana, menos grave y del mismo tipo: sus 5 vistas son de reels, así
+  // que filtradas por un `instance_id` de LinkedIn devuelven ceros sin fallar. La familia de la `015`.
+  assert.equal(zonasDePipeline("linkedin").includes("entender"), false);
 });
 
 test("un pipeline que nadie declaró no tiene NINGUNA zona — el default seguro de ADR-056", () => {
@@ -38,15 +54,10 @@ test("un pipeline que nadie declaró no tiene NINGUNA zona — el default seguro
 test("🔒 la intersección exige las DOS condiciones: el rol alcanza y el pipeline implementa", () => {
   // El operador alcanza transcribir por rol…
   assert.equal(zonasDe("operador").includes("transcribir"), true);
-  // …y aun así no la ve en LinkedIn, porque el pipeline no la tiene. `entender` sí sobrevive: la
-  // alcanza por rol (desde el 05/08) y LinkedIn la implementa. Que de las cuatro zonas del operador
-  // caiga exactamente una es lo que prueba que el filtro es la intersección y no el rol solo.
-  assert.deepEqual(zonasVisibles(zonasDe("operador"), "linkedin"), [
-    "operar",
-    "curar",
-    "entender",
-    "ajustes",
-  ]);
+  // …y aun así no la ve en LinkedIn, porque el pipeline no la tiene. Desde ADR-066 tampoco `operar`
+  // ni `entender`: de las cinco zonas que el operador alcanza por rol, en LinkedIn caen TRES. Que
+  // caiga más de la mitad es lo que prueba que el filtro es la intersección y no el rol solo.
+  assert.deepEqual(zonasVisibles(zonasDe("operador"), "linkedin"), ["curar", "ajustes"]);
   // En reels no cae ninguna, porque ahí las dos condiciones se cumplen para las cinco.
   assert.deepEqual(zonasVisibles(zonasDe("operador"), "short-form-content"), [
     "operar",
@@ -57,29 +68,27 @@ test("🔒 la intersección exige las DOS condiciones: el rol alcanza y el pipel
   ]);
 });
 
-test("el sponsor ve lo mismo que el dev en los dos pipelines, y pierde transcribir en LinkedIn igual", () => {
+test("el sponsor ve lo mismo que el dev en los dos pipelines, y en LinkedIn los dos quedan en dos zonas", () => {
   // Desde el 2026-08-07 el sponsor opera. Lo que sigue recortando su nav no es el rol sino el
-  // pipeline: LinkedIn ya es texto, así que `transcribir` no existe ahí (ADR-055 §3). Que la
-  // intersección de ADR-056 siga mandando es justo lo que este test cuida.
+  // pipeline. Que la intersección de ADR-056 siga mandando es justo lo que este test cuida.
   assert.deepEqual(zonasVisibles(zonasDe("sponsor"), "short-form-content"), zonasVisibles(zonasDe("dev"), "short-form-content"));
-  assert.deepEqual(zonasVisibles(zonasDe("sponsor"), "linkedin"), ["operar", "curar", "entender", "ajustes"]);
+  assert.deepEqual(zonasVisibles(zonasDe("sponsor"), "linkedin"), ["curar", "ajustes"]);
 });
 
-test("el dev pierde transcribir en LinkedIn y conserva el resto", () => {
-  assert.deepEqual(zonasVisibles(zonasDe("dev"), "linkedin"), [
-    "operar",
-    "curar",
-    "entender",
-    "ajustes",
-  ]);
+test("ni siquiera el dev ve `operar` en LinkedIn — el recorte es del pipeline, no del rol", () => {
+  // Importa que sea el `dev` el que lo pruebe: es el rol que alcanza todo, así que si acá cae, cae
+  // por el pipeline. Un dev tampoco puede disparar el motor de reels desde un cockpit de LinkedIn.
+  assert.deepEqual(zonasVisibles(zonasDe("dev"), "linkedin"), ["curar", "ajustes"]);
 });
 
 test("el orden lo pone el rol, no el pipeline — es lo que hace que la zona inicial no se re-decida", () => {
   // `zonasDe` viene ordenada por prioridad y la intersección la respeta. El caso que lo prueba es
   // `substack`, cuyo array de pipeline empieza por una zona que el rol tiene más abajo: si se
   // filtrara al revés, la inicial saldría del pipeline y no del rol.
-  assert.equal(zonaInicialEn(zonasDe("operador"), "linkedin"), "operar");
-  assert.equal(zonaInicialEn(zonasDe("sponsor"), "linkedin"), "operar");
+  // En LinkedIn la inicial pasó a ser `curar` (antes `operar`) como efecto de ADR-066: la primera
+  // zona que el rol alcanza Y el pipeline implementa. Nadie tuvo que re-decidirlo — sale del orden.
+  assert.equal(zonaInicialEn(zonasDe("operador"), "linkedin"), "curar");
+  assert.equal(zonaInicialEn(zonasDe("sponsor"), "linkedin"), "curar");
   assert.equal(zonaInicialEn(zonasDe("dev"), "short-form-content"), "operar");
 });
 

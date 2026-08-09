@@ -111,13 +111,17 @@ runbook:
   stop: "Desactivar el workflow en n8n."
   test: >
     Antes de que exista el workflow.json, lo que sí se verifica es el cockpit: crear una instancia
-    de linkedin y comprobar que /<empresa>/<slug> abre, que el nav NO dibuja `transcribir`, y que
-    entrar a mano a /<empresa>/<slug>/transcribir redirige (ADR-056: la UI esconde, el servidor
-    impide).
+    de linkedin y comprobar que /<empresa>/<slug> abre en `curar`, que el nav dibuja SOLO `curar` y
+    `ajustes`, y que entrar a mano a /<empresa>/<slug>/{transcribir,operar,entender} redirige
+    (ADR-056: la UI esconde, el servidor impide). Desde ADR-066 `operar` y `entender` tampoco se
+    declaran: no tienen pantalla propia, y `operar` traía los tres botones que disparan los
+    workflows de REELS. Cuando este workflow exista y `operar` vuelva, la guarda por pipeline de
+    `operar/actions.ts` NO se saca — ahí está el porqué escrito.
   docs:
     - README.md
     - ../../docs/adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md
     - ../../docs/adr/ADR-056-las-zonas-son-rol-interseccion-pipeline.md
+    - ../../docs/adr/ADR-066-un-cockpit-sin-motor-solo-muestra-lo-que-se-configura.md
 
 cost_per_run: >
   Por medir. Estructuralmente más barato que reels: no hay transcripción (Supadata sale del todo) y
