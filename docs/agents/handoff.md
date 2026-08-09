@@ -22,6 +22,122 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🔗 2026-08-09 (cierre 106) · EL COCKPIT DE LINKEDIN ESTÁ LISTO PARA CONFIGURAR, Y EL BOTÓN ▶ DISPARABA LA MÁQUINA EQUIVOCADA
+>
+> **Leelo antes que nada si vas a tocar LinkedIn.** Alejandro toma el pipeline de LinkedIn de acá en
+> adelante. El diseño vive en **`../maquina-linkedin/`** (PLAN, entrevista a Fernando, ADR 001–004) y
+> **no se copia** — ese repo es el *por qué*; la construcción es este (ADR 004 de allá / ADR-055 de acá).
+>
+> ### 🔴 Lo primero, porque estaba vivo en producción
+>
+> **El cockpit de LinkedIn podía disparar los tres workflows de reels.** `operar/actions.ts` tiene
+> `correrAhora` → `MOTOR_WEBHOOK_URL`, `buscarAhora` → `DESCUBRIMIENTO_WEBHOOK_URL` y `archivarAhora`
+> → `ARCHIVADO_WEBHOOK_URL`, y las tres se guardaban **solo** con `exigirTenant("operar")`, que
+> autoriza **la zona** — que LinkedIn declaraba. Mandaban `{ instancia }` con el uuid de LinkedIn, o
+> sea que le pedían al motor de reels correr sobre un tenant ajeno. **No falla**: el motor arranca.
+>
+> 📏 **Medido antes de cerrarlo: cero `runs`, cero `processed_items`, cero `outputs`** contra las 3
+> instancias de LinkedIn ⇒ nadie llegó a apretarlo y no hubo nada que reparar.
+>
+> Cerrado por [ADR-066](../adr/ADR-066-un-cockpit-sin-motor-solo-muestra-lo-que-se-configura.md) con
+> **dos** reglas, y la segunda **no es redundante**: (1) LinkedIn queda en `curar` + `ajustes`;
+> (2) el disparo se guarda **por pipeline**, en `noEsSuMaquina()`. Sacar la zona cierra la puerta
+> *hoy*; el día que LinkedIn recupere `operar` con su motor propio, la guardia de zona **vuelve a
+> autorizar** el POST al motor de reels, en silencio. Hay un test que se pone rojo si alguien vuelve a
+> declarar `operar` y que apunta a ese comentario.
+>
+> ### ✅ El cockpit pasó de 1 pantalla a 4
+>
+> | Pantalla | Tabla | Estado |
+> |---|---|---|
+> | **Voces** ([ADR-067](../adr/ADR-067-el-perfil-de-voz-de-linkedin-es-una-capa-sobre-las-voces-de-la-empresa.md)) | `app.voces_linkedin` | 🆕 perfil, **firma** (R-2), espaciado, separación, franjas, días, líneas rojas |
+> | **Referentes** | `app.referentes_linkedin` | ya estaba |
+> | **Feed** | `app.candidatos_linkedin` | 🆕 vacío: no hay motor |
+> | **Descartes** | `app.descartes_linkedin` | 🆕 vacío: no hay motor |
+>
+> ⛔ **`historicos` y `sugeridos` NO se declaran, y no es un pendiente:** no tienen **escritor** (el
+> archivado que llena `outputs` es de reels; no hay descubrimiento de LinkedIn). Ratificado en ADR-066
+> para no re-litigarlo.
+>
+> ### 🩸 Medir dio vuelta el supuesto sobre las voces
+>
+> ADR 002 del repo de diseño daba por inventariadas las de 30X (Andrés y Daniel Bilbao) y por
+> desconocidas las de Retia. **En el sistema es al revés:**
+>
+> | | |
+> |---|---|
+> | `app.voces` | **3 filas, las 3 de `retia`** — 30X y EstadoX tienen **cero** |
+> | Y son | justo las dos cuyo cockpit de LinkedIn está `active` (`retia/linkedin` está en `draft`) |
+> | Peor | **30X y EstadoX no tienen cockpit de reels** ⇒ no existía **ninguna** pantalla desde donde darles de alta una voz |
+>
+> Por eso la pantalla de Voces **también crea la voz**, y esa es su única escritura sobre `app.voces`.
+>
+> 🔴 **La regla que no se toca:** lo que activa una voz en LinkedIn es **que exista su perfil**, nunca
+> `voces.activo`. Ese flag significa de facto *"corre en reels"* (lo consume `leerConfigOperar`):
+> leerlo escondería voces válidas y **escribirlo apagaría proyectos de reels en producción, sin un
+> solo error**. El alta fuerza `activo: false` — **guarda, no default**: en Retia, la única empresa con
+> los dos cockpits, una voz nacida activa entraría al plan del motor de reels sin que nadie lo pidiera.
+>
+> ### ⬜ Lo que queda, y el orden
+>
+> | | Quién | Qué |
+> |---|---|---|
+> 1️⃣ | Mani + Majo + Jero | **D3**, la demo de 10 min. Sigue siendo el **único item sin marcar del ROADMAP §3** y ahora no compite con un cockpit nuevo |
+> 2️⃣ | Alejandro | **Prender `retia/linkedin`** (`update instances set estado='active' …`). Se dejó en `draft` a propósito: prenderlo hoy le mete a Majo y Jero un selector de pipeline con un cockpit casi vacío justo antes de D3 |
+> 3️⃣ | Alejandro | **Cargar la primera voz y el banco semilla.** No es código y **nada lo destraba**: 10–15 cuentas por marca + los filtros de Pinterest |
+> 4️⃣ | — | **Fase 4 (ajustes de LinkedIn), sin hacer.** Ver abajo |
+>
+> ⏸️ **La Fase 4 se paró por falta de entorno, no de decisión.** Es la única con migración (`028`:
+> `drop constraint ajustes_clave_check` —viene de la `014`, está **nombrado**— y `add constraint` con
+> la unión de vocabularios) y toca `app.ajustes`, que reels usa todas las semanas. La disciplina de la
+> `027` pide **correrla contra un Postgres local con la forma de prod antes de tocar nada**, y en esta
+> máquina **el daemon de Docker no responde y no hay `psql`**. Sin ese ensayo es la `019` otra vez: se
+> corrió, no dio error visible y **no había entrado**. También es la que menos desbloquea — son
+> perillas que ningún motor lee.
+>
+> ### 🎯 Y lo que sigue de verdad: el motor en n8n
+>
+> **Ahí va Alejandro ahora.** Lo que hay que saber antes de abrir n8n:
+>
+> 🔴 **Los 3 bloqueos siguen sin ser técnicos** (ADR-055 §Consecuencias, y ninguna sesión de código
+> los mueve): **no hay definición de "funcionó"** (son 3 respuestas, una por marca; solo EstadoX puede
+> anclarla a dinero), **no existe el banco de referentes**, y **faltan los few-shot** (3–4 posts que
+> Fernando sienta perfectos, por cuenta). Sin el 3.º, la etapa de generación no tiene con qué.
+>
+> **Un solo workflow parametrizado, NO uno por empresa** (ADR-050, el dispatcher). La evidencia está
+> en el propio n8n: hay **~57 workflows apagados**, muchos con el mismo nombre repetido — eso es lo que
+> produce el patrón viejo de un workflow por cliente. Y la unidad de config **es la voz, no la
+> empresa** (ADR 002), así que uno por empresa igual necesitaría config por voz adentro.
+>
+> **Lo que le falta al tooling para que LinkedIn exista en n8n** (todo medido):
+>
+> | | |
+> |---|---|
+> | `Workflows/workflow-linkedin/` | tiene `README.md` + `workflow.yaml`, **no `workflow.json`** |
+> | `validate.mjs` | **no valida que exista el `workflow.json`** — por eso `linkedin` pasa en verde estando vacío de motor |
+> | `n8n-sync.mjs` | su `ALIAS` está **hardcodeado con 5 workflows** y `linkedin` no está: `n8n:diff` y `n8n:push` no lo ven |
+> | `auditar-workflows.mjs` | **saltea** los dirs sin `workflow.json` |
+> | `clients/<cliente>/linkedin.yaml` | el manifest lo declara y **no existe** (solo hay `_ejemplo/` y `piloto/` de short-form) |
+> | cron en el dispatcher | **no existe** |
+> | `GET /api/engine/run-plan?ambito=linkedin` | 🔴 **da 400 hoy** — `route.ts` acepta solo `motor\|completo`, y el `workflow.yaml` de LinkedIn **ya declara ese ámbito**. Es lo primero que se va a chocar |
+> | `leerRunPlanCrudo` (`lib/config.ts`) | **no tiene rama por pipeline**: llena el plan siempre desde las tablas de reels. Necesita su `armarRunPlanLinkedin` |
+>
+> ⚠️ **Y el ritual que no cambió:** crear nodos o conexiones es **re-import completo** — `n8n:push` lo
+> detecta y se niega. Después de cualquier import, `npm run n8n:diff` (el `<<SUPABASE_URL>>` sin
+> resolver ya rompió el error handler **dos veces**, silenciado por `onError: continue`).
+>
+> ### 🧪 Dos cosas de método que valieron más que el código
+>
+> **1. Casi reporto un bug que no existía.** Sondeando el check de `candidatos_linkedin.calificacion`,
+> un `🔥` **válido** devolvió `23514` — leído literal, *"el check rechaza su propio vocabulario"*. Era
+> la sonda: **el shell mutila los emoji a `??`** (se veía en el `details`). Con escape JSON
+> (`🔥`), `🔥` y `👎` pasan y mueren en la FK. ⇒ **Toda sonda de un vocabulario cerrado
+> necesita un control negativo que falle** — acá `👌`, que siguió dando `23514` y se leyó bien.
+>
+> **2. Las 4 tablas siguen en 0 filas después de todo el sondeo.** El camino de escritura se verificó
+> **sin escribir**: la forma exacta de la app con FK inexistente da `23503` (o sea que todas las
+> columnas y tipos pasaron), una columna inventada da `PGRST204`, y un valor fuera de check da `23514`.
+
 > ## 🔑 2026-08-07 (cierre 104) · LA PUERTA SE ABRE CON CONTRASEÑA, Y ESO DESTRABA LAS DOS VERIFICACIONES QUE FALTAN
 >
 > **[ADR-065](../adr/ADR-065-la-puerta-se-abre-con-contrasena.md) construida, deployada y verificada
@@ -2079,6 +2195,22 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-09 (cierre 106) — El cockpit de LinkedIn queda listo para configurar, y el ▶ disparaba la máquina equivocada (Claude, con Alejandro).**
+**Qué se hizo:** las Fases 0, 1 y 3 del plan de integración de LinkedIn. Commits `8737b0e` (ADR-066: las interferencias), `b73086b` (ADR-067: perfil de voz) y `0453739` (feed y descartes), los tres pusheados. El cockpit pasó de **1 pantalla a 4**. Antes, limpieza pedida: se borraron las 2 filas `prueba rls` de `app.referentes_linkedin` (`be8e3a1`) — la voz "Alejo" **no se tocó porque ya no existía**, la había borrado el cierre 102.
+
+**🔴 El hallazgo que reordenó el trabajo:** `operar/actions.ts` tiene **tres** disparos (`correrAhora`, `buscarAhora`, `archivarAhora`) que hacen POST a los webhooks de los workflows de **reels**, y ninguno miraba el pipeline: se guardaban solo con `exigirTenant("operar")`, que autoriza **la zona** — que LinkedIn declaraba. Con `30x/linkedin` y `estadox/linkedin` en `active`, el ▶ estaba vivo apuntando a la máquina equivocada desde el 03/08. **Medido antes de cerrarlo: cero `runs`, cero `processed_items`, cero `outputs`** ⇒ nadie lo apretó.
+
+**🔑 Y la parte que importa para el futuro:** la guarda quedó **además** de sacarle la zona a LinkedIn, y no es redundancia. Sacar la zona cierra la puerta *hoy*; el día que LinkedIn recupere `operar` con su motor propio, la guardia de zona **vuelve a autorizar el POST al motor de reels, en silencio**. La zona contesta *"¿este cockpit tiene esta pantalla?"* y lo que hay que preguntar es *"¿es el dueño de esta máquina?"*. Es la misma lección que ya se pagó un nivel más arriba con las 7 pantallas de `curar`: **una guardia se pone donde está la consecuencia, no donde está la ruta.**
+
+**🩸 Medir dio vuelta un supuesto del diseño.** ADR 002 daba por inventariadas las voces de 30X y desconocidas las de Retia; en el sistema **`app.voces` tiene 3 filas y las 3 son de `retia`**, mientras 30X y EstadoX tienen **cero** — siendo las dos cuyo cockpit está activo. Y como **no tienen cockpit de reels**, no existía ninguna pantalla desde donde darles de alta una voz. Por eso la pantalla de Voces también crea la voz, con `activo: false` forzado (**guarda, no default**: en Retia una voz nacida activa entraría al plan del motor de reels sin que nadie lo pidiera).
+
+**⏸️ Qué quedó a medias, y por qué:** la **Fase 4** (ajustes de LinkedIn) no se hizo. Es la única con migración (`028`) y toca `app.ajustes`, que reels usa todas las semanas; la disciplina de la `027` pide ensayarla contra un Postgres local antes de tocar prod, y en esta máquina **Docker no responde y no hay `psql`**. Sin ensayo es la `019` otra vez. También quedó **`retia/linkedin` en `draft`**, a pedido: prenderlo hoy le mete a Majo y Jero un cockpit casi vacío justo antes de D3.
+
+**🧪 Método:** casi reporto un bug inexistente — un `🔥` **válido** dio `23514` porque **el shell mutila los emoji a `??`** en el body de curl. Con escape JSON pasa el check y muere en la FK. La lección generalizable: **una sonda de vocabulario cerrado necesita un control negativo que falle**. Las 4 tablas de LinkedIn siguen en **0 filas** después de todos los sondeos.
+
+**Verde:** `typecheck` · **280 tests** (+26) · `build` · `validate` **2224 checks**.
+**Qué sigue:** **D3** (sin cambios, único item del ROADMAP §3), prender `retia/linkedin`, cargar la primera voz y el banco semilla — y después **el motor en n8n**, que es donde va Alejandro. El bloque de arriba trae la lista medida de lo que le falta al tooling (`n8n-sync.mjs` no conoce el alias `linkedin`, `validate.mjs` no exige `workflow.json`, no hay `clients/*/linkedin.yaml`, no hay cron, y **`run-plan?ambito=linkedin` da 400** aunque el manifest ya lo declare). **Skills sugeridas:** `/grill-with-docs` antes de construir el workflow — los 3 bloqueos son de definición, no de código.
 
 **2026-08-08 (cierre 105) — El histórico abre bien en Excel, y la receta que todo el mundo cita era la equivocada (Claude, pedido de Mani).**
 **Qué se hizo:** el CSV pasó de **UTF-8 + coma** a **UTF-16LE + TAB**. `domain/csv.ts` (delimitador + `aUtf16le` nueva, +4 tests), el `Blob` de `historicos/lista.tsx`, y las docs que lo afirmaban ([ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) §consecuencias y [verificaciones-humanas](../verificaciones-humanas.md) §1). Commit `2e6a906`, pusheado y deployado.
