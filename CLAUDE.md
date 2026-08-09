@@ -135,9 +135,12 @@ re-import queda solo para topología, y solo ahí aplican sus placeholders y cre
 - [Workflows/workflow-dispatcher/README.md](Workflows/workflow-dispatcher/README.md) — el que convierte **un** workflow parametrizado en **N corridas aisladas**, una por instancia (ADR-050). Los dos crons del sistema viven acá.
 - [Workflows/workflow-registro-fallos/README.md](Workflows/workflow-registro-fallos/README.md) — el error handler global: marca como `fallo` el run de la ejecución que se cayó, encontrado por `params.execution_id` (ADR-054). Activo y verificado end-to-end; lo apuntan los 4 workflows. Se rompió **dos veces** por un `<<SUPABASE_URL>>` sin resolver que `onError: continue` silenciaba: por eso `npm run n8n:diff` va después de cada import.
 
-*(`workflow-linkedin/` y `workflow-substack/` son pipelines del repo que todavía **no** corren en n8n:
-LinkedIn ya tiene su `020` aplicada y sus 3 cockpits en `instances`, pero no existe el workflow en
-n8n ni tiene cron en el dispatcher, ADR-055.)*
+*(`workflow-linkedin/` existe en n8n desde el 2026-08-09 pero **INACTIVO y sin cron**, y es solo su
+**esqueleto de infraestructura**: 11 nodos (triggers, `Config`, guard single-flight, abrir/cerrar run,
+`Leer plan` fail-closed) y **cero etapas de contenido**. La fachada ya le sirve su plan de corrida
+(ADR-068). Lo que falta no es plomería: `generar` sigue bloqueada por los few-shot, y con 0 voces y
+0 referentes cualquier etapa que se construya corre en vacío. `workflow-substack/` sigue siendo solo
+manifest, sin `workflow.json`.)*
 
 ## Agent skills
 
@@ -172,8 +175,9 @@ módulos), `/handoff` (compactar una sesión).
   `npm test` (dominio con `node:test`, corre los `.ts` directo en Node 26). Si tocaste rutas o
   auth, además `npm run build`. Cómo correrlo y sus pasos manuales:
   [apps/dashboard/README.md](apps/dashboard/README.md).
-- **¿el live corre lo que dice el repo?** `cd core/scripts && npm run n8n:diff` — compara los **5**
-  workflows (los 4 del pipeline + el error handler) contra n8n por la API (ADR-053). Clasifica cada campo, así que solo grita lo accionable:
+- **¿el live corre lo que dice el repo?** `cd core/scripts && npm run n8n:diff` — compara los **6**
+  workflows (los 4 del pipeline + el error handler + el esqueleto de LinkedIn) contra n8n por la API
+  (ADR-053). Clasifica cada campo, así que solo grita lo accionable:
   **drift** (los dos lados tienen valor y difieren), **topología**, **orden de ramas** y placeholders
   que no pudo aprender. Lo benigno (defaults que n8n borra, campos que agrega, resourceLocators de
   Apify) va a un contador; `-- --todo` los lista. Solo lee. **Corrélo antes de tocar un workflow.json

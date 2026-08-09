@@ -4,15 +4,33 @@ Detecta contenido que ya funcionó —incluido el de otros idiomas—, lo cura u
 en la voz de la cuenta con su firma, y lo deja en una cola para que **una persona lo apruebe y
 publique**.
 
-> ## ⚠️ Estado al 2026-08-08: hay diseño, tablas, RLS y cockpit. **No hay `workflow.json`.**
+> ## ⚠️ Estado al 2026-08-09: está el esqueleto, **no hay ni una etapa de contenido**
 >
 > | Pieza | Estado |
 > |---|---|
-> | Las decisiones | ✅ [ADR-055](../../docs/adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md) (la forma) · [ADR-056](../../docs/adr/ADR-056-las-zonas-son-rol-interseccion-pipeline.md) (la superficie) · [ADR-066](../../docs/adr/ADR-066-un-cockpit-sin-motor-solo-muestra-lo-que-se-configura.md) (qué se dibuja sin motor) |
+> | Las decisiones | ✅ [ADR-055](../../docs/adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md) (la forma) · [ADR-056](../../docs/adr/ADR-056-las-zonas-son-rol-interseccion-pipeline.md) (la superficie) · [ADR-066](../../docs/adr/ADR-066-un-cockpit-sin-motor-solo-muestra-lo-que-se-configura.md) (qué se dibuja sin motor) · [ADR-067](../../docs/adr/ADR-067-el-perfil-de-voz-de-linkedin-es-una-capa-sobre-las-voces-de-la-empresa.md) (el perfil de voz) · [ADR-068](../../docs/adr/ADR-068-el-pipeline-lo-dice-la-instancia-no-el-que-pregunta.md) (el plan de corrida) |
 > | Las tablas | ✅ [`020`](../../core/schema/020_pipeline_linkedin.sql) **aplicada**, y [`024`](../../core/schema/024_rls_linkedin.sql) le puso las policies (grano **instancia**) · ⬜ **las 4 con 0 filas** |
-> | El cockpit | ✅ **3 instancias**: `30x/linkedin` y `estadox/linkedin` en `active`, `retia/linkedin` en `draft` (o sea que todavía no existe como cockpit) · 🔧 **1 de 6** pantallas de `curar`: Referentes |
+> | El cockpit | ✅ **3 instancias**: `30x/linkedin` y `estadox/linkedin` en `active`, `retia/linkedin` en `draft` · ✅ **4 de 6** pantallas de `curar` (ADR-066: las otras 2 no tienen escritor) |
+> | La fachada | ✅ `GET /api/engine/run-plan` sirve el plan de LinkedIn (ADR-068), **verificado en prod** |
 > | El manifest | ✅ [`workflow.yaml`](workflow.yaml), válido contra el contrato |
-> | El motor en n8n | ❌ **no existe** — 0 nodos, ni cron en el dispatcher |
+> | El motor en n8n | 🔧 **esqueleto de 11 nodos, INACTIVO** — creado por API el 09/08 (`n8n:diff` verde). ❌ **Cero etapas de contenido** y ❌ **sin cron en el dispatcher** |
+>
+> ### 🔧 Qué es exactamente el esqueleto, y qué NO es
+>
+> Los 11 nodos son **solo infraestructura**, la misma de los otros 4 workflows: los 2 triggers
+> (webhook + manual), `Config`, el barrido de runs zombie, el guard single-flight por instancia, la
+> apertura y el cierre del run en el registro, y la lectura del plan por la fachada **fail-closed**.
+> Entre `Leer plan (fachada)` y `Cerrar run en el registro` **no hay nada**: ahí van las 8 etapas.
+>
+> El único nodo propio es **`Resumen del run`**, y no es relleno: **afirma que el plan recibido dice
+> `pipeline: linkedin`** y aborta si no. Es el primer consumidor del campo que ADR-068 agregó, y el
+> único punto donde ese fallo se puede cazar — porque su síntoma no es un error, es un plan bien
+> formado del pipeline equivocado. De paso deja en `runs.metricas` cuántas voces con perfil y cuántos
+> referentes activos trajo la fachada, que son las dos cifras que dicen si el motor tendría con qué
+> trabajar. **Hoy son 0 y 0**, y esa es la respuesta correcta.
+>
+> ⚠️ **No se activó, y no debe activarse todavía**: un workflow activo con webhook vivo y sin etapas
+> abre runs que no entregan nada.
 >
 > 🩸 **Lo que se cerró el 08/08 (ADR-066), y vale como advertencia para el próximo pipeline:**
 > declarar una zona que no tenés **no es mostrar de menos, es mostrar la del otro**. LinkedIn

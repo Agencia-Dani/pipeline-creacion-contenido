@@ -3,13 +3,18 @@
 # El pipeline N+1 (ADR-055), y el test real del invariante #3 de PLAN §F5: si LinkedIn entra sin
 # tocar el núcleo más allá de su propia migración, "clonar y configurar" deja de ser una promesa.
 #
-# ⚠️ ESTADO REAL, 2026-08-03 — leelo antes de creerle a las etapas de abajo.
-#   Existen: los ADRs (055/056), las tablas (`core/schema/020_pipeline_linkedin.sql`) y la
-#   superficie del cockpit (las zonas del pipeline, ADR-056).
-#   NO existe: el `workflow.json`. Este manifest describe el diseño acordado, no algo que corra —
-#   por eso `status: draft`. Las etapas marcadas [POR CONSTRUIR] están bloqueadas por cosas que no
-#   son técnicas y están listadas en ADR-055 §Consecuencias: no hay definición de "funcionó", no
-#   existe el banco de referentes, y no hay inventario de voces de EstadoX ni de Retia.
+# ⚠️ ESTADO REAL, 2026-08-09 — leelo antes de creerle a las etapas de abajo.
+#   Existen: los ADRs (055/056/066/067/068), las tablas (`core/schema/020_pipeline_linkedin.sql`), el
+#   cockpit con sus 4 pantallas, la fachada sirviendo el plan de este pipeline (ADR-068) y —desde
+#   hoy— el `workflow.json`, pero SOLO SU ESQUELETO DE INFRAESTRUCTURA: 11 nodos (los 2 triggers,
+#   Config, barrido de zombies, guard single-flight, apertura y cierre del run, la lectura del plan
+#   fail-closed y un `Resumen del run` que afirma que el plan recibido es el de LinkedIn).
+#   Creado en n8n por API el 2026-08-09 e **INACTIVO**.
+#
+#   NO existe NINGUNA etapa de contenido. Las 8 de abajo siguen [POR CONSTRUIR] y el esqueleto no
+#   toca ninguna: entre `Leer plan` y `Cerrar run` no hay nada. Los bloqueos son los mismos de
+#   siempre y ninguno es técnico (ADR-055 §Consecuencias): no hay definición de "funcionó", no
+#   existe el banco de referentes, y faltan los few-shot. Por eso sigue en `status: draft`.
 contract_version: 1
 
 id: linkedin

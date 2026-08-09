@@ -54,6 +54,9 @@ const FAIL_CLOSED = {
   "workflow-dispatcher": {
     "Leer instancias (fachada)": "sin la lista de instancias no hay a quién disparar (ADR-028 + ADR-050)",
   },
+  "workflow-linkedin": {
+    "Leer plan (fachada)": "sin config el run tiene que abortar (ADR-028)",
+  },
 };
 
 const WF_ROOT = resolve(dirname(fileURLToPath(import.meta.url)));

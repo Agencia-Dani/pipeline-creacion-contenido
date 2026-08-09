@@ -1,0 +1,318 @@
+{
+  "name": "Workflow - LinkedIn",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<<WEBHOOK_PATH_LINKEDIN>>",
+        "responseMode": "onReceived",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "disparo-on-demand-webhook",
+      "name": "Disparo on-demand (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Webhook Motor Header"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "ejecutar-manual",
+      "name": "Ejecutar manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 560]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c_supa",
+              "name": "supabase_url",
+              "value": "<<SUPABASE_URL>>",
+              "type": "string"
+            },
+            {
+              "id": "c_dash",
+              "name": "dashboard_url",
+              "value": "<<DASHBOARD_URL>>",
+              "type": "string"
+            },
+            {
+              "id": "c_inst",
+              "name": "instance_id",
+              "value": "={{ $('Disparo on-demand (webhook)').isExecuted ? (($('Disparo on-demand (webhook)').first().json.body || {}).instancia || '') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "c_ventana",
+              "name": "ventana_corrida_min",
+              "value": 60,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 400],
+      "notes": "instance_id sale del payload del webhook ({ instancia }), no de un placeholder (ADR-048).\nPara «Ejecutar manual»: reemplazá el '' final de la expresión por el uuid de la instancia.\nEn git va VACÍO a propósito — vacío hace que run-plan responda 400 y la corrida no arranque.\n\nSOLO están las perillas que algún nodo LEE hoy. Las del manifest (umbral_reacciones, pins_por_consulta, dias_recencia, n_por_voz) NO están: declarar knobs que nadie lee es el fallo mudo de siempre. Entran con la etapa que las use, y su casa definitiva es app.ajustes tras la migración 028 (Fase 4).",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.linkedin&instance_id=eq.' + $('Config').first().json.instance_id + '&estado=eq.en_curso&inicio=lt.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { estado: 'fallo', fin: $now.toISO(), error: 'run de linkedin sin cerrar (en_curso mas viejo que ventana_corrida_min); barrido por corrida posterior' } }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "barrer-runs-zombie-linkedin",
+      "name": "Barrer runs zombie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 400],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?params-%3E%3Eworkflow=eq.linkedin&instance_id=eq.' + $('Config').first().json.instance_id + '&estado=eq.en_curso&inicio=gte.' + encodeURIComponent($now.minus({ minutes: $('Config').first().json.ventana_corrida_min || 120 }).toISO()) + '&select=id,inicio,trigger_type&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "leer-corridas-vivas",
+      "name": "Leer corridas vivas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 400],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "guard-libre",
+              "leftValue": "={{ Boolean($json.id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "guard-single-flight",
+      "name": "Guard single-flight",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {},
+      "id": "bloqueada-corrida-viva",
+      "name": "Bloqueada: ya hay corrida viva",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"instance_id\": \"{{ $('Config').first().json.instance_id }}\", \"trigger_type\": \"{{ $('Disparo on-demand (webhook)').isExecuted ? 'on_demand' : ($('Ejecutar manual').isExecuted ? 'manual' : 'cron') }}\", \"estado\": \"en_curso\", \"params\": { \"workflow\": \"linkedin\", \"execution_id\": \"{{ $execution.id }}\" } }",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "abrir-run-en-el-registro",
+      "name": "Abrir run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 320],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.dashboard_url + '/api/engine/run-plan?ambito=motor&instancia=' + $('Config').first().json.instance_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "leer-plan-fachada",
+      "name": "Leer plan (fachada)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 320],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Run Plan Header"
+        }
+      },
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "notes": "La config del cockpit (ADR-028). FAIL-CLOSED a proposito: sin onError, cualquier respuesta !=200 tras 3 intentos aborta el run.\n\n`ambito=motor` NO dice que este sea el pipeline de reels: son DOS EJES (ADR-068). El pipeline lo DERIVA la fachada de la instancia y no se pide nunca; `ambito` es solo el filtro (motor = con filtros, completo = sin ellos). Este workflow pide el filtrado, y lo que recibe es el plan de LinkedIn porque su instancia lo es."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Cierre del ESQUELETO. Todavía no hay etapas de contenido: colectar y generar esperan el banco\n// de referentes y los few-shot de Fernando (ADR-055 §Consecuencias), que no son problemas de código.\n//\n// Lo que este nodo SÍ hace no es relleno: verifica ADR-068 desde adentro de n8n, que es el único\n// lugar donde importa, y deja la medición escrita en `runs.metricas`.\n\nconst plan = $('Leer plan (fachada)').first().json || {};\n\n// 🔴 La afirmación que ADR-068 existe para habilitar, y por eso este workflow es su primer\n// consumidor. La fachada deriva el pipeline de la instancia, así que un plan que dice otra cosa\n// significa que este workflow está apuntado a una instancia ajena. **Ese fallo no produce un error\n// río arriba: produce un documento bien formado**, con voces y referentes de verdad adentro. Es el\n// único punto donde se puede cazar, y se corta con el run YA ABIERTO para que quede la fila.\nif (plan.pipeline !== 'linkedin') {\n  throw new Error(\n    `run-plan devolvió pipeline='${plan.pipeline}' (esperaba 'linkedin'): esta corrida está apuntada a una instancia que no es de LinkedIn. No se escribió nada.`,\n  );\n}\n\nconst voces = Array.isArray(plan.voces) ? plan.voces : [];\nconst referentes = Array.isArray(plan.referentes) ? plan.referentes : [];\n\n// Las dos cifras que deciden si el motor tendría con qué trabajar el día que exista. Hoy son 0 y 0\n// en las tres marcas, y esa es la respuesta correcta: el banco hay que construirlo, no capturarlo.\nreturn [\n  {\n    json: {\n      metricas: {\n        etapa: 'esqueleto',\n        pipeline: plan.pipeline,\n        voces_con_perfil: voces.length,\n        referentes_activos: referentes.length,\n        nota: 'Esqueleto de infraestructura: sin etapas de contenido. Ver Workflows/workflow-linkedin/README.md',\n      },\n    },\n  },\n];\n"
+      },
+      "id": "resumen-del-run",
+      "name": "Resumen del run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 320],
+      "notes": "Afirma que el plan recibido es el de LinkedIn (ADR-068) y reporta qué trajo. Es el smoke test del cableado, no una etapa del pipeline.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?id=eq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fin: $now.toISO(), estado: 'ok', metricas: $json.metricas } }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "cerrar-run-en-el-registro",
+      "name": "Cerrar run en el registro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 320],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase account"
+        }
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Disparo on-demand (webhook)": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Ejecutar manual": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Config": {
+      "main": [[{ "node": "Barrer runs zombie", "type": "main", "index": 0 }]]
+    },
+    "Barrer runs zombie": {
+      "main": [[{ "node": "Leer corridas vivas", "type": "main", "index": 0 }]]
+    },
+    "Leer corridas vivas": {
+      "main": [[{ "node": "Guard single-flight", "type": "main", "index": 0 }]]
+    },
+    "Guard single-flight": {
+      "main": [
+        [{ "node": "Abrir run en el registro", "type": "main", "index": 0 }],
+        [{ "node": "Bloqueada: ya hay corrida viva", "type": "main", "index": 0 }]
+      ]
+    },
+    "Abrir run en el registro": {
+      "main": [[{ "node": "Leer plan (fachada)", "type": "main", "index": 0 }]]
+    },
+    "Leer plan (fachada)": {
+      "main": [[{ "node": "Resumen del run", "type": "main", "index": 0 }]]
+    },
+    "Resumen del run": {
+      "main": [[{ "node": "Cerrar run en el registro", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

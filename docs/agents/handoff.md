@@ -107,24 +107,81 @@
 >    ⚠️ **Y es la única prueba observable de que esto hizo algo** hasta que haya filas: las listas
 >    siguen vacías, lo que cambia es que `pipeline` dice `linkedin`.
 >
+> ### 🔧 Y después: el ESQUELETO del motor existe en n8n (11 nodos, INACTIVO)
+>
+> Salió de una pregunta de Alejandro —*"¿con la API de n8n no podrías generar el motor?"*— y la
+> respuesta medida es **sí, y no había límite de API**:
+>
+> | | |
+> |---|---|
+> | `POST /workflows` | ✅ probado (es lo que hace `n8n:test` cada vez) |
+> | `GET /credentials` | ✅ **200**, devuelve `id · name · type` ⇒ el mapa nombre→id se resuelve solo |
+> | `POST /workflows/{id}/activate` | ✅ existe |
+>
+> 🔑 **Y una distinción que CLAUDE.md no hacía:** el miedo escrito ahí —*"`nodes` reemplaza: un push
+> que crea nodos también puede borrarlos"*— es sobre un **`PUT` a un workflow vivo**. Crear uno que
+> no existe es un `POST` **sin nada que destruir**: es más seguro que el `n8n:push --apply` de rutina.
+> Eso no cierra §14.2 de plan-multi-tenant (la topología sobre workflows vivos sigue pendiente), pero
+> le saca de encima el caso "workflow nuevo".
+>
+> **Qué se creó, y qué NO.** 11 nodos de **pura infraestructura**, calcados de los otros 4: 2 triggers,
+> `Config`, barrido de zombies, guard single-flight, abrir/cerrar run, y `Leer plan (fachada)`
+> fail-closed. **Entre el plan y el cierre no hay NADA** — las 8 etapas siguen sin existir y el
+> esqueleto no adivina ninguna (ni el actor de Apify, ni la generación sin few-shot).
+>
+> El único nodo propio es **`Resumen del run`**, que **afirma que el plan dice `pipeline: linkedin`**
+> y aborta si no. Es el primer consumidor del campo de ADR-068 y el único lugar donde ese fallo se
+> caza, porque su síntoma es un plan **bien formado del pipeline equivocado**. Deja en
+> `runs.metricas` cuántas voces con perfil y cuántos referentes activos vinieron: **hoy 0 y 0**.
+>
+> **Cómo se hizo (repo primero, ADR-053):** el `workflow.json` se escribió en el repo, pasó
+> `auditar-workflows.mjs` (11 nodos, 4 continue-on-fail + 1 fail-closed con su porqué, el code node
+> compila) y recién ahí se hizo el `POST`. Las 5 credenciales se resolvieron **por id** desde
+> `GET /credentials` — que es exactamente lo que falló dos veces en el re-import a mano del
+> multi-tenant, cuando se elegían de un desplegable.
+>
+> ✅ **`n8n:diff`: 6 de 6 corren lo que dice el repo**, `linkedin` incluido — y el alias **se
+> autodescubrió**, sin tocar el script, que era el punto del cambio de esta misma sesión.
+>
+> 🔑 **En el `.env` (local, gitignored) quedaron `N8N_WF_LINKEDIN` y `WEBHOOK_PATH_LINKEDIN`.** El
+> path del webhook **hay que copiarlo al gestor de contraseñas compartido**: es la mitad secreta de
+> la URL de disparo y hoy solo existe en la máquina de Alejandro y en n8n.
+>
+> ⛔ **NO se activó, y no se activa todavía.** Un workflow activo con webhook vivo y sin etapas abre
+> runs que no entregan nada. Tampoco tiene cron en el dispatcher, por lo mismo.
+>
+> ⬜ **Lo que falta para que sea un motor:** las 8 etapas. `normalizar`, `filtrar_scorear`, `entregar`
+> y el validador `calidad` (R-1 + R-2, que ya tiene su insumo: la `firma` viaja en el plan) son
+> construibles hoy. `colectar` pide elegir actor de Apify para Pinterest. **`generar` sigue bloqueada
+> por los few-shot.**
+>
 > ### 🧪 Verde
 >
-> **289 tests** (280 antes) · typecheck · build · `validate` **2244 checks / 7 workflows** ·
-> `auditar-workflows` sin hallazgos · `test-nodos` del motor verde · **`n8n:test` 15/15** ·
-> **`n8n:diff`: los 5 workflows corren lo que dice el repo** (esto no toca n8n: para reels la
-> respuesta es byte-idéntica salvo el campo agregado).
+> **289 tests** (280 antes) · typecheck · build · `validate` **2254 checks / 7 workflows** ·
+> `auditar-workflows` **6 de 7 auditados, sin hallazgos** · `test-nodos` del motor verde ·
+> **`n8n:test` 15/15** · **`n8n:diff` 6/6: todos corren lo que dice el repo**. Para reels la respuesta
+> de la fachada es byte-idéntica salvo el campo `pipeline` agregado ⇒ **no hubo re-import ni push**.
 >
-> ### ⬜ Lo que sigue, sin cambios de orden salvo el de arriba
+> ✅ **Deployado y verificado en prod** (`f90a751`): `30x/linkedin` → `pipeline: linkedin`, claves
+> `version,pipeline,generado_en,voces,referentes` · `retia/reels` motor → `short-form-content` con
+> 1 voz / 2 proyectos / 17 referentes / 18 ajustes, y `completo` con 3 / 6 / 17 / 18 (o sea que el eje
+> `ambito` quedó intacto) · `?ambito=linkedin` **sigue dando 400**, que es lo correcto.
+>
+> ### ⬜ Lo que sigue
 >
 > 1️⃣ **D3** (Mani + Majo + Jero) — sigue siendo el único item sin marcar del ROADMAP §3.
-> 2️⃣ **Deploy de esto** y recién ahí **prender `retia/linkedin`**.
-> 3️⃣ **Cargar la primera voz y el banco semilla** (Alejandro) — no es código y nada lo destraba.
-> 4️⃣ **Fase 4 (ajustes)**, parada por entorno: su `028` pide ensayo contra un Postgres local y Docker
+> 2️⃣ **Prender `retia/linkedin`** — ya sin condición de orden: el deploy de ADR-068 está arriba.
+> 3️⃣ **Cargar la primera voz y el banco semilla** (Alejandro). **Es lo único que destraba todo lo
+> demás**: con 0 voces y 0 referentes, cualquier motor que se construya corre en vacío.
+> 4️⃣ **Las etapas del motor**, en el orden en que tienen insumos: `normalizar` / `filtrar_scorear` /
+> `entregar` / `calidad` (R-1 + R-2) → `colectar` (pide elegir actor de Apify) → **`generar`, que
+> sigue bloqueada por los few-shot**.
+> 5️⃣ **Fase 4 (ajustes)**, parada por entorno: su `028` pide ensayo contra un Postgres local y Docker
 > no responde en esta máquina.
 >
 > 🔴 **Los 3 bloqueos NO técnicos del motor siguen intactos** (ADR-055 §Consecuencias): no hay
-> definición de *"funcionó"*, no existe el banco de referentes, faltan los few-shot. Esto les sacó
-> del camino la primera piedra técnica, nada más.
+> definición de *"funcionó"*, no existe el banco de referentes, faltan los few-shot. Lo de hoy les
+> sacó del camino la plomería —la fachada y el esqueleto—, **nada más**.
 
 > ## 🔗 2026-08-09 (cierre 106) · EL COCKPIT DE LINKEDIN ESTÁ LISTO PARA CONFIGURAR, Y EL BOTÓN ▶ DISPARABA LA MÁQUINA EQUIVOCADA
 >
