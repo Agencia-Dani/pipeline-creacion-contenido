@@ -86,6 +86,19 @@ const COPY_LINKEDIN: Partial<Record<PantallaCurar, Copy>> = {
     descripcion:
       "De dónde sale el material: filtros de Pinterest, cuentas de LinkedIn, páginas sueltas y el archivo propio de cada voz. Solo los prendidos entran en la próxima corrida.",
   },
+  // Las dos de curación dicen que están vacías **desde la tarjeta**, antes de que alguien entre. Es
+  // más honesto que dejar que lo descubra adentro: el motor no existe todavía, y sin decirlo acá el
+  // cockpit promete un trabajo diario que no hay.
+  feed: {
+    titulo: "Feed",
+    descripcion:
+      "Lo que la máquina traiga, para calificar. Todavía vacío: el motor de LinkedIn no existe. Calificar acá no genera el post — marca la pieza y nada más.",
+  },
+  descartes: {
+    titulo: "Descartes",
+    descripcion:
+      "Lo que el filtro mate, para decir si acertó. Todavía vacío, por lo mismo que el feed.",
+  },
 };
 
 export default async function CurarPage({

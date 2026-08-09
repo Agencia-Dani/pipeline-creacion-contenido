@@ -128,15 +128,20 @@ export type PantallaCurar = (typeof PANTALLAS_CURAR)[number];
 
 const CURAR_POR_PIPELINE: Record<Pipeline, readonly PantallaCurar[]> = {
   "short-form-content": PANTALLAS_CURAR,
-  // Hoy LinkedIn tiene DOS. No es una limitación temporal disfrazada de diseño: es que hay dos
-  // pantallas construidas. Las demás entran cuando existan, no antes — y `historicos` y `sugeridos`
-  // no van a entrar por falta de pantalla sino porque **no tienen escritor** (el archivado que llena
-  // `outputs` es de reels, y no hay descubrimiento de LinkedIn). ADR-066 lo ratifica.
+  // LinkedIn tiene CUATRO de las seis. Las dos que faltan no son un pendiente: `historicos` y
+  // `sugeridos` **no tienen escritor** (el archivado que llena `outputs` es de reels y su pantalla
+  // lee columnas de video; no hay descubrimiento de LinkedIn). ADR-066 lo ratifica para que no se
+  // re-litigue cada vez que alguien mire la lista y las eche de menos.
   //
-  // El orden del array es el orden de las tarjetas del índice, y `voces` va primera a propósito: es
-  // la unidad de configuración de la máquina (ADR 002 del repo de diseño), así que es por donde se
-  // empieza. El banco de referentes no sirve de nada sin una voz que lo use.
-  linkedin: ["voces", "referentes"],
+  // El orden del array es el de las tarjetas del índice, y **no es el de reels a propósito**: acá
+  // va primero lo que se configura (`voces`, `referentes`) y después lo que se cura (`feed`,
+  // `descartes`). En reels es al revés porque el motor corre hace meses y lo de todos los días es
+  // calificar; en LinkedIn el motor **no existe**, así que las dos de curación están vacías y
+  // ponerlas arriba mandaría a quien entra por primera vez a dos pantallas sin nada.
+  //
+  // ⚠️ Cuando el motor de LinkedIn corra, este orden hay que darlo vuelta — y entonces va a coincidir
+  // con el de reels, que es la señal de que el pipeline maduró.
+  linkedin: ["voces", "referentes", "feed", "descartes"],
 };
 
 /** Las pantallas de `curar` que este pipeline implementa. Un pipeline no declarado no tiene ninguna. */

@@ -5,7 +5,9 @@ import { FILTRO_INICIAL } from "@/domain/feed";
 import { exigirPantallaDeCurar } from "@/lib/auth";
 import { contarFeed, leerFeed } from "@/lib/candidatos";
 import { contarDescartesPendientes } from "@/lib/descartes";
+import { leerFeedLinkedin, TECHO } from "@/lib/candidatos-linkedin";
 import { Mazo } from "./mazo";
+import { MazoLinkedin } from "./mazo-linkedin";
 
 // El feed de calificación (D6). Desde D7 los candidatos viven en Postgres — acá
 // cambia la superficie, no el dueño (ver lib/candidatos.ts).
@@ -23,6 +25,28 @@ export default async function FeedPage({
   const { cliente, pipeline } = await params;
   const { ctx, cockpit } = await exigirPantallaDeCurar("feed", cliente, pipeline);
   const base = comoRuta(cockpit);
+
+  const volver = (
+    <Link href={rutaDe(base, "curar")} className="text-sm text-muted-foreground hover:underline">
+      ← Curar
+    </Link>
+  );
+
+  // **Una ruta, dos mazos.** Mismo ramificado que `curar/voces` y `curar/referentes`: decide el
+  // `workflowId` del cockpit, que es lo único que ya sabe de qué pipeline es esta pantalla.
+  //
+  // El de LinkedIn es más simple a propósito y no por estar a medias: no tiene filtros ni chips
+  // porque **no hay contra qué filtrar todavía** (la tabla está vacía y su motor no existe), y
+  // agregar cuatro `head` counts sobre una tabla en cero es cuatro queries para decir 0 cuatro veces.
+  if (cockpit.workflowId === "linkedin") {
+    const { filas, total } = await leerFeedLinkedin(ctx);
+    return (
+      <div className="space-y-6">
+        {volver}
+        <MazoLinkedin candidatos={filas} total={total} techo={TECHO} />
+      </div>
+    );
+  }
 
   // Los conteos van aparte de las filas a propósito: son cuatro `head` counts sobre la tabla
   // entera, y es lo que deja que los chips digan el avance de CADA filtro y no solo del abierto.

@@ -113,7 +113,7 @@ test("🩸 compartir la ZONA no es compartir las pantallas: es el agujero del 06
   // /curar/feed y leía `app.candidatos` —la tabla de REELS— filtrada por su instance_id: cero filas,
   // sin error, indistinguible de "todavía no cargamos datos".
   assert.deepEqual(pantallasDeCurar("short-form-content"), PANTALLAS_CURAR);
-  assert.deepEqual(pantallasDeCurar("linkedin"), ["voces", "referentes"]);
+  assert.deepEqual(pantallasDeCurar("linkedin"), ["voces", "referentes", "feed", "descartes"]);
 });
 
 test("el orden de la lista es el de las tarjetas, y `voces` va primera", () => {
@@ -124,7 +124,7 @@ test("el orden de la lista es el de las tarjetas, y `voces` va primera", () => {
 });
 
 test("la guardia del servidor contesta por pantalla, no por zona", () => {
-  const deLinkedin: readonly string[] = ["voces", "referentes"];
+  const deLinkedin: readonly string[] = ["voces", "referentes", "feed", "descartes"];
   for (const p of PANTALLAS_CURAR) {
     assert.equal(
       implementaPantalla("linkedin", p),
@@ -159,7 +159,7 @@ test("🔀 toda pantalla compartida tiene que ramificar en su page.tsx", () => {
   const compartidas = PANTALLAS_CURAR.filter(
     (p) => implementaPantalla("linkedin", p) && implementaPantalla("short-form-content", p),
   );
-  assert.deepEqual(compartidas, ["voces", "referentes"]);
+  assert.deepEqual(compartidas, ["feed", "descartes", "voces", "referentes"]);
 });
 
 test("ninguna declaración de pantallas inventa una, ni deja una zona `curar` vacía", () => {

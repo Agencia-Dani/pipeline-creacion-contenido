@@ -3,7 +3,9 @@ import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerDescartes } from "@/lib/descartes";
+import { leerDescartesLinkedin, TECHO } from "@/lib/candidatos-linkedin";
 import { Lista } from "./lista";
+import { ListaDescartesLinkedin } from "./lista-linkedin";
 
 // La auditoría del gate (ADR-021). Es la mitad más valiosa de D6: `veredicto` está en 0
 // auditorías desde que la tabla existe — no por decisión, sino porque Airtable no dejaba
@@ -20,6 +22,20 @@ export default async function DescartesPage({
   const { cliente, pipeline } = await params;
   const { ctx, cockpit } = await exigirPantallaDeCurar("descartes", cliente, pipeline);
   const base = comoRuta(cockpit);
+
+  // Una ruta, dos listas — el mismo ramificado que sus hermanas (ADR-049: tablas propias por
+  // pipeline, así que también lectores propios).
+  if (cockpit.workflowId === "linkedin") {
+    const { filas, total } = await leerDescartesLinkedin(ctx);
+    return (
+      <div className="space-y-6">
+        <Link href={rutaDe(base, "curar")} className="text-sm text-muted-foreground hover:underline">
+          ← Curar
+        </Link>
+        <ListaDescartesLinkedin descartes={filas} total={total} techo={TECHO} />
+      </div>
+    );
+  }
 
   const descartes = await leerDescartes(ctx);
 
