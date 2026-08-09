@@ -182,7 +182,27 @@
 > 1 voz / 2 proyectos / 17 referentes / 18 ajustes, y `completo` con 3 / 6 / 17 / 18 (o sea que el eje
 > `ambito` quedó intacto) · `?ambito=linkedin` **sigue dando 400**, que es lo correcto.
 >
-> ### ⬜ Lo que sigue
+> ### ⬜ Lo que sigue — **el plan paso a paso está en [plan-motor-linkedin.md](./plan-motor-linkedin.md)**
+>
+> 🔑 **Y escribirlo destapó algo que este handoff venía diciendo mal: "los 3 bloqueos no técnicos"
+> NO son un bloque.** Los dos carriles de ADR-055 §2 no comparten bloqueos:
+>
+> | | Personal | Copiable |
+> |---|---|---|
+> | Banco de referentes de Fernando | **NO lo necesita** — *"no tengo el listado"* habla de cuentas **ajenas**; sus filas (`fuente: archivo`) son material que la casa ya tiene | sí |
+> | Apify | no | sí |
+> | Umbral | no (no compite con nadie) | sí, y es por carril |
+> | Few-shot | sí | sí |
+>
+> ⇒ **El carril personal está a UN pedido de ser construible**, y es el que ADR-055 llama *"el más
+> barato del proyecto"*. Por eso el plan **no** sigue el orden del manifest: va por la espina que
+> puede correr entera con lo más barato (con un `colectar` de mentira que emite 1 pieza), y el
+> entregable de la fase 1 no es código sino **Fernando mirando la primera pieza en el Feed**.
+>
+> ❓ **Y dejó una pregunta abierta que hay que cerrar antes de escribir `colectar` personal:** un
+> podcast es audio y `enriquecer` es `n/a` en este pipeline ⇒ no hay transcripción. ¿Pega texto una
+> persona (como el `transcribir` de reels), guarda URL y el motor baja texto, o se reabre
+> `enriquecer` con Supadata? **Lo tercero contradice el manifest y pide ADR.**
 >
 > 1️⃣ **D3** (Mani + Majo + Jero) — sigue siendo el único item sin marcar del ROADMAP §3.
 > 2️⃣ **Prender `retia/linkedin`** — ya sin condición de orden: el deploy de ADR-068 está arriba.

@@ -23,6 +23,9 @@ en §Agent skills; acá solo se ubican.
 
 - [docs/agents/plan-cockpit-propio.md](docs/agents/plan-cockpit-propio.md) — el plan del **cockpit propio**
   que reemplazó a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
+- [docs/agents/plan-motor-linkedin.md](docs/agents/plan-motor-linkedin.md) — de **esqueleto a motor**:
+  las fases 0–4 para que el pipeline de LinkedIn corra. Su hallazgo ordenador: **los dos carriles no
+  comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
 - [docs/adr/](docs/adr/) — ADRs 001–068, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
