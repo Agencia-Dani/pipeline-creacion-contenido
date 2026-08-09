@@ -22,11 +22,23 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## 🔌 2026-08-09 (cierre 107) · LA FACHADA YA SABE QUE LINKEDIN EXISTE, Y EL 400 QUE LA TAPABA NO PROTEGÍA NADA
+> ## 🔌 2026-08-09 (cierre 107) · LA FACHADA SABE QUE LINKEDIN EXISTE, EL ESQUELETO DEL MOTOR ESTÁ EN n8n, Y EL 400 QUE LO TAPABA NO PROTEGÍA NADA
 >
-> **Leelo antes de prender `retia/linkedin`.** El cierre 106 dejó 8 huecos de tooling medidos entre
-> el cockpit de LinkedIn y su motor en n8n. Esta sesión cerró los que no dependen de que el workflow
-> exista, y el primero resultó ser más grande de lo que decía el renglón.
+> **Leelo antes de tocar LinkedIn.** El cierre 106 dejó 8 huecos de tooling medidos entre el cockpit
+> y su motor en n8n. Esta sesión cerró los 6 que no dependen de que el workflow exista, creó el
+> **esqueleto del workflow por API** y dejó el plan de las fases que faltan. El primer hueco resultó
+> más grande de lo que decía el renglón.
+>
+> **En una línea:** `main` = `ca587d7`, deployado y verificado en prod. **ADR-068** + el esqueleto de
+> 11 nodos **inactivo** en n8n + [plan-motor-linkedin.md](./plan-motor-linkedin.md). El motor **sigue
+> sin tener una sola etapa de contenido**, y eso es lo correcto: lo que falta no es plomería.
+>
+> 🧭 **Las tres correcciones que se hicieron a afirmaciones propias, porque el patrón importa más que
+> cada una:** (1) *"se abre la ventana por lo que tarde Vercel"* sonaba a fuga viva y **no lo es** —
+> se midió quién puede pedir ese plan y no hay caller automático; (2) la ADR decía *"la primera pieza
+> de motor que existe de verdad"* y **no es una pieza del motor**, es la fachada que el motor va a
+> leer; (3) el handoff listaba *"los 3 bloqueos no técnicos"* como un bloque y **los dos carriles no
+> los comparten**. Las tres salieron de que Alejandro preguntó, no de un review.
 >
 > ### 🩸 El 400 era el síntoma barato; abajo había un 200
 >
