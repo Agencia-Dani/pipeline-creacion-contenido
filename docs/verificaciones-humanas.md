@@ -442,7 +442,13 @@ ROADMAP §4: *el equipo de redes usa el sistema un día completo sin ayuda de un
 ## 10. 🔬 **La prueba de §14.6 — RLS de LinkedIn con filas** *(la mitad de query ya está cerrada)*
 
 **Quién:** quien tenga la cuenta con membresía en **30X y EstadoX** (`alejandro.davila@30x.com`).
-**Cuánto:** 3 minutos. **Las dos filas ya están sembradas en prod**, esperando este clic.
+**Cuánto:** 3 minutos + el paso 0.
+
+🚮 **Las dos filas YA NO están: se borraron el 2026-08-08 a pedido de Mani**, y con ellas
+`app.referentes_linkedin` quedó **vacía**. La prueba no se canceló, pero **ahora empieza por
+re-sembrarlas** (paso 0). Se borraron porque la prueba es la que el handoff da por descartable —las
+4 tablas de LinkedIn están vacías y su workflow no existe, ADR-055— así que el fixture no valía
+tenerlo ocupando prod indefinidamente.
 
 ✅ **Lo que ya NO hay que hacer, porque se midió el 06/08 con sesiones reales contra prod** (la tabla
 completa en [plan-multi-tenant §14.6](./agents/plan-multi-tenant.md)): la query de las dos capas
@@ -450,6 +456,15 @@ compuestas devuelve **1 y 1**, y **2** sin el filtro de cockpit — o sea que el
 fila"*. Una cuenta de Retia ve **0** de esas mismas 2 filas, y el `insert` cruzado muere con `42501`.
 
 ⬜ **Lo que falta es exactamente esto, y nada más:**
+
+0. **Re-sembrar el fixture** (borrado el 08/08). Son las dos filas exactas que estaban, con sus
+   `instance_id` de la tabla de [plan-multi-tenant §14.6](./agents/plan-multi-tenant.md):
+
+   ```sql
+   insert into app.referentes_linkedin (instance_id, fuente, consulta, idioma, activo, notas) values
+     ('f35d0282-2511-4905-b407-2ab338bc2336', 'pinterest', 'prueba rls 30x',     'en', false, 'sembrado para §14.6 — borrable'),
+     ('f7baff77-8211-43f7-a64c-aed9e7a3e860', 'pinterest', 'prueba rls estadox', 'en', false, 'sembrado para §14.6 — borrable');
+   ```
 
 1. En **incógnito** (si no, el magic link cae sobre otra sesión), abrí
    `/30x/linkedin/curar/referentes` → tiene que verse **`prueba rls 30x`, y sola**.
@@ -460,7 +475,7 @@ fila"*. Una cuenta de Retia ve **0** de esas mismas 2 filas, y el `insert` cruza
 **Si ves 2 en cada pantalla**, la Capa 1 se rompió entre la query y el render (la query ya se probó y
 da 1). **Si ves 0**, mirá la consola: la query anda, así que el problema está en la pantalla.
 
-🚮 **Limpieza, cuando termines:** `delete from app.referentes_linkedin where consulta like 'prueba rls%';`
+🚮 **Limpieza, cuando termines** (si re-sembraste): `delete from app.referentes_linkedin where consulta like 'prueba rls%';`
 
 ⚠️ **No sirve con una cuenta `es_dueno`**: `app.clientes_visibles()` le devuelve todas las empresas,
 así que su resultado es indistinguible del de RLS apagado. Por diseño.

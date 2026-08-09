@@ -1013,8 +1013,10 @@ sobre algo que no se guardó.** Acá está cubierto y a propósito: `lib/referen
 abrir `/30x/linkedin/curar/referentes` y `/estadox/linkedin/curar/referentes` con la cuenta de doble
 membresía (incógnito) y ver **1 y 1** en la pantalla, más un alta desde el botón. La query ya está
 probada; lo que el clic agrega es que la pantalla dibuje lo que la query devuelve.
-🚮 **Las dos filas quedaron sembradas a propósito, para que ese clic se pueda hacer.** Se limpian con
-`delete from app.referentes_linkedin where consulta like 'prueba rls%';`
+🚮 **Las dos filas ya NO están: se borraron el 2026-08-08** y `app.referentes_linkedin` quedó vacía,
+así que el clic **empieza por re-sembrarlas**. El `insert` exacto (con estos mismos `instance_id`)
+vive en [`verificaciones-humanas.md` §10](../verificaciones-humanas.md), paso 0 — **un hecho, un
+dueño.**
 
 ---
 
