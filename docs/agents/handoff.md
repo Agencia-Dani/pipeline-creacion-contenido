@@ -46,11 +46,31 @@
 > | `retia/linkedin` | **403** — está en `draft`, y `leerInstancias()` solo trae las `active` | **200 con 3 voces, 6 proyectos y 17 referentes de REELS** |
 >
 > **El vacío de hoy es el peor de los dos**: una corrida que termina en verde sin entregar nada se
-> lee como *"todavía no cargamos referentes"*. Y la ventana con datos **la abre el paso 2 de la lista
-> de abajo**, o sea lo próximo que se iba a hacer.
+> lee como *"todavía no cargamos referentes"*. Y lo que le pone datos adentro es **el paso 2 de la
+> lista de abajo**, o sea lo próximo que se iba a hacer.
 >
-> ⚠️ **Orden que importa: este deploy va ANTES de prender `retia/linkedin`.** Al revés se abre esa
-> ventana por el tiempo que tarde Vercel.
+> ### 📏 Pero la ventana es LATENTE, no está viva — y esto también se midió
+>
+> **La respuesta equivocada existe; hoy nadie la pide.** Vale la pena tenerlo claro para no tratar
+> esto como una fuga en producción, que no lo es:
+>
+> - Los **3 workflows que consumen `run-plan`** (motor, descubrimiento, archivado) **no inventan el
+>   uuid**: se lo pasa el dispatcher en el payload del webhook.
+> - El **dispatcher tiene exactamente 2 crons** (motor lunes 8:00, archivado domingo 18:00) y
+>   pregunta `instancias?workflow=<su propio pipeline>`, que filtra por `workflow_id` ⇒ **un uuid de
+>   LinkedIn no sale nunca de ahí**.
+> - **No existe workflow de LinkedIn en n8n ni cron suyo**, y el botón ▶ lo cerró ADR-066 dos veces
+>   (sacar la zona + la guarda por pipeline de `operar/actions.ts`).
+>
+> ⇒ Para cobrarse algo, alguien tiene que llamar a la fachada **a mano** con ese uuid y el header
+> compartido. **No hay camino automático.**
+>
+> ⚠️ **El orden igual se respeta, y la razón es la asimetría, no el riesgo: este deploy va ANTES de
+> prender `retia/linkedin`.** Invertirlo no abre una fuga alcanzable, **deja el arma cargada para el
+> primero que sondee la fachada** — que es literalmente el primer movimiento de quien se siente a
+> construir el motor (el `curl` para ver qué contesta), con la diferencia de que la respuesta sería
+> una **mentira plausible**: 17 referentes de Instagram en un plan de LinkedIn. Y respetar el orden
+> cuesta **cero**: es un `UPDATE` después de un deploy en vez de antes.
 >
 > ### ✅ Lo que entró — [ADR-068](../adr/ADR-068-el-pipeline-lo-dice-la-instancia-no-el-que-pregunta.md)
 >

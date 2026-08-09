@@ -35,15 +35,26 @@
   | `30x/linkedin`, `estadox/linkedin` | **200 con el plan de reels VACÍO** — `voces`, `proyectos`, `referentes` y `ajustes` en 0 filas, porque las dos empresas tienen cero de todo | igual |
   | `retia/linkedin` | **403** `instancia_desconocida` — está en `draft`, y `leerInstancias()` solo trae las `active` | **200 con 3 voces, 6 proyectos y 17 referentes de REELS** (medido en `app.*`, son de grano empresa y los comparten los dos pipelines) |
 
-  Dos cosas salen de ahí, y las dos afilan la decisión en vez de aflojarla:
+  Tres cosas salen de ahí, y la tercera contradice la lectura fácil de las dos primeras:
 
   1. **Hoy el plan ajeno es el VACÍO, que es el peor de los dos.** Un plan lleno de datos raros
      alguien lo mira dos veces; un plan vacío produce una corrida que termina **en verde sin entregar
      nada**, y en un pipeline recién nacido eso se lee como *"todavía no cargamos referentes"*.
-  2. **La ventana se abre con la próxima acción de la lista.** Prender `retia/linkedin` es el paso 2
-     del handoff del cierre 106 — no es hipotético, es lo siguiente. Ese día la misma llamada pasa de
-     vacía a **17 cuentas de Instagram/TikTok y 6 proyectos de reels** entregados a un motor de
-     LinkedIn. Arreglarlo antes cuesta esta ADR; después cuesta encontrarlo en los datos.
+  2. **Prender `retia/linkedin` es lo que le pone datos adentro.** Es el paso 2 del handoff del cierre
+     106 — no es hipotético, es lo siguiente. Ese día la misma llamada pasa de vacía a **17 cuentas de
+     Instagram/TikTok y 6 proyectos de reels**.
+  3. 📏 **Pero NO hay ningún camino automático que haga esa llamada, y eso también se midió.** La
+     respuesta equivocada existe; nadie la pide. Los **3 workflows que consumen `run-plan`** (motor,
+     descubrimiento, archivado) no inventan el uuid: se lo pasa el dispatcher en el payload, y el
+     dispatcher tiene **exactamente 2 crons** (motor lunes 8:00, archivado domingo 18:00) que
+     preguntan `instancias?workflow=<su propio pipeline>`, filtrado por `workflow_id` ⇒ un uuid de
+     LinkedIn no sale de ahí. **No existe workflow de LinkedIn en n8n ni cron suyo**, y el botón ▶ lo
+     cerró ADR-066 dos veces (la zona y la guarda por pipeline).
+
+  ⇒ **La formulación correcta: prender el cockpit antes del deploy no abre una fuga alcanzable, deja
+  el arma cargada para el primero que sondee la fachada a mano.** Y eso no es un caso raro: es
+  literalmente el primer movimiento de quien se sienta a construir el motor —el `curl` para ver qué
+  contesta— con la diferencia de que la respuesta sería una **mentira plausible**.
 
   **Y el arreglo obvio lo habilita en vez de cerrarlo.** Agregar `linkedin` a la lista de `ambito`
   hace que el 400 desaparezca, pero deja que **el que llama declare de qué pipeline es**. Ahí se abre
@@ -130,9 +141,11 @@
     prueba observable de que el cambio hizo algo** hasta que haya filas. La prueba con datos es la
     misma que espera [plan-multi-tenant §14.6](../agents/plan-multi-tenant.md) para las policies de
     la `024`.
-  - 📌 **Y hay un orden que conviene respetar:** este deploy tiene que estar en producción **antes**
-    de prender `retia/linkedin` (paso 2 del handoff). Al revés, se abre la ventana medida arriba —
-    17 referentes y 6 proyectos de reels servidos a un cockpit de LinkedIn— por el tiempo que tarde
-    el deploy.
+  - 📌 **Y hay un orden que conviene respetar, aunque NO por urgencia:** este deploy va **antes** de
+    prender `retia/linkedin` (paso 2 del handoff). Invertirlo no abre una fuga alcanzable —está
+    medido arriba: no hay caller automático— pero deja al primero que sondee la fachada con ese uuid
+    recibiendo 17 referentes de Instagram en un plan de LinkedIn. **La razón para respetarlo es la
+    asimetría, no el riesgo: cuesta cero.** Es un `UPDATE` después de un deploy en vez de antes, y no
+    hay nada que ganar al revés.
   - **Deuda anotada:** cuando la Fase 4 aplique la `028`, el plan de LinkedIn gana `ajustes` y ese sí
     es un cambio de forma para un consumidor que para entonces va a existir.
