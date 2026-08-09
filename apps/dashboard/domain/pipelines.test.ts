@@ -113,17 +113,34 @@ test("🩸 compartir la ZONA no es compartir las pantallas: es el agujero del 06
   // /curar/feed y leía `app.candidatos` —la tabla de REELS— filtrada por su instance_id: cero filas,
   // sin error, indistinguible de "todavía no cargamos datos".
   assert.deepEqual(pantallasDeCurar("short-form-content"), PANTALLAS_CURAR);
-  assert.deepEqual(pantallasDeCurar("linkedin"), ["referentes"]);
+  assert.deepEqual(pantallasDeCurar("linkedin"), ["voces", "referentes"]);
+});
+
+test("el orden de la lista es el de las tarjetas, y `voces` va primera", () => {
+  // No es cosmético: la voz es la unidad de configuración de la máquina (ADR 002 del repo de
+  // diseño), así que es por donde se empieza. Un banco de referentes sin una voz que lo use no
+  // produce nada.
+  assert.equal(pantallasDeCurar("linkedin")[0], "voces");
 });
 
 test("la guardia del servidor contesta por pantalla, no por zona", () => {
-  assert.equal(implementaPantalla("linkedin", "referentes"), true);
-  for (const p of PANTALLAS_CURAR.filter((p) => p !== "referentes")) {
-    assert.equal(implementaPantalla("linkedin", p), false, `linkedin no implementa ${p}`);
-  }
+  const deLinkedin: readonly string[] = ["voces", "referentes"];
   for (const p of PANTALLAS_CURAR) {
+    assert.equal(
+      implementaPantalla("linkedin", p),
+      deLinkedin.includes(p),
+      `linkedin ${deLinkedin.includes(p) ? "implementa" : "no implementa"} ${p}`,
+    );
     assert.equal(implementaPantalla("short-form-content", p), true);
   }
+});
+
+test("🚫 historicos y sugeridos NO son un pendiente: no tienen escritor", () => {
+  // Ratificado en ADR-066 para no re-litigarlo cada vez que alguien mire la lista y las eche de
+  // menos. El archivado que llena `outputs` es de reels (y su pantalla lee columnas de video), y no
+  // hay descubrimiento de LinkedIn. Se declaran el día que haya quien escriba, no antes.
+  assert.equal(implementaPantalla("linkedin", "historicos"), false);
+  assert.equal(implementaPantalla("linkedin", "sugeridos"), false);
 });
 
 test("un pipeline no declarado no tiene NINGUNA pantalla — mismo default seguro", () => {
@@ -131,13 +148,18 @@ test("un pipeline no declarado no tiene NINGUNA pantalla — mismo default segur
   assert.equal(implementaPantalla("substack", "feed"), false);
 });
 
-test("referentes es la única pantalla compartida hoy, y por eso su página ramifica", () => {
-  // Si alguna vez fueran dos, el `page.tsx` de cada una tiene que ramificar igual. Este test es el
-  // que avisa: su lista es la que hay que mirar cuando alguien suma una pantalla a LinkedIn.
+test("🔀 toda pantalla compartida tiene que ramificar en su page.tsx", () => {
+  // Este test es el que avisa: su lista es la que hay que mirar cuando alguien suma una pantalla a
+  // LinkedIn. Ya disparó una vez —el 08/08, al entrar `voces`— y esa es exactamente su función.
+  //
+  // Cada una de estas rutas es UNA ruta con DOS pantallas adentro, y el `page.tsx` decide por
+  // `cockpit.workflowId`. Si alguien agrega una acá sin ramificar, el cockpit de LinkedIn renderiza
+  // la de reels contra tablas de reels filtradas por su instance_id: cero filas, sin error — que es
+  // el fallo mudo que toda esta tabla existe para matar.
   const compartidas = PANTALLAS_CURAR.filter(
     (p) => implementaPantalla("linkedin", p) && implementaPantalla("short-form-content", p),
   );
-  assert.deepEqual(compartidas, ["referentes"]);
+  assert.deepEqual(compartidas, ["voces", "referentes"]);
 });
 
 test("ninguna declaración de pantallas inventa una, ni deja una zona `curar` vacía", () => {

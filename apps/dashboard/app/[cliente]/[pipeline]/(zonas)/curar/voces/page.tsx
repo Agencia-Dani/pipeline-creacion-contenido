@@ -6,7 +6,9 @@ import { leerResultadosPorCuenta } from "@/lib/config";
 import { leerVocesConProyectos } from "@/lib/proyectos";
 import { cuentasPorProyecto } from "@/lib/referentes";
 import { leerPendientes } from "@/lib/sugeridos";
+import { leerVocesConPerfil } from "@/lib/voces-linkedin";
 import { Pantalla } from "./pantalla";
+import { PantallaVocesLinkedin } from "./pantalla-linkedin";
 
 // Voces y proyectos: el tercer dominio que se cortó de Airtable (D5, corte 3/4). Postgres es el
 // dueño.
@@ -33,6 +35,30 @@ export default async function VocesPage({
   const { ctx, cockpit } = await exigirPantallaDeCurar("voces", cliente, pipeline);
   const base = comoRuta(cockpit);
 
+  const volver = (
+    <Link href={rutaDe(base, "curar")} className="text-sm text-muted-foreground hover:underline">
+      ← Curar
+    </Link>
+  );
+
+  // **Una ruta, dos pantallas** — el mismo ramificado que `curar/referentes`, y por la misma razón:
+  // el `TenantContext` no lleva el pipeline a propósito, pero `exigirPantallaDeCurar` ya devuelve el
+  // `cockpit`, que trae el `workflowId` del registro. Decide el único que ya lo sabía.
+  //
+  // Y son dos pantallas y no una parametrizada porque **no configuran lo mismo**: la de reels es la
+  // voz con sus proyectos, su N y sus criterios de relevancia; la de LinkedIn es cómo habla y cuándo
+  // publica. Comparten la fila de `app.voces` y nada más (ADR-049: con dos pipelines, un componente
+  // genérico prematuro cuesta más que la duplicación).
+  if (cockpit.workflowId === "linkedin") {
+    const voces = await leerVocesConPerfil(ctx);
+    return (
+      <div className="space-y-6">
+        {volver}
+        <PantallaVocesLinkedin voces={voces} />
+      </div>
+    );
+  }
+
   const [voces, ajustes, cuentas, propuestas] = await Promise.all([
     leerVocesConProyectos(ctx),
     leerAjustes(ctx),
@@ -42,9 +68,7 @@ export default async function VocesPage({
 
   return (
     <div className="space-y-6">
-      <Link href={rutaDe(base, "curar")} className="text-sm text-muted-foreground hover:underline">
-        ← Curar
-      </Link>
+      {volver}
       <Pantalla
         voces={voces}
         cuentasPorProyecto={Object.fromEntries(cuentas)}

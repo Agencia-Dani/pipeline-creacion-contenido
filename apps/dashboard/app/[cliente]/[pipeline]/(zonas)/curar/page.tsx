@@ -68,6 +68,26 @@ const COPY: Record<PantallaCurar, Copy> = {
   },
 };
 
+// 🔑 **Las pantallas compartidas no significan lo mismo en los dos pipelines, así que el copy tampoco.**
+// Es un overlay `Partial` y no un segundo Record completo: solo se escribe lo que de verdad cambia,
+// y lo que no está acá cae al de arriba. Así una pantalla nueva sigue sin compilar hasta tener copy
+// (el Record base es exhaustivo) sin obligar a escribir dos veces la que dice lo mismo.
+//
+// `voces` es el caso que lo justifica: en reels es *la voz con sus proyectos, su N y sus criterios*;
+// en LinkedIn es *cómo habla y cuándo publica*. La misma ruta, dos cosas distintas.
+const COPY_LINKEDIN: Partial<Record<PantallaCurar, Copy>> = {
+  voces: {
+    titulo: "Voces",
+    descripcion:
+      "Cómo habla cada cuenta y cuándo publica: su firma, su espaciado, sus franjas y sus días. Es la unidad de configuración de la máquina — se empieza por acá.",
+  },
+  referentes: {
+    titulo: "Referentes",
+    descripcion:
+      "De dónde sale el material: filtros de Pinterest, cuentas de LinkedIn, páginas sueltas y el archivo propio de cada voz. Solo los prendidos entran en la próxima corrida.",
+  },
+};
+
 export default async function CurarPage({
   params,
 }: {
@@ -86,7 +106,7 @@ export default async function CurarPage({
         <h1 className="text-2xl font-semibold">Curar</h1>
         <p className="text-muted-foreground">
           {cockpit.workflowId === "linkedin"
-            ? "Acá se mantiene de dónde sale el material del pipeline de LinkedIn."
+            ? "Acá se configura la máquina de LinkedIn: las voces que van a hablar y de dónde sale el material."
             : "Acá vas a calificar candidatos y mantener referentes, voces y proyectos."}
         </p>
       </div>
@@ -96,16 +116,21 @@ export default async function CurarPage({
           Este pipeline todavía no tiene pantallas de curación.
         </p>
       ) : (
-        tarjetas.map((pantalla) => (
-          <Link key={pantalla} href={rutaDe(base, `curar/${pantalla}`)} className="block">
-            <Card className="transition-colors hover:bg-accent/40">
-              <CardHeader>
-                <CardTitle>{COPY[pantalla].titulo}</CardTitle>
-                <CardDescription>{COPY[pantalla].descripcion}</CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-        ))
+        tarjetas.map((pantalla) => {
+          const copy =
+            (cockpit.workflowId === "linkedin" ? COPY_LINKEDIN[pantalla] : undefined) ??
+            COPY[pantalla];
+          return (
+            <Link key={pantalla} href={rutaDe(base, `curar/${pantalla}`)} className="block">
+              <Card className="transition-colors hover:bg-accent/40">
+                <CardHeader>
+                  <CardTitle>{copy.titulo}</CardTitle>
+                  <CardDescription>{copy.descripcion}</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          );
+        })
       )}
     </div>
   );

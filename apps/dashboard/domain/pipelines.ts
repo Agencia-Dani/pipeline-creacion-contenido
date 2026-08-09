@@ -128,11 +128,15 @@ export type PantallaCurar = (typeof PANTALLAS_CURAR)[number];
 
 const CURAR_POR_PIPELINE: Record<Pipeline, readonly PantallaCurar[]> = {
   "short-form-content": PANTALLAS_CURAR,
-  // Hoy LinkedIn tiene UNA. No es una limitación temporal disfrazada de diseño: es que hay una
-  // pantalla construida. Las demás entran cuando existan, no antes (ADR-055 §3 deja además fuera a
-  // `historicos` en su forma actual — el histórico de LinkedIn es `outputs`, pero su pantalla lee
-  // columnas de video).
-  linkedin: ["referentes"],
+  // Hoy LinkedIn tiene DOS. No es una limitación temporal disfrazada de diseño: es que hay dos
+  // pantallas construidas. Las demás entran cuando existan, no antes — y `historicos` y `sugeridos`
+  // no van a entrar por falta de pantalla sino porque **no tienen escritor** (el archivado que llena
+  // `outputs` es de reels, y no hay descubrimiento de LinkedIn). ADR-066 lo ratifica.
+  //
+  // El orden del array es el orden de las tarjetas del índice, y `voces` va primera a propósito: es
+  // la unidad de configuración de la máquina (ADR 002 del repo de diseño), así que es por donde se
+  // empieza. El banco de referentes no sirve de nada sin una voz que lo use.
+  linkedin: ["voces", "referentes"],
 };
 
 /** Las pantallas de `curar` que este pipeline implementa. Un pipeline no declarado no tiene ninguna. */

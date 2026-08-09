@@ -185,3 +185,41 @@ export async function exigirPantallaDeAjustes(
 
   return sesion;
 }
+
+/**
+ * 🔒 La guardia de los **server actions** de un pipeline concreto. No redirige: devuelve.
+ *
+ * Es la pregunta que ninguna de las de arriba contesta, y hace falta porque una pantalla compartida
+ * tiene un juego de actions por pipeline. `exigirTenant("curar", …)` resuelve el cockpit y comprueba
+ * rol + zona, pero **la zona `curar` existe en los dos pipelines**: sin esta línea, un cockpit de
+ * REELS podría llamar los actions de LinkedIn y escribir filas en `app.*_linkedin` atribuidas a una
+ * instancia de reels — filas **válidas para la base** (el `instance_id` existe) e invisibles para
+ * siempre, porque ninguna pantalla de LinkedIn las va a pedir con ese id.
+ *
+ * 🩸 **Ni `scoped()` ni RLS lo atrapan**, y por eso no alcanza con las dos capas de ADR-047: las dos
+ * preguntan *"¿es tuya esta instancia?"*, y lo es. La pregunta que falta es *"¿es esta instancia de
+ * este pipeline?"*, y solo la puede contestar el registro.
+ *
+ * **Devuelve en vez de redirigir** porque un server action no está renderizando una página: quien lo
+ * llamó espera un `Resultado` que la pantalla pueda mostrar. Un `redirect()` acá sería una excepción
+ * atravesando un `try/catch` de UI.
+ *
+ * Su hermana en `operar/actions.ts` (`noEsSuMaquina`) hace la misma pregunta para el caso de los
+ * disparos, y es deliberadamente otra función: ahí lo que se protege no es una tabla sino **qué
+ * máquina arranca** (ADR-066).
+ */
+export async function exigirCockpitDePipeline(
+  zona: Zona,
+  workflowId: string,
+  cliente: string,
+  pipeline: string,
+): Promise<
+  | { ok: true; usuario: Usuario; ctx: TenantContext; cockpit: Instancia; rol: Rol }
+  | { ok: false; mensaje: string }
+> {
+  const sesion = await exigirTenant(zona, cliente, pipeline);
+  if (sesion.cockpit.workflowId !== workflowId) {
+    return { ok: false, mensaje: "Este cockpit no es de ese pipeline. Recargá la página." };
+  }
+  return { ok: true, ...sesion };
+}

@@ -10,7 +10,7 @@ import {
   type FormReferenteLinkedin,
 } from "@/domain/linkedin";
 import type { TenantContext } from "@/domain/tenant";
-import { exigirTenant } from "@/lib/auth";
+import { exigirCockpitDePipeline } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import { leerProyectos } from "@/lib/referentes";
 import {
@@ -21,32 +21,18 @@ import {
   prenderReferenteLinkedin,
   type DatosReferenteLinkedin,
 } from "@/lib/referentes-linkedin";
-import type { Instancia } from "@/lib/tenant";
 
 export type Resultado = { ok: boolean; mensaje: string };
 
 /**
  * 🔒 La guardia que `exigirTenant` sola no da, y que hace falta acá.
  *
- * `exigirTenant("curar")` resuelve el cockpit abierto y comprueba rol + zona, pero **no comprueba
- * el pipeline**: no tiene por qué, la zona `curar` existe en los dos. Sin esta línea, un cockpit de
- * REELS podría llamar estos actions y escribir filas en `app.referentes_linkedin` atribuidas a una
- * instancia de reels — filas válidas para la base (el `instance_id` existe) e invisibles para
- * siempre, porque ninguna pantalla de LinkedIn las va a pedir con ese instance_id.
- *
- * Ni `scoped()` ni RLS lo atrapan: los dos preguntan *"¿es tuya esta instancia?"*, y lo es. La
- * pregunta que falta es *"¿es esta instancia de este pipeline?"*, y solo la puede contestar el
- * registro. Es la misma disciplina de `exigirTenant`: la UI esconde, el servidor impide.
+ * El porqué largo —por qué ni `scoped()` ni RLS lo atrapan— vive en `exigirCockpitDePipeline`
+ * (`lib/auth.ts`), que es de donde sale desde el 2026-08-08: la pantalla de perfil de voz de
+ * LinkedIn necesitaba la misma guardia y dos copias divergen.
  */
-async function exigirCockpitLinkedin(enRuta: CockpitEnRuta): Promise<
-  { ok: true; usuario: { id: string }; ctx: TenantContext; cockpit: Instancia } | { ok: false; mensaje: string }
-> {
-  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
-  if (cockpit.workflowId !== "linkedin") {
-    return { ok: false, mensaje: "Este cockpit no es de LinkedIn." };
-  }
-  return { ok: true, usuario, ctx, cockpit };
-}
+const exigirCockpitLinkedin = (enRuta: CockpitEnRuta) =>
+  exigirCockpitDePipeline("curar", "linkedin", enRuta.cliente, enRuta.pipeline);
 
 /**
  * La autoridad está en el servidor: la pantalla ya validó con la MISMA función del dominio, y acá
