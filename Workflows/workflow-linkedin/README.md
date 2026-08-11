@@ -65,8 +65,11 @@ publique**.
 >    puede anclarla a dinero hoy.
 > 2. 🔴 **No existe el banco de referentes.** Fernando, textual: *"no tengo el listado"*. Hay que
 >    construirlo, no capturarlo.
-> 3. 🟠 **Faltan los few-shot**: 3–4 posts que Fernando sienta que salieron perfectos, por cuenta.
->    Es el pedido más barato del proyecto y ancla toda la generación.
+> 3. 🟠 **Faltan los few-shot**: 3–4 posts que se sientan perfectos, **por cuenta**. Es el pedido más
+>    barato del proyecto y ancla toda la generación. ⚠️ Este renglón decía *"que **Fernando** sienta
+>    perfectos"* y estaba mal (corregido el 2026-08-11): Fernando dio la idea general de cómo
+>    funciona la máquina, no el molde que se copia. Los few-shot anclan la voz de **una cuenta**, así
+>    que el pedido es de quien manda esa cuenta.
 >
 > **Lo que sí se puede construir sin ellas** es la detección, la curación y el cockpit. Eso es lo
 > que está hecho.

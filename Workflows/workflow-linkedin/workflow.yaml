@@ -110,8 +110,12 @@ stages:                         # las 8 etapas canónicas de PLAN §2.4 (n/a si 
     [POR CONSTRUIR — bloqueado] Claude con el perfil de voz + 2 a 4 posts reales como few-shot +
     cache_control, el patrón que ya funciona en reels. En el carril copiable la imagen NO se genera:
     se REBRANDEA (paleta de la marca, traducción al español, firma al pie).
-    🔴 Bloqueado por el pedido más barato del proyecto y que sigue sin hacerse: 3–4 posts que
-    Fernando sienta que salieron perfectos, por cuenta. Sin ellos la generación sale genérica.
+    🔴 Bloqueado por el pedido más barato del proyecto y que sigue sin hacerse: 3–4 posts que se
+    sientan perfectos, POR CUENTA. Sin ellos la generación sale genérica. La firma NO es uno de esos
+    insumos: sale del plan (voces[].fields.firma) y la impone `calidad`, no el prompt.
+    ⚠️ Este renglón decía "que Fernando sienta perfectos" y estaba mal (corregido el 2026-08-11):
+    Fernando dio la idea general de cómo funciona la máquina, no el molde que se copia. Los few-shot
+    anclan la voz de UNA CUENTA, así que el pedido es de quien manda esa cuenta.
   calidad: >
     [HECHO, Fase 1.2] Nodo `Calidad (R-1 + R-2)`. El validador determinista de ADR-055 §4, que corre
     DESPUÉS del LLM y antes de que nada llegue a un humano: R-1 (el gancho es un bloque continuo de
