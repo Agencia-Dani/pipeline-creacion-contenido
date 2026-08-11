@@ -22,6 +22,98 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🦴 2026-08-11 (cierre 108) · LA ESPINA DEL CARRIL PERSONAL EXISTE EN EL REPO, `calidad` ESTÁ ENTERA, Y EL DUEÑO DE LOS FEW-SHOT NO ERA FERNANDO
+>
+> **En una línea:** `Workflows/workflow-linkedin/workflow.json` pasó de **11 a 16 nodos** con las
+> **fases 1.1 y 1.2** de [plan-motor-linkedin.md](./plan-motor-linkedin.md). ⛔ **En n8n vive todavía
+> el esqueleto de 11**: los 5 nuevos son topología y no se aplicaron.
+>
+> ```
+> Leer plan → Verificar plan (ADR-068) → Colectar (stub personal) → Calidad (R-1 + R-2) ─┬─→ Preparar candidatos → POST Candidatos
+>                                                                                        └─→ Resumen del run → Cerrar run
+> ```
+>
+> ### 🎯 Por qué esto y no `calidad` sola
+>
+> `calidad` era el único item del plan que no dependía de ningún insumo humano, pero **no se puede
+> cablear sola**: un nodo que no cuelga de nadie es *inalcanzable* y `auditar-workflows.mjs` lo marca.
+> La unidad mínima que compila es la espina — 1.1 (`colectar` de mentira + `entregar`) **más** 1.2.
+>
+> ### 🔴 La decisión que hace que el run cierre siempre, y casi se me pasa
+>
+> `Preparar candidatos` devuelve `[]` cuando no hay nada que escribir, y en n8n **un `[]` corta la
+> rama entera**. Puesto en serie —que es lo intuitivo—, el cierre del run queda detrás de ese corte
+> ⇒ **toda corrida sin piezas deja la fila `en_curso`** hasta el barrido de la siguiente. Y hoy, con
+> **0 voces con perfil en las tres marcas, esas son TODAS las corridas**: un zombie por disparo,
+> silencioso. Por eso `Resumen del run` cuelga de `Calidad` en la **rama hermana**, y la de entrega
+> corre primero por tener **Y menor en el canvas** (320 < 480) — reordenar `connections` no haría
+> nada. *La contracara está escrita en el nodo: desde el resumen NO se ve si el POST entró, porque no
+> se puede referenciar un nodo de la rama hermana. No hace falta — `POST Candidatos` es fail-closed y
+> el error handler global marca el run `fallo` por `params.execution_id` (ADR-054).*
+>
+> ### 🩸 El stub emite DOS piezas, y una está rota a propósito
+>
+> `Colectar (stub personal)` no lee ninguna fila: emite piezas **fijas** (con `external_id` fijo, así
+> que correrlo dos veces deja **una** fila). La segunda **viola R-1** — un gancho de una sola línea —
+> y tiene que quedar afuera. **Es la única forma de que una corrida real pruebe que `Calidad` está
+> CABLEADA y no solamente presente**, que es la lección que este repo ya pagó dos veces (el guard de
+> ADR-029 que nunca entró en vigor, la captura de setteo que era código muerto). Si alguna vez aparece
+> en el Feed, el bug es de cableado y se ve a simple vista. `Resumen del run` además **avisa** si el
+> stub entró entero.
+>
+> ### 🔑 Las dos reglas de ADR-055 §4 no se tratan igual, y lo decide quién es dueño del texto
+>
+> | | Qué hace | Por qué |
+> |---|---|---|
+> | **R-1** (gancho de 2–3 líneas sin `\n\n`) | **rechaza** | el gancho es contenido; código no puede inventar uno |
+> | **R-2** (firma al cierre) | **repara**: se la agrega | la firma es texto de **la casa**, guardado por voz (`020` §3). Ponerla no es escribir |
+>
+> Tres bordes que no se leen de la regla y tienen test: **el gancho es el primer bloque** (hasta la
+> primera línea en blanco) y lo que se mide es cuántas líneas quedaron de ese lado; **si la firma
+> aparece en el medio se rechaza** (agregarla la duplica, moverla es reescribir), y reparar es
+> idempotente; y **un rechazo de calidad NO va a `app.descartes_linkedin`** —esa tabla es para
+> near-miss del *gate* (ADR-036)— sino a `runs.metricas`: es una falla de generación, no un falso
+> negativo de curación.
+>
+> ⚠️ **Límite conocido de R-1, escrito en el nodo:** cuenta **saltos de línea, no líneas visuales**.
+> Una línea larga que envuelve en el teléfono cuenta como una. No hay forma de saber el ancho del
+> viewport desde un code node, y la regla de la entrevista habla de `\n\n`, que sí se puede medir.
+>
+> ### 🧪 Verde, y las guardas se verificaron PONIÉNDOLAS ROJAS
+>
+> **51 checks** en `Workflows/workflow-linkedin/test-nodos.mjs` (nuevo) · `auditar-workflows`
+> **6 de 7, sin hallazgos** · `validate` **2272 checks / 7 workflows** · `n8n:diff` **5 de 6 verdes**
+> y linkedin en `[topologia]`, que es lo correcto.
+>
+> Tres controles negativos, cada uno rompiendo una guarda a mano: R-1 aceptando un gancho de 1 línea
+> → **8 fallos**; `Colectar` devolviendo `[]` → **2**; R-2 sin la rama de firma-en-el-medio → **2**.
+>
+> 🩸 **Y el primer control encontró un defecto EN EL TEST, no en el código: la suite reventaba con un
+> `TypeError` en vez de reportar**, y se llevaba puesto todo lo que venía después — o sea que **romper
+> una guarda escondía el resto de las guardas**. Se arregló haciendo que el helper devuelva `{}` y
+> nunca `null`. *Un test que no sobrevive a la implementación rota no es una red: es una linterna que
+> se apaga justo cuando hay que mirar.*
+>
+> ### 🔴 La corrección de Alejandro, que cambia de quién es un pendiente
+>
+> Este handoff, el plan y ADR-055 venían diciendo *"pedirle a **Fernando** 3–4 posts que sienta
+> perfectos"*, tratándolo como el dueño del criterio. **No lo es: Fernando dio la idea general de cómo
+> funciona la máquina, no el molde que hay que copiar.** Los few-shot anclan la voz de **una cuenta**,
+> así que el pedido es de quien manda esa cuenta — y para el carril personal el material *ya está en
+> la casa*. **`generar` sigue bloqueada por los few-shot; lo que dejó de ser cierto es que haya que
+> esperar a una sola persona para tenerlos.** (Corregido en `plan-motor-linkedin.md` §0.4.)
+>
+> ### ⬜ Lo que sigue
+>
+> 1️⃣ **Aplicar la topología a n8n.** Es el ritual manual de ADR-053 y **no** va por `n8n:push` (el
+>    push la detecta y se niega). Nadie vio todavía una pieza en el Feed: **ese sigue siendo el gate
+>    real de la Fase 1**, y necesita además **0.3** (una voz con perfil) — sin ella el stub emite 0
+>    piezas a propósito. ⚠️ Distinto del cron en el dispatcher, que sí es tocar un workflow **activo**.
+> 2️⃣ **Fase 0** (Alejandro), sin cambios salvo el dueño de la 0.4.
+> 3️⃣ **1.3 `generar`** — lo único que falta para que la espina sea un motor del carril personal.
+> 4️⃣ **1.4 `colectar` personal**, con su pregunta de diseño abierta (el archivo propio es audio y
+>    `enriquecer` es `n/a`: ¿pega texto una persona, se guarda URL, o se reabre `enriquecer`?).
+
 > ## 🔌 2026-08-09 (cierre 107) · LA FACHADA SABE QUE LINKEDIN EXISTE, EL ESQUELETO DEL MOTOR ESTÁ EN n8n, Y EL 400 QUE LO TAPABA NO PROTEGÍA NADA
 >
 > **Leelo antes de tocar LinkedIn.** El cierre 106 dejó 8 huecos de tooling medidos entre el cockpit

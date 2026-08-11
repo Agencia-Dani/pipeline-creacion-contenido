@@ -56,6 +56,7 @@ const FAIL_CLOSED = {
   },
   "workflow-linkedin": {
     "Leer plan (fachada)": "sin config el run tiene que abortar (ADR-028)",
+    "POST Candidatos": "es LA entrega, no el registro",
   },
 };
 

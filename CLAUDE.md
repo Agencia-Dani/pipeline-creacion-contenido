@@ -138,12 +138,15 @@ re-import queda solo para topología, y solo ahí aplican sus placeholders y cre
 - [Workflows/workflow-dispatcher/README.md](Workflows/workflow-dispatcher/README.md) — el que convierte **un** workflow parametrizado en **N corridas aisladas**, una por instancia (ADR-050). Los dos crons del sistema viven acá.
 - [Workflows/workflow-registro-fallos/README.md](Workflows/workflow-registro-fallos/README.md) — el error handler global: marca como `fallo` el run de la ejecución que se cayó, encontrado por `params.execution_id` (ADR-054). Activo y verificado end-to-end; lo apuntan los 4 workflows. Se rompió **dos veces** por un `<<SUPABASE_URL>>` sin resolver que `onError: continue` silenciaba: por eso `npm run n8n:diff` va después de cada import.
 
-*(`workflow-linkedin/` existe en n8n desde el 2026-08-09 pero **INACTIVO y sin cron**, y es solo su
-**esqueleto de infraestructura**: 11 nodos (triggers, `Config`, guard single-flight, abrir/cerrar run,
-`Leer plan` fail-closed) y **cero etapas de contenido**. La fachada ya le sirve su plan de corrida
-(ADR-068). Lo que falta no es plomería: `generar` sigue bloqueada por los few-shot, y con 0 voces y
-0 referentes cualquier etapa que se construya corre en vacío. `workflow-substack/` sigue siendo solo
-manifest, sin `workflow.json`.)*
+*(`workflow-linkedin/` está **INACTIVO y sin cron**. Su `workflow.json` tiene **16 nodos** desde el
+2026-08-11: los 11 de infraestructura (triggers, `Config`, guard single-flight, abrir/cerrar run,
+`Leer plan` fail-closed) más la **espina del carril personal** — `Colectar (stub personal)` →
+`Calidad (R-1 + R-2)` → `Preparar candidatos` → `POST Candidatos`. **`calidad` está entera** (R-1 y
+R-2 de ADR-055 §4, con `node Workflows/workflow-linkedin/test-nodos.mjs`); **`colectar` es un stub
+que emite piezas fijas** y lo reemplaza la Fase 1.4. 🔴 **En n8n vive todavía el esqueleto de 11**:
+los 5 nodos nuevos son topología, no entran por `n8n:push` y `n8n:diff` los grita a propósito. Lo que
+falta no es plomería: `generar` sigue bloqueada por los few-shot y el carril copiable por el banco de
+referentes. `workflow-substack/` sigue siendo solo manifest, sin `workflow.json`.)*
 
 ## Agent skills
 

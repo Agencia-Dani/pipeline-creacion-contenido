@@ -3,18 +3,25 @@
 # El pipeline N+1 (ADR-055), y el test real del invariante #3 de PLAN §F5: si LinkedIn entra sin
 # tocar el núcleo más allá de su propia migración, "clonar y configurar" deja de ser una promesa.
 #
-# ⚠️ ESTADO REAL, 2026-08-09 — leelo antes de creerle a las etapas de abajo.
+# ⚠️ ESTADO REAL, 2026-08-11 — leelo antes de creerle a las etapas de abajo.
 #   Existen: los ADRs (055/056/066/067/068), las tablas (`core/schema/020_pipeline_linkedin.sql`), el
-#   cockpit con sus 4 pantallas, la fachada sirviendo el plan de este pipeline (ADR-068) y —desde
-#   hoy— el `workflow.json`, pero SOLO SU ESQUELETO DE INFRAESTRUCTURA: 11 nodos (los 2 triggers,
-#   Config, barrido de zombies, guard single-flight, apertura y cierre del run, la lectura del plan
-#   fail-closed y un `Resumen del run` que afirma que el plan recibido es el de LinkedIn).
-#   Creado en n8n por API el 2026-08-09 e **INACTIVO**.
+#   cockpit con sus 4 pantallas, la fachada sirviendo el plan de este pipeline (ADR-068) y el
+#   `workflow.json` con **16 nodos**: los 11 de infraestructura (2 triggers, Config, barrido de
+#   zombies, guard single-flight, apertura y cierre del run, lectura del plan fail-closed) más la
+#   **espina del carril personal** — `Colectar (stub personal)` → `Calidad (R-1 + R-2)` →
+#   `Preparar candidatos` → `POST Candidatos`, con `Verificar plan (ADR-068)` al frente.
 #
-#   NO existe NINGUNA etapa de contenido. Las 8 de abajo siguen [POR CONSTRUIR] y el esqueleto no
-#   toca ninguna: entre `Leer plan` y `Cerrar run` no hay nada. Los bloqueos son los mismos de
-#   siempre y ninguno es técnico (ADR-055 §Consecuencias): no hay definición de "funcionó", no
-#   existe el banco de referentes, y faltan los few-shot. Por eso sigue en `status: draft`.
+#   🔴 DOS COSAS QUE NO SON LO QUE PARECEN:
+#     1. **`Colectar` es un STUB**: emite piezas FIJAS, no lee nada. Existe para probar el cableado
+#        (tenant, FK, RLS, dedup, R-1, R-2, PostgREST) antes de gastar un peso. Lo reemplaza la
+#        Fase 1.4 de `docs/agents/plan-motor-linkedin.md`.
+#     2. **En n8n vive todavía el esqueleto de 11 nodos.** Estos 5 son topología nueva, y la
+#        topología no entra por `n8n:push`. Hasta que alguien la aplique, `n8n:diff` grita — y eso
+#        es correcto, no un bug.
+#
+#   Sigue **INACTIVO y sin cron**, y sigue en `status: draft`: `generar` está bloqueada por los
+#   few-shot y `colectar` copiable por el banco de referentes. Ninguno de los dos bloqueos es
+#   técnico (ADR-055 §Consecuencias) y ninguna sesión de código los mueve.
 contract_version: 1
 
 id: linkedin
@@ -78,10 +85,14 @@ inputs:
 
 stages:                         # las 8 etapas canónicas de PLAN §2.4 (n/a si no aplica)
   colectar: >
-    [POR CONSTRUIR] Bifurcada en dos carriles (ADR-055 §2). Copiable: Apify sobre Pinterest (por
-    filtro) y sobre las fuentes en inglés del banco (app.referentes_linkedin). Personal: el archivo
-    propio de la voz. 🔴 El banco NO EXISTE en ninguna marca todavía — Fernando, textual: "no tengo
-    el listado de referentes". Hay que construirlo, no capturarlo.
+    [STUB, Fase 1.1] Bifurcada en dos carriles (ADR-055 §2). Copiable: Apify sobre Pinterest (por
+    filtro) y sobre las fuentes en inglés del banco (app.referentes_linkedin) — [POR CONSTRUIR],
+    bloqueada porque el banco NO EXISTE en ninguna marca. Personal: el archivo propio de la voz —
+    hoy es `Colectar (stub personal)`, que emite piezas FIJAS y no lee ninguna fila. El stub existe
+    para que la cadena entera corra y se verifique antes de gastar en Apify o en un LLM: si la
+    pieza aparece en el Feed, lo que falta es contenido, no cableado. La Fase 1.4 lo reemplaza por
+    la lectura real de las filas `fuente: archivo`, y antes de escribirla hay que cerrar cómo entra
+    ese archivo (un podcast es audio y `enriquecer` es n/a: no hay transcripción).
   normalizar: >
     [POR CONSTRUIR] Pins y posts → content_item, el formato común que ya especifica
     core/contracts/schemas/. Cada pieza carga su `carril` y su `fuente`: no son etiquetas
@@ -102,21 +113,35 @@ stages:                         # las 8 etapas canónicas de PLAN §2.4 (n/a si 
     🔴 Bloqueado por el pedido más barato del proyecto y que sigue sin hacerse: 3–4 posts que
     Fernando sienta que salieron perfectos, por cuenta. Sin ellos la generación sale genérica.
   calidad: >
-    [POR CONSTRUIR] El validador determinista de ADR-055 §4, que corre DESPUÉS del LLM y antes de
-    que nada llegue a un humano: R-1 (el gancho es un bloque continuo de 2–3 líneas sin línea en
-    blanco — un \n\n antes de la línea 2 esconde el post detrás del "ver más") y R-2 (firma
-    obligatoria al cierre, sin excepción). Las dos se imponen a todas las voces y son código, no
-    prompt. R-3 y R-4 no se validan acá: son placeholders de la voz.
+    [HECHO, Fase 1.2] Nodo `Calidad (R-1 + R-2)`. El validador determinista de ADR-055 §4, que corre
+    DESPUÉS del LLM y antes de que nada llegue a un humano: R-1 (el gancho es un bloque continuo de
+    2–3 líneas sin línea en blanco — un \n\n antes de la línea 2 esconde el post detrás del "ver
+    más") y R-2 (firma obligatoria al cierre, sin excepción). Las dos se imponen a todas las voces y
+    son código, no prompt. R-3 y R-4 no se validan acá: son placeholders de la voz.
+    🔑 Las dos reglas se tratan distinto según quién sea dueño del texto: R-1 RECHAZA (el gancho es
+    contenido, código no puede inventar uno) y R-2 REPARA agregando la firma de la voz al cierre (es
+    texto de la casa). Si la firma aparece en el medio se rechaza: agregarla la duplicaría y moverla
+    ya es reescribir. Un rechazo de calidad NO va a app.descartes_linkedin —esa tabla es para los
+    near-miss del gate (ADR-036)— sino a runs.metricas: es una falla de generación, no un falso
+    negativo de curación. Se escribió ANTES que `generar` a propósito, contra texto de prueba, para
+    que el día que entre el LLM ya tenga quién lo sanitice. Tests: test-nodos.mjs.
   entregar: >
-    [POR CONSTRUIR] Candidatos a app.candidatos_linkedin por PostgREST (ADR-035) con estado 'nuevo',
-    descartes borderline a app.descartes_linkedin para auditar falsos negativos, y registro de la
-    corrida en runs/outputs. Todo con el instance_id del payload.
+    [PARCIAL, Fase 1.1] `Preparar candidatos` → `POST Candidatos`: filas a app.candidatos_linkedin
+    por PostgREST (ADR-035) con estado 'nuevo', el instance_id del payload (ADR-048) y
+    `resolution=ignore-duplicates` sobre el unique (instance_id, external_id). El POST es fail-closed
+    (es LA entrega, no el registro) y el cierre del run cuelga de `Calidad` en la rama HERMANA, no
+    detrás del POST: sin eso, una corrida sin piezas —hoy, con 0 voces, todas— dejaría el run
+    `en_curso` hasta el barrido siguiente.
+    [POR CONSTRUIR] Los descartes borderline a app.descartes_linkedin, que llegan con la Fase 2.6
+    junto con el gate que los produce.
   notificar: n/a                # el equipo vive en el cockpit; no hay email
 
 outputs:
   - type: post_linkedin
     destination_native: postgres      # app.candidatos_linkedin (ADR-049: un pipeline, sus tablas)
-    registered: pending               # reporta al registro central cuando exista el workflow.json
+    registered: pending               # el run se abre y se cierra en `runs` con su embudo en
+                                      # `metricas`; lo que todavía NO se escribe es una fila en
+                                      # `outputs`, porque una pieza sin publicar no es una entrega.
 
 runbook:
   setup: >

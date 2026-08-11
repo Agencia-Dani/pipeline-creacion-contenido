@@ -13,7 +13,10 @@
       "name": "Disparo on-demand (webhook)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 400],
+      "position": [
+        0,
+        400
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "name": "Webhook Motor Header"
@@ -26,7 +29,10 @@
       "name": "Ejecutar manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 560]
+      "position": [
+        0,
+        560
+      ]
     },
     {
       "parameters": {
@@ -64,7 +70,10 @@
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [240, 400],
+      "position": [
+        240,
+        400
+      ],
       "notes": "instance_id sale del payload del webhook ({ instancia }), no de un placeholder (ADR-048).\nPara «Ejecutar manual»: reemplazá el '' final de la expresión por el uuid de la instancia.\nEn git va VACÍO a propósito — vacío hace que run-plan responda 400 y la corrida no arranque.\n\nSOLO están las perillas que algún nodo LEE hoy. Las del manifest (umbral_reacciones, pins_por_consulta, dias_recencia, n_por_voz) NO están: declarar knobs que nadie lee es el fallo mudo de siempre. Entran con la etapa que las use, y su casa definitiva es app.ajustes tras la migración 028 (Fase 4).",
       "notesInFlow": true
     },
@@ -98,7 +107,10 @@
       "name": "Barrer runs zombie",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 400],
+      "position": [
+        460,
+        400
+      ],
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
@@ -120,7 +132,10 @@
       "name": "Leer corridas vivas",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 400],
+      "position": [
+        680,
+        400
+      ],
       "onError": "continueRegularOutput",
       "alwaysOutputData": true,
       "credentials": {
@@ -158,7 +173,10 @@
       "name": "Guard single-flight",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [900, 400]
+      "position": [
+        900,
+        400
+      ]
     },
     {
       "parameters": {},
@@ -166,7 +184,10 @@
       "name": "Bloqueada: ya hay corrida viva",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1120, 560]
+      "position": [
+        1120,
+        560
+      ]
     },
     {
       "parameters": {
@@ -198,7 +219,10 @@
       "name": "Abrir run en el registro",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 320],
+      "position": [
+        1120,
+        320
+      ],
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
@@ -220,7 +244,10 @@
       "name": "Leer plan (fachada)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1340, 320],
+      "position": [
+        1340,
+        320
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "name": "Run Plan Header"
@@ -234,14 +261,17 @@
     },
     {
       "parameters": {
-        "jsCode": "// Cierre del ESQUELETO. Todavía no hay etapas de contenido: colectar y generar esperan el banco\n// de referentes y los few-shot de Fernando (ADR-055 §Consecuencias), que no son problemas de código.\n//\n// Lo que este nodo SÍ hace no es relleno: verifica ADR-068 desde adentro de n8n, que es el único\n// lugar donde importa, y deja la medición escrita en `runs.metricas`.\n\nconst plan = $('Leer plan (fachada)').first().json || {};\n\n// 🔴 La afirmación que ADR-068 existe para habilitar, y por eso este workflow es su primer\n// consumidor. La fachada deriva el pipeline de la instancia, así que un plan que dice otra cosa\n// significa que este workflow está apuntado a una instancia ajena. **Ese fallo no produce un error\n// río arriba: produce un documento bien formado**, con voces y referentes de verdad adentro. Es el\n// único punto donde se puede cazar, y se corta con el run YA ABIERTO para que quede la fila.\nif (plan.pipeline !== 'linkedin') {\n  throw new Error(\n    `run-plan devolvió pipeline='${plan.pipeline}' (esperaba 'linkedin'): esta corrida está apuntada a una instancia que no es de LinkedIn. No se escribió nada.`,\n  );\n}\n\nconst voces = Array.isArray(plan.voces) ? plan.voces : [];\nconst referentes = Array.isArray(plan.referentes) ? plan.referentes : [];\n\n// Las dos cifras que deciden si el motor tendría con qué trabajar el día que exista. Hoy son 0 y 0\n// en las tres marcas, y esa es la respuesta correcta: el banco hay que construirlo, no capturarlo.\nreturn [\n  {\n    json: {\n      metricas: {\n        etapa: 'esqueleto',\n        pipeline: plan.pipeline,\n        voces_con_perfil: voces.length,\n        referentes_activos: referentes.length,\n        nota: 'Esqueleto de infraestructura: sin etapas de contenido. Ver Workflows/workflow-linkedin/README.md',\n      },\n    },\n  },\n];\n"
+        "jsCode": "// Verificar plan (ADR-068) — lo PRIMERO después de leer la config, y el orden ES la decisión:\n// verifica antes de que ninguna etapa gaste ni escriba nada.\n//\n// 🔴 Qué afirma, y por qué no se puede afirmar en ningún otro lado. La fachada DERIVA el pipeline\n// de `instances.workflow_id`; nadie se lo pide (ADR-068). Entonces un plan que dice otra cosa\n// significa que este workflow está apuntado a una instancia ajena, y **ese fallo no llega como\n// error: llega como un documento bien formado**, con voces y referentes de verdad adentro — los de\n// reels. Una corrida así termina en verde habiendo colectado del banco equivocado.\n//\n// Corta con el run YA ABIERTO a propósito: la fila queda, y el error handler global la marca\n// `fallo` por `params.execution_id` (ADR-054).\n\nconst plan = $('Leer plan (fachada)').first().json || {};\n\nif (plan.pipeline !== 'linkedin') {\n  throw new Error(\n    \"run-plan devolvió pipeline='\" + plan.pipeline + \"' (esperaba 'linkedin'): esta corrida está \" +\n      'apuntada a una instancia que no es de LinkedIn. No se colectó ni se escribió nada.',\n  );\n}\n\nconst voces = Array.isArray(plan.voces) ? plan.voces : [];\nconst referentes = Array.isArray(plan.referentes) ? plan.referentes : [];\n\n// 🔴 Lo que activa una voz en LinkedIn es que EXISTA SU PERFIL, jamás `voces.activo` (ADR-067).\n// El plan de `ambito=motor` ya filtró por eso, así que `configurada` viene true en todas. Se\n// vuelve a contar acá porque son dos cifras distintas en `ambito=completo`, y la diferencia entre\n// ellas es lo único que delataría que este nodo está leyendo el plan equivocado.\nconst conPerfil = voces.filter(function (v) { return (v.fields || {}).configurada === true; });\n\nconst conteo = {\n  pipeline: plan.pipeline,\n  plan_version: plan.version,\n  voces: voces.length,\n  voces_con_perfil: conPerfil.length,\n  referentes_activos: referentes.length,\n};\n\n// Con 0 voces no hay de quién escribir y con 0 referentes no hay de qué. La corrida SIGUE y\n// entrega 0, que es la respuesta correcta y no un error — pero no puede ser muda: un run en verde\n// sin piezas se lee como \"el motor no encontró nada\" cuando lo que pasa es que nadie lo configuró.\nconst avisos = [];\nif (conPerfil.length === 0) avisos.push('0 voces con perfil: no hay de quién escribir (Fase 0.3 de plan-motor-linkedin)');\nif (referentes.length === 0) avisos.push('0 referentes activos: el banco está vacío (Fase 0.5)');\n\nconsole.log('[Verificar plan] ' + JSON.stringify(conteo) + (avisos.length ? ' · ' + avisos.join(' · ') : ''));\nreturn [{ json: { conteo: conteo, avisos: avisos } }];\n"
       },
-      "id": "resumen-del-run",
-      "name": "Resumen del run",
+      "id": "verificar-plan-adr068",
+      "name": "Verificar plan (ADR-068)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1560, 320],
-      "notes": "Afirma que el plan recibido es el de LinkedIn (ADR-068) y reporta qué trajo. Es el smoke test del cableado, no una etapa del pipeline.",
+      "position": [
+        1560,
+        320
+      ],
+      "notes": "Afirma que el plan recibido es el de LinkedIn (ADR-068) y cuenta con qué insumos arranca la corrida. Va primero a propósito: verifica antes de gastar.",
       "notesInFlow": true
     },
     {
@@ -270,7 +300,10 @@
       "name": "Cerrar run en el registro",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1780, 320],
+      "position": [
+        2440,
+        480
+      ],
       "onError": "continueRegularOutput",
       "credentials": {
         "supabaseApi": {
@@ -278,38 +311,270 @@
         }
       },
       "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Colectar (stub personal) — Fase 1.1 de plan-motor-linkedin. **ES UN STUB, y tiene que seguir\n// siéndolo hasta la 1.4**, que lo reemplaza por la lectura real de las filas `fuente: archivo`\n// del plan.\n//\n// Por qué existe un nodo de mentira: la cadena entera —tenant, FK, RLS, dedup, R-1, R-2,\n// PostgREST— corre y se verifica ANTES de gastar un peso en Apify o en un LLM. Si la pieza aparece\n// en el Feed, lo que falta es contenido, no cableado.\n//\n// 🔴 NO INVENTA LA FIRMA. Sale de `voces[].fields.firma`, que es la columna `not null` de la\n// `020` §3 (R-2, ADR-055 §4). Una firma escrita acá sería la casa firmando con un texto que nadie\n// aprobó, y encima haría pasar el validador de la etapa siguiente sin haber probado nada.\n\nconst plan = $('Leer plan (fachada)').first().json || {};\nconst voces = (Array.isArray(plan.voces) ? plan.voces : []).filter(function (v) {\n  return (v.fields || {}).configurada === true;\n});\n\n// Sin voz configurada no hay pieza posible: la firma es obligatoria y no hay de dónde sacarla.\n// Devuelve UN item igual, con `piezas: []`. Un code node que devuelve [] corta su rama entera, y\n// acá eso todavía es seguro sólo porque el cierre del run cuelga de `Calidad` en la rama hermana.\nif (voces.length === 0) {\n  console.log('[Colectar] 0 voces con perfil: no hay de quién escribir. 0 piezas.');\n  return [{ json: { piezas: [], stub: true, motivo: 'sin voces con perfil' } }];\n}\n\nconst voz = voces[0];\nconst nombreVoz = (voz.fields || {}).nombre || voz.id;\nconst firma = (voz.fields || {}).firma;\n\n// Dos piezas, y la segunda está rota A PROPÓSITO: es la única forma de que una corrida real pruebe\n// que `Calidad` está CABLEADA y no solamente presente. Es la lección del setteo por WhatsApp y la\n// del guard de ADR-029 — código correcto que nadie ejecuta protege exactamente cero. La rota viola\n// R-1 (línea en blanco después de la primera línea del gancho, que es justo lo que esconde el post\n// detrás del \"ver más\") y tiene que quedar afuera. Si alguna vez aparece en el Feed, el bug es de\n// cableado y se ve a simple vista.\n//\n// El `external_id` es FIJO a propósito: `unique (instance_id, external_id)` +\n// `resolution=ignore-duplicates` hacen que la segunda corrida no duplique nada. Correr esto dos\n// veces es seguro y deja UNA fila.\nconst piezas = [\n  {\n    external_id: 'stub-personal-ok',\n    carril: 'personal',\n    fuente: 'archivo',\n    titulo: 'Pieza de prueba del carril personal',\n    texto: [\n      'Esta pieza no la escribió un modelo.',\n      'La emite el stub de la Fase 1.1 para probar el cableado.',\n      'Si la estás viendo en el Feed, la cadena entera funciona.',\n      '',\n      'Lo que prueba: que el tenant viaja, que la FK resuelve, que RLS deja escribir, que el dedup ' +\n        'no duplica y que el validador determinista dejó pasar lo que cumple R-1 y R-2.',\n      '',\n      'Lo que NO prueba: que la máquina escriba bien. Eso empieza cuando exista `generar`.',\n      '',\n      firma,\n    ].join('\\n'),\n    voz_id: voz.id,\n    firma: firma,\n  },\n  {\n    external_id: 'stub-personal-r1',\n    carril: 'personal',\n    fuente: 'archivo',\n    titulo: 'Pieza de prueba que TIENE que ser rechazada (R-1)',\n    texto: ['Un gancho de una sola línea.', '', 'Y el resto del post acá abajo.', '', firma].join('\\n'),\n    voz_id: voz.id,\n    firma: firma,\n  },\n];\n\nif (voces.length > 1) {\n  console.log('[Colectar] ' + voces.length + ' voces con perfil; el stub usa la primera (' + nombreVoz +\n    '). Las demás entran con la 1.4.');\n}\nconsole.log('[Colectar] ' + piezas.length + ' piezas fijas (stub) para la voz ' + nombreVoz);\nreturn [{ json: { piezas: piezas, stub: true, voz_id: voz.id } }];\n"
+      },
+      "id": "colectar-stub-personal",
+      "name": "Colectar (stub personal)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        320
+      ],
+      "notes": "STUB de la Fase 1.1: emite piezas FIJAS para probar el cableado sin gastar. La 1.4 lo reemplaza. Una de las dos piezas viola R-1 a propósito.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calidad — el validador determinista de ADR-055 §4. Corre DESPUÉS del LLM y ANTES de que nada\n// llegue a un humano. **Es código, no prompt**, y la diferencia no es de estilo: un prompt que pide\n// \"no pongas línea en blanco en el gancho\" falla en silencio una de cada N veces y nadie se entera\n// hasta que el post está publicado.\n//\n// Solo R-1 y R-2, que son las dos que se imponen a TODAS las voces. R-3 (espaciado) y R-4\n// (separación mínima entre posts) son preferencia de la persona, viven como placeholder por voz y\n// no se validan acá — R-4 ni siquiera es del post, es de la cola.\n//\n// 🔑 Las dos reglas se tratan distinto, y no es comodidad: lo decide quién es dueño del texto.\n//   · R-1 → RECHAZO. El gancho es contenido. Código no puede inventar uno.\n//   · R-2 → REPARACIÓN. La firma es texto de la CASA, guardado por voz (`020` §3). Ponerla no es\n//     escribir. La única reparación que existe es agregarla al cierre cuando falta ENTERA: si\n//     aparece en el medio del post se rechaza, porque agregarla la duplicaría y moverla ya es\n//     reescribir.\n\nconst MIN_LINEAS_GANCHO = 2;\nconst MAX_LINEAS_GANCHO = 3;\n\n// Colapsa todo espacio a uno solo y recorta. Es para COMPARAR la firma, no para guardarla: el LLM\n// puede reflowear el salto de línea de adentro de la firma sin cambiar una palabra, y esa\n// diferencia no es una violación de R-2.\nfunction normalizar(s) {\n  return String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();\n}\n\n// El gancho es el PRIMER BLOQUE: todo lo que hay hasta la primera línea en blanco. Por definición\n// no tiene línea en blanco adentro — lo que R-1 mide es cuántas líneas quedaron de ese lado. Un\n// `\\n\\n` después de la línea 1 deja un gancho de 1 y esconde el post detrás del \"ver más\".\n//\n// ⚠️ Límite conocido y deliberado: cuenta SALTOS DE LÍNEA, no líneas visuales. Una línea larga que\n// envuelve en el teléfono se cuenta como una sola. No hay forma de saber el ancho del viewport\n// desde un code node, y la regla de la entrevista habla de `\\n\\n`, que sí se puede medir.\nfunction lineasDelGancho(texto) {\n  const limpio = String(texto == null ? '' : texto).replace(/\\r\\n/g, '\\n');\n  const bloque = limpio.split(/\\n[ \\t]*\\n/)[0] || '';\n  return bloque\n    .split('\\n')\n    .map(function (l) { return l.trim(); })\n    .filter(function (l) { return l !== ''; });\n}\n\nfunction evaluar(pieza) {\n  const texto = String(pieza.texto == null ? '' : pieza.texto).replace(/\\r\\n/g, '\\n').replace(/\\s+$/, '');\n  const firma = String(pieza.firma == null ? '' : pieza.firma);\n\n  if (normalizar(texto) === '') return { estado: 'rechazada', motivo: 'sin_texto' };\n\n  // Una voz sin firma no es un problema del post: es config faltante, y es estructural. La `020`\n  // §3 declara `firma not null`, así que esto sólo puede pasar con un plan de `ambito=completo`\n  // (donde las voces sin perfil viajan con los campos en null). Se rechaza, no se inventa nada.\n  if (normalizar(firma) === '') return { estado: 'rechazada', motivo: 'voz_sin_firma (R-2)' };\n\n  const gancho = lineasDelGancho(texto);\n  if (gancho.length < MIN_LINEAS_GANCHO || gancho.length > MAX_LINEAS_GANCHO) {\n    return {\n      estado: 'rechazada',\n      motivo: 'gancho_de_' + gancho.length + '_lineas (R-1: entre ' + MIN_LINEAS_GANCHO + ' y ' + MAX_LINEAS_GANCHO + ')',\n    };\n  }\n\n  const nt = normalizar(texto);\n  const nf = normalizar(firma);\n  if (nt.slice(-nf.length) === nf) return { estado: 'ok', texto: texto };\n  if (nt.indexOf(nf) !== -1) return { estado: 'rechazada', motivo: 'firma_fuera_del_cierre (R-2)' };\n  return { estado: 'reparada', motivo: 'firma_agregada (R-2)', texto: texto + '\\n\\n' + firma.trim() };\n}\n\nconst entrada = $input.first().json || {};\nconst piezas = Array.isArray(entrada.piezas) ? entrada.piezas : [];\n\nconst aprobadas = [];\nconst rechazos = [];\nlet reparadas = 0;\n\npiezas.forEach(function (p) {\n  const v = evaluar(p);\n  if (v.estado === 'rechazada') {\n    rechazos.push({ external_id: p.external_id || null, motivo: v.motivo });\n    return;\n  }\n  if (v.estado === 'reparada') reparadas++;\n  aprobadas.push(Object.assign({}, p, { texto: v.texto, calidad: v.estado }));\n});\n\nconst calidad = {\n  evaluadas: piezas.length,\n  aprobadas: aprobadas.length,\n  reparadas: reparadas,\n  rechazadas: rechazos.length,\n  rechazos: rechazos,\n};\n\n// 🔴 Un rechazo de calidad NO va a `app.descartes_linkedin`, y no es un olvido: esa tabla es para\n// los near-miss del GATE (ADR-036), o sea piezas que un humano podría querer auditar como falso\n// negativo. Un post malformado no es un falso negativo, es una falla de generación — y su sumidero\n// es `runs.metricas`, que es donde se ve si el LLM empezó a romper R-1 sistemáticamente.\nrechazos.forEach(function (r) { console.log('[Calidad] ✗ ' + r.external_id + ': ' + r.motivo); });\nconsole.log('[Calidad] ' + JSON.stringify(calidad));\nreturn [{ json: { piezas: aprobadas, calidad: calidad } }];\n"
+      },
+      "id": "calidad-r1-r2",
+      "name": "Calidad (R-1 + R-2)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        320
+      ],
+      "notes": "R-1 (gancho de 2–3 líneas sin línea en blanco) y R-2 (firma al cierre). R-1 rechaza; R-2 repara agregando la firma de la voz. R-3 y R-4 no se validan acá: son placeholder por voz.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar candidatos — filas planas para PostgREST contra `app.candidatos_linkedin`. Es la\n// mitad de escritura de ADR-035: *n8n lee su config por la fachada, escribe sus resultados por\n// PostgREST*.\n\nconst entrada = $input.first().json || {};\nconst piezas = Array.isArray(entrada.piezas) ? entrada.piezas : [];\nconst instanceId = $('Config').first().json.instance_id;\n\nconst filas = piezas.map(function (p) {\n  return {\n    // De quién es esta fila. `instance_id` es `not null` y SIN default en la `020` §4 a\n    // propósito: un insert que se olvide del tenant falla en el primer intento en vez de\n    // atribuirle datos a la instancia equivocada. Sale del payload del webhook (ADR-048).\n    instance_id: instanceId,\n    // Lo que dedupea, y va SCOPEADO por instancia. El unique global fue el peor hallazgo del\n    // diagnóstico multi-tenant: le vacía el supply a la segunda empresa sin un solo error.\n    external_id: p.external_id,\n    carril: p.carril,\n    fuente: p.fuente,\n    titulo: p.titulo,\n    texto: p.texto,\n    idioma: p.idioma || null,\n    url: p.url || null,\n    autor: p.autor || null,\n    imagen_url: p.imagen_url || null,\n    referente_id: p.referente_id || null,\n    proyecto_id: p.proyecto_id || null,\n    voz_id: p.voz_id || null,\n    estado: 'nuevo',\n  };\n});\n\nconsole.log('[Entrega] ' + filas.length + ' candidatos a app.candidatos_linkedin');\n\n// Sin filas no hay POST: devolver [] corta ESTA rama, que es lo correcto — no hay nada que\n// escribir y un POST con `[]` sería un request al pedo contra un nodo fail-closed.\n// 🔴 Ese corte es seguro por UNA razón y sólo una: el cierre del run cuelga de `Calidad` en la\n// rama hermana, no de acá. Si alguien vuelve a poner `Resumen del run` en serie detrás del POST,\n// toda corrida sin piezas —hoy, con 0 voces, TODAS— deja el run `en_curso` hasta el barrido de la\n// corrida siguiente.\nreturn filas.length ? [{ json: { filas: filas } }] : [];\n"
+      },
+      "id": "preparar-candidatos-linkedin",
+      "name": "Preparar candidatos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        320
+      ],
+      "notes": "Filas planas para PostgREST. Devuelve [] si no hay nada que escribir: el run igual cierra porque el resumen cuelga de la rama hermana.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/candidatos_linkedin' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Profile",
+              "value": "app"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.filas) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "post-candidatos-linkedin",
+      "name": "POST Candidatos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2440,
+        320
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase account"
+        }
+      },
+      "notes": "FAIL-CLOSED: es LA entrega, no el registro. Sin onError a propósito."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resumen del run — el embudo de la corrida a `runs.metricas`. `Cerrar run` persiste\n// `$json.metricas` tal cual.\n//\n// 🔑 Cuelga de `Calidad` en una rama HERMANA de la entrega, no detrás de ella, y esa es la\n// decisión que hace que el run cierre SIEMPRE: `Preparar candidatos` devuelve [] cuando no hay\n// nada que escribir, y un [] corta su rama entera. Con el cierre ahí atrás, toda corrida sin\n// piezas —hoy, con 0 voces, todas— dejaría la fila `en_curso` hasta el barrido siguiente.\n// La rama de entrega corre PRIMERO porque su destino tiene Y menor (320 < 480): en n8n v1 el orden\n// de las hermanas lo decide la posición en el canvas, no el array de `connections`.\n//\n// ⚠️ La contracara, y hay que saberla: desde acá NO se ve si el POST entró. No se puede\n// referenciar un nodo de la rama hermana —no es ancestro, y `auditar-workflows.mjs` lo caza—. Y\n// no hace falta: `POST Candidatos` es fail-closed, así que si falla la ejecución aborta y el\n// error handler global marca el run `fallo` por `params.execution_id` (ADR-054).\n\nconst verificado = $('Verificar plan (ADR-068)').first().json || {};\nconst conteo = verificado.conteo || {};\nconst colecta = $('Colectar (stub personal)').first().json || {};\nconst calidad = ($input.first().json || {}).calidad || {};\n\nconst avisos = (verificado.avisos || []).slice();\n\n// El stub emite 2 piezas y una está rota a propósito (R-1). Mientras siga siendo el stub, ese\n// reparto ES la prueba de que `Calidad` está cableada: si entraran las dos, el validador no está\n// corriendo. Aviso y no throw — qué hacer con una corrida de prueba lo decide quien la mira.\nif (colecta.stub === true && (calidad.evaluadas || 0) > 0 && (calidad.rechazadas || 0) === 0) {\n  avisos.push('el stub emite una pieza que viola R-1 y NINGUNA fue rechazada: revisá que Calidad esté cableada');\n}\n\nconst metricas = {\n  etapa: colecta.stub === true ? 'stub (Fase 1.1: colectar de mentira)' : 'motor',\n  pipeline: conteo.pipeline,\n  voces_con_perfil: conteo.voces_con_perfil,\n  referentes_activos: conteo.referentes_activos,\n  colectadas: calidad.evaluadas || 0,\n  aprobadas: calidad.aprobadas || 0,\n  reparadas: calidad.reparadas || 0,\n  rechazadas: calidad.rechazadas || 0,\n  rechazos: calidad.rechazos || [],\n  entregadas: calidad.aprobadas || 0,\n  avisos: avisos,\n};\n\nconsole.log('[Resumen] ' + JSON.stringify(metricas));\nreturn [{ json: { metricas: metricas } }];\n"
+      },
+      "id": "resumen-del-run-linkedin",
+      "name": "Resumen del run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        480
+      ],
+      "notes": "El embudo a runs.metricas. Cuelga de Calidad en rama hermana de la entrega: es lo que hace que el run cierre aunque no haya nada que escribir.",
+      "notesInFlow": true
     }
   ],
   "connections": {
     "Disparo on-demand (webhook)": {
-      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Ejecutar manual": {
-      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Config": {
-      "main": [[{ "node": "Barrer runs zombie", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Barrer runs zombie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Barrer runs zombie": {
-      "main": [[{ "node": "Leer corridas vivas", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Leer corridas vivas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Leer corridas vivas": {
-      "main": [[{ "node": "Guard single-flight", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Guard single-flight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Guard single-flight": {
       "main": [
-        [{ "node": "Abrir run en el registro", "type": "main", "index": 0 }],
-        [{ "node": "Bloqueada: ya hay corrida viva", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Abrir run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bloqueada: ya hay corrida viva",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Abrir run en el registro": {
-      "main": [[{ "node": "Leer plan (fachada)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Leer plan (fachada)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Leer plan (fachada)": {
-      "main": [[{ "node": "Resumen del run", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Verificar plan (ADR-068)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar plan (ADR-068)": {
+      "main": [
+        [
+          {
+            "node": "Colectar (stub personal)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Colectar (stub personal)": {
+      "main": [
+        [
+          {
+            "node": "Calidad (R-1 + R-2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calidad (R-1 + R-2)": {
+      "main": [
+        [
+          {
+            "node": "Preparar candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resumen del run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar candidatos": {
+      "main": [
+        [
+          {
+            "node": "POST Candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Resumen del run": {
-      "main": [[{ "node": "Cerrar run en el registro", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Cerrar run en el registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

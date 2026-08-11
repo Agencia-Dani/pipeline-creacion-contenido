@@ -4,7 +4,7 @@ Detecta contenido que ya funcionó —incluido el de otros idiomas—, lo cura u
 en la voz de la cuenta con su firma, y lo deja en una cola para que **una persona lo apruebe y
 publique**.
 
-> ## ⚠️ Estado al 2026-08-09: está el esqueleto, **no hay ni una etapa de contenido**
+> ## ⚠️ Estado al 2026-08-11: está la **espina del carril personal**, y su primera etapa es un stub
 >
 > | Pieza | Estado |
 > |---|---|
@@ -13,24 +13,42 @@ publique**.
 > | El cockpit | ✅ **3 instancias**: `30x/linkedin` y `estadox/linkedin` en `active`, `retia/linkedin` en `draft` · ✅ **4 de 6** pantallas de `curar` (ADR-066: las otras 2 no tienen escritor) |
 > | La fachada | ✅ `GET /api/engine/run-plan` sirve el plan de LinkedIn (ADR-068), **verificado en prod** |
 > | El manifest | ✅ [`workflow.yaml`](workflow.yaml), válido contra el contrato |
-> | El motor en n8n | 🔧 **esqueleto de 11 nodos, INACTIVO** — creado por API el 09/08 (`n8n:diff` verde). ❌ **Cero etapas de contenido** y ❌ **sin cron en el dispatcher** |
+> | El `workflow.json` | ✅ **16 nodos**: los 11 de infraestructura + la espina `colectar → calidad → entregar`. `calidad` está **entera**; `colectar` es un **stub** |
+> | El motor en n8n | 🔧 **11 nodos, INACTIVO** — en n8n vive todavía el esqueleto del 09/08. Los 5 nodos nuevos son **topología**, y la topología no entra por `n8n:push` ⇒ **`n8n:diff` grita a propósito** |
+> | Lo que falta | ❌ `generar` (bloqueada por los few-shot) · ❌ el carril copiable entero (bloqueado por el banco) · ❌ sin cron en el dispatcher |
 >
-> ### 🔧 Qué es exactamente el esqueleto, y qué NO es
+> ### 🔧 Qué hace hoy la espina, y qué NO
 >
-> Los 11 nodos son **solo infraestructura**, la misma de los otros 4 workflows: los 2 triggers
-> (webhook + manual), `Config`, el barrido de runs zombie, el guard single-flight por instancia, la
-> apertura y el cierre del run en el registro, y la lectura del plan por la fachada **fail-closed**.
-> Entre `Leer plan (fachada)` y `Cerrar run en el registro` **no hay nada**: ahí van las 8 etapas.
+> ```
+> Leer plan (fachada) → Verificar plan (ADR-068) → Colectar (stub personal) → Calidad (R-1 + R-2) ─┬─→ Preparar candidatos → POST Candidatos
+>                                                                                                  └─→ Resumen del run → Cerrar run
+> ```
 >
-> El único nodo propio es **`Resumen del run`**, y no es relleno: **afirma que el plan recibido dice
-> `pipeline: linkedin`** y aborta si no. Es el primer consumidor del campo que ADR-068 agregó, y el
-> único punto donde ese fallo se puede cazar — porque su síntoma no es un error, es un plan bien
-> formado del pipeline equivocado. De paso deja en `runs.metricas` cuántas voces con perfil y cuántos
-> referentes activos trajo la fachada, que son las dos cifras que dicen si el motor tendría con qué
-> trabajar. **Hoy son 0 y 0**, y esa es la respuesta correcta.
+> **`Verificar plan (ADR-068)`** —antes llamado `Resumen del run`— **afirma que el plan recibido dice
+> `pipeline: linkedin`** y aborta si no. Es el primer consumidor del campo que ADR-068 agregó y el
+> único punto donde ese fallo se puede cazar, porque su síntoma no es un error: es un plan **bien
+> formado del pipeline equivocado**, con las voces y los referentes de reels adentro. Va primero para
+> que verifique **antes** de que ninguna etapa gaste o escriba.
 >
-> ⚠️ **No se activó, y no debe activarse todavía**: un workflow activo con webhook vivo y sin etapas
-> abre runs que no entregan nada.
+> **`Colectar (stub personal)` es de mentira, a propósito.** Emite piezas **fijas** —no lee ninguna
+> fila— para que la cadena entera (tenant, FK, RLS, dedup, R-1, R-2, PostgREST) corra y se verifique
+> **antes** de gastar un peso en Apify o en un LLM. Si la pieza aparece en el Feed, lo que falta es
+> contenido, no cableado. Emite **dos**, y la segunda **viola R-1 a propósito**: es la única forma de
+> que una corrida real pruebe que `Calidad` está *cableada* y no sólo presente. Sus `external_id` son
+> fijos, así que correrlo dos veces deja **una** fila.
+>
+> **`Calidad (R-1 + R-2)` sí está terminado**, y se escribió **antes** que `generar` a propósito —
+> contra texto de prueba— para que el día que entre el LLM ya tenga quién lo sanitice. Ver la tabla
+> de las cuatro reglas más abajo.
+>
+> 🔑 **Por qué el cierre del run cuelga de `Calidad` y no del POST.** `Preparar candidatos` devuelve
+> `[]` cuando no hay nada que escribir, y en n8n un `[]` corta la rama entera. Con el cierre detrás
+> del POST, toda corrida sin piezas —hoy, con 0 voces, **todas**— dejaría el run `en_curso` hasta el
+> barrido de la corrida siguiente. La rama de entrega corre primero porque su destino tiene **Y
+> menor** en el canvas (320 < 480); reordenar el array de `connections` no haría nada.
+>
+> ⚠️ **No se activó, y no debe activarse todavía**: sin `generar`, un webhook vivo abre runs que
+> entregan una pieza de prueba y nada más.
 >
 > 🩸 **Lo que se cerró el 08/08 (ADR-066), y vale como advertencia para el próximo pipeline:**
 > declarar una zona que no tenés **no es mostrar de menos, es mostrar la del otro**. LinkedIn
@@ -86,6 +104,41 @@ protege el diseño: *si no cabe en un placeholder, no era proceso — era gusto*
 
 **El LLM propone; código determinista sanitiza antes de que nada llegue a un humano.** No es
 opcional y no es nuevo: es la misma costura que usa el resto del sistema.
+
+R-1 y R-2 viven en el nodo **`Calidad (R-1 + R-2)`**, y **se tratan distinto según quién sea dueño
+del texto** — no es una asimetría de comodidad:
+
+| | Qué hace | Por qué |
+|---|---|---|
+| **R-1** | **rechaza** | el gancho es contenido, y código no puede inventar uno |
+| **R-2** | **repara**: le agrega la firma al cierre | la firma es texto de **la casa**, guardado por voz en `app.voces_linkedin.firma`. Ponerla no es escribir |
+
+Los tres bordes que no se adivinan leyendo la regla, y que tienen test:
+
+- **El gancho es el primer bloque**, o sea todo lo que hay hasta la primera línea en blanco. Por
+  definición no tiene una adentro: lo que R-1 mide es **cuántas líneas quedaron de ese lado**. Un
+  `\n\n` después de la línea 1 deja un gancho de 1 y esconde el post detrás del *"ver más"*.
+  ⚠️ Cuenta **saltos de línea, no líneas visuales**: una línea larga que envuelve en el teléfono
+  cuenta como una. No hay forma de saber el ancho del viewport desde un code node, y la regla de la
+  entrevista habla de `\n\n`, que sí se puede medir.
+- **Si la firma aparece en el MEDIO del post, se rechaza.** Agregarla la duplicaría y moverla ya es
+  reescribir. Sólo se repara cuando falta **entera**, y reparar es idempotente.
+- **Un rechazo de calidad NO va a `app.descartes_linkedin`.** Esa tabla es para los near-miss del
+  *gate* (ADR-036), o sea piezas que un humano podría auditar como falso negativo. Un post
+  malformado no es un falso negativo: es una falla de generación, y su sumidero es `runs.metricas`
+  — que es donde se ve si el LLM empezó a romper R-1 sistemáticamente.
+
+## Validar
+
+```sh
+node test-nodos.mjs            # los 5 code nodes, con `$` y `$input` mockeados
+node ../auditar-workflows.mjs  # conexiones, alcanzabilidad, refs a no-ancestros, invariante #1
+```
+
+`test-nodos.mjs` es el hermano del de reels, y acá pesa más: este workflow está **inactivo y sin
+cron**, así que no hay ninguna corrida real que desmienta un bug. Las tres guardas que más importan
+—R-1 rechazando el gancho de una línea, R-2 sin duplicar la firma, y `Colectar` devolviendo un item
+aunque no tenga piezas— **se verificaron poniéndolas rojas**.
 
 ## Las tablas
 

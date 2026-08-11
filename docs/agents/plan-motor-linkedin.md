@@ -1,8 +1,10 @@
 # Plan — de esqueleto a motor de LinkedIn
 
-> **Estado al 2026-08-09.** Existen las tablas (`020`+`024`), el cockpit con sus 4 pantallas
-> (ADR-066/067), la fachada sirviendo su plan de corrida (ADR-068) y el **esqueleto de 11 nodos en
-> n8n, inactivo**. No existe **ninguna etapa de contenido**.
+> **Estado al 2026-08-11.** Existen las tablas (`020`+`024`), el cockpit con sus 4 pantallas
+> (ADR-066/067), la fachada sirviendo su plan de corrida (ADR-068) y —en el repo— **16 nodos**: los
+> 11 del esqueleto más la **espina del carril personal**. **La 1.1 y la 1.2 están hechas**
+> (`Colectar` como stub, `Calidad` entera). En n8n sigue viviendo el esqueleto de 11: los 5 nodos
+> nuevos son **topología** y todavía no se aplicaron.
 >
 > Hermano de [plan-cockpit-propio.md](./plan-cockpit-propio.md) y
 > [plan-multi-tenant.md](./plan-multi-tenant.md). El estado vivo manda: si esto y
@@ -42,12 +44,20 @@ etapa que se construya corre en vacío, y eso está medido, no supuesto.
 | **0.1** | Copiar `WEBHOOK_PATH_LINKEDIN` del `.env` al gestor de contraseñas compartido | 2 min | Está en el gestor |
 | **0.2** | `update instances set estado='active' where client_id='retia' and slug='linkedin';` | 1 min | `/retia/linkedin` abre en `curar` |
 | **0.3** | **Cargar UNA voz con su perfil y su firma**, en la marca que Fernando maneje mejor | 1–2 h con él | `run-plan` devuelve `voces: 1` |
-| **0.4** | 🔴 **Pedirle a Fernando 3–4 posts que sienta perfectos, de esa cuenta** | 1 mensaje + su tiempo | Los posts, en texto plano |
+| **0.4** | 🔴 **Conseguir 3–4 posts que se sientan perfectos, de esa cuenta** | 1 mensaje + su tiempo | Los posts, en texto plano |
 | **0.5** | Cargar 3–5 piezas de archivo propio (`fuente: archivo`) en Referentes | 30 min | `run-plan` devuelve `referentes: ≥3` |
 
 > ⚠️ **0.2 ya no tiene condición de orden** — el deploy de ADR-068 está en producción. Lo único que
 > puede aconsejar esperar es **D3**: prenderlo le mete a Majo y Jero un selector de pipeline con un
 > cockpit casi vacío.
+
+> 🔴 **Corrección del 2026-08-11, de Alejandro, y cambia de quién es la 0.4.** Este plan y ADR-055
+> venían diciendo *"pedirle a Fernando 3–4 posts que sienta perfectos"*, tratándolo como el dueño del
+> criterio. **No lo es: Fernando dio la idea general de cómo funciona la máquina, no el molde que
+> hay que copiar.** Los few-shot anclan la voz de **una cuenta**, así que el dueño del pedido es
+> quien manda esa cuenta — y para el carril personal ese material *ya está en la casa*. Lo que no
+> cambia es que sin ellos `generar` no tiene con qué. Lo que cambia es que **no hay que esperar a
+> una sola persona para tenerlos**.
 
 > 📌 **La 0.5 es la que sorprende.** El carril personal también vive en `app.referentes_linkedin`,
 > con `fuente: archivo` — la tabla no es solo el banco ajeno. Sus filas son material que la casa ya
@@ -66,13 +76,19 @@ vez que alguien puede *ver* el producto, y el orden está elegido para llegar ah
 
 | # | Etapa | Qué entra a n8n | Por qué en este orden |
 |---|---|---|---|
-| **1.1** | `entregar` + un `colectar` **de mentira** | Un code node que emite **1 pieza fija**, y el `POST` a `app.candidatos_linkedin` con `estado: 'nuevo'` | La cadena completa corre el día 1. Si la pieza aparece en el Feed, el cableado —tenant, FK, RLS, dedup— está probado **antes** de gastar un peso en LLM o scrape |
-| **1.2** | `calidad` | El validador determinista de ADR-055 §4: **R-1** (gancho = bloque continuo de 2–3 líneas, sin `\n\n`) y **R-2** (firma al cierre) | Va **antes** que `generar` a propósito: se escribe contra texto de prueba, y así el día que el LLM entre ya tiene quién lo sanitice. Es **código, no prompt** |
+| ✅ **1.1** | `entregar` + un `colectar` **de mentira** | **HECHO (repo, 2026-08-11).** `Colectar (stub personal)` emite **2 piezas fijas**, `Preparar candidatos` + `POST Candidatos` escriben `app.candidatos_linkedin` con `estado: 'nuevo'` | La cadena completa corre el día 1. Si la pieza aparece en el Feed, el cableado —tenant, FK, RLS, dedup— está probado **antes** de gastar un peso en LLM o scrape |
+| ✅ **1.2** | `calidad` | **HECHO (repo, 2026-08-11).** `Calidad (R-1 + R-2)`: **R-1** (gancho = bloque continuo de 2–3 líneas, sin `\n\n`) **rechaza**, **R-2** (firma al cierre) **repara** | Va **antes** que `generar` a propósito: se escribe contra texto de prueba, y así el día que el LLM entre ya tiene quién lo sanitice. Es **código, no prompt** |
 | **1.3** | `generar` | Claude con el `perfil` de la voz + los few-shot de 0.4 + `cache_control`, el patrón que ya funciona en reels | Necesita 0.4. La firma sale del plan (`voces[].fields.firma`) |
 | **1.4** | `colectar` personal | Reemplaza el stub de 1.1: lee las filas `fuente: archivo` del plan | Último porque es el único con una pregunta de diseño abierta (ver abajo) |
 
-**🚦 Gate de la fase:** una pieza generada aparece en `/[empresa]/linkedin/curar/feed`, Fernando la
-lee y dice si sirve. **Ese juicio es el entregable de la fase 1**, no el código.
+**🚦 Gate de la fase:** una pieza generada aparece en `/[empresa]/linkedin/curar/feed` y alguien que
+manda esa cuenta la lee y dice si sirve. **Ese juicio es el entregable de la fase 1**, no el código.
+
+> ⬜ **Lo que la 1.1 todavía NO cerró, y es el gate de verdad: nadie vio una pieza en el Feed.** El
+> código está en el repo con sus tests, pero **en n8n vive el esqueleto de 11 nodos**: los 5 nuevos
+> son topología y la topología **no entra por `n8n:push`** (el push la detecta y se niega). Aplicarla
+> es el ritual manual de ADR-053, y toca decidirlo aparte — con la instancia `30x/linkedin`, que ya
+> está `active`, y **0.3 hecho**, porque sin una voz con perfil el stub emite 0 piezas a propósito.
 
 > ❓ **La pregunta abierta de 1.4, que hay que resolver ANTES de escribirla:** ¿cómo entra el archivo
 > propio? Un podcast es audio y `enriquecer` es `n/a` en este pipeline (ADR-055 §3) — o sea que **no
