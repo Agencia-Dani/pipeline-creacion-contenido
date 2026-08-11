@@ -24,9 +24,11 @@
 
 > ## 🦴 2026-08-11 (cierre 108) · LA ESPINA DEL CARRIL PERSONAL EXISTE EN EL REPO, `calidad` ESTÁ ENTERA, Y EL DUEÑO DE LOS FEW-SHOT NO ERA FERNANDO
 >
-> **En una línea:** `Workflows/workflow-linkedin/workflow.json` pasó de **11 a 16 nodos** con las
-> **fases 1.1 y 1.2** de [plan-motor-linkedin.md](./plan-motor-linkedin.md). ⛔ **En n8n vive todavía
-> el esqueleto de 11**: los 5 nuevos son topología y no se aplicaron.
+> **En una línea:** `main` = **`ec7aace`** (+ `a93555b`). `Workflows/workflow-linkedin/workflow.json`
+> pasó de **11 a 16 nodos** con las **fases 1.1 y 1.2** de
+> [plan-motor-linkedin.md](./plan-motor-linkedin.md). ⛔ **En n8n vive todavía el esqueleto de 11**:
+> los 5 nuevos son topología y no se aplicaron. **Nada de esto tocó producción** — ni deploy, ni
+> migración, ni un solo escritura contra la base.
 >
 > ```
 > Leer plan → Verificar plan (ADR-068) → Colectar (stub personal) → Calidad (R-1 + R-2) ─┬─→ Preparar candidatos → POST Candidatos
@@ -75,6 +77,17 @@
 > near-miss del *gate* (ADR-036)— sino a `runs.metricas`: es una falla de generación, no un falso
 > negativo de curación.
 >
+> **Los 5 code nodes, y qué hace cada uno** (`node Workflows/workflow-linkedin/test-nodos.mjs` los
+> ejercita a los 5 fuera de n8n, con `$` y `$input` mockeados):
+>
+> | Nodo | Qué hace | Nota |
+> |---|---|---|
+> | `Verificar plan (ADR-068)` | afirma `pipeline === 'linkedin'` y cuenta insumos | **es el `Resumen del run` viejo, renombrado**. El nombre mentía en cuanto dejó de ser el último nodo. Va primero para verificar **antes** de que nada gaste |
+> | `Colectar (stub personal)` | emite 2 piezas **fijas**, `external_id` fijo | correrlo dos veces deja **una** fila (unique + `ignore-duplicates`). **No inventa la firma**: sale de `voces[].fields.firma` |
+> | `Calidad (R-1 + R-2)` | valida y repara | lo único con reglas de negocio |
+> | `Preparar candidatos` | filas planas para PostgREST | devuelve `[]` si no hay nada — ver arriba por qué eso es seguro |
+> | `Resumen del run` | el embudo a `runs.metricas` | **nuevo**, al final de la rama hermana |
+>
 > ⚠️ **Límite conocido de R-1, escrito en el nodo:** cuenta **saltos de línea, no líneas visuales**.
 > Una línea larga que envuelve en el teléfono cuenta como una. No hay forma de saber el ancho del
 > viewport desde un code node, y la regla de la entrevista habla de `\n\n`, que sí se puede medir.
@@ -96,12 +109,16 @@
 >
 > ### 🔴 La corrección de Alejandro, que cambia de quién es un pendiente
 >
-> Este handoff, el plan y ADR-055 venían diciendo *"pedirle a **Fernando** 3–4 posts que sienta
-> perfectos"*, tratándolo como el dueño del criterio. **No lo es: Fernando dio la idea general de cómo
+> Este handoff, el plan, el manifest y el README venían diciendo *"pedirle a **Fernando** 3–4 posts
+> que sienta perfectos"*, tratándolo como el dueño del criterio. **No lo es: Fernando dio la idea general de cómo
 > funciona la máquina, no el molde que hay que copiar.** Los few-shot anclan la voz de **una cuenta**,
 > así que el pedido es de quien manda esa cuenta — y para el carril personal el material *ya está en
 > la casa*. **`generar` sigue bloqueada por los few-shot; lo que dejó de ser cierto es que haya que
-> esperar a una sola persona para tenerlos.** (Corregido en `plan-motor-linkedin.md` §0.4.)
+> esperar a una sola persona para tenerlos.** Corregido en `plan-motor-linkedin.md` §0.4, en el
+> manifest (`stages.generar`) y en el README del workflow — los tres decían lo mismo mal, que es la
+> forma en que un supuesto se endurece: **se copia, no se re-verifica**. ADR-055 no hace falta
+> tocarla: nunca le atribuyó el criterio, sólo el *"no tengo el listado"*, que sigue siendo suyo y
+> sigue siendo cierto.
 >
 > ### ⬜ Lo que sigue
 >
