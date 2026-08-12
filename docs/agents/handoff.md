@@ -22,6 +22,80 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> ## 🔀 2026-08-11 (cierre 109) · EL SELECTOR DE PIPELINE NO HABÍA QUE CONSTRUIRLO, Y PRENDER `retia/linkedin` FUE EL PRIMER TEST REAL DE ADR-068
+>
+> **En una línea:** `retia/linkedin` pasó de `draft` a **`active`** (1 fila, cero código). Con eso el
+> **selector de pipeline de ADR-056 se dibuja por primera vez en producción**, y la fachada quedó
+> medida contra la única instancia donde la afirmación de ADR-068 se podía probar.
+>
+> ### 🩸 El pedido era "creemos el selector de pipeline", y no había nada que crear
+>
+> Alejandro no lo encontraba en el cockpit. **Está construido, cableado y correcto** desde ADR-056:
+> `SelectorPipeline` (`components/selector-cockpit.tsx`), montado en `(zonas)/layout.tsx` bajo
+> `pipelinesDelEquipo > 1`. No se dibujaba por una **condición de datos**: `leerInstancias()` filtra
+> `.eq("estado","active")` y **ninguna empresa tenía más de un cockpit activo** — `30x` y `estadox`
+> uno cada una (linkedin), `retia` uno (reels) más linkedin en `draft`.
+>
+> *La forma del error vale más que el caso: "no veo el control" se lee como código faltante, y era
+> una fila de la base. Un control condicionado por datos es invisible de la misma manera que uno que
+> no existe.*
+>
+> ### ✅ El test de ADR-068, que hasta hoy no se podía hacer
+>
+> `30x/linkedin` y `estadox/linkedin` tienen **0 de todo**, así que su plan vacío **no distingue
+> "derivó bien el pipeline" de "no hay datos"**. `retia` es la única instancia con datos de reels
+> detrás. Medido contra prod, mismo momento:
+>
+> | | `retia/linkedin` | `retia/reels` |
+> |---|---|---|
+> | `pipeline` | **`linkedin`** | `short-form-content` |
+> | claves del plan | `voces`, `referentes` | + `proyectos`, `ajustes` |
+> | `ambito=motor` | **0 voces · 0 referentes** | 1 · 2 · 17 · 18 (**intacto**) |
+> | `ambito=completo` | **3 voces**, las 3 `configurada: false` | — |
+>
+> 🔑 **La fila de `completo` es la que cierra el argumento:** la fachada **sí encuentra** las 3 voces
+> de la empresa, así que el 0 de `motor` es **el filtro de ADR-067 corriendo** —manda la existencia
+> del perfil, jamás `voces.activo`— y no una consulta vacía. Misma empresa, dos instancias, dos
+> planes distintos: el pipeline sale de `instances.workflow_id` y no de quien pregunta.
+>
+> 🔴 **Y falsifica una predicción que estaba escrita en el cierre 107 de este mismo handoff**
+> (*"200 con 3 voces, 6 proyectos y 17 referentes de REELS"*). Esa celda describía el problema
+> **antes** de que ADR-068 lo arreglara y nadie la tocó al arreglarlo; ya quedó corregida abajo.
+> *Una predicción escrita antes del fix no es un pronóstico, es un residuo — y se lee igual que un
+> hecho.*
+>
+> ### 📏 Lo que se verificó ANTES de tocar, y por qué no rompe nada
+>
+> - **Ningún cron lo agarra:** el `Config` del dispatcher tiene `pipeline: "short-form-content"`
+>   **hardcodeado** y los **dos** crons pasan por ese nodo ⇒ una instancia con
+>   `workflow_id = linkedin` no puede salir de `/api/engine/instancias?workflow=…`.
+> - **No hay botón ▶** (ADR-066 le sacó `operar`, con guarda por pipeline además de por zona).
+> - **RLS cubierto** desde la `024`, grano instancia.
+> - El costo **no es rotura, es timing**: los 9 usuarios de Retia ven un control nuevo y un pipeline
+>   casi vacío antes de D3. Alejandro lo decidió sabiéndolo.
+>
+> **Rollback**: `update instances set estado='draft' where client_id='retia' and slug='linkedin';`
+>
+> ### 🧭 Dos correcciones a afirmaciones mías de la misma sesión
+>
+> 1. 🔴 **`es_dueno` NO necesita membresía.** `puedeVerCliente` es `esDueno || membresías.some(…)` y
+>    `ROL_DE_DUENO = "dev"`. Dije que la cuenta de dueño sólo alcanzaba `retia`: **alcanza las tres
+>    empresas, como `dev`**. O sea que `/30x/linkedin` ya era accesible sin este cambio y sin la
+>    segunda cuenta.
+> 2. Dicté un paso —*"selector de pipeline → LinkedIn"*— **que no podía ocurrir**. Ese control no se
+>    montaba para nadie.
+>
+> ### ⬜ Lo que sigue
+>
+> 1️⃣ **Cargar la voz** (Fase 0.3) en `/retia/linkedin/curar/voces`. Retia ya tiene 3 voces ⇒ es
+>    **"Configurar"**, no "Nueva voz". Gate: `run-plan` de `retia/linkedin` devuelve **`voces: 1`**.
+>    *Configurar una voz existente escribe **sólo** `app.voces_linkedin` y jamás `voces.activo`
+>    (`lib/voces-linkedin.ts`), así que no hay forma de tocar reels desde ahí.*
+> 2️⃣ **Aplicar la topología a n8n** — el ritual manual de ADR-053, sigue pendiente.
+> 3️⃣ 🔬 **Y ahora sí se puede hacer la prueba de plan-multi-tenant §14.6**: las policies de LinkedIn
+>    **con filas**. Estaba trabada porque las 4 tablas estaban vacías; la primera fila de
+>    `app.voces_linkedin` la destraba.
+
 > ## 🦴 2026-08-11 (cierre 108) · LA ESPINA DEL CARRIL PERSONAL EXISTE EN EL REPO, `calidad` ESTÁ ENTERA, Y EL DUEÑO DE LOS FEW-SHOT NO ERA FERNANDO
 >
 > **En una línea:** `main` = **`ec7aace`** (+ `a93555b`). `Workflows/workflow-linkedin/workflow.json`
@@ -164,7 +238,7 @@
 > | | Hoy | Cuando se prenda `retia/linkedin` |
 > |---|---|---|
 > | `30x/linkedin` · `estadox/linkedin` | **200 con el plan de reels VACÍO** (las dos empresas tienen 0 voces / 0 proyectos / 0 referentes) | igual |
-> | `retia/linkedin` | **403** — está en `draft`, y `leerInstancias()` solo trae las `active` | **200 con 3 voces, 6 proyectos y 17 referentes de REELS** |
+> | `retia/linkedin` | **403** — está en `draft`, y `leerInstancias()` solo trae las `active` | ~~**200 con 3 voces, 6 proyectos y 17 referentes de REELS**~~ 🔴 **FALSO, medido el 2026-08-11** — ver cierre 109. Da **200 con el plan de LINKEDIN**: 0 voces, 0 referentes y sin `proyectos` ni `ajustes`. Esta celda describe el problema **antes** de que ADR-068 lo arreglara, y no se actualizó al arreglarlo |
 >
 > **El vacío de hoy es el peor de los dos**: una corrida que termina en verde sin entregar nada se
 > lee como *"todavía no cargamos referentes"*. Y lo que le pone datos adentro es **el paso 2 de la

@@ -10,7 +10,7 @@ publique**.
 > |---|---|
 > | Las decisiones | ✅ [ADR-055](../../docs/adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md) (la forma) · [ADR-056](../../docs/adr/ADR-056-las-zonas-son-rol-interseccion-pipeline.md) (la superficie) · [ADR-066](../../docs/adr/ADR-066-un-cockpit-sin-motor-solo-muestra-lo-que-se-configura.md) (qué se dibuja sin motor) · [ADR-067](../../docs/adr/ADR-067-el-perfil-de-voz-de-linkedin-es-una-capa-sobre-las-voces-de-la-empresa.md) (el perfil de voz) · [ADR-068](../../docs/adr/ADR-068-el-pipeline-lo-dice-la-instancia-no-el-que-pregunta.md) (el plan de corrida) |
 > | Las tablas | ✅ [`020`](../../core/schema/020_pipeline_linkedin.sql) **aplicada**, y [`024`](../../core/schema/024_rls_linkedin.sql) le puso las policies (grano **instancia**) · ⬜ **las 4 con 0 filas** |
-> | El cockpit | ✅ **3 instancias**: `30x/linkedin` y `estadox/linkedin` en `active`, `retia/linkedin` en `draft` · ✅ **4 de 6** pantallas de `curar` (ADR-066: las otras 2 no tienen escritor) |
+> | El cockpit | ✅ **3 instancias, las 3 `active`** desde el 2026-08-11 (`retia/linkedin` estaba en `draft`) · ✅ **4 de 6** pantallas de `curar` (ADR-066: las otras 2 no tienen escritor) · 🆕 con `retia` teniendo dos cockpits, **el selector de pipeline de ADR-056 se dibuja por primera vez** |
 > | La fachada | ✅ `GET /api/engine/run-plan` sirve el plan de LinkedIn (ADR-068), **verificado en prod** |
 > | El manifest | ✅ [`workflow.yaml`](workflow.yaml), válido contra el contrato |
 > | El `workflow.json` | ✅ **16 nodos**: los 11 de infraestructura + la espina `colectar → calidad → entregar`. `calidad` está **entera**; `colectar` es un **stub** |

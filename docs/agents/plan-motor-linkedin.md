@@ -42,14 +42,33 @@ etapa que se construya corre en vacío, y eso está medido, no supuesto.
 | # | Qué | Cuánto | Gate: cómo sé que está |
 |---|---|---|---|
 | **0.1** | Copiar `WEBHOOK_PATH_LINKEDIN` del `.env` al gestor de contraseñas compartido | 2 min | Está en el gestor |
-| **0.2** | `update instances set estado='active' where client_id='retia' and slug='linkedin';` | 1 min | `/retia/linkedin` abre en `curar` |
+| ✅ **0.2** | ~~`update instances set estado='active'…`~~ **HECHO el 2026-08-11.** 1 fila afectada | 1 min | la fachada pasó de **403** a **200 con el plan de LinkedIn** |
 | **0.3** | **Cargar UNA voz con su perfil y su firma**, en la marca que Fernando maneje mejor | 1–2 h con él | `run-plan` devuelve `voces: 1` |
 | **0.4** | 🔴 **Conseguir 3–4 posts que se sientan perfectos, de esa cuenta** | 1 mensaje + su tiempo | Los posts, en texto plano |
 | **0.5** | Cargar 3–5 piezas de archivo propio (`fuente: archivo`) en Referentes | 30 min | `run-plan` devuelve `referentes: ≥3` |
 
-> ⚠️ **0.2 ya no tiene condición de orden** — el deploy de ADR-068 está en producción. Lo único que
-> puede aconsejar esperar es **D3**: prenderlo le mete a Majo y Jero un selector de pipeline con un
-> cockpit casi vacío.
+> ✅ **0.2 entró el 2026-08-11, y de paso fue el primer test REAL de ADR-068.** Se prendió sabiendo
+> el costo de D3 (Majo y Jero ven un selector de pipeline nuevo). Lo que compró a cambio es la única
+> medición que valía: `30x/linkedin` y `estadox/linkedin` tienen 0 de todo, así que su plan vacío no
+> distingue *"derivó bien el pipeline"* de *"no hay datos"*. **`retia` es la única instancia con datos
+> de reels detrás**, y midió así:
+>
+> | | `retia/linkedin` | `retia/reels` |
+> |---|---|---|
+> | `pipeline` | **`linkedin`** | `short-form-content` |
+> | claves del plan | `voces`, `referentes` | + `proyectos`, `ajustes` |
+> | `ambito=motor` | **0 voces · 0 referentes** | 1 voz · 2 proyectos · 17 referentes · 18 ajustes |
+> | `ambito=completo` | **3 voces**, las 3 con `configurada: false` | — |
+>
+> 🔑 **Esa última fila es la que cierra el argumento:** con `completo` la fachada SÍ encuentra las 3
+> voces de la empresa, así que el 0 de `motor` es **el filtro de ADR-067 funcionando** —manda la
+> existencia del perfil, no `voces.activo`— y no una consulta vacía. Misma empresa, mismo momento,
+> dos planes distintos porque las instancias declaran pipelines distintos.
+>
+> 🩸 **Y falsifica una predicción que el handoff del cierre 107 tenía escrita:** decía que prender
+> `retia/linkedin` daría *"200 con 3 voces, 6 proyectos y 17 referentes de REELS"*. Esa tabla
+> describía el problema **antes** de que ADR-068 lo arreglara y nadie la actualizó al arreglarlo.
+> *Una predicción escrita antes del fix no es un pronóstico: es un residuo.*
 
 > 🔴 **Corrección del 2026-08-11, de Alejandro, y cambia de quién es la 0.4.** Este plan y ADR-055
 > venían diciendo *"pedirle a Fernando 3–4 posts que sienta perfectos"*, tratándolo como el dueño del
