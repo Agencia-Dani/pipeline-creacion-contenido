@@ -22,7 +22,92 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> ## 🔀 2026-08-11 (cierre 109) · EL SELECTOR DE PIPELINE NO HABÍA QUE CONSTRUIRLO, Y PRENDER `retia/linkedin` FUE EL PRIMER TEST REAL DE ADR-068
+> # ⛔ DECISIÓN ABIERTA — LEER ANTES DE TOCAR CUALQUIER ETAPA DE LINKEDIN
+> ## ¿Qué es un candidato de LinkedIn: material crudo para curar, o un post ya generado?
+>
+> *Abierta el 2026-08-12. **Bloquea `colectar` personal (Fase 1.4) y pone en duda dónde va `calidad`,
+> que ya está cableada.** No es una duda de implementación: es de producto, y la tiene que contestar
+> Alejandro. Mientras esté abierta, no se construye ninguna etapa de contenido nueva.*
+>
+> ### El hallazgo
+>
+> Alejandro eligió la opción **(a)** de la pregunta que venía abierta desde el cierre 107 —*"el
+> archivo propio entra **pegado por una persona**"*, como el `transcribir` de reels—. Diseñando la
+> migración apareció una contradicción **más profunda que la pregunta original**: los artefactos del
+> repo no se ponen de acuerdo sobre qué contiene `app.candidatos_linkedin`.
+>
+> | Fuente | Qué dice | Lectura |
+> |---|---|---|
+> | `workflow.yaml`, orden de `stages` | `… generar → calidad → entregar` | **post generado** |
+> | [ADR-055](../adr/ADR-055-linkedin-es-un-pipeline-de-este-repo.md) §5 | *"la máquina deja **el post listo** en una cola con estado"* | **post generado** |
+> | `curar/feed/mazo-linkedin.tsx` | *"Lo que la máquina trajo, **para decidir qué entra**"* · *"**Calificar acá todavía no genera el post**: marca la pieza y nada más"* | **material crudo** |
+> | `020` §4, columna `texto` | *"El post **o la idea**, tal cual vino"* | **hedgea las dos** |
+>
+> **El esquema mismo dejó la pregunta abierta con un "o".** Nunca se decidió.
+>
+> ### Por qué importa, y qué pone en duda
+>
+> **Lectura A — el candidato es un post generado.** `colectar` trae el archivo → `generar` lo
+> convierte en post → `calidad` lo valida → `entregar` lo pone en el Feed. El humano aprueba **posts
+> listos**.
+> ⇒ La espina del cierre 108 **está bien cableada**, y **`colectar` personal NO se puede construir
+> hasta que exista `generar`**: sin esa etapa en el medio, entregaría transcripciones crudas como si
+> fueran posts.
+>
+> **Lectura B — el candidato es material crudo.** `colectar → entregar` pone la anécdota en el Feed,
+> el humano decide *"esto merece un post"*, y **recién ahí** corren `generar` + `calidad` hacia
+> `outputs`.
+> ⇒ **`colectar` personal se puede construir ya**, hay que **mover `calidad` de lugar** (o sea
+> corregir el cableado del cierre 108), y **falta una etapa post-curación que ningún doc tiene**.
+>
+> 📌 **La B se parece más a reels**, donde `app.candidatos.script` es **la transcripción literal** y
+> el humano juzga material crudo. La A se parece más a lo que dice ADR-055.
+>
+> ### 🩸 Por qué esto no apareció antes: el stub emitía el artefacto equivocado
+>
+> `Colectar (stub personal)` emite una **pieza terminada** —gancho de 3 líneas, cuerpo, firma—, o sea
+> exactamente lo que la lectura A espera. Con eso la cadena `colectar → calidad → entregar` se ve
+> sana y **los 51 tests pasan**, porque prueban la cadena contra el artefacto que el stub eligió, no
+> contra el que va a llegar de verdad. Un transcript de podcast no tiene gancho: R-1 lo rechazaría
+> siempre, y el motor entregaría 0 en verde.
+>
+> 🔑 **La idea portable, y es cara: un stub no es neutral — CONTESTA la pregunta que el diseño dejó
+> abierta, y lo hace en silencio.** Al elegir qué forma tiene la pieza falsa, elegí (sin darme
+> cuenta) la lectura A, y la cadena entera se validó contra esa elección. *Un stub que emite el
+> artefacto equivocado hace que una tubería equivocada se vea correcta, con los tests en verde.*
+> Salió a la luz recién ahora porque `colectar` personal es lo primero que produce material **real**.
+>
+> ### ✅ Lo que vale en las dos lecturas, y se puede construir sin esperar
+>
+> La decisión (a) **sí quedó tomada** y su consecuencia de schema no depende de nada de lo anterior:
+> hoy una fila de `app.referentes_linkedin` con `fuente: archivo` **no tiene dónde guardar el texto**
+> (tiene `consulta`, `idioma`, `activo`, `notas` y nada más).
+>
+> **Propuesta ya diseñada, pendiente de ADR + migración `028`:**
+> - columna **`texto`** en `app.referentes_linkedin`. Para `fuente: archivo`, `consulta` es el
+>   **título** de la pieza —y su `unique (instance_id, fuente, consulta)` la dedupea— y `texto` es el
+>   contenido pegado.
+> - **El texto NO viaja en el run-plan.** Un transcript son 30–60 KB y el plan lo pide *todo*
+>   workflow que arranca. El plan sigue trayendo las filas `archivo` (filtradas por `activo`, con el
+>   `carril` resuelto — ese filtro es de la fachada y no se duplica en un code node) y `colectar` trae
+>   **sólo los textos de esos ids** por PostgREST.
+> - ✅ **Verificado que eso no contradice [ADR-035](../adr/ADR-035-n8n-lee-por-la-fachada-escribe-por-postgrest.md):** su regla es sobre **config**. El motor de reels ya lee
+>   *datos* por PostgREST en `Leer procesados` y `Leer feed vivo`. **Config por la fachada, datos por
+>   PostgREST.**
+> - ⚠️ La `028` estaba **reservada de palabra** para la Fase 4 (ajustes), que sigue parada por
+>   entorno. Si esta entra primero, la de Fase 4 pasa a **`029`** y hay que corregir las dos
+>   menciones en `plan-motor-linkedin.md` y `workflow.yaml`.
+>
+> ### ⬜ Cómo se destraba
+>
+> 1. **Alejandro contesta A o B.** Es de producto: *¿el humano cura **ideas** o aprueba **posts
+>    terminados**?*
+> 2. Sale un **ADR** con la respuesta (y, si es B, con la etapa post-curación que falta nombrar).
+> 3. Si es **B**, además hay que **corregir el cableado del cierre 108** — `calidad` se mueve — y el
+>    stub deja de emitir posts terminados para emitir material crudo.
+> 4. Recién ahí: ADR + `028` + `colectar` personal.
+
+> ## 🔀 2026-08-12 (cierre 109) · EL SELECTOR DE PIPELINE NO HABÍA QUE CONSTRUIRLO, Y PRENDER `retia/linkedin` FUE EL PRIMER TEST REAL DE ADR-068
 >
 > **En una línea:** `retia/linkedin` pasó de `draft` a **`active`** (1 fila, cero código). Con eso el
 > **selector de pipeline de ADR-056 se dibuja por primera vez en producción**, y la fachada quedó

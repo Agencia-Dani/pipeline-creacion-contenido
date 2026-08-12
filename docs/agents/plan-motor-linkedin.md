@@ -109,12 +109,16 @@ manda esa cuenta la lee y dice si sirve. **Ese juicio es el entregable de la fas
 > es el ritual manual de ADR-053, y toca decidirlo aparte — con la instancia `30x/linkedin`, que ya
 > está `active`, y **0.3 hecho**, porque sin una voz con perfil el stub emite 0 piezas a propósito.
 
-> ❓ **La pregunta abierta de 1.4, que hay que resolver ANTES de escribirla:** ¿cómo entra el archivo
-> propio? Un podcast es audio y `enriquecer` es `n/a` en este pipeline (ADR-055 §3) — o sea que **no
-> hay transcripción**. Las salidas: (a) una persona pega texto ya transcrito, como el `transcribir`
-> de reels (ADR-031); (b) `fuente: archivo` guarda una URL y el motor baja texto; (c) se reabre
-> `enriquecer` y vuelve Supadata, que **contradice el manifest** y hay que decidirlo con ADR.
-> **No la resuelvo yo: cambia el contrato del pipeline.**
+> ✅ **La pregunta abierta de 1.4 quedó CONTESTADA el 2026-08-12: opción (a), una persona pega el
+> texto ya transcrito**, como el `transcribir` de reels (ADR-031). Descartadas: (b) guardar una URL y
+> que el motor baje el texto, (c) reabrir `enriquecer` con Supadata — contradecía el manifest.
+>
+> ⛔ **Pero contestarla destapó una más profunda, y ESA bloquea la 1.4: ¿qué es un candidato de
+> LinkedIn, material crudo o un post ya generado?** El manifest y ADR-055 §5 dicen una cosa, la
+> pantalla del Feed dice la otra, y la columna `texto` de la `020` **hedgea las dos** (*"el post **o
+> la idea**"*). Decide si `colectar` personal es construible hoy y si `calidad` está en el lugar
+> correcto. **Está escrita entera, con las dos lecturas y su evidencia, arriba de todo en
+> [handoff.md](./handoff.md).**
 
 ---
 
