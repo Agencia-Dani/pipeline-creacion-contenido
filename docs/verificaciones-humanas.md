@@ -224,17 +224,38 @@ salieron de que una persona apretara el botón. Es el argumento entero de este d
 La lógica tiene tests; falta el ojo. *No se probó desde una sesión de agente a propósito: habría
 requerido generar un magic link de la cuenta de otra persona.*
 
-## 4. 🔴 Que un **operador** NO vea los costos de proveedor *(Carril 0)*
+## 4. ✅ Que un **operador** NO vea los costos de proveedor — **CERRADA el 2026-08-12** *(Carril 0)*
 
-**Quién:** Mani, y **después** de que el gate de `entender/page.tsx` pase a `rol === "dev"` ·
-**1 minuto.**
+**La cerró Alejandro**, mirando `/retia/reels/entender` con las dos cuentas:
 
-Con gente de Retia adentro, eso es el margen de la agencia, y el gate **falla hacia MOSTRAR**.
+| Cuenta | Rol en `retia` | La tarjeta "Costos de la semana" |
+|---|---|---|
+| **Alejandro 30X** (`es_dueno: false`) | `operador` | ❌ **no aparece** |
+| Alejandro Dávila | `dev` (por `es_dueno`) | ✅ aparece |
 
-- Con cuenta **`operador`** en `/retia/reels/entender`: **no** aparece la tarjeta de costos.
-- Con cuenta **`dev`**: sí aparece.
+Era **la única de esta lista que bloqueaba dar de alta a alguien de Retia**. Ya no bloquea.
 
-**Es la única de esta lista que bloquea dar de alta a alguien de Retia.**
+🔑 **Lo que la destrabó no fue código: fue una cuenta.** Llevaba días esperando a Mani porque hacía
+falta un `operador` **real** con acceso a Retia, y no existía ninguno que no fuera del equipo de
+redes. Se creó dándole a `Alejandro 30X` —que ya era operador de `30x` y `estadox`, y **no es
+dueño**, que es lo que hace válida la prueba— una membresía `operador` en `retia`. *La prueba que
+falta a veces no espera trabajo: espera un dato.*
+
+🩸 **Y salió mal la primera vez, por las dos razones que este doc ya tenía escritas y nadie relee:**
+
+1. **Las dos pestañas eran la misma sesión.** La cookie es una por dominio **y por perfil de
+   navegador**, así que entrar con la segunda cuenta borró la primera y las dos mostraban al dueño.
+   Ver costos en las dos era el resultado *correcto* de la prueba mal montada. Ver el recuadro de
+   §4-bis: **dos perfiles de Chrome**, no dos ventanas y no incógnito.
+2. **La bajada de la pantalla decía "y costos de la semana" sin gate**, así que la pregunta
+   *"¿ves costos?"* tenía dos respuestas según si mirabas la frase o la tarjeta. **Ya está
+   arreglado** (`entender/page.tsx`): la frase ahora se corta con el mismo `puedeVerCostos` que la
+   tarjeta. *Una prueba de fuga que se puede contestar mal por una frase decorativa es una prueba
+   rota.*
+
+⚠️ **Cómo se lee bien, para la próxima:** lo que hay que buscar es **la tabla** de servicio ·
+consumo · monto, no la palabra *"costos"*. Y antes de creerle a nada, mirar **el nombre arriba a la
+derecha** de cada pestaña: si las dos dicen lo mismo, estás mirando una sola sesión.
 
 ## 4-bis. 🟡 **A7 — que dos personas en Operar se vean** *(nuevo del 06/08)*
 

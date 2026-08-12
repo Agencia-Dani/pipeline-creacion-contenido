@@ -63,9 +63,17 @@ export default async function EntenderPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Entender</h1>
+        {/* 🩸 El "y costos de la semana" iba SUELTO acá y la tarjeta sí estaba gateada, así que a un
+            operador esta bajada le prometía algo que la pantalla no le iba a mostrar. No era una
+            fuga —los números nunca viajaron, `leerCostos` ni se llama— pero es la familia de la
+            `015`: texto que describe algo ausente. Lo encontró la verificación #4 del 2026-08-12,
+            que quedó AMBIGUA por esto: "¿ves costos?" tiene dos respuestas distintas según si el
+            que mira lee la bajada o la tarjeta. Una prueba de fuga que se puede contestar mal por
+            una frase decorativa es una prueba rota. */}
         <p className="text-muted-foreground">
-          Precisión por proyecto, embudo del motor y costos de la semana. Todo sale de
-          Supabase, calculado en la base — acá no se edita nada.
+          Precisión por proyecto, embudo del motor
+          {puedeVerCostos ? " y costos de la semana" : ""}. Todo sale de Supabase, calculado en la
+          base — acá no se edita nada.
         </p>
       </div>
 

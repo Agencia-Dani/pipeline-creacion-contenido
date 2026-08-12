@@ -85,9 +85,35 @@
 > 2. Dicté un paso —*"selector de pipeline → LinkedIn"*— **que no podía ocurrir**. Ese control no se
 >    montaba para nadie.
 >
+> ### ✅ Y de rebote se cerró la verificación #4 — la única 🔴 que bloqueaba dar de alta a Retia
+>
+> Alejandro pidió darle a `Alejandro 30X` (su segunda cuenta, `es_dueno: false`, ya operador de `30x`
+> y `estadox`) una membresía **`operador` en `retia`**. Eso creó, sin querer, exactamente lo que la
+> verificación #4 llevaba días esperando de Mani: **un `operador` real con acceso a Retia**.
+> Verificado en `/retia/reels/entender`: la tarjeta *"Costos de la semana"* **no aparece** con el
+> operador y **sí** con el dev. *La prueba que falta a veces no espera trabajo: espera un dato.*
+>
+> 🩸 **Salió mal en el primer intento, por dos cosas que este repo ya tenía escritas:**
+>
+> 1. **Las dos pestañas eran la misma sesión** —una cookie por dominio **y por perfil de navegador**,
+>    así que el segundo login borró el primero—, y los dos veían costos. Era el resultado correcto de
+>    una prueba mal montada. Es literalmente la trampa que `verificaciones-humanas.md` §4-bis
+>    documenta y que ya había trabado esta misma prueba antes.
+> 2. 🔧 **La bajada de `entender` decía *"y costos de la semana"* SIN gate**, mientras la tarjeta sí
+>    lo tenía. No era fuga —`leerCostos` ni se llama— pero hacía que *"¿ves costos?"* tuviera dos
+>    respuestas según si mirabas la frase o la tabla. **Arreglado**: la frase se corta con el mismo
+>    `puedeVerCostos`. *Una prueba de fuga que se puede contestar mal por una frase decorativa es una
+>    prueba rota.*
+>
+> 🔑 **Y el método que evitó un falso positivo caro:** con las dos capas —el gate de la UI y
+> `app.ve_costos()` en la base— afirmando que un operador no puede, la hipótesis correcta no era
+> *"encontramos una fuga"* sino *"la prueba está mal montada"*. Se pidió la evidencia que las separa
+> (¿la tabla o la frase?, ¿qué nombre dice cada pestaña?) **antes** de tocar una línea.
+>
 > ### ⬜ Lo que sigue
 >
-> 1️⃣ **Cargar la voz** (Fase 0.3) en `/retia/linkedin/curar/voces`. Retia ya tiene 3 voces ⇒ es
+> 1️⃣ **Cargar la voz** (Fase 0.3) en `/retia/linkedin/curar/voces`. **Medido: sigue sin hacerse** —
+>    las 4 tablas de LinkedIn están en 0 filas. Retia ya tiene 3 voces ⇒ es
 >    **"Configurar"**, no "Nueva voz". Gate: `run-plan` de `retia/linkedin` devuelve **`voces: 1`**.
 >    *Configurar una voz existente escribe **sólo** `app.voces_linkedin` y jamás `voces.activo`
 >    (`lib/voces-linkedin.ts`), así que no hay forma de tocar reels desde ahí.*
