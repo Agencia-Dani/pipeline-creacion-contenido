@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { marcarComoGrabada } from "./actions";
@@ -20,29 +19,49 @@ import { usarCockpit } from "../usar-cockpit";
 //
 // Se ofrece en TODA fila y no solo en las `listo`: si alguien grabó el video antes de que llegara su
 // transcripción, la herramienta no tiene por qué discutírselo.
-export function Grabado({ id, grabado }: { id: string; grabado: boolean }) {
+//
+// 🩸 **El estado lo lleva `Fila` y NO se refresca con `router.refresh()`, y eso es un arreglo, no un
+// atajo** (encontrado por Mani el 2026-08-18, apretando el botón en prod). Las filas de una tanda
+// abierta viven en el `useState` de `tanda.tsx` — bajan una sola vez por `cargarTanda`, y `abrir()`
+// tiene un `if (filas) return` que impide recargarlas. `router.refresh()` re-renderiza **server
+// components**: ese estado del cliente no lo toca ni puede tocarlo. La marca entraba a la base
+// (verificado: `grabado_en` escrito) y **la pantalla no cambiaba nada**, que es el peor de los dos
+// mundos — el operador vuelve a apretar creyendo que falló.
+//
+// Es el mismo patrón que `titulo` en `tanda.tsx`, con el mismo comentario: **el `revalidatePath` de
+// la acción sirve para la próxima carga entera; lo que se ve ahora lo pinta el cliente.**
+export function Grabado({
+  id,
+  grabado,
+  onCambio,
+}: {
+  id: string;
+  grabado: boolean;
+  onCambio: (grabado: boolean) => void;
+}) {
   const cockpit = usarCockpit();
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [enviando, startTransition] = useTransition();
 
   return (
     <span className="inline-flex items-center gap-2">
       <Button
-        variant={grabado ? "secondary" : "ghost"}
+        variant={grabado ? "secondary" : "outline"}
         size="sm"
         disabled={enviando}
         onClick={() =>
           startTransition(async () => {
             const r = await marcarComoGrabada(cockpit, id, !grabado);
-            setError(r.ok ? null : r.mensaje);
-            // Igual que en `Reintentar` y `Abandonar`: el `revalidatePath` de la acción invalida el
-            // cache del server, pero la lista que hay que repintar es la del cliente.
-            if (r.ok) router.refresh();
+            if (r.ok) {
+              setError(null);
+              onCambio(!grabado);
+              return;
+            }
+            setError(r.mensaje);
           })
         }
       >
-        {enviando ? "Guardando…" : grabado ? "✓ Grabado" : "Marcar como grabado"}
+        {enviando ? "Guardando…" : grabado ? "✓ Grabado · sacar marca" : "Marcar como grabado"}
       </Button>
       {error && <span className="text-xs text-destructive">{error}</span>}
     </span>

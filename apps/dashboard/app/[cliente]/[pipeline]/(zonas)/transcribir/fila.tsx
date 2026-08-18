@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { haceCuanto } from "@/domain/corrida";
 import type { Transcripcion } from "@/lib/transcripciones";
@@ -42,6 +43,17 @@ const BADGE_POR_ESTADO: Record<
 };
 
 export function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
+  // 🩸 **Optimista sobre el prop, igual que `titulo` en `tanda.tsx` y por la misma razón.** El
+  // `revalidatePath` de la acción sirve para la próxima carga entera, pero las filas de una tanda
+  // abierta viven en el `useState` de `tanda.tsx` (bajan una vez, y `abrir()` tiene un
+  // `if (filas) return`), así que **ningún refresh del server las repinta**. Sin esto, marcar
+  // grababa en la base y la pantalla no acusaba recibo — lo encontró Mani apretando el botón en
+  // prod el 18/08.
+  //
+  // Vive acá y no adentro de `Grabado` porque son **dos** cosas las que tienen que cambiar: el badge
+  // de esta línea y el botón de abajo. `Fila` es el ancestro común más chico.
+  const [grabado, setGrabado] = useState(t.grabado_en !== null);
+
   return (
     <li className="space-y-2 border-b pb-4 last:border-0 last:pb-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -57,7 +69,7 @@ export function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
         {/* Un badge propio y no un `estado` más: grabar es ORTOGONAL a que la transcripción haya
             salido bien (ADR-069 §1). Una fila puede estar `Listo` y grabada a la vez, y esas son
             dos cosas que el operador necesita ver juntas, no una pisando a la otra. */}
-        {t.grabado_en && <Badge variant="secondary">Grabado</Badge>}
+        {grabado && <Badge variant="secondary">Grabado</Badge>}
         <span className="text-muted-foreground">
           {haceCuanto(t.creado_en, ahora)}
           {t.idioma && t.idioma !== "es" && ` · original en ${t.idioma}`}
@@ -93,7 +105,7 @@ export function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
         )}
         {/* Este va SIEMPRE, incluso en una fila fallada: si el video se grabó igual (por ejemplo
             porque alguien lo transcribió a oído), la marca sirve lo mismo para el próximo pegote. */}
-        <Grabado id={t.id} grabado={t.grabado_en !== null} />
+        <Grabado id={t.id} grabado={grabado} onCambio={setGrabado} />
       </span>
     </li>
   );

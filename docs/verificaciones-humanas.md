@@ -302,6 +302,18 @@ el circuito entero, de punta a punta:
    fuera una lista nueva. El aviso tiene que decir **"1 ya se grabó"** — y **no** *"1 ya lo pediste
    antes"*, que es lo que decía hasta hoy.
 
+> 🩸 **Los pasos 1 y 2 fallaron la primera vez que Mani los corrió (18/08), y el bug NO era el
+> botón.** La marca entraba a la base perfecto (`grabado_en` escrito, verificado por query) y **la
+> pantalla no acusaba recibo**: las filas de una tanda abierta viven en el `useState` de
+> `tanda.tsx`, y `router.refresh()` solo re-renderiza server components. Arreglado con estado
+> optimista en `Fila`, el mismo patrón que `titulo` ya usaba 40 líneas más arriba en ese archivo.
+> **La lección: un botón que escribe bien y no repinta se lee como un botón roto**, y el operador
+> vuelve a apretarlo.
+>
+> ⚠️ **`Reintentar` y `Abandonar` tienen el MISMO bug dentro de una tanda abierta** y sigue vivo:
+> los dos hacen `router.refresh()`. No se notó porque esos botones también salen en la **tarjeta de
+> fallidas**, que sí es server-rendered y ahí el refresh funciona. Pendiente de decisión de Mani.
+
 🔑 **El punto 3 es toda la prueba.** Los otros dos solo confirman que el botón guarda; el 3 confirma
 que **el montón nuevo le gana en precedencia a `enCola`** (ADR-069 §4). Un video grabado está
 *siempre* en la cola —se marca desde su propia fila, así que la fila existe por construcción— y si
