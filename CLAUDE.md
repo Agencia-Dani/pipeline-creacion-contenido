@@ -36,85 +36,18 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–028; se aplican a mano en el SQL Editor,
-  en orden). Al 2026-08-07, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
-  **las 27 primeras aplicadas**.
-  ⏳ **La [`028`](core/schema/028_grabado.sql) (ADR-069) está escrita y NO aplicada** — es la única
-  pendiente. Agrega `app.transcripciones.grabado_en` (una columna nullable, sin backfill y sin
-  índice) para que el pegote pueda avisar *"N de estos ya se grabaron"* antes de pagar. **Va antes
-  que el deploy de la pantalla**, como la `024`, la `025` y la `027`: `COLUMNAS` de
-  `lib/transcripciones.ts` ya la pide, y un `select` de una columna inexistente es `42703` — la
-  zona Transcribir entera deja de cargar. Su §Verificación se mide por su efecto desde afuera (un
-  PATCH con la forma exacta del toggle: `PGRST204` antes, `200 []` después).
-  ✅ **La [`027`](core/schema/027_tandas.sql) (ADR-064) entró el 2026-08-07 y se verificó por su
-  efecto**: `app.v_tandas` devuelve **9 tandas** con el reparto **52·48·2·2·2·1·1·1·1** (suma 110) y
-  `transcripciones?tanda_id=is.null` da **0** — el backfill no dejó huérfanas y el caso `null` no
-  quedó vivo. `app.autores_de_tandas()` existe con sus grants ajustados: llamarla con `service_role`
-  da **`42501`** (permiso), no `PGRST202` (no existe), que es la respuesta correcta — el `grant` es
-  solo para `authenticated`, que es el rol con el que entra la app. Trae tabla + `tanda_id` + la
-  vista de cabeceras + policy + esa función.
-  🧪 **Se corrió entera contra un Postgres local con la forma de prod antes de tocar nada**
-  (110 filas / 9 grupos): produce las 9 tandas con el reparto exacto **52·48·2·2·2·1·1·1·1**, cero
-  huérfanas, cero grupos fusionados, es **idempotente** (segunda corrida = mismo estado) y su policy
-  aísla —una sesión que alcanza otra empresa ve 0 tandas y el `with check` le rechaza el insert—.
-  🔴 Ese ensayo **encontró una guarda que faltaba**: `app.v_tandas` es `security_invoker` y cruza
-  `app.transcripciones`, así que sin `select` sobre ella la pantalla entera muere con `42501` (el
-  modo de falla que documenta la `021` §4). En prod el grant está desde la `021`, pero el §0 ahora lo
-  afirma en vez de asumirlo — y la guarda se verificó **poniéndola roja**.
-  🆕 **La `026` (ADR-062) metió al transcriptor en el sistema**: el estado `abandonado` en
-  `app.transcripciones` y `transcripcion_a_pedido` en el catálogo de `outputs.tipo`. **Ese segundo
-  cambio no estaba previsto y lo cazó un sondeo, no un review:** la ADR afirmaba que `outputs.tipo`
-  no tenía check duro, citando media frase de la `001` — la otra media dice *"cuando se selle, se
-  agrega el check en 002"*, y la `002` lo selló. El POST con la forma exacta de la app devolvió
-  **23514**, y el mismo con `tipo = 'guion_reel'` devolvió **23503**. *Regla que sale de ahí: una
-  nota de diseño de una migración vieja describe una intención, no el estado — verificalo.*
-  🧹 **La `022` (ADR-059) podó la "balde 2"**: 5 vistas sin consumidor, `outputs.publicado_en`,
-  `runs.costo_estimado`, `instances.config_ref` y las 6 `airtable_id`.
-  ✅ **Y la `023` cerró la otra mitad el 2026-08-07** (las 4 columnas write-only de
-  `processed_items` + `outputs.source_items` + `transcripciones.pedido_por`). Llevaba gate humano
-  porque el modo de falla es mudo: PostgREST rechaza el **insert entero** con `PGRST204` si el body
-  trae una columna que no existe, y esos POST son `onError: continue`, así que el 400 se traga y
-  deja al motor cerrando **en verde y sin memoria de dedup**.
-  🔬 **Se firmó midiendo, no afirmando, y el §0 del archivo estaba equivocado sobre eso.** Decía que
-  una corrida que ya no manda las columnas escribe filas *"idénticas"* a una que sí: **no, las deja
-  en NULL**, y ese contraste (run del 03/08 con dato vs. las 48 filas del 06/08 en NULL) es
-  exactamente la prueba que se creía imposible. Después de aplicarla se sondeó el camino de
-  escritura **sin escribir nada**: el POST con la forma exacta del motor y un `instance_id`
-  inexistente devuelve **`23503`** (pasó la validación de schema, aborta por FK), y el mismo POST
-  con `url` agregada devuelve **`PGRST204`**. El camino está sano.
-  ✅ **La ventana del expand se cerró**: la `019` mató `usuarios.rol` y `usuarios.client_id`, y el
-  acceso vive solo en `app.usuarios_clientes` (**9 filas** al 06/08 — `retia` 5 operadores + 2 devs,
-  `30x` y `estadox` 1 operador cada uno, sobre 8 usuarios, 2 de ellos `es_dueno`) + el flag
-  `es_dueno` (ADR-051).
-  ⚠️ **Una migración con gate humano no se da por aplicada porque se haya corrido, sino cuando se
-  mide su efecto**: la `019` se corrió el 03/08 sin error visible y **no había entrado** — el
-  `raise exception` del §0 abortaba la transacción entera. Se midió, se firmó el gate y entró el 04/08.
-  ✅ **La `021` (RLS, Capa 2 de ADR-047) DEJÓ DE SER INERTE el 2026-08-05** (`d8edea2`): el flip de
-  `scoped.ts` está en producción y el cockpit lee con la sesión del usuario, así que sus policies
-  se evalúan de verdad. *(Son **19**, contadas en el SQL el 06/08 — los docs venían diciendo 17.)* **El `service_role` quedó solo donde no hay sesión**: la fachada de ADR-028 y
-  las escrituras de n8n por PostgREST (ADR-035).
-  🔑 **Cómo sabe `scoped()` bajo qué autoridad corre:** el `TenantContext` lleva
-  `origen: "sesion" | "fachada"`, estampado en los dos únicos constructores que existen
-  (`armarContexto` en `domain/tenant.ts` y `contextoDeFachada` en `lib/tenant.ts`). **No es
-  cosmético**: la fachada comparte `scoped()` con el cockpit —`run-plan` llega por `lib/config.ts`—
-  así que sin esa marca el flip dejaba al motor con `42501` y sin plan que leer. El porqué completo,
-  y la ventana de ADR-047 que se cerró **sin** suspender cockpits, en
-  [ADR-058](docs/adr/ADR-058-el-flip-de-la-capa-2.md).
-  ✅ **El agujero que la `021` NO cubría está tapado:** las 4 tablas `*_linkedin` de la `020` nacieron
-  con RLS enabled y **cero policies**; la [`024`](core/schema/024_rls_linkedin.sql) se aplicó el
-  2026-08-06 y les puso las suyas, **grano instancia** (`instancias_visibles` en el `qual`, no
-  `clientes_`, que era el error fácil porque su hermana de reels es por empresa).
-  📏 **Medido el 06/08 en `pg_policies`: 26 policies** (19 de la `021` + 4 de la `024` + 1 del `007`
-  + 2 de la `025`), y el check *"¿queda alguna tabla con tenant, RLS y sin policy?"* corrido **contra
-  prod** por primera vez da **cero filas** — antes y después de la `025`. ⏳ Lo que falta es ejercitar
-  las de LinkedIn **con filas** (las 4 tablas están vacías): es la prueba de
-  [plan-multi-tenant §14.6](docs/agents/plan-multi-tenant.md), escrita paso a paso.
-  🔐 **La `025` (ADR-060) cerró el margen de la agencia en la base**, no solo en la UI: `app.tarifas`
-  dejó de ser `using (true)` y ahora pregunta `app.ve_costos()`. **Medido con sesiones reales contra
-  prod: un `operador` obtiene 0 tarifas, un `dev` las 8.** Y las funciones `usuarios_visibles()` /
-  `emails_visibles()` dejan a la agencia **fuera de toda superficie que liste personas** (ADR-051 §3),
-  por policy y no por un `.filter()` de React — verificado: **cero dueños asoman** en las 3 sesiones
-  probadas.
+- [core/schema/](core/schema/) — migraciones SQL de Supabase. **Se aplican a mano en el SQL Editor, en
+  orden**; el modelo vivo son las migraciones, no su descripción en prosa. Al 2026-08-07 están
+  **aplicadas las 001–027**, medidas contra prod **por su efecto** (PostgREST + `pg_policies`), no por
+  haberse corrido: *una migración con gate humano no se da por aplicada porque se haya ejecutado,
+  sino cuando se mide su efecto.*
+  ⏳ **La [`028`](core/schema/028_grabado.sql) (ADR-069) está escrita y NO aplicada — es la única
+  pendiente.** Agrega `app.transcripciones.grabado_en` (nullable, sin backfill, sin índice) para que
+  el pegote avise *"N de estos ya se grabaron"* antes de pagar. **Va antes que el deploy de la
+  pantalla**: `COLUMNAS` de `lib/transcripciones.ts` ya la pide, y un `select` de una columna
+  inexistente es `42703` — la zona Transcribir entera deja de cargar.
+  *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)
+  vive en sus ADRs, en [handoff.md](docs/agents/handoff.md) y en git — acá no se duplica.*
 
 **Runbooks (el N+1)**
 - [docs/runbooks/agregar-cliente.md](docs/runbooks/agregar-cliente.md) — dar de alta **una empresa**.
