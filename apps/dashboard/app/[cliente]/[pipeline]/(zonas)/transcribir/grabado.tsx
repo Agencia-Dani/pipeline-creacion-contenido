@@ -17,6 +17,13 @@ import { usarCockpit } from "../usar-cockpit";
 // deshace; este se deshace con el mismo clic. Un modal acá sería ruido sobre un acto que no destruye
 // nada — es plan-cockpit §3.3 en su otra dirección.
 //
+// 🎨 **El botón NO es el indicador de estado: eso lo dice el badge `✓ Grabado` de `Fila`.** Primero
+// se intentó que el botón fuera las dos cosas (relleno cuando está marcado) y no alcanzaba — el
+// cambio de fondo en un botón `sm` es casi imperceptible, y Mani reportó dos veces que "no hay
+// manera de saber si se marcó". La separación correcta es la de siempre: **el estado se muestra
+// fuerte, la acción se ofrece callada**. Por eso acá el botón se vuelve `ghost` cuando ya está
+// marcado (es una salida, no el protagonista) y dice literalmente qué hace, no en qué estado está.
+//
 // Se ofrece en TODA fila y no solo en las `listo`: si alguien grabó el video antes de que llegara su
 // transcripción, la herramienta no tiene por qué discutírselo.
 //
@@ -46,7 +53,7 @@ export function Grabado({
   return (
     <span className="inline-flex items-center gap-2">
       <Button
-        variant={grabado ? "secondary" : "outline"}
+        variant={grabado ? "ghost" : "outline"}
         size="sm"
         disabled={enviando}
         onClick={() =>
@@ -61,7 +68,7 @@ export function Grabado({
           })
         }
       >
-        {enviando ? "Guardando…" : grabado ? "✓ Grabado · sacar marca" : "Marcar como grabado"}
+        {enviando ? "Guardando…" : grabado ? "Sacar la marca de grabado" : "Marcar como grabado"}
       </Button>
       {error && <span className="text-xs text-destructive">{error}</span>}
     </span>

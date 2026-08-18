@@ -68,8 +68,13 @@ export function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
         </a>
         {/* Un badge propio y no un `estado` más: grabar es ORTOGONAL a que la transcripción haya
             salido bien (ADR-069 §1). Una fila puede estar `Listo` y grabada a la vez, y esas son
-            dos cosas que el operador necesita ver juntas, no una pisando a la otra. */}
-        {grabado && <Badge variant="secondary">Grabado</Badge>}
+            dos cosas que el operador necesita ver juntas, no una pisando a la otra.
+            🎨 Y va en `default` (color de acento), NO en `secondary`, que fue el primer intento y
+            no servía: **`listo` ya usa `secondary`** (`BADGE_POR_ESTADO`, arriba), así que la marca
+            quedaba como una segunda pastilla gris idéntica pegada a la primera — presente en el DOM
+            e invisible para el ojo. Mani lo reportó dos veces. Este badge ES el acuse de recibo del
+            botón; la acción de sacarlo se ofrece callada, abajo. */}
+        {grabado && <Badge>✓ Grabado</Badge>}
         <span className="text-muted-foreground">
           {haceCuanto(t.creado_en, ahora)}
           {t.idioma && t.idioma !== "es" && ` · original en ${t.idioma}`}

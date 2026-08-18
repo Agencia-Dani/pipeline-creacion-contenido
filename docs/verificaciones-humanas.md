@@ -310,6 +310,14 @@ el circuito entero, de punta a punta:
 > **La lección: un botón que escribe bien y no repinta se lee como un botón roto**, y el operador
 > vuelve a apretarlo.
 >
+> 🎨 **Y hubo un SEGUNDO arreglo, porque el primero no alcanzó.** Con el estado ya funcionando, Mani
+> volvió a reportar *"no hay manera de saber si se marcó"* — y tenía razón: el badge se había puesto
+> en `variant="secondary"`, **el mismo que usa `listo`**, así que quedaban dos pastillas grises
+> idénticas pegadas. El cue existía en el DOM y no existía para el ojo. Ahora el badge va en
+> `default` (color de acento) y el botón deja de intentar ser indicador: **el estado se muestra
+> fuerte (`✓ Grabado`), la acción se ofrece callada (`Sacar la marca de grabado`)**.
+> *Generalizable: un indicador nuevo se elige contra los que YA están en esa línea, no en abstracto.*
+>
 > ⚠️ **`Reintentar` y `Abandonar` tienen el MISMO bug dentro de una tanda abierta** y sigue vivo:
 > los dos hacen `router.refresh()`. No se notó porque esos botones también salen en la **tarjeta de
 > fallidas**, que sí es server-rendered y ahí el refresh funciona. Pendiente de decisión de Mani.
