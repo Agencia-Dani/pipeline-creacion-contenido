@@ -19,6 +19,13 @@ import { usarCockpit } from "../usar-cockpit";
 // reintento "no hacía nada". El `revalidatePath` invalida el cache del server, pero acá lo que
 // tiene que cambiar es el prop `pendientes` que dispara el efecto, y eso pide re-render del cliente.
 // El pegote no lo notaba porque ahí el `setResultado`/`setTexto` ya provocaban uno.
+//
+// 🔁 **Y desde el 2026-08-18 ese mismo refresh es lo que repinta la fila.** Hasta entonces no lo
+// hacía: dentro de una tanda abierta las filas viven en el `useState` de `tanda.tsx` y el refresh no
+// las toca, así que esto escribía bien y la pantalla no acusaba recibo — el segundo clic devolvía
+// *"Ese enlace ya no se puede reintentar"* sobre algo que había funcionado. El arreglo no está acá:
+// `tanda.tsx` mira los contadores de su cabecera (que este refresh baja de nuevo) y recarga sus
+// filas si cambiaron. Por eso este componente no necesita saber nada de la tanda que lo contiene.
 export function Reintentar({ id }: { id: string }) {
   const cockpit = usarCockpit();
   const router = useRouter();

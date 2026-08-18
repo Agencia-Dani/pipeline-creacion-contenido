@@ -39,7 +39,10 @@ export function Abandonar({ id }: { id: string }) {
             setError(r.ok ? null : r.mensaje);
             setConfirmando(false);
             // Igual que en `Reintentar`: el `revalidatePath` de la acción invalida el cache del
-            // server, pero la lista que hay que repintar es la del cliente.
+            // server, pero la lista que hay que repintar es la del cliente. Y también igual que
+            // ahí, este refresh baja la cabecera con `abandonadas` ya sumada, que es lo que hace
+            // que `tanda.tsx` recargue sus filas — sin eso la fila seguía ofreciendo el botón, y el
+            // cuarto clic (este pide confirmación) devolvía un error sobre algo que sí se abandonó.
             if (r.ok) router.refresh();
           });
         }}

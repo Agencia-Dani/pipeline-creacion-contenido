@@ -54,6 +54,19 @@ export function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
   // de esta línea y el botón de abajo. `Fila` es el ancestro común más chico.
   const [grabado, setGrabado] = useState(t.grabado_en !== null);
 
+  // 🔁 **Y cuando el prop trae un dato nuevo, gana el prop.** Desde que `tanda.tsx` recarga sus filas
+  // al cambiar los contadores, un `t` nuevo puede llegar sin que React remonte nada: la `key` es
+  // `t.id` y no cambia, así que este `useState` se quedaría con el valor con el que nació. Importa
+  // por el mismo caso de doble superficie que motivó la recarga — una fila fallada se dibuja **dos
+  // veces** (tarjeta de fallidas y tanda abierta), cada copia con su propio estado, y marcar grabado
+  // en una dejaba a la otra mintiendo. Es el patrón de React de ajustar estado durante el render:
+  // más barato que un efecto, que repintaría dos veces.
+  const [visto, setVisto] = useState(t.grabado_en);
+  if (visto !== t.grabado_en) {
+    setVisto(t.grabado_en);
+    setGrabado(t.grabado_en !== null);
+  }
+
   return (
     <li className="space-y-2 border-b pb-4 last:border-0 last:pb-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
