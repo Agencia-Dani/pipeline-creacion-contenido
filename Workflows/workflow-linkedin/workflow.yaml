@@ -67,7 +67,8 @@ inputs:
   filters:
     # ⚠️ NINGUNA de estas perillas existe todavía en `app.ajustes` (es de grano instancia y LinkedIn
     # no tiene filas), y por eso el plan de corrida NO trae `ajustes`. Las crea la Fase 4 con su
-    # migración `028`; hasta entonces viven acá como diseño y el motor las lleva en su `Config`.
+    # su migración (la próxima libre de `core/schema/` — la `028` se la llevó ADR-069); hasta
+    # entonces viven acá como diseño y el motor las lleva en su `Config`.
     # El umbral es POR CARRIL, y esa es la diferencia estructural con reels (ADR-055 §2).
     - { key: umbral_reacciones, type: number, scope: client, desc: "Carril copiable, fuente LinkedIn: piso de reacciones. NO aplica al carril personal, que no compite con nadie" }
     - { key: pins_por_consulta, type: number, scope: client, default: 20, desc: "Carril copiable, fuente Pinterest: cuántos pins traer por filtro. Acá el umbral es de pertinencia y formato, no de viralidad — un pin no tiene reacciones que comparar" }

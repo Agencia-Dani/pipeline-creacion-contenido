@@ -200,13 +200,16 @@ En este orden, y no al revés:
 
 ---
 
-## Fase 4 — Las perillas (migración `028`)
+## Fase 4 — Las perillas (migración: **la próxima libre**)
 
 Hoy los umbrales viven en el `Config` del workflow y **eso está bien mientras haya una instancia
 afinándolos**. Deja de estarlo cuando dos empresas quieran valores distintos: ahí `Config` obliga a
 un push por cada cambio y el equipo no puede tocarlo sin un dev.
 
-- La `028` hace `drop constraint ajustes_clave_check` (viene de la `014`, **está nombrado**) y lo
+- 🔢 **El número se toma cuando el archivo existe, no cuando un doc lo nombra.** Esta fase decía
+  `028` y **la `028` se la llevó `028_grabado.sql`** (ADR-069, aplicada el 2026-08-18) mientras esta
+  seguía parada. Miren `core/schema/` y tomen la siguiente, no lo que diga esta línea.
+- La migración hace `drop constraint ajustes_clave_check` (viene de la `014`, **está nombrado**) y lo
   vuelve a crear con la unión de vocabularios.
 - 🔴 **Toca `app.ajustes`, que reels usa todas las semanas.** La disciplina de la `027` pide
   **correrla contra un Postgres local con la forma de prod antes de tocar nada**. En la máquina de

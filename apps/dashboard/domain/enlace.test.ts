@@ -206,6 +206,7 @@ describe("repartirEnlaces", () => {
       enCola: [],
       fallados: [],
       vistosPorElMotor: [],
+      grabadas: [],
     });
   });
 
@@ -225,5 +226,34 @@ describe("repartirEnlaces", () => {
     const e = ig("10");
     const r = repartirEnlaces([e], new Set([claveDe(e)]), new Set(), new Set([claveDe(e)]));
     assert.deepEqual(r.nuevos, []);
+  });
+
+  it("🩸 grabado gana sobre 'en cola' (ADR-069): es el caso REAL, no un borde", () => {
+    // Un video grabado está SIEMPRE en la cola — se marca desde su propia fila, así que la fila
+    // existe por construcción. Si ganara `enCola`, el aviso diría "el guion está o viene en camino"
+    // sobre algo que ya se usó, y ese es exactamente el mensaje que manda a grabarlo de nuevo.
+    const e = ig("11");
+    const r = repartirEnlaces([e], new Set([claveDe(e)]), new Set(), new Set(), new Set([claveDe(e)]));
+    assert.deepEqual(r.grabadas.map((x) => x.external_id), ["11"]);
+    assert.deepEqual(r.enCola, []);
+    assert.deepEqual(r.nuevos, []);
+  });
+
+  it("🩸 grabado gana también sobre la memoria del motor y sobre fallado", () => {
+    // El otro orden dejaría "ya lo vio el motor" (que invita a transcribirlo igual) o "reintentalo"
+    // sobre un video que el equipo ya grabó. Las tres frases son verdad; solo una es la útil.
+    const e = ig("12");
+    const todos = new Set([claveDe(e)]);
+    const r = repartirEnlaces([e], todos, todos, todos, todos);
+    assert.deepEqual(r.grabadas.map((x) => x.external_id), ["12"]);
+    assert.deepEqual(r.fallados, []);
+    assert.deepEqual(r.vistosPorElMotor, []);
+  });
+
+  it("sin grabadas, el reparto es exactamente el de antes", () => {
+    // El parámetro es opcional a propósito: los tres call sites viejos no se tocan.
+    const r = repartirEnlaces([ig("13")], new Set(), new Set());
+    assert.deepEqual(r.nuevos.map((x) => x.external_id), ["13"]);
+    assert.deepEqual(r.grabadas, []);
   });
 });

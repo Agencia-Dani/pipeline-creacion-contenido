@@ -26,11 +26,13 @@ const filaTranscripcion = z.object({
   error: z.string().nullable(),
   creado_en: z.string(),
   procesado_en: z.string().nullable(),
+  // ADR-069: ortogonal a `estado`. NULL = no grabado, que es el estado normal de casi toda fila.
+  grabado_en: z.string().nullable(),
 });
 export type Transcripcion = z.infer<typeof filaTranscripcion>;
 
 const COLUMNAS =
-  "id, plataforma, external_id, url, estado, script, idioma, error, creado_en, procesado_en";
+  "id, plataforma, external_id, url, estado, script, idioma, error, creado_en, procesado_en, grabado_en";
 
 /** Los dos estados de los que solo se sale por el botón `Reintentar`. */
 export const ESTADOS_FALLIDOS = ["fallo", "sin_transcript"] as const;
@@ -319,6 +321,40 @@ export async function cualesFallidas(ctx: TenantContext, ids: string[]): Promise
   return claves;
 }
 
+/**
+ * Cuáles de esos links **ya se grabaron** (ADR-069).
+ *
+ * 🔑 **Es la única de las cuatro preguntas que responde "no lo vuelvas a mandar".** Las otras tres
+ * describen dónde está el link (en la cola, fallado, visto por el motor) y todas admiten un "pero
+ * transcribilo igual" razonable. Esta no: el guion ya se usó. Por eso `repartirEnlaces` le da
+ * precedencia sobre las tres.
+ *
+ * Pregunta por `grabado_en is not null` y no por una columna booleana: la marca guarda **cuándo**,
+ * porque es la pregunta que sigue siempre a "¿ya se grabó?" y cuesta lo mismo.
+ *
+ * Mismo troceo de 200 que sus hermanas: 400 links en un `in.()` arman una URL de varios KB y el
+ * límite del que se entera uno es el 414 en producción.
+ */
+export async function cualesGrabadas(ctx: TenantContext, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const s = await scoped(ctx);
+  const claves = new Set<string>();
+
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await s
+      .select("app.transcripciones", "plataforma, external_id")
+      .in("external_id", ids.slice(i, i + 200))
+      .not("grabado_en", "is", null);
+    if (error)
+      throw new Error(`Supabase respondió con error consultando las grabadas: ${error.message}`);
+    for (const fila of z
+      .array(z.object({ plataforma: z.string(), external_id: z.string() }))
+      .parse(data ?? []))
+      claves.add(`${fila.plataforma}:${fila.external_id}`);
+  }
+  return claves;
+}
+
 export async function cualesVistosPorElMotor(
   ctx: TenantContext,
   ids: string[],
@@ -398,5 +434,35 @@ export async function abandonar(ctx: TenantContext, id: string): Promise<boolean
     .in("estado", [...ESTADOS_FALLIDOS])
     .select("id");
   if (error) throw new Error(`Supabase respondió con error abandonando: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Prende o apaga la marca de "ya se grabó" (ADR-069 §5).
+ *
+ * 🔓 **Las dos direcciones en la misma función, y sin guardia de estado.** Es deliberado y es lo
+ * contrario de `abandonar` y `reencolar`, que sí filtran por `estado`: ahí el `.in(...)` impide que
+ * un POST a mano destruya un guion pagado. Acá no hay nada que destruir — desmarcar devuelve el
+ * estado exacto de antes — así que una guardia solo agregaría un modo de falla ("no se pudo marcar")
+ * sobre un acto que no tiene consecuencias.
+ *
+ * Tampoco filtra por `estado = 'listo'`: marcar un `pendiente` como grabado es raro pero no es un
+ * error del sistema. Si alguien grabó el video antes de que llegara su transcripción, la herramienta
+ * no tiene por qué discutírselo.
+ *
+ * Devuelve `false` cuando no tocó ninguna fila: o no existe, o no es de este cockpit (el filtro de
+ * `scoped` entra en el `update`). Las dos se contestan igual, y ninguna es un error del servidor.
+ */
+export async function marcarGrabado(
+  ctx: TenantContext,
+  id: string,
+  grabado: boolean,
+): Promise<boolean> {
+  const { data, error } = await (await scoped(ctx))
+    .update("app.transcripciones", { grabado_en: grabado ? new Date().toISOString() : null })
+    .eq("id", id)
+    .select("id");
+  if (error)
+    throw new Error(`Supabase respondió con error marcando lo grabado: ${error.message}`);
   return (data?.length ?? 0) > 0;
 }

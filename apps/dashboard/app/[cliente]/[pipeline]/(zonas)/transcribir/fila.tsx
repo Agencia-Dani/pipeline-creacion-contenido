@@ -5,6 +5,7 @@ import { haceCuanto } from "@/domain/corrida";
 import type { Transcripcion } from "@/lib/transcripciones";
 import { Abandonar } from "./abandonar";
 import { Copiar } from "./copiar";
+import { Grabado } from "./grabado";
 import { Reintentar } from "./reintentar";
 
 // La fila de un enlace. Vive en su propio archivo desde ADR-064 porque ahora la dibujan **dos**
@@ -53,6 +54,10 @@ export function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
         >
           {t.url}
         </a>
+        {/* Un badge propio y no un `estado` más: grabar es ORTOGONAL a que la transcripción haya
+            salido bien (ADR-069 §1). Una fila puede estar `Listo` y grabada a la vez, y esas son
+            dos cosas que el operador necesita ver juntas, no una pisando a la otra. */}
+        {t.grabado_en && <Badge variant="secondary">Grabado</Badge>}
         <span className="text-muted-foreground">
           {haceCuanto(t.creado_en, ahora)}
           {t.idioma && t.idioma !== "es" && ` · original en ${t.idioma}`}
@@ -79,12 +84,17 @@ export function Fila({ t, ahora }: { t: Transcripcion; ahora: Date }) {
           Las dos salidas van juntas a propósito: reintentar sirve cuando el fallo
           fue transitorio, y abandonar cuando no puede ganar nunca (un video sin voz). Con una sola
           de las dos, la fila queda ofreciendo un botón que pierde siempre (ADR-062 §4). */}
-      {(t.estado === "fallo" || t.estado === "sin_transcript") && (
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <Reintentar id={t.id} />
-          <Abandonar id={t.id} />
-        </span>
-      )}
+      <span className="inline-flex flex-wrap items-center gap-2">
+        {(t.estado === "fallo" || t.estado === "sin_transcript") && (
+          <>
+            <Reintentar id={t.id} />
+            <Abandonar id={t.id} />
+          </>
+        )}
+        {/* Este va SIEMPRE, incluso en una fila fallada: si el video se grabó igual (por ejemplo
+            porque alguien lo transcribió a oído), la marca sirve lo mismo para el próximo pegote. */}
+        <Grabado id={t.id} grabado={t.grabado_en !== null} />
+      </span>
     </li>
   );
 }

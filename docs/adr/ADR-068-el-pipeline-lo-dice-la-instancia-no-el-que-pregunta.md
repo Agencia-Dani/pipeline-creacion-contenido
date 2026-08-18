@@ -103,7 +103,7 @@
   | `voces` | las de la empresa **con su perfil de LinkedIn**. 🔴 El filtro de `motor` es **la existencia del perfil, jamás `voces.activo`** (ADR-067). Ese flag significa de facto *"corre en reels"* y la pantalla de LinkedIn crea las voces con `activo: false` a propósito ⇒ filtrar por él le daría al motor **cero voces en las tres marcas**, en verde |
   | `referentes` | el banco de `app.referentes_linkedin` prendido, con `carril` **ya resuelto** desde la fuente (decide qué umbral se aplica, ADR-055 §2: esa regla no puede quedar duplicada en un code node) y `proyecto_id` como string nullable, **no** como array de un elemento — esa forma es herencia de un campo *link* de Airtable y no se arrastra a un contrato nuevo |
   | ~~`proyectos`~~ | **no viaja.** En LinkedIn la unidad de config es la **voz**, no el proyecto: no hay corte por proyecto ni `N` que resolver |
-  | ~~`ajustes`~~ | **no viaja, y la ausencia es la decisión.** `app.ajustes` es de grano instancia y LinkedIn no tiene una sola fila (por eso su cockpit tampoco declara la pantalla `motor`, ADR-066). Servir `ajustes: []` sería la lista siempre vacía que se lee como *"todavía no lo configuraron"*. Las perillas del manifest llegan con la Fase 4 y su migración `028`, y **ese** es el día de agregar el campo |
+  | ~~`ajustes`~~ | **no viaja, y la ausencia es la decisión.** `app.ajustes` es de grano instancia y LinkedIn no tiene una sola fila (por eso su cockpit tampoco declara la pantalla `motor`, ADR-066). Servir `ajustes: []` sería la lista siempre vacía que se lee como *"todavía no lo configuraron"*. Las perillas del manifest llegan con la Fase 4 y su migración (~~`028`~~ — se la llevó ADR-069 el 18/08; es la próxima libre), y **ese** es el día de agregar el campo |
 
 - **Alternativas descartadas.**
 
@@ -151,5 +151,6 @@
     recibiendo 17 referentes de Instagram en un plan de LinkedIn. **La razón para respetarlo es la
     asimetría, no el riesgo: cuesta cero.** Es un `UPDATE` después de un deploy en vez de antes, y no
     hay nada que ganar al revés.
-  - **Deuda anotada:** cuando la Fase 4 aplique la `028`, el plan de LinkedIn gana `ajustes` y ese sí
+  - **Deuda anotada:** cuando la Fase 4 aplique su migración (~~`028`~~: se la llevó ADR-069 el
+    2026-08-18, es la próxima libre de `core/schema/`), el plan de LinkedIn gana `ajustes` y ese sí
     es un cambio de forma para un consumidor que para entonces va a existir.

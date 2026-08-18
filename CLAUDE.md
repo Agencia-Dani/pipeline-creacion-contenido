@@ -28,7 +28,7 @@ en §Agent skills; acá solo se ubican.
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–068, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–069, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -36,9 +36,16 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/ingesta-registro.md](core/contracts/ingesta-registro.md) — cómo un workflow reporta runs/outputs a Supabase.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
-- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–027; se aplican a mano en el SQL Editor,
+- [core/schema/](core/schema/) — migraciones SQL de Supabase (001–028; se aplican a mano en el SQL Editor,
   en orden). Al 2026-08-07, **medido contra prod por su efecto** (PostgREST + `pg_policies`), están
-  **las 27 de 27 aplicadas**. No queda ninguna pendiente.
+  **las 27 primeras aplicadas**.
+  ⏳ **La [`028`](core/schema/028_grabado.sql) (ADR-069) está escrita y NO aplicada** — es la única
+  pendiente. Agrega `app.transcripciones.grabado_en` (una columna nullable, sin backfill y sin
+  índice) para que el pegote pueda avisar *"N de estos ya se grabaron"* antes de pagar. **Va antes
+  que el deploy de la pantalla**, como la `024`, la `025` y la `027`: `COLUMNAS` de
+  `lib/transcripciones.ts` ya la pide, y un `select` de una columna inexistente es `42703` — la
+  zona Transcribir entera deja de cargar. Su §Verificación se mide por su efecto desde afuera (un
+  PATCH con la forma exacta del toggle: `PGRST204` antes, `200 []` después).
   ✅ **La [`027`](core/schema/027_tandas.sql) (ADR-064) entró el 2026-08-07 y se verificó por su
   efecto**: `app.v_tandas` devuelve **9 tandas** con el reparto **52·48·2·2·2·1·1·1·1** (suma 110) y
   `transcripciones?tanda_id=is.null` da **0** — el backfill no dejó huérfanas y el caso `null` no
@@ -161,7 +168,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..068).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..069).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

@@ -286,6 +286,37 @@ no una a propósito.
 🔑 **Lo que NO prueba:** dos clicks **simultáneos** siguen pasando los dos. Es la race de 1-2 s de
 ADR-023 C.3.3, aceptada y argumentada — la corta el guard de n8n, no la pantalla.
 
+## 4-ter. ⬜ **El botón "Marcar como grabado" y su aviso** *(nuevo del 18/08, ADR-069)*
+
+**Quién:** Majo o Jero · **2 minutos** · *No la puede cerrar un agente porque el aviso solo aparece
+si una persona marcó primero: la mitad del circuito es un hábito, no un query.*
+
+La `028` **ya está aplicada y verificada por su efecto** (129 filas, 0 grabadas, y un PATCH con la
+forma exacta del toggle devuelve `200 []` en vez de `PGRST204`, sin escribir nada). Lo que falta es
+el circuito entero, de punta a punta:
+
+1. En **Transcribir**, abrir una tanda y apretar **Marcar como grabado** en una fila `Listo`.
+   Tiene que aparecer el cartelito **Grabado** en esa fila.
+2. Apretarlo de nuevo. La marca tiene que **salir**, sin preguntar nada y sin romper la fila.
+3. Volver a marcarla, copiar **el link de esa misma fila**, y pegarlo en el campo de arriba como si
+   fuera una lista nueva. El aviso tiene que decir **"1 ya se grabó"** — y **no** *"1 ya lo pediste
+   antes"*, que es lo que decía hasta hoy.
+
+🔑 **El punto 3 es toda la prueba.** Los otros dos solo confirman que el botón guarda; el 3 confirma
+que **el montón nuevo le gana en precedencia a `enCola`** (ADR-069 §4). Un video grabado está
+*siempre* en la cola —se marca desde su propia fila, así que la fila existe por construcción— y si
+ganara `enCola`, el aviso diría *"el guion está o viene en camino"* sobre algo que ya se usó, que es
+exactamente el mensaje que manda a grabarlo de nuevo. El test de dominio ya cubre el orden
+(`enlace.test.ts`); esto cubre que la pantalla lo muestre.
+
+⚠️ **No gasta plata:** `revisarPegote` no escribe ni cobra, y aceptar el aviso saca el link de la
+lista antes de encolarlo. Se puede hacer con cualquier fila real sin consecuencias.
+
+🔴 **Y la mitad que ninguna prueba cierra:** si el equipo no toma el hábito de marcar, el aviso no
+aparece nunca y la columna es peso muerto. El canario está en ADR-069 §Consecuencias — a un mes,
+`select count(*) from app.transcripciones where grabado_en is not null`. Si da 0, la decisión estaba
+equivocada y lo que falta es otra cosa.
+
 ## 5. ✅ **V4 — el re-rank: CERRADO por Mani el 2026-08-07**
 
 *"Filtrar por aprobados en curar/feed sirve de maravilla."*

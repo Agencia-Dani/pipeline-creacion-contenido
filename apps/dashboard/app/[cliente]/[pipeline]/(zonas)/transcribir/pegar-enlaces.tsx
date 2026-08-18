@@ -23,6 +23,12 @@ import { usarCockpit } from "../usar-cockpit";
 // Se ofrece en vez de quitarlos solo porque "el motor ya lo vio" NO implica que exista el guion:
 // `processed_items` guarda todo lo que el motor consideró, aunque el gate lo haya matado antes de
 // transcribirlo. Quitarlo por default escondería la única forma de conseguir ese script.
+//
+// 🆕 **Desde ADR-069 son cuatro avisos y el nuevo va primero.** "Ya se grabó" es el único que dice
+// *no lo vuelvas a mandar*: los otros tres describen dónde está el link y todos admiten un
+// "transcribilo igual" razonable. Sale de un reporte de Majo que resultó falso en su letra (la
+// herramienta no repetía nada: 977 ids distintos de 977 filas) y verdadero en su fondo — el equipo
+// grababa videos y el sistema no tenía dónde anotarlo.
 export function PegarEnlaces() {
   const cockpit = usarCockpit();
   const [texto, setTexto] = useState("");
@@ -55,7 +61,11 @@ export function PegarEnlaces() {
         setResultado({ ok: false, mensaje: r.mensaje });
         return;
       }
-      const sobra = r.revision.yaEnCola + r.revision.fallados + r.revision.yaVistosPorElMotor;
+      const sobra =
+        r.revision.yaEnCola +
+        r.revision.fallados +
+        r.revision.yaVistosPorElMotor +
+        r.revision.yaGrabadas;
       if (sobra === 0) {
         const enviado = await pegarEnlaces(cockpit, texto);
         setResultado(enviado);
@@ -113,10 +123,22 @@ export function PegarEnlaces() {
         <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
           <div>
             <p className="font-medium">
-              {revision.yaEnCola + revision.fallados + revision.yaVistosPorElMotor} de estos{" "}
-              {validos.length} no hace falta transcribirlos.
+              {revision.yaEnCola +
+                revision.fallados +
+                revision.yaVistosPorElMotor +
+                revision.yaGrabadas}{" "}
+              de estos {validos.length} no hace falta transcribirlos.
             </p>
             <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
+              {/* Va PRIMERO en la lista, igual que en la precedencia de `repartirEnlaces`: es el
+                  único de los cuatro que dice "no lo vuelvas a mandar". Los otros tres describen
+                  dónde está el link y todos admiten un "transcribilo igual" razonable. */}
+              {revision.yaGrabadas > 0 && (
+                <li>
+                  <strong>{revision.yaGrabadas}</strong> <strong>ya se grabaron</strong>. Alguien del
+                  equipo los marcó desde la lista de abajo, así que el guion ya se usó.
+                </li>
+              )}
               {revision.yaEnCola > 0 && (
                 <li>
                   <strong>{revision.yaEnCola}</strong> ya los pediste antes — el guion está o viene

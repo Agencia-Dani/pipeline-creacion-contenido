@@ -15,9 +15,11 @@ import { LARGO_MAX_TITULO, tituloParaGuardar } from "@/domain/tanda";
 import {
   abandonar,
   contarPendientes,
+  marcarGrabado,
   leerFilasDeTanda,
   cualesEnCola,
   cualesFallidas,
+  cualesGrabadas,
   cualesVistosPorElMotor,
   encolarEnlaces,
   marcarResultado,
@@ -106,6 +108,8 @@ export type Revision = {
   /** Están en la cola pero terminaron mal: el guion NO viene, hay que reintentarlos desde la lista. */
   fallados: number;
   yaVistosPorElMotor: number;
+  /** El equipo ya grabó esos videos (ADR-069). El único montón que dice "no lo vuelvas a mandar". */
+  yaGrabadas: number;
   noReconocidos: number;
 };
 
@@ -142,12 +146,13 @@ export async function revisarPegote(
 
   try {
     const ids = validos.map((e) => e.external_id);
-    const [enCola, vistos, fallados] = await Promise.all([
+    const [enCola, vistos, fallados, grabadas] = await Promise.all([
       cualesEnCola(ctx, ids),
       cualesVistosPorElMotor(ctx, ids),
       cualesFallidas(ctx, ids),
+      cualesGrabadas(ctx, ids),
     ]);
-    const reparto = repartirEnlaces(validos, enCola, vistos, fallados);
+    const reparto = repartirEnlaces(validos, enCola, vistos, fallados, grabadas);
 
     return {
       ok: true,
@@ -156,6 +161,7 @@ export async function revisarPegote(
         yaEnCola: reparto.enCola.length,
         fallados: reparto.fallados.length,
         yaVistosPorElMotor: reparto.vistosPorElMotor.length,
+        yaGrabadas: reparto.grabadas.length,
         noReconocidos: invalidos.length,
       },
     };
@@ -252,6 +258,47 @@ export async function reintentarTranscripcion(
  * El reintento sirve cuando el fallo fue transitorio. Cuando el video **no tiene voz**, reintentar
  * no puede ganar nunca y la fila queda ofreciendo un botón que no gana. Esto la cierra (ADR-062 §4).
  */
+/**
+ * Prende o apaga la marca de "ya se grabó" (ADR-069 §5).
+ *
+ * 🔓 **No pide confirmación, a diferencia de `abandonarTranscripcion`, que está justo abajo.** Esa
+ * la pide porque no se deshace; esta se deshace con el mismo clic, así que un modal sería ruido
+ * sobre un acto sin consecuencias. Es el criterio de plan-cockpit §3.3 aplicado en su otra
+ * dirección: lo que no se puede deshacer se pregunta, lo que sí se deshace no.
+ *
+ * El evento SÍ se registra en las dos direcciones. Desmarcar es información: si alguien marca y
+ * desmarca seguido, el hábito no cuajó y eso es lo que hay que saber para juzgar esta decisión
+ * (ADR-069 §Consecuencias nombra el canario).
+ */
+export async function marcarComoGrabada(
+  enRuta: CockpitEnRuta,
+  id: string,
+  grabado: boolean,
+): Promise<ResultadoPegar> {
+  const { usuario, ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
+
+  let marcada: boolean;
+  try {
+    marcada = await marcarGrabado(ctx, id, grabado);
+  } catch (e) {
+    console.error(`[transcribir] falló marcar grabado ${id}:`, e);
+    return { ok: false, mensaje: "No se pudo guardar la marca. Probá de nuevo." };
+  }
+
+  if (!marcada) {
+    return { ok: false, mensaje: "Ese enlace ya no está. Recargá la página." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "transcribir.grabado", { transcripcion: id, grabado });
+  revalidatePath(rutaDe(comoRuta(cockpit), "transcribir"));
+  return {
+    ok: true,
+    mensaje: grabado
+      ? "Marcado como grabado. Si alguien vuelve a pegar este link, la herramienta lo avisa."
+      : "Marca sacada.",
+  };
+}
+
 export async function abandonarTranscripcion(
   enRuta: CockpitEnRuta,
   id: string,

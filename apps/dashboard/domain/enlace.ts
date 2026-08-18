@@ -154,6 +154,12 @@ export function parsearEnlaces(texto: string): LoteDeEnlaces {
  *    que *consideró*, aunque el pre-trim o el gate lo hayan matado antes de transcribirlo, así que
  *    puede no existir el guion en ningún lado. Por eso se ofrece quitarlos y no se quitan solos.
  *
+ *  · `grabadas` — el equipo ya grabó ese video (ADR-069). **Va primero en la precedencia**, y no
+ *    es cosmética: sin ella un grabado que está en la cola cae en `enCola` (*"el guion está o viene
+ *    en camino"*) y uno que trajo el motor cae en `vistosPorElMotor` (*"eso no garantiza que exista
+ *    el guion"*). Las dos frases son verdad y las dos son el mensaje equivocado — la pregunta que
+ *    el operador tiene enfrente es *"¿lo grabo otra vez?"*, y la respuesta es no.
+ *
  *  · `fallados` — está en la cola, pero terminó en `fallo` o `sin_transcript`. Es un montón aparte
  *    desde el 2026-08-07 y no es cosmético: contarlo junto con `enCola` hacía que la pantalla
  *    dijera *"el guion está o viene en camino"* sobre un link que **no viene**, y mandara a esperar
@@ -164,14 +170,15 @@ export function parsearEnlaces(texto: string): LoteDeEnlaces {
  * descartaría igual, así que la pantalla anunciaría *"1 en cola"* y no se encolaría nada. Volver a
  * pegar el link **nunca** puede arreglar una fila fallada; solo el botón puede.
  *
- * Precedencia: primero fallado, después en cola. Las dos son "ya está en la tabla", pero solo una
- * termina en un guion.
+ * Precedencia: **grabado gana sobre todo**, después fallado, después en cola. Las tres son "ya está
+ * en la tabla", pero cada una manda a una acción distinta y solo una termina en un guion nuevo.
  */
 export type Reparto = {
   nuevos: EnlaceVideo[];
   enCola: EnlaceVideo[];
   fallados: EnlaceVideo[];
   vistosPorElMotor: EnlaceVideo[];
+  grabadas: EnlaceVideo[];
 };
 
 export function repartirEnlaces(
@@ -179,11 +186,19 @@ export function repartirEnlaces(
   enCola: ReadonlySet<string>,
   vistosPorElMotor: ReadonlySet<string>,
   fallados: ReadonlySet<string> = new Set(),
+  grabadas: ReadonlySet<string> = new Set(),
 ): Reparto {
-  const reparto: Reparto = { nuevos: [], enCola: [], fallados: [], vistosPorElMotor: [] };
+  const reparto: Reparto = {
+    nuevos: [],
+    enCola: [],
+    fallados: [],
+    vistosPorElMotor: [],
+    grabadas: [],
+  };
   for (const e of validos) {
     const clave = claveDe(e);
-    if (fallados.has(clave)) reparto.fallados.push(e);
+    if (grabadas.has(clave)) reparto.grabadas.push(e);
+    else if (fallados.has(clave)) reparto.fallados.push(e);
     else if (enCola.has(clave)) reparto.enCola.push(e);
     else if (vistosPorElMotor.has(clave)) reparto.vistosPorElMotor.push(e);
     else reparto.nuevos.push(e);

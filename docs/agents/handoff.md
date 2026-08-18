@@ -94,9 +94,12 @@
 > - ✅ **Verificado que eso no contradice [ADR-035](../adr/ADR-035-n8n-lee-por-la-fachada-escribe-por-postgrest.md):** su regla es sobre **config**. El motor de reels ya lee
 >   *datos* por PostgREST en `Leer procesados` y `Leer feed vivo`. **Config por la fachada, datos por
 >   PostgREST.**
-> - ⚠️ La `028` estaba **reservada de palabra** para la Fase 4 (ajustes), que sigue parada por
->   entorno. Si esta entra primero, la de Fase 4 pasa a **`029`** y hay que corregir las dos
->   menciones en `plan-motor-linkedin.md` y `workflow.yaml`.
+> - ✅ **La colisión que este renglón anticipaba OCURRIÓ el 2026-08-18, y no por donde se esperaba:**
+>   la `028` se la llevó **`028_grabado.sql`** (ADR-069, ya aplicada en prod), que no era ninguna de
+>   las dos candidatas. Las dos menciones de `plan-motor-linkedin.md` y `workflow.yaml` **ya están
+>   corregidas**, y con ellas la regla que evita la próxima: **el número se toma cuando el archivo
+>   existe, no cuando un doc lo reserva.** Esta propuesta y la Fase 4 toman la próxima libre de
+>   `core/schema/` el día que se escriban — no se pre-asignan acá.
 >
 > ### ⬜ Cómo se destraba
 >
@@ -105,7 +108,108 @@
 > 2. Sale un **ADR** con la respuesta (y, si es B, con la etapa post-curación que falta nombrar).
 > 3. Si es **B**, además hay que **corregir el cableado del cierre 108** — `calidad` se mueve — y el
 >    stub deja de emitir posts terminados para emitir material crudo.
-> 4. Recién ahí: ADR + `028` + `colectar` personal.
+> 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
+>    `colectar` personal.
+
+> ## 🎬 2026-08-18 (cierre 110) · LA QUEJA MÁS RUIDOSA ERA FALSA, Y ADENTRO HABÍA UN HECHO VERDADERO QUE EL SISTEMA NO PODÍA SABER
+>
+> **En una línea:** Majo reportó que la herramienta *"saca repetidos y devuelve links rotos"*. Se
+> midió contra prod: **las dos afirmaciones son falsas sobre la herramienta**, pero adentro había un
+> hecho cierto que nadie podía ver — el equipo grababa videos y **el sistema no tenía dónde
+> anotarlo**. Sale ADR-069 + la `028` (aplicada) + el botón *Marcar como grabado*.
+>
+> ### 📏 Lo que se midió antes de escribir una línea de código
+>
+> | Afirmación | Medición | Veredicto |
+> |---|---|---|
+> | *"saca repetidos"* | `processed_items`: **977 filas / 977 `external_id` distintos**. Los 12 eventos `transcribir.pegar`: **`ya_estaban: 0` en los 12**. Los 50 links del doc de Mile: `primera_vez` = 07/08, todos | **falso** |
+> | *"los reels 30·31·33·39·41 no tienen link que sirva"* | Apify (el actor del propio motor): **30, 31, 33 y 39 borrados** (`not_found`), **41 VIVO** — es el duplicado del #11 | **4 de 5, y por borrado del autor** |
+> | *"la herramienta rompe los links"* | De los **64** links que la herramienta entregó en los dos docs, **1 caído**. Los otros 6 están en el carril pegado a mano | **falso** |
+>
+> ### 🔬 El método, que es lo que hay que llevarse
+>
+> La hipótesis fácil era el **formato de URL**: la herramienta emite siempre `/p/<shortcode>/`
+> (429/429 filas) y los rotos venían con `/reel/…?igsh=`. **Mani la falsificó bien:** *"si alguien
+> abre el link y lo re-copia, queda igual"*. Cierto, y por eso el formato es hipótesis y no prueba.
+> Lo que la cerró fueron **tres pruebas independientes que no dependen del formato**:
+>
+> 1. 🧬 **El guion.** Comparados los 45 transcripts del doc contra los **509 scripts guardados**
+>    (`candidatos.script` + `outputs.contenido_o_link` + `transcripciones.script`): los 14 del carril
+>    herramienta dan **0.99–1.00** contra el script **del mismo shortcode**; los 31 restantes dan
+>    **0.03–0.16**, ruido. Si la herramienta los hubiera producido, su guion estaría guardado.
+> 2. 👤 **El dueño.** **18 de esos 31** son de cuentas que **ni siquiera son referentes**
+>    (`swingtradinglab`, `andreacimi.trading`, `elliotrades`, `jdub_trades`…). El motor solo scrapea
+>    los 17 registrados.
+> 3. 🗃️ **`processed_items` está probadamente completa** — el hueco que Mani señalaba. Los **298**
+>    videos alguna vez entregados tienen su marca, **298/298**, en las 7 fechas de entrega. Cero
+>    huecos, así que la ausencia de esos 31 no es un fallo de registro.
+>
+> **Generalizable: cuando la partición "obvia" acierta 45/45, buscá una segunda señal que no comparta
+> su mecanismo.** El formato y la membresía en la base coincidían perfecto, y aun así el formato solo
+> no probaba nada.
+>
+> ### 🩸 El hecho verdadero que estaba adentro de la queja falsa
+>
+> `outputs.estado` admite `'publicado'` desde la `001` y tiene **0 filas**. `candidatos.estado` llega
+> hasta `aprobado`. **El ciclo se corta en la calificación:** un guion sale hacia un Google Doc, se
+> graba, y nada vuelve. `revisarPegote` no tenía un bug — contestó bien; **le faltaba un hecho que
+> nadie le contó nunca.**
+>
+> ### 🔑 Tres decisiones de ADR-069, y las tres las cambió medir
+>
+> - **Columna y no valor de `estado`.** Ahí `estado` es el ciclo del *trabajo de transcribir*; grabar
+>   es ortogonal (un `listo` puede estar grabado o no). Pisarlo perdería el resultado ya pagado y
+>   haría mentir a `reclamarPendientes`, `reencolar` y `abandonar`.
+> - **Solo en `app.transcripciones`, NO en `candidatos`.** Empezó queriendo las dos por simetría y
+>   medir lo tumbó: **el motor no puede proponer dos veces el mismo video** (298/298), así que esa
+>   columna nacía **sin escritor** — justo lo que la `023` acaba de podar. El pegote es el único
+>   carril donde un humano re-introduce un video.
+> - **No se reusó `outputs.estado = 'publicado'`**, que era la opción de cero columnas. Se cae
+>   midiendo: **`outputs.external_id` significa dos cosas distintas según el carril** (uuid del
+>   candidato en 93, record id de Airtable en 79, id del video en 128) ⇒ no hay clave por video. Y
+>   `leerAprobados` filtra `aprobado`: mover la fila **la borraría del histórico que lee Dani**.
+>
+> ### ✅ Estado
+>
+> **La `028` está APLICADA y verificada por su efecto** (Mani, 18/08): 129 filas / **0 grabadas**;
+> `estado` intacto (**128 `listo` + 1 `abandonado`**, idéntico a antes); y un PATCH con la forma
+> exacta del toggle e id falso da **`200 []`** donde antes daba `PGRST204` — **sin escribir ninguna
+> fila**. El código está deployado.
+>
+> 🔢 **Se llevó puesto un número reservado:** la `028` estaba apalabrada para la Fase 4 de LinkedIn.
+> Las menciones ya se corrigieron en `plan-motor-linkedin.md`, `workflow.yaml` y ADR-068, con la
+> regla que evita la próxima: **el número se toma cuando el archivo existe, no cuando un doc lo
+> reserva.**
+>
+> ⬜ **Falta el ojo humano:** [verificaciones-humanas §4-ter](../verificaciones-humanas.md). Los pasos
+> 1 y 2 solo confirman que el botón guarda; **el 3 es toda la prueba** — pegar el link de una fila ya
+> marcada tiene que decir *"1 ya se grabó"* y **no** *"1 ya lo pediste antes"*, que es lo que decía
+> hasta hoy. Eso confirma la precedencia sobre `enCola`, que es donde estaba el riesgo.
+>
+> 🔴 **Y la mitad que ningún test cierra: es el primer botón de Transcribir que NO es automático.**
+> Si el equipo no marca, el aviso no aparece nunca y la columna es peso muerto. **Canario a un mes:**
+> `select count(*) from app.transcripciones where grabado_en is not null`. Si da 0, la decisión
+> estaba equivocada y lo que falta es otra cosa.
+>
+> ### 🚨 Hallazgo lateral que NO es de esta tarea y urge más
+>
+> **El cockpit de Retia está frío hace 11 días.** Cero eventos humanos desde el **07/08 23:40**, y
+> **101 de 101 candidatos sin calificar** (el más viejo del 01/08). El motor sigue corriendo solo (4
+> el 10/08, 5 el 17/08) y el aviso de la corrida del 17/08 —*"posible caida de Supadata: 76% de
+> transcripciones vacias esta corrida"*— **no lo vio nadie**.
+> ⏳ **Con fecha:** el nodo `Barrer candidatos sin calificar` del archivado borra los `nuevo` de más
+> de 20 días, y el archivado corre los domingos 23:00 ⇒ **en la corrida del ~23/08 se borran solos
+> unos 86 candidatos** (los del 01, 02 y 03 de agosto) sin que nadie los haya mirado. Calificar antes,
+> o pausar ese nodo.
+> **Esto importa para el onboarding:** mandarle un botón nuevo a un equipo que no abre la herramienta
+> hace 11 días probablemente no mueva nada. Primero la conversación de por qué dejaron de entrar.
+>
+> **Verde:** `typecheck` · **292 tests** (+4) · `build` · `validate` **2290 checks** · **0 workflows
+> de n8n tocados** (nada de `n8n:push` ni re-import).
+> **Qué sigue:** **D3** sigue siendo el único item sin marcar del ROADMAP §3, y ahora arrastra el
+> problema de uso de arriba. **Skills sugeridas:** `/diagnose` si vuelve a llegar un *"la herramienta
+> hace X"* — el loop de esta sesión (medir la afirmación antes de creerla, buscar una segunda señal
+> que no comparta mecanismo con la primera) es exactamente el suyo.
 
 > ## 🔀 2026-08-12 (cierre 109) · EL SELECTOR DE PIPELINE NO HABÍA QUE CONSTRUIRLO, Y PRENDER `retia/linkedin` FUE EL PRIMER TEST REAL DE ADR-068
 >

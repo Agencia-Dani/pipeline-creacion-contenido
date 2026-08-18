@@ -656,18 +656,46 @@ chat de WhatsApp copiado entero con los mensajes y todo — la herramienta saca 
 muestra cuántos entendió **antes** de arrancar. Después van apareciendo los scripts en la lista de
 abajo, con un botón para copiar cada uno.
 
-**Tres cosas que conviene saber:**
+**Cuatro cosas que conviene saber:**
 
 - **Lo que pegan deja de aparecer en el Feed.** Ese es el punto: si ustedes ya trabajaron un video, la
   máquina no se los vuelve a recomendar la semana que viene. Se marca solo, no tienen que hacer nada.
 - **Pegar dos veces el mismo video no cuesta nada.** Si ya lo pidieron antes, les devuelve el script
   que ya estaba en vez de volver a procesarlo.
+- **Cuando graben un video, márquenlo.** ⬅️ *lo nuevo, 2026-08-18.* Ver abajo.
 - **Sirven links de Instagram (reels y posts de video) y de TikTok.** Los links cortos de TikTok (los
   `vm.tiktok.com/…` que salen del botón de compartir) **no** sirven: abrilo, y copiá el link largo de
   la barra de direcciones, el que tiene `/video/`.
 
 El script que sale es exactamente el mismo tipo de script que el del Feed: **literal**, el video tal
 cual traducido. La adaptación a la voz sigue siendo de ustedes.
+
+#### El botón "Marcar como grabado" (nuevo, 2026-08-18)
+
+Cada fila de la lista tiene ahora un botón **Marcar como grabado**. Cuando graben el video de ese
+guion, apriétenlo. Queda un cartelito **Grabado** en la fila, y si se equivocaron, el mismo botón lo
+saca — no se rompe nada, no pregunta nada.
+
+**Para qué sirve:** la próxima vez que alguien pegue una lista, si adentro hay un video que ustedes
+ya grabaron, la herramienta lo avisa **antes** de procesarlo:
+
+> *"3 ya se grabaron. Alguien del equipo los marcó desde la lista de abajo, así que el guion ya se usó."*
+
+Y les ofrece sacarlos de la lista con un clic.
+
+🔴 **Ojo, esto es lo primero de Transcribir que NO es automático.** Todo lo demás de esta pestaña se
+marca solo; esto no, porque la herramienta no tiene forma de enterarse de que ustedes grabaron algo.
+Si nadie marca, el aviso no aparece nunca y estamos igual que antes.
+
+**Por qué lo agregamos:** Majo avisó que en una lista venían videos que el equipo ya había grabado.
+Revisamos y la herramienta **no estaba repitiendo nada** (los 50 links de esa lista entraron por
+primera vez ese día, y el sistema tiene un candado que impide que un video se proponga dos veces).
+El problema era otro: **nadie le había dicho nunca a la herramienta qué se grabó.** Esto es esa
+conversación que faltaba.
+
+**Y lo importante:** esto **no arregla las listas viejas.** Empieza a proteger desde la primera vez
+que marquen. Lo que se grabó antes de hoy, la herramienta no lo sabe y no hay forma de que lo
+adivine.
 
 ---
 
