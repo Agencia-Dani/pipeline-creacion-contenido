@@ -204,8 +204,39 @@
 > **Esto importa para el onboarding:** mandarle un botón nuevo a un equipo que no abre la herramienta
 > hace 11 días probablemente no mueva nada. Primero la conversación de por qué dejaron de entrar.
 >
+> ### 🖥️ Y después de deployar aparecieron DOS bugs más, los dos de pantalla, los dos encontrados apretando el botón
+>
+> Ninguno de los dos lo habría cazado un test: el dominio estaba verde en las tres versiones.
+>
+> **1. El botón escribía bien y no repintaba** (`2cc59c6`). Mani apretó *Marcar como grabado* en prod
+> y no pasó nada visible. **La marca SÍ entraba** (`grabado_en` escrito en `DYn0DWFx6VK`, verificado
+> por query). Las filas de una tanda abierta viven en el `useState` de `tanda.tsx` —bajan una vez por
+> `cargarTanda`, y `abrir()` tiene un `if (filas) return`— así que **`router.refresh()` no puede
+> repintarlas**: solo re-renderiza server components. El patrón correcto estaba **40 líneas más
+> arriba en ese mismo archivo** (el `titulo` optimista, con el mismo comentario) y no se aplicó.
+> Arreglado subiendo el estado a `Fila`, que es el ancestro común del badge y del botón.
+> 🩸 **Un botón que escribe bien y no repinta se lee igual que un botón roto**, y el operador vuelve
+> a apretarlo — que acá significa **desmarcar sin saberlo**.
+>
+> **2. El cue existía en el DOM y no existía para el ojo** (`4c979fa`). Con el estado ya andando,
+> Mani volvió a reportar *"no hay manera de saber si se marcó"*, **y tenía razón**: el badge se había
+> puesto en `variant="secondary"`… que es **exactamente el que usa `listo`** (`BADGE_POR_ESTADO`, 20
+> líneas más arriba). Quedaban **dos pastillas grises idénticas pegadas**. Y el botón pasaba de
+> `outline` a `secondary`, imperceptible en un `sm`. El error de fondo: el botón intentaba ser **la
+> acción y el indicador a la vez**. Separados — badge `default` con `✓ Grabado` (el estado, fuerte) y
+> botón `ghost` diciendo *"Sacar la marca de grabado"* (la acción, callada).
+> 🩸 **Un indicador nuevo se elige contra los que YA están en esa línea, no en abstracto.**
+>
+> ⚠️ **`Reintentar` y `Abandonar` tienen el bug 1 y SIGUE VIVO.** Los dos hacen `router.refresh()`.
+> No se nota porque esos botones también salen en la **tarjeta de fallidas**, que sí es
+> server-rendered; **dentro de una tanda abierta no acusan recibo**. Señalado, no arreglado: es otra
+> semántica (cambian `estado`, que además hace desaparecer los botones) y la decisión de tocarlo
+> quedó para Mani.
+>
 > **Verde:** `typecheck` · **292 tests** (+4) · `build` · `validate` **2290 checks** · **0 workflows
 > de n8n tocados** (nada de `n8n:push` ni re-import).
+> **3 commits pusheados:** `8d46295` (ADR-069 + `028` + la pantalla) · `2cc59c6` (el repintado) ·
+> `4c979fa` (el cue). ✅ **Verificado con los ojos por Mani en producción.**
 > **Qué sigue:** **D3** sigue siendo el único item sin marcar del ROADMAP §3, y ahora arrastra el
 > problema de uso de arriba. **Skills sugeridas:** `/diagnose` si vuelve a llegar un *"la herramienta
 > hace X"* — el loop de esta sesión (medir la afirmación antes de creerla, buscar una segunda señal
