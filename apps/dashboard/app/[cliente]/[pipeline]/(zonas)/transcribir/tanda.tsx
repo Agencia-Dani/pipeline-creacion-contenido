@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { claveDe } from "@/domain/enlace";
 import { LARGO_MAX_TITULO, resumenDeTanda, tituloDeTanda } from "@/domain/tanda";
 import type { CabeceraTanda } from "@/lib/tandas";
 import type { Transcripcion } from "@/lib/transcripciones";
@@ -37,6 +38,9 @@ export function Tanda({
 }) {
   const cockpit = usarCockpit();
   const [filas, setFilas] = useState<Transcripcion[] | null>(null);
+  // Las claves de los videos ya grabados, que bajan JUNTO con las filas (ADR-070). No pueden llegar
+  // por otro lado: la marca ya no es una columna de la fila y esta lista se dibuja en el cliente.
+  const [grabadas, setGrabadas] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [cargando, startCarga] = useTransition();
 
@@ -53,6 +57,7 @@ export function Tanda({
       const r = await cargarTanda(cockpit, cabecera.id);
       if (r.ok) {
         setFilas(r.filas);
+        setGrabadas(new Set(r.grabadas));
         setError(null);
       } else {
         setError(r.mensaje);
@@ -131,7 +136,12 @@ export function Tanda({
           ) : filas && filas.length > 0 ? (
             <ul className="space-y-4">
               {filas.map((t) => (
-                <Fila key={t.id} t={t} ahora={ahora} />
+                <Fila
+                  key={t.id}
+                  t={t}
+                  ahora={ahora}
+                  grabadaInicial={grabadas.has(claveDe(t))}
+                />
               ))}
             </ul>
           ) : filas ? (

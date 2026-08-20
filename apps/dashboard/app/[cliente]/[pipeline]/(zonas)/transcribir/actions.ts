@@ -4,8 +4,9 @@ import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import type { TenantContext } from "@/domain/tenant";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { parsearEnlaces, repartirEnlaces } from "@/domain/enlace";
+import { claveDe, parsearEnlaces, repartirEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { exigirTenant } from "@/lib/auth";
+import { cualesGrabadas, desmarcar, marcar } from "@/lib/grabados";
 import { registrarEvento } from "@/lib/eventos";
 import { transcribir, traducir } from "@/lib/transcribir";
 import { abrirRunTranscriptor, barrerRunsZombieTranscriptor, cerrarRunTranscriptor } from "@/lib/runs";
@@ -15,11 +16,9 @@ import { LARGO_MAX_TITULO, tituloParaGuardar } from "@/domain/tanda";
 import {
   abandonar,
   contarPendientes,
-  marcarGrabado,
   leerFilasDeTanda,
   cualesEnCola,
   cualesFallidas,
-  cualesGrabadas,
   cualesVistosPorElMotor,
   encolarEnlaces,
   marcarResultado,
@@ -182,10 +181,17 @@ export async function revisarPegote(
 export async function cargarTanda(
   enRuta: CockpitEnRuta,
   tandaId: string,
-): Promise<{ ok: true; filas: Transcripcion[] } | { ok: false; mensaje: string }> {
+): Promise<{ ok: true; filas: Transcripcion[]; grabadas: string[] } | { ok: false; mensaje: string }> {
   const { ctx } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
   try {
-    return { ok: true, filas: await leerFilasDeTanda(ctx, tandaId) };
+    const filas = await leerFilasDeTanda(ctx, tandaId);
+    // 🔑 **Las marcas viajan con las filas, y tienen que hacerlo** (ADR-070). Antes el estado de
+    // grabado era una columna de la propia fila, así que venía gratis. Ahora vive en `app.grabados`,
+    // con clave por video, y una tanda abierta se dibuja **en el cliente** — si la marca no baja
+    // acá, no hay segundo momento en el que pueda llegar: `abrir()` tiene un `if (filas) return`.
+    // Es un array y no un Set porque cruza el límite del server: un Set no es serializable.
+    const grabadas = await cualesGrabadas(ctx, filas.map((f) => f.external_id));
+    return { ok: true, filas, grabadas: [...grabadas] };
   } catch (e) {
     console.error(`[transcribir] no se pudo cargar la tanda ${tandaId}:`, e);
     return { ok: false, mensaje: "No se pudieron cargar los enlaces. Probá de nuevo." };
@@ -258,8 +264,20 @@ export async function reintentarTranscripcion(
  * El reintento sirve cuando el fallo fue transitorio. Cuando el video **no tiene voz**, reintentar
  * no puede ganar nunca y la fila queda ofreciendo un botón que no gana. Esto la cierra (ADR-062 §4).
  */
+/** Lo que identifica al video que se marca. Zod porque cruza el límite del cliente. */
+const enlaceAMarcar = z.object({
+  plataforma: z.enum(["instagram", "tiktok"]),
+  external_id: z.string().min(1).max(30),
+  url: z.string().url().max(500),
+});
+
 /**
- * Prende o apaga la marca de "ya se grabó" (ADR-069 §5).
+ * Prende o apaga la marca de "ya se grabó" (ADR-069 §5, con la clave de ADR-070).
+ *
+ * ⚠️ **Recibe el VIDEO, no el id de la transcripción**, y ese cambio es toda la enmienda de ADR-070.
+ * Con el id de la fila, esto solo podía marcar links que hubieran pasado por el transcriptor — 128
+ * de los 183 guiones del histórico. Con `(plataforma, external_id)` marca cualquier video, venga del
+ * Feed, de acá, o de un Excel del equipo.
  *
  * 🔓 **No pide confirmación, a diferencia de `abandonarTranscripcion`, que está justo abajo.** Esa
  * la pide porque no se deshace; esta se deshace con el mismo clic, así que un modal sería ruido
@@ -268,28 +286,32 @@ export async function reintentarTranscripcion(
  *
  * El evento SÍ se registra en las dos direcciones. Desmarcar es información: si alguien marca y
  * desmarca seguido, el hábito no cuajó y eso es lo que hay que saber para juzgar esta decisión
- * (ADR-069 §Consecuencias nombra el canario).
+ * (ADR-070 §Consecuencias nombra el canario).
  */
 export async function marcarComoGrabada(
   enRuta: CockpitEnRuta,
-  id: string,
+  enlace: EnlaceVideo,
   grabado: boolean,
 ): Promise<ResultadoPegar> {
   const { usuario, ctx, cockpit } = await exigirTenant("transcribir", enRuta.cliente, enRuta.pipeline);
 
-  let marcada: boolean;
+  const parseo = enlaceAMarcar.safeParse(enlace);
+  if (!parseo.success) return { ok: false, mensaje: "Ese enlace no se pudo identificar." };
+  const video = parseo.data;
+
   try {
-    marcada = await marcarGrabado(ctx, id, grabado);
+    if (grabado) await marcar(ctx, video);
+    else await desmarcar(ctx, video.plataforma, video.external_id);
   } catch (e) {
-    console.error(`[transcribir] falló marcar grabado ${id}:`, e);
+    console.error(`[transcribir] falló marcar grabado ${claveDe(video)}:`, e);
     return { ok: false, mensaje: "No se pudo guardar la marca. Probá de nuevo." };
   }
 
-  if (!marcada) {
-    return { ok: false, mensaje: "Ese enlace ya no está. Recargá la página." };
-  }
-
-  await registrarEvento(ctx, usuario.id, "transcribir.grabado", { transcripcion: id, grabado });
+  // 🔑 **Ya no hay caso "no tocó ninguna fila".** Antes un `update` sobre un id inexistente devolvía
+  // 0 y había que avisar *"ese enlace ya no está"*. Ahora marcar es un insert idempotente (siempre
+  // llega al estado pedido) y desmarcar un delete (si no había nada, el estado pedido ya se cumplía).
+  // Las dos son idempotentes hacia el estado que el operador quiso, así que no hay nada que reportar.
+  await registrarEvento(ctx, usuario.id, "transcribir.grabado", { video: claveDe(video), grabado });
   revalidatePath(rutaDe(comoRuta(cockpit), "transcribir"));
   return {
     ok: true,

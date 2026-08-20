@@ -16,10 +16,21 @@ import { scoped } from "@/lib/supabase/scoped";
 
 export const POR_PAGINA = 25;
 
+/**
+ * Un guion del histórico, **sin su script**.
+ *
+ * 🔑 **El script salió del tipo a propósito** (ADR-070). La pantalla pasó de paginar de a 25 a traer
+ * el histórico entero —lo necesita para cruzarlo con las marcas de grabado y filtrar por ellas— y
+ * con los guiones adentro eso serían ~1,5 MB. Sin ellos son ~110 KB, el mismo orden que el feed
+ * aceptó en el cierre 98 cuando hizo exactamente este movimiento (405 KB → 16 KB).
+ *
+ * Que el campo **no exista** en el tipo, en vez de venir `null`, es la parte que importa: un `null`
+ * se dibujaría como *"Sin transcripción"* y estaría mintiendo sobre un guion que sí existe. Quien lo
+ * quiera lo pide con `textoDeHistorico`, que es un viaje por fila abierta.
+ */
 export type Historico = {
   id: string;
   titulo: string;
-  script: string | null;
   proyecto: string | null;
   voz: string | null;
   referente: string | null;
@@ -38,6 +49,9 @@ export type Historico = {
   origen: "feed" | "transcribir";
 };
 
+/** Con el guion adentro. Solo lo usa el CSV, que es justamente el artefacto que va a buscar texto. */
+export type HistoricoConScript = Historico & { script: string | null };
+
 const texto = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
 const numero = (v: unknown): number | null => (typeof v === "number" ? v : null);
 
@@ -48,27 +62,40 @@ const numero = (v: unknown): number | null => (typeof v === "number" ? v : null)
 const filaOutput = z.object({
   id: z.string(),
   titulo: z.string().nullable(),
-  contenido_o_link: z.string().nullable(),
+  // `.optional()` porque la lista NO lo pide (ADR-070): cuando la query no nombra la columna,
+  // PostgREST no la manda, y sin esto el parse se caería justo en el camino barato.
+  contenido_o_link: z.string().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
   calificado_en: z.string().nullable(),
 });
 
+// El tope existe para que esto no pueda convertirse en una query sin fondo el día que el histórico
+// crezca: **corta y avisa** en vez de tumbar el request en silencio. Con 183 filas hoy y ~60
+// aprobados por semana, 5.000 son ~18 meses — cuando muerda, la respuesta es paginar por fecha, no
+// subir el número.
+const TOPE_EXPORT = 5000;
+
 /**
- * Una página de aprobados, de a `POR_PAGINA`. Devuelve también si queda más, para que el botón
- * "Cargar más" exista solo cuando sirve.
+ * Una página de aprobados, de a `POR_PAGINA`. Devuelve también si queda más.
  *
  * El orden es por fecha de calificación descendente (lo último que el equipo decidió arriba),
  * con `id` como desempate para que la paginación sea estable: sin desempate, dos filas con el
  * mismo `calificado_en` pueden repetirse o saltearse entre páginas.
+ *
+ * `conScript` decide si viaja `contenido_o_link`, que es el campo gordo. Hoy solo lo pide el CSV.
  */
-export async function leerAprobados(
+async function leerPagina(
   ctx: TenantContext,
   pagina: number,
-): Promise<{ filas: Historico[]; hayMas: boolean; total: number }> {
+  conScript: boolean,
+): Promise<{ filas: HistoricoConScript[]; hayMas: boolean; total: number }> {
   const desde = pagina * POR_PAGINA;
+  const columnas = conScript
+    ? "id, titulo, contenido_o_link, metadata, calificado_en"
+    : "id, titulo, metadata, calificado_en";
 
   const { data, error, count } = await (await scoped(ctx))
-    .select("public.outputs", "id, titulo, contenido_o_link, metadata, calificado_en", { count: "exact" })
+    .select("public.outputs", columnas, { count: "exact" })
     .eq("estado", "aprobado")
     .order("calificado_en", { ascending: false })
     .order("id", { ascending: true })
@@ -100,30 +127,73 @@ export async function leerAprobados(
       // el archivado no trae la marca, y su ausencia significa "vino del feed": es el caso viejo y
       // el mayoritario, así que el default correcto es ese y no un "(desconocido)".
       origen: m.origen === "transcribir" ? "transcribir" : "feed",
-    } satisfies Historico;
+    } satisfies HistoricoConScript;
   });
 
   const total = count ?? filas.length;
   return { filas, hayMas: desde + filas.length < total, total };
 }
 
-// El histórico entero, para el CSV que reemplaza al Google Sheet (ADR-057). La pantalla pagina
-// de a 25 porque nadie lee 500 tarjetas; el archivo descargable es justamente lo contrario, así
-// que acá se recorren todas las páginas.
-//
-// El tope existe para que esto no pueda convertirse en una query sin fondo el día que el
-// histórico crezca: **corta y avisa** en vez de tumbar el request en silencio. Con 88 filas hoy
-// y ~60 aprobados por semana, 5.000 son ~18 meses — cuando muerda, la respuesta es paginar el
-// export por fecha, no subir el número.
-const TOPE_EXPORT = 5000;
-
-export async function leerTodosLosAprobados(
+/**
+ * **El histórico entero, sin guiones.** Es lo que carga la pantalla desde ADR-070.
+ *
+ * 🩸 **Por qué se dejó de paginar de a 25.** La pantalla ahora cruza cada guion con las marcas de
+ * `app.grabados` y filtra por *sin grabar / grabados*. Ese cruce **no se puede empujar a la query**:
+ * `outputs` no tiene columna con la clave del video —se deriva de `metadata.url_referente` en
+ * memoria (ADR-070)— así que filtrar sobre una página de 25 daría "3 grabados" cuando hay 40, y el
+ * contador mentiría sin que nada avise. O baja todo, o el filtro es falso.
+ *
+ * Lo que lo vuelve barato es que el `script` ya no viaja. **Medido contra prod el 2026-08-20, las
+ * 183 filas aprobadas:** sin guion **74.888 bytes**, con guion **299.508**. El campo gordo era el
+ * 75% del payload. Es el mismo trueque que hizo el feed en el cierre 98 (405 KB → 16 KB).
+ *
+ * ponytail: techo declarado. A partir de unos pocos miles de `outputs` esto pide una columna
+ * `video_key` en la tabla (con su backfill y el nodo del archivado escribiéndola), y ahí el filtro
+ * vuelve a la query y la paginación vuelve. Con ~60 aprobados por semana, eso es más de un año.
+ */
+export async function leerHistoricoCompleto(
   ctx: TenantContext,
 ): Promise<{ filas: Historico[]; truncado: boolean }> {
   const todas: Historico[] = [];
 
   for (let pagina = 0; todas.length < TOPE_EXPORT; pagina++) {
-    const { filas, hayMas } = await leerAprobados(ctx, pagina);
+    const { filas, hayMas } = await leerPagina(ctx, pagina, false);
+    todas.push(...filas);
+    if (!hayMas || filas.length === 0) return { filas: todas, truncado: false };
+  }
+  return { filas: todas.slice(0, TOPE_EXPORT), truncado: true };
+}
+
+/**
+ * El guion de UNA fila, cuando alguien la abre.
+ *
+ * El otro lado de haber sacado el script de la lista: se paga el texto de lo que alguien miró a
+ * propósito. Mismo patrón que `leerTextos` en el feed y que `cargarTanda` en Transcribir.
+ */
+export async function textoDeHistorico(
+  ctx: TenantContext,
+  id: string,
+): Promise<string | null> {
+  const { data, error } = await (await scoped(ctx))
+    .select("public.outputs", "contenido_o_link")
+    .eq("id", id)
+    .eq("estado", "aprobado")
+    .maybeSingle();
+  if (error)
+    throw new Error(`Supabase respondió con error leyendo el guion: ${error.message}`);
+  return texto(z.object({ contenido_o_link: z.string().nullable() }).nullable().parse(data ?? null)?.contenido_o_link);
+}
+
+// El histórico entero **con sus guiones**, para el CSV que reemplaza al Google Sheet (ADR-057).
+// Es el único camino que paga el `contenido_o_link` de todas las filas, y tiene sentido: un
+// descargable sin la columna SCRIPT no sirve para nada.
+export async function leerTodosLosAprobados(
+  ctx: TenantContext,
+): Promise<{ filas: HistoricoConScript[]; truncado: boolean }> {
+  const todas: HistoricoConScript[] = [];
+
+  for (let pagina = 0; todas.length < TOPE_EXPORT; pagina++) {
+    const { filas, hayMas } = await leerPagina(ctx, pagina, true);
     todas.push(...filas);
     if (!hayMas || filas.length === 0) return { filas: todas, truncado: false };
   }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import type { EnlaceVideo } from "@/domain/enlace";
 import { marcarComoGrabada } from "./actions";
 import { usarCockpit } from "../usar-cockpit";
 
@@ -38,11 +39,13 @@ import { usarCockpit } from "../usar-cockpit";
 // Es el mismo patrón que `titulo` en `tanda.tsx`, con el mismo comentario: **el `revalidatePath` de
 // la acción sirve para la próxima carga entera; lo que se ve ahora lo pinta el cliente.**
 export function Grabado({
-  id,
+  enlace,
   grabado,
   onCambio,
 }: {
-  id: string;
+  // ⚠️ **El VIDEO, no el id de la fila** (ADR-070). Con el id de la transcripción este botón solo
+  // podía existir en esta pantalla; con la clave del video, el mismo acto sirve en el histórico.
+  enlace: EnlaceVideo;
   grabado: boolean;
   onCambio: (grabado: boolean) => void;
 }) {
@@ -58,7 +61,7 @@ export function Grabado({
         disabled={enviando}
         onClick={() =>
           startTransition(async () => {
-            const r = await marcarComoGrabada(cockpit, id, !grabado);
+            const r = await marcarComoGrabada(cockpit, enlace, !grabado);
             if (r.ok) {
               setError(null);
               onCambio(!grabado);
