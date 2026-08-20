@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { aCsv } from "@/domain/csv";
 import { claveDe, parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { armarRegistro, estaGrabada } from "@/domain/grabados";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
@@ -133,11 +132,11 @@ export async function verGuion(
   }
 }
 
-// ── Los dos CSV ──────────────────────────────────────────────────────────────
+// ── Los dos archivos descargables ────────────────────────────────────────────
 //
 // Las 15 primeras columnas son las del Google Sheet Histórico, en su orden, y no es coincidencia:
-// este CSV **es** el reemplazo del Sheet (ADR-057), así que quien tenga una planilla armada encima
-// del export viejo la puede seguir usando. Salen de `Preparar filas Sheet` del archivado.
+// este export **es** el reemplazo del Sheet (ADR-057), así que quien tenga una planilla armada
+// encima del export viejo la puede seguir usando. Salen de `Preparar filas Sheet` del archivado.
 //
 // `ESTADO` va aunque acá siempre valga `aprobado`: la columna existía en el Sheet, y una columna
 // que desaparece rompe la planilla de quien la esté leyendo por posición.
@@ -152,12 +151,24 @@ const COLUMNAS = [
   "RELEVANCIA SCORE", "RELEVANCIA RAZON", "ORIGEN", "GRABADO EN",
 ] as const;
 
-export type ResultadoCsv =
-  | { ok: true; csv: string; nombre: string; filas: number; truncado: boolean }
+export type ResultadoExport =
+  | {
+      ok: true;
+      /** Los encabezados y las filas crudas: el archivo lo arma el cliente (ver abajo). */
+      encabezados: readonly string[];
+      filas: unknown[][];
+      nombre: string;
+      truncado: boolean;
+    }
   | { ok: false; mensaje: string };
 
 /**
- * El histórico como CSV. `soloGrabados` decide qué filas trae; **las columnas son las mismas**.
+ * El histórico para descargar. `soloGrabados` decide qué filas trae; **las columnas son las mismas**.
+ *
+ * 📦 **Devuelve filas, no un archivo** (ADR-071). El `.xlsx` lo arma el cliente con `aXlsx`, que es
+ * dominio puro y corre en los dos lados: así lo que cruza la red sigue siendo datos serializables
+ * y no un blob binario que habría que pasar a base64 y de vuelta. Es la misma forma que tenía con
+ * el CSV —el server mandaba el texto y el cliente hacía el `Blob`—, movida un escalón.
  *
  * 🔑 **Los dos botones no traen el mismo universo, y es a propósito** (decidido con Mani el
  * 2026-08-20):
@@ -174,10 +185,10 @@ export type ResultadoCsv =
  * nuevo, y así el export pasa por **la misma guardia de tenant** que la pantalla, sin una segunda
  * copia de esa lógica que se pueda atrasar.
  */
-export async function exportarCsv(
+export async function exportar(
   enRuta: CockpitEnRuta,
   soloGrabados = false,
-): Promise<ResultadoCsv> {
+): Promise<ResultadoExport> {
   const { ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
   try {
@@ -189,40 +200,39 @@ export async function exportarCsv(
     // Se arma el registro igual que la pantalla —con la misma función— para que el archivo y lo que
     // se ve no puedan divergir. Dos implementaciones del mismo cruce serían dos verdades.
     const registro = armarRegistro(filas, marcas);
-    const aExportar = soloGrabados ? registro.filter(estaGrabada) : registro.filter((f) => f.tipo === "guion");
+    const aExportar = soloGrabados
+      ? registro.filter(estaGrabada)
+      : registro.filter((f) => f.tipo === "guion");
 
-    const csv = aCsv(
-      COLUMNAS,
-      aExportar.map((f) =>
-        f.tipo === "huerfana"
-          ? // Una huérfana solo sabe tres cosas de sí misma. El resto van vacías en vez de
-            // inventar un proyecto o un guion que no existen.
-            [null, null, null, f.marca.url, f.marca.url, null, null,
-             null, null, null, null, null, "aprobado",
-             null, null, "cargado a mano", f.marca.grabadoEn]
-          : [
-              f.guion.calificadoEn, f.guion.proyecto, f.guion.voz, f.guion.titulo,
-              f.guion.urlReferente, f.guion.script, f.guion.idioma,
-              f.guion.views, f.guion.likes, f.guion.seguidores, f.guion.heat,
-              f.guion.calificacion, "aprobado",
-              f.guion.relevanciaScore, f.guion.relevanciaRazon, f.guion.origen, f.grabadoEn,
-            ],
-      ),
+    const filasExport = aExportar.map((f) =>
+      f.tipo === "huerfana"
+        ? // Una huérfana solo sabe tres cosas de sí misma. El resto van vacías en vez de inventar
+          // un proyecto o un guion que no existen.
+          [null, null, null, f.marca.url, f.marca.url, null, null,
+           null, null, null, null, null, "aprobado",
+           null, null, "cargado a mano", f.marca.grabadoEn]
+        : [
+            f.guion.calificadoEn, f.guion.proyecto, f.guion.voz, f.guion.titulo,
+            f.guion.urlReferente, f.guion.script, f.guion.idioma,
+            f.guion.views, f.guion.likes, f.guion.seguidores, f.guion.heat,
+            f.guion.calificacion, "aprobado",
+            f.guion.relevanciaScore, f.guion.relevanciaRazon, f.guion.origen, f.grabadoEn,
+          ],
     );
 
     // El nombre lleva empresa, pipeline y fecha: con varios cockpits, dos descargas del mismo día
-    // terminarían siendo `historicos.csv` y `historicos (1).csv` en la carpeta de alguien.
+    // terminarían siendo `historico.xlsx` y `historico (1).xlsx` en la carpeta de alguien.
     const hoy = new Date().toISOString().slice(0, 10);
     const { cliente, pipeline } = comoRuta(cockpit);
     return {
       ok: true,
-      csv,
-      nombre: `${soloGrabados ? "grabados" : "historico"}-${cliente}-${pipeline}-${hoy}.csv`,
-      filas: aExportar.length,
+      encabezados: COLUMNAS,
+      filas: filasExport,
+      nombre: `${soloGrabados ? "grabados" : "historico"}-${cliente}-${pipeline}-${hoy}.xlsx`,
       truncado,
     };
   } catch (e) {
-    console.error("[historicos] falló el export a CSV:", e);
+    console.error("[historicos] falló el export:", e);
     return { ok: false, mensaje: "No se pudo generar el archivo. Probá de nuevo." };
   }
 }

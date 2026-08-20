@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
-import { aUtf16le } from "@/domain/csv";
+import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
 import { parsearEnlaces } from "@/domain/enlace";
 import {
   armarRegistro,
@@ -21,7 +21,7 @@ import { fecha } from "@/lib/fechas";
 import type { Historico } from "@/lib/historicos";
 import { miles } from "@/lib/utils";
 import { usarCockpit } from "../../usar-cockpit";
-import { exportarCsv, marcarGrabado, marcarMuchosComoGrabados, verGuion } from "./actions";
+import { exportar, marcarGrabado, marcarMuchosComoGrabados, verGuion } from "./actions";
 
 // El histórico, que desde ADR-070 dejó de ser un archivo de solo lectura y pasa a ser **el tablero**:
 // qué guiones tenemos y cuáles ya usamos.
@@ -106,16 +106,19 @@ export function Lista({
     setError(null);
     setAviso(null);
     startBajar(async () => {
-      const r = await exportarCsv(cockpit, soloGrabados);
+      const r = await exportar(cockpit, soloGrabados);
       if (!r.ok) {
         setError(r.mensaje);
         return;
       }
-      // `text/csv` a secas y no `application/octet-stream`: en el móvil decide si se puede abrir
-      // en vez de solo guardar. El `charset` acompaña a los bytes de `aUtf16le` — mandar el string
-      // pelado acá lo codificaría en UTF-8 y Excel volvería a partir mal el archivo (domain/csv.ts).
+      // 📦 El archivo se arma ACÁ (ADR-071): el server manda filas y `aXlsx` las vuelve un `.xlsx`
+      // de verdad. Sin encoding que adivinar ni separador que negociar — que es exactamente lo que
+      // rompía al CSV, cuyos bytes UTF-16LE se veían con una línea vacía entre filas en cualquier
+      // lector que no fuera el Excel de región CO.
       const url = URL.createObjectURL(
-        new Blob([aUtf16le(r.csv)], { type: "text/csv;charset=utf-16le" }),
+        new Blob([aXlsx(r.encabezados, r.filas, soloGrabados ? "Grabados" : "Histórico")], {
+          type: TIPO_XLSX,
+        }),
       );
       const a = document.createElement("a");
       a.href = url;
@@ -124,7 +127,7 @@ export function Lista({
       URL.revokeObjectURL(url);
 
       if (r.truncado) {
-        setAviso(`El archivo trae las ${r.filas} más recientes. Hay más histórico del que entra en una descarga.`);
+        setAviso(`El archivo trae las ${r.filas.length} más recientes. Hay más histórico del que entra en una descarga.`);
       }
     });
   }
@@ -159,7 +162,7 @@ export function Lista({
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => bajar(false)} disabled={bajando}>
-            {bajando ? "Preparando…" : "Descargar todo"}
+            {bajando ? "Preparando…" : "Descargar todo (Excel)"}
           </Button>
           <Button
             variant="outline"
@@ -167,7 +170,7 @@ export function Lista({
             onClick={() => bajar(true)}
             disabled={bajando || cuentas.grabados === 0}
           >
-            Descargar solo grabados
+            Descargar solo grabados (Excel)
           </Button>
         </div>
       </div>

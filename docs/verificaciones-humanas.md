@@ -81,7 +81,16 @@ así que **si pasaron días, medí de nuevo** (las queries están en el §0 de a
 
 ---
 
-## 1. ✅ El clic al **Descargar CSV** — CERRADO por Mani el 2026-08-07
+## 1. ✅ El clic al **Descargar CSV** — CERRADO el 2026-08-07 · 🪦 **y el CSV murió el 2026-08-20**
+
+> 📗 **Esta sección ya es historia: desde [ADR-071](./adr/ADR-071-el-export-es-un-xlsx-de-verdad.md)
+> el export es un `.xlsx` de verdad y no hay CSV.** Se deja entera porque **su última línea predijo
+> exactamente lo que pasó** — *"si aparece [un lector que no es ese Excel], es el momento de
+> discutir un `.xlsx` de verdad"*. Apareció: el archivo se veía con una línea vacía entre cada fila.
+> *Un costo que se escribe cuando se acepta es el que después se puede cobrar sin discutir de nuevo.*
+> Lo que sigue vigente: el ⬜ de Google Sheets **se cierra solo** (un xlsx se sube y abre), y la
+> regla de que las columnas no se corren de posición.
+
 
 *"Ya descargué el CSV y sale perfecto, todos aparecen con sus respectivas columnas."* Era el arrastre
 más viejo abierto de la lista (venía del cierre 94). **Ojo para la próxima descarga:** el CSV ahora
@@ -377,9 +386,14 @@ Los pasos:
    recién marcada acá, ir a **Transcribir** y pegarlo. Tiene que decir **"1 ya se grabó"** y **no**
    *"1 ya lo vio el motor"*. Eso confirma que las dos pantallas escriben y leen el mismo lugar —
    que es toda la razón de ser de ADR-070.
-7. Bajar los dos Excel. **Descargar todo** trae 183 filas y **17 columnas** (la 17 es `GRABADO EN`,
-   al final, con las 16 de siempre en su posición exacta). **Descargar solo grabados** trae menos
-   filas e incluye los cargados a mano, con las celdas de texto vacías.
+7. Bajar los dos archivos. Desde ADR-071 son **`.xlsx` de verdad**, no CSV: doble clic y abren.
+   **Descargar todo** trae 183 filas y **17 columnas** (la 17 es `GRABADO EN`, al final, con las 16
+   de siempre en su posición exacta). **Descargar solo grabados** trae menos filas e incluye los
+   cargados a mano, con las celdas de texto vacías.
+   ✅ **Ya verificado por máquina** contra los 183 guiones de prod: abre con un lector real de Excel
+   (`openpyxl`), 184×17, CRCs válidos, acentos y emoji intactos, y `VIEWS`/`HEAT SCORE` como número
+   y no como texto. Lo que falta es **abrirlo en el Excel de Mani** — un `.xlsx` roto no se ve mal,
+   directamente no abre, así que la prueba es binaria y de 5 segundos.
 
 ⚠️ **No gasta plata en ningún paso.** La carga masiva solo escribe la marca: no llama a Supadata ni
 a Haiku, aunque peguen 300 links.

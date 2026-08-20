@@ -100,7 +100,7 @@ al mail (no hay contraseña que recordar).
 | Zona del cockpit | Para qué | Qué hacen ahí |
 |---|---|---|
 | **Curar → Feed** | El tablero de trabajo | Leen los videos y los califican. Es donde viven el 95% del tiempo. |
-| **Curar → Históricos** | Sus guiones de todas las semanas, y **cuáles ya grabaron** | Marcan lo grabado, filtran por `Sin grabar / Grabados`, cargan una lista de links ya grabados, y bajan el Excel (dos botones: todo, o solo lo grabado). |
+| **Curar → Históricos** | Sus guiones de todas las semanas, y **cuáles ya grabaron** | Marcan lo grabado, filtran por `Sin grabar / Grabados`, cargan una lista de links ya grabados, y bajan el Excel `.xlsx` (dos botones: todo, o solo lo grabado). |
 | **Operar** | Disparar una corrida | El botón **▶ Correr ahora** y el estado de lo que está corriendo. |
 
 > ☠️ **Airtable ya no existe en este sistema, y el Google Sheet "Histórico" tampoco.** Si alguien les
@@ -738,8 +738,13 @@ ahí para que la herramienta no se los vuelva a proponer.
 
 | Botón | Qué baja |
 |---|---|
-| **Descargar todo** | El archivo de siempre, con una columna nueva al final: **GRABADO EN**. Las demás columnas quedan donde estaban, así que si alguien armó una planilla encima de este export, le sigue funcionando. |
-| **Descargar solo grabados** | Solamente lo que ya grabaron, incluidos los links que cargaron a mano. Es el parte de *"esto ya salió"*. |
+| **Descargar todo (Excel)** | El archivo de siempre, con una columna nueva al final: **GRABADO EN**. Las demás quedan donde estaban, así que si alguien armó una planilla encima de este export, le sigue funcionando. |
+| **Descargar solo grabados (Excel)** | Solamente lo que ya grabaron, incluidos los links que cargaron a mano. Es el parte de *"esto ya salió"*. |
+
+> 📗 **Desde el 2026-08-20 los dos bajan un `.xlsx` de verdad**, no un `.csv`. Se abre haciendo
+> doble clic, en Excel, Numbers, LibreOffice o Google Sheets, sin importar el país ni la
+> configuración: ya no hay que elegir separador ni pelear con los acentos. Y las vistas, los likes
+> y los puntajes llegan como **números**, así que se pueden ordenar y sumar directo.
 
 ---
 
@@ -781,7 +786,7 @@ llegan menos. La palanca para subir la entrega es agregar Referentes buenos a es
 cambien la `calificacion` o el `estado`. Después del domingo ya se fue al Histórico.
 
 **Aprobé un video pero desapareció de la lista. ¿Se perdió?** No. Los aprobados se van a **Históricos**
-cada domingo, con su transcripción entera. Ahí quedan guardados, y el botón **Descargar CSV** te baja
+cada domingo, con su transcripción entera. Ahí quedan guardados, y los botones de descarga te bajan
 todo lo aprobado de todas las semanas para abrirlo en Excel o en Sheets. La lista de Candidatos se
 limpia sola para no llenarse.
 
