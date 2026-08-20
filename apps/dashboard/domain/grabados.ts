@@ -138,3 +138,92 @@ export function contarRegistro<G extends GuionDelRegistro>(
   const grabados = filas.filter(estaGrabada).length;
   return { "sin-grabar": filas.length - grabados, grabados, todos: filas.length };
 }
+
+// ── Revisar una lista de links contra lo que ya hay ──────────────────────────
+//
+// 🔑 **Por qué esto existe aparte de marcar.** Hasta hoy, la única forma de preguntar *"¿este link
+// ya está en la herramienta?"* era pegarlo en el cuadro de Transcribir — que está **a un clic de
+// pagarle a Supadata**. Preguntar y comprar no pueden ser el mismo gesto: el equipo necesita
+// chequear una lista sin arriesgarse a gastar ni a escribir nada.
+//
+// Y sale gratis: la pantalla ya tiene los 183 guiones y todas las marcas en memoria, así que el
+// cruce se resuelve sin ir al servidor. Lo único que no está en memoria es la memoria del motor.
+
+/**
+ * En qué situación está un link respecto de lo que la herramienta ya sabe.
+ *
+ * El orden **es** la precedencia, y no es cosmético: un video puede cumplir varias a la vez, y cada
+ * una manda a una acción distinta. Es la misma lógica de `repartirEnlaces` en `enlace.ts`.
+ */
+export const ESTADOS_REVISION = [
+  /** Alguien del equipo ya lo grabó. La respuesta a "¿lo grabo otra vez?" es no. */
+  "grabado",
+  /** Tiene guion en el histórico y nadie lo marcó. Se puede leer, y se puede marcar. */
+  "con-guion",
+  /** El motor lo procesó alguna vez, pero **no hay guion**: el gate pudo matarlo antes. */
+  "visto-por-el-motor",
+  /** No está en ningún lado. */
+  "nuevo",
+] as const;
+export type EstadoRevision = (typeof ESTADOS_REVISION)[number];
+
+export type LinkRevisado<G extends GuionDelRegistro> = {
+  enlace: { plataforma: string; external_id: string; url: string };
+  clave: string;
+  estado: EstadoRevision;
+  /** La fila del histórico, cuando existe: es lo que deja abrir el guion desde el resultado. */
+  guion: G | null;
+  grabadoEn: string | null;
+};
+
+export function revisarContraRegistro<G extends GuionDelRegistro>(
+  enlaces: readonly { plataforma: string; external_id: string; url: string }[],
+  filas: readonly FilaRegistro<G>[],
+  vistosPorElMotor: ReadonlySet<string> = new Set(),
+): LinkRevisado<G>[] {
+  // Índice por clave de video: una pasada sobre el registro en vez de una búsqueda por link.
+  const porClave = new Map<string, { guion: G | null; grabadoEn: string | null }>();
+  for (const f of filas) {
+    if (f.tipo === "huerfana") {
+      porClave.set(f.marca.clave, { guion: null, grabadoEn: f.marca.grabadoEn });
+    } else if (f.clave !== null) {
+      porClave.set(f.clave, { guion: f.guion, grabadoEn: f.grabadoEn });
+    }
+  }
+
+  return enlaces.map((enlace) => {
+    const clave = `${enlace.plataforma}:${enlace.external_id}`;
+    const hit = porClave.get(clave);
+    const estado: EstadoRevision =
+      hit?.grabadoEn != null
+        ? "grabado"
+        : hit?.guion
+          ? "con-guion"
+          : vistosPorElMotor.has(clave)
+            ? "visto-por-el-motor"
+            : "nuevo";
+    return { enlace, clave, estado, guion: hit?.guion ?? null, grabadoEn: hit?.grabadoEn ?? null };
+  });
+}
+
+export type CuentasRevision = Record<EstadoRevision, number>;
+
+export function contarRevision<G extends GuionDelRegistro>(
+  revisados: readonly LinkRevisado<G>[],
+): CuentasRevision {
+  const cuentas: CuentasRevision = {
+    grabado: 0,
+    "con-guion": 0,
+    "visto-por-el-motor": 0,
+    nuevo: 0,
+  };
+  for (const r of revisados) cuentas[r.estado]++;
+  return cuentas;
+}
+
+/** Los que todavía se pueden marcar: todo lo que no esté ya grabado. */
+export function loQueFaltaMarcar<G extends GuionDelRegistro>(
+  revisados: readonly LinkRevisado<G>[],
+): LinkRevisado<G>[] {
+  return revisados.filter((r) => r.estado !== "grabado");
+}

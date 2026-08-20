@@ -5,9 +5,12 @@ import {
   claveDeUrl,
   contarRegistro,
   estaGrabada,
+  contarRevision,
   esFiltroRegistro,
   fechaDeFila,
   filtrarRegistro,
+  loQueFaltaMarcar,
+  revisarContraRegistro,
   type GuionDelRegistro,
   type MarcaGrabado,
 } from "./grabados.ts";
@@ -168,4 +171,87 @@ test("esFiltroRegistro rechaza lo que no es un filtro", () => {
   assert.equal(esFiltroRegistro("grabados"), true);
   assert.equal(esFiltroRegistro("aprobados"), false);
   assert.equal(esFiltroRegistro(null), false);
+});
+
+// ── revisarContraRegistro ─────────────────────────────────────────────────────
+//
+// La capacidad que pidió el equipo: chequear una lista SIN marcar nada y sin arriesgarse a pagar
+// una transcripción. Lo que se protege acá es la precedencia — un mismo video puede cumplir varias
+// condiciones y cada una manda a una acción distinta.
+
+const IG = "3462890932644704702"; // DAOqPTANXG-
+const IG2 = "3533826375939613252"; // DEKrF2ryWJE
+
+const enlace = (external_id: string, url = "https://www.instagram.com/p/X/") => ({
+  plataforma: "instagram",
+  external_id,
+  url,
+});
+
+test("un link que no está en ningún lado sale como nuevo", () => {
+  const r = revisarContraRegistro([enlace(IG)], armarRegistro([], new Map()));
+  assert.equal(r[0].estado, "nuevo");
+  assert.equal(r[0].guion, null);
+});
+
+test("un link con guion en el histórico sale como con-guion, y trae el guion", () => {
+  // Es lo que deja abrir el texto desde el resultado de la revisión, sin ir a buscarlo a mano.
+  const g = guion("abc", "https://www.instagram.com/p/DAOqPTANXG-/");
+  const r = revisarContraRegistro([enlace(IG)], armarRegistro([g], new Map()));
+  assert.equal(r[0].estado, "con-guion");
+  assert.equal(r[0].guion?.id, "abc");
+});
+
+test("un link ya grabado sale como grabado, con su fecha", () => {
+  const g = guion("abc", "https://www.instagram.com/p/DAOqPTANXG-/");
+  const r = revisarContraRegistro(
+    [enlace(IG)],
+    armarRegistro([g], new Map([[`instagram:${IG}`, marca(`instagram:${IG}`, "u")]])),
+  );
+  assert.equal(r[0].estado, "grabado");
+  assert.equal(r[0].grabadoEn, "2026-08-20T00:00:00Z");
+});
+
+test("🔒 grabado GANA sobre con-guion — es la precedencia que importa", () => {
+  // Los dos son verdad a la vez. Si gana con-guion, la pantalla invita a marcar algo que ya está
+  // marcado y el operador lo aprieta: eso DESMARCA sin que se dé cuenta.
+  const g = guion("abc", "https://www.instagram.com/p/DAOqPTANXG-/");
+  const filas = armarRegistro([g], new Map([[`instagram:${IG}`, marca(`instagram:${IG}`, "u")]]));
+  assert.equal(revisarContraRegistro([enlace(IG)], filas)[0].estado, "grabado");
+});
+
+test("una marca huérfana también cuenta como grabado, aunque no tenga guion", () => {
+  const filas = armarRegistro([], new Map([[`instagram:${IG}`, marca(`instagram:${IG}`, "u")]]));
+  const r = revisarContraRegistro([enlace(IG)], filas);
+  assert.equal(r[0].estado, "grabado");
+  assert.equal(r[0].guion, null);
+});
+
+test("visto-por-el-motor solo aplica cuando NO hay guion ni marca", () => {
+  const vistos = new Set([`instagram:${IG}`]);
+  assert.equal(revisarContraRegistro([enlace(IG)], [], vistos)[0].estado, "visto-por-el-motor");
+
+  // Con guion, gana el guion: decir "lo vio el motor" sobre algo que tiene texto manda a buscar
+  // algo que ya está.
+  const conGuion = armarRegistro([guion("a", "https://www.instagram.com/p/DAOqPTANXG-/")], new Map());
+  assert.equal(revisarContraRegistro([enlace(IG)], conGuion, vistos)[0].estado, "con-guion");
+});
+
+test("contarRevision reparte todo y no pierde ninguno", () => {
+  const filas = armarRegistro(
+    [guion("a", "https://www.instagram.com/p/DEKrF2ryWJE/")],
+    new Map([[`instagram:${IG}`, marca(`instagram:${IG}`, "u")]]),
+  );
+  const r = revisarContraRegistro([enlace(IG), enlace(IG2), enlace("999")], filas);
+  const c = contarRevision(r);
+  assert.deepEqual(c, { grabado: 1, "con-guion": 1, "visto-por-el-motor": 0, nuevo: 1 });
+  assert.equal(c.grabado + c["con-guion"] + c["visto-por-el-motor"] + c.nuevo, r.length);
+});
+
+test("loQueFaltaMarcar deja afuera lo ya grabado y nada más", () => {
+  const filas = armarRegistro([], new Map([[`instagram:${IG}`, marca(`instagram:${IG}`, "u")]]));
+  const r = revisarContraRegistro([enlace(IG), enlace(IG2)], filas);
+  const faltan = loQueFaltaMarcar(r);
+  assert.equal(faltan.length, 1);
+  assert.equal(faltan[0].enlace.external_id, IG2);
 });

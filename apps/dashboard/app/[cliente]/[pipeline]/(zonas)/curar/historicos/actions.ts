@@ -9,6 +9,8 @@ import { exigirTenant } from "@/lib/auth";
 import { registrarEvento } from "@/lib/eventos";
 import { desmarcar, leerMarcas, marcar, marcarMuchos } from "@/lib/grabados";
 import { leerTodosLosAprobados, textoDeHistorico } from "@/lib/historicos";
+import { cualesVistosPorElMotor } from "@/lib/transcripciones";
+import { fechaHoraPlana } from "@/lib/fechas";
 
 // El histórico dejó de ser solo lectura con ADR-070: acá el equipo marca qué guiones ya grabó y
 // carga en masa los que grabó por fuera de la herramienta.
@@ -115,6 +117,31 @@ export async function marcarMuchosComoGrabados(
   return { ok: true, mensaje: partes.join(" · ") + "." };
 }
 
+/**
+ * De un lote de links, cuáles ya pasaron alguna vez por el motor.
+ *
+ * 🔑 **Es lo ÚNICO de la revisión que necesita el servidor.** Si un link ya está grabado o tiene
+ * guion en el histórico se contesta en el cliente, contra los 183 que la pantalla ya bajó. La
+ * memoria del motor (`processed_items`, 977 filas) es lo único que no está ahí, y sin ella un video
+ * que el motor procesó y el gate mató diría "no está" — que es verdad a medias y manda a
+ * transcribirlo de nuevo.
+ */
+export async function vistosPorElMotor(
+  enRuta: CockpitEnRuta,
+  externalIds: string[],
+): Promise<string[]> {
+  const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  const ids = z.array(z.string().min(1).max(30)).max(500).safeParse(externalIds);
+  if (!ids.success) return [];
+  try {
+    return [...(await cualesVistosPorElMotor(ctx, ids.data))];
+  } catch (e) {
+    // Sumidero: sin esto la revisión igual contesta las tres preguntas que importan.
+    console.error("[historicos] no se pudo consultar la memoria del motor:", e);
+    return [];
+  }
+}
+
 /** El guion de una fila, cuando alguien la abre. Ver `leerHistoricoCompleto`: la lista no lo trae. */
 export async function verGuion(
   enRuta: CockpitEnRuta,
@@ -145,10 +172,16 @@ export async function verGuion(
 // conservan su posición exacta, así que una planilla armada sobre el export viejo —que lee por
 // posición— sigue funcionando. Meter una en el medio correría 12 columnas de lugar sin que nadie se
 // entere hasta que los números de otro se movieran solos.
+//
+// 🔑 **`ESTADO` NO dice "grabado", y es una decisión.** `ESTADO` es `outputs.estado` — el ciclo de
+// curación (`aprobado` / `descartado`). Grabar es **ortogonal**: un aprobado puede estar grabado o
+// no (ADR-069 §1). Meterlo ahí pisaría un dato distinto y rompería la columna heredada del Sheet.
+// Por eso lo grabado vive en dos columnas propias al final: `GRABADO` (SÍ/NO, para filtrar de un
+// vistazo) y `GRABADO EN` (cuándo, vacío si no se grabó).
 const COLUMNAS = [
   "FECHA CALIFICACION", "PROYECTO", "VOZ", "TITULO", "URL ORIGINAL", "SCRIPT", "IDIOMA",
   "VIEWS", "LIKES", "SEGUIDORES", "HEAT SCORE", "CALIFICACION", "ESTADO",
-  "RELEVANCIA SCORE", "RELEVANCIA RAZON", "ORIGEN", "GRABADO EN",
+  "RELEVANCIA SCORE", "RELEVANCIA RAZON", "ORIGEN", "GRABADO", "GRABADO EN",
 ] as const;
 
 export type ResultadoExport =
@@ -204,19 +237,26 @@ export async function exportar(
       ? registro.filter(estaGrabada)
       : registro.filter((f) => f.tipo === "guion");
 
+    // Las fechas van legibles y en la zona del equipo. Crudas salían como
+    // `2026-08-20T20:14:47.421495+00:00`: ilegibles, con microsegundos que no le importan a nadie y
+    // corridas 5 horas para quien las lee en Bogotá. `YYYY-MM-DD HH:mm` además ordena bien como
+    // texto, que es lo que se necesita en una planilla.
+    const cuando = (iso: string | null) => (iso ? fechaHoraPlana(iso) : null);
+
     const filasExport = aExportar.map((f) =>
       f.tipo === "huerfana"
         ? // Una huérfana solo sabe tres cosas de sí misma. El resto van vacías en vez de inventar
           // un proyecto o un guion que no existen.
           [null, null, null, f.marca.url, f.marca.url, null, null,
            null, null, null, null, null, "aprobado",
-           null, null, "cargado a mano", f.marca.grabadoEn]
+           null, null, "cargado a mano", "SÍ", cuando(f.marca.grabadoEn)]
         : [
-            f.guion.calificadoEn, f.guion.proyecto, f.guion.voz, f.guion.titulo,
+            cuando(f.guion.calificadoEn), f.guion.proyecto, f.guion.voz, f.guion.titulo,
             f.guion.urlReferente, f.guion.script, f.guion.idioma,
             f.guion.views, f.guion.likes, f.guion.seguidores, f.guion.heat,
             f.guion.calificacion, "aprobado",
-            f.guion.relevanciaScore, f.guion.relevanciaRazon, f.guion.origen, f.grabadoEn,
+            f.guion.relevanciaScore, f.guion.relevanciaRazon, f.guion.origen,
+            f.grabadoEn ? "SÍ" : "NO", cuando(f.grabadoEn),
           ],
     );
 

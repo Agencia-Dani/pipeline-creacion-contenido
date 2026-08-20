@@ -11,17 +11,28 @@ import { parsearEnlaces } from "@/domain/enlace";
 import {
   armarRegistro,
   contarRegistro,
+  contarRevision,
   filtrarRegistro,
   FILTROS_REGISTRO,
+  loQueFaltaMarcar,
+  revisarContraRegistro,
+  type EstadoRevision,
   type FilaRegistro,
   type FiltroRegistro,
+  type LinkRevisado,
   type MarcaGrabado,
 } from "@/domain/grabados";
 import { fecha } from "@/lib/fechas";
 import type { Historico } from "@/lib/historicos";
 import { miles } from "@/lib/utils";
 import { usarCockpit } from "../../usar-cockpit";
-import { exportar, marcarGrabado, marcarMuchosComoGrabados, verGuion } from "./actions";
+import {
+  exportar,
+  marcarGrabado,
+  marcarMuchosComoGrabados,
+  verGuion,
+  vistosPorElMotor,
+} from "./actions";
 
 // El histórico, que desde ADR-070 dejó de ser un archivo de solo lectura y pasa a ser **el tablero**:
 // qué guiones tenemos y cuáles ya usamos.
@@ -45,6 +56,15 @@ const ETIQUETA_FILTRO: Record<FiltroRegistro, string> = {
 const ETIQUETA_ORIGEN: Record<Historico["origen"], string> = {
   feed: "Del Feed",
   transcribir: "De Transcribir",
+};
+
+// Cada estado manda a una acción distinta, así que se nombra por lo que el equipo tiene que hacer
+// con él, no por dónde está guardado.
+const ETIQUETA_REVISION: Record<EstadoRevision, string> = {
+  grabado: "✓ Ya lo grabaron",
+  "con-guion": "Está acá, sin grabar",
+  "visto-por-el-motor": "Lo vio el motor, sin guion",
+  nuevo: "No está en la herramienta",
 };
 
 export function Lista({
@@ -132,19 +152,24 @@ export function Lista({
     });
   }
 
-  const abierto = visibles.find((f) => f.tipo === "guion" && f.guion.id === abiertoId) ?? null;
+  // 🩸 Busca en el registro ENTERO y no en `visibles`, y no es un detalle: desde la revisión se
+  // puede abrir un guion que el filtro de arriba está escondiendo (revisás un link, el chip está en
+  // «Grabados» y ese guion todavía no lo está). Contra `visibles`, el botón «Ver el guion» no haría
+  // nada — un botón que a veces funciona es peor que uno que no está.
+  const abierto = registro.find((f) => f.tipo === "guion" && f.guion.id === abiertoId) ?? null;
 
   return (
     <div className="space-y-4">
-      <CargarGrabados
-        onCargado={(mensaje, nuevas) => {
-          setAviso(mensaje);
+      <RevisarYMarcar
+        registro={registro}
+        onAbrirGuion={setAbiertoId}
+        onMarcado={(nuevas) =>
           setMarcas((m) => {
             const copia = new Map(m);
             for (const marca of nuevas) copia.set(marca.clave, marca);
             return copia;
-          });
-        }}
+          })
+        }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -328,44 +353,86 @@ function Huerfana({ marca }: { marca: MarcaGrabado }) {
 }
 
 /**
- * La carga masiva del Excel (ADR-070 §6).
+ * Revisar una lista de links, y marcarlos si corresponde.
  *
- * Mismo cuadro que el pegote de Transcribir y a propósito: es la interacción que el equipo ya
- * aprendió. Copian la columna de links de su planilla, la pegan, y `parsearEnlaces` saca los links
- * de cualquier texto. La diferencia con aquel: **acá no se transcribe ni se paga nada**, solo entra
- * la marca.
+ * 🩸 **Dos arreglos de un reporte de Mani (2026-08-20), y los dos son de forma, no de lógica:**
+ *
+ * 1. **El resultado se dibuja ACÁ ADENTRO, pegado al botón.** Antes se escribía en un `<p>` que vive
+ *    después de la grilla, o sea **183 tarjetas más abajo** del botón que lo disparó: el equipo
+ *    apretaba y no pasaba nada visible. Un acto sin acuse de recibo se lee igual que uno roto.
+ * 2. **Se desglosa caso por caso** en vez de una línea. "3 marcados" no dice si tenían guion o
+ *    quedaron cargados a mano, que son dos resultados distintos y llevan a acciones distintas.
+ *
+ * 🔑 **Y revisar dejó de exigir Transcribir.** Preguntar *"¿este link ya está?"* obligaba a usar el
+ * cuadro de Transcribir, que está **a un clic de pagarle a Supadata**. Preguntar y comprar no pueden
+ * ser el mismo gesto. Por eso *Revisar* es la acción principal acá y no escribe nada: el cruce sale
+ * de los guiones y las marcas que la pantalla YA tiene en memoria, así que es instantáneo y gratis.
  */
-function CargarGrabados({
-  onCargado,
+function RevisarYMarcar({
+  registro,
+  onAbrirGuion,
+  onMarcado,
 }: {
-  onCargado: (mensaje: string, nuevas: MarcaGrabado[]) => void;
+  registro: FilaRegistro<Historico>[];
+  onAbrirGuion: (id: string) => void;
+  onMarcado: (nuevas: MarcaGrabado[]) => void;
 }) {
   const cockpit = usarCockpit();
   const [texto, setTexto] = useState("");
+  const [revisados, setRevisados] = useState<LinkRevisado<Historico>[] | null>(null);
+  const [resultado, setResultado] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [enviando, startEnviar] = useTransition();
+  const [revisando, startRevisar] = useTransition();
+  const [marcando, startMarcar] = useTransition();
 
   // Se cuenta mientras escriben, antes de tocar el servidor: el equipo ve cuántos entendió la
   // herramienta ANTES de apretar nada.
   const lote = useMemo(() => parsearEnlaces(texto), [texto]);
+  const cuentas = revisados ? contarRevision(revisados) : null;
+  const faltan = revisados ? loQueFaltaMarcar(revisados) : [];
 
-  function enviar() {
+  // Editar el campo invalida la revisión: mostrar un resultado viejo sobre un texto nuevo es peor
+  // que no mostrar nada. Mismo criterio que `pegar-enlaces.tsx` en Transcribir.
+  function escribir(v: string) {
+    setTexto(v);
+    setRevisados(null);
+    setResultado(null);
     setError(null);
-    startEnviar(async () => {
+  }
+
+  function revisar() {
+    setError(null);
+    setResultado(null);
+    startRevisar(async () => {
+      // Lo único que va al servidor: la memoria del motor. Lo demás ya está acá.
+      const vistos = await vistosPorElMotor(cockpit, lote.validos.map((e) => e.external_id));
+      setRevisados(revisarContraRegistro(lote.validos, registro, new Set(vistos)));
+    });
+  }
+
+  function marcar() {
+    setError(null);
+    startMarcar(async () => {
+      const texto = faltan.map((r) => r.enlace.url).join("\n");
       const r = await marcarMuchosComoGrabados(cockpit, texto);
       if (!r.ok) {
         setError(r.mensaje);
         return;
       }
       const ahora = new Date().toISOString();
-      onCargado(
-        r.mensaje,
-        lote.validos.map((e) => ({
-          clave: `${e.plataforma}:${e.external_id}`,
-          url: e.url,
-          grabadoEn: ahora,
-        })),
-      );
+      onMarcado(faltan.map((f) => ({ clave: f.clave, url: f.enlace.url, grabadoEn: ahora })));
+
+      // El desglose que faltaba: cuántos cayeron sobre un guion y cuántos quedaron cargados a mano.
+      const conGuion = faltan.filter((f) => f.guion !== null).length;
+      const sinGuion = faltan.length - conGuion;
+      const lineas = [`✅ ${faltan.length} marcados como grabados.`];
+      if (conGuion > 0) lineas.push(`   · ${conGuion} ya tenían su guion en la herramienta.`);
+      if (sinGuion > 0)
+        lineas.push(`   · ${sinGuion} quedaron como «cargado a mano» (no tienen guion acá).`);
+      if (cuentas && cuentas.grabado > 0)
+        lineas.push(`↩︎ ${cuentas.grabado} ya estaban marcados de antes — no se tocaron.`);
+      setResultado(lineas);
+      setRevisados(null);
       setTexto("");
     });
   }
@@ -373,32 +440,127 @@ function CargarGrabados({
   return (
     <details className="rounded-lg border">
       <summary className="cursor-pointer p-4 text-sm font-medium">
-        Cargar una lista de videos ya grabados
+        Revisar o marcar una lista de links
       </summary>
       <div className="space-y-3 border-t p-4">
         <p className="text-sm text-muted-foreground">
-          Si grabaron videos que no salieron de acá, pegá sus links y quedan marcados. Copiá la
-          columna de links de tu Excel y pegala tal cual: uno por línea, separados por comas o
-          cualquier texto que los tenga adentro. <strong>No se transcribe nada y no cuesta nada</strong> —
-          solo queda la marca, para que la herramienta no te los vuelva a proponer.
+          Pegá links y la herramienta te dice cuáles ya conoce. Copiá la columna de tu Excel y
+          pegala tal cual: uno por línea, separados por comas, o cualquier texto que los tenga
+          adentro. <strong>Revisar no cambia nada y no cuesta nada</strong>; marcar tampoco cobra —
+          solo deja la marca de que ya los grabaron.
         </p>
         <Textarea
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => escribir(e.target.value)}
           rows={5}
-          disabled={enviando}
-          placeholder="Pegá acá los links de los videos que ya grabaron"
+          disabled={revisando || marcando}
+          placeholder="Pegá acá los links que querés revisar o marcar"
         />
-        {texto.trim() !== "" && (
+
+        {texto.trim() !== "" && !revisados && (
           <p className="text-sm text-muted-foreground">
             {lote.validos.length} videos detectados
             {lote.invalidos.length > 0 && ` · ${lote.invalidos.length} links que no sirven`}
           </p>
         )}
+
+        {lote.invalidos.length > 0 && (
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            {lote.invalidos.slice(0, 5).map((i) => (
+              <li key={i.texto}>
+                ⚠️ <span className="break-all">{i.texto}</span> — {i.razon}
+              </li>
+            ))}
+          </ul>
+        )}
+
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button size="sm" onClick={enviar} disabled={enviando || lote.validos.length === 0}>
-          {enviando ? "Guardando…" : `Marcar ${lote.validos.length} como grabados`}
-        </Button>
+
+        {resultado && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
+            {resultado.map((l) => (
+              <p key={l} className="whitespace-pre-wrap text-sm">
+                {l}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {revisados && cuentas && (
+          <div className="space-y-3 rounded-md bg-muted/50 p-3">
+            <p className="text-sm font-medium">
+              Revisé {revisados.length} {revisados.length === 1 ? "link" : "links"}:
+            </p>
+            <ul className="space-y-2">
+              {revisados.map((r) => (
+                <li key={r.clave} className="flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant={r.estado === "grabado" ? "default" : "outline"}>
+                    {ETIQUETA_REVISION[r.estado]}
+                  </Badge>
+                  <span className="break-all text-xs text-muted-foreground">
+                    {r.guion?.titulo ?? r.enlace.url}
+                  </span>
+                  {r.grabadoEn && (
+                    <span className="text-xs text-muted-foreground">· {fechaDe(r.grabadoEn)}</span>
+                  )}
+                  {/* El botón que pidió el equipo: llevame a ese video adentro de la herramienta.
+                      Solo existe si hay guion — prometer solo lo que existe. */}
+                  {r.guion && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onAbrirGuion(r.guion!.id)}
+                    >
+                      Ver el guion
+                    </Button>
+                  )}
+                  <a
+                    href={r.enlace.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground underline underline-offset-4"
+                  >
+                    ver el video ↗
+                  </a>
+                </li>
+              ))}
+            </ul>
+            {cuentas.grabado > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {cuentas.grabado} ya {cuentas.grabado === 1 ? "está" : "están"} marcado
+                {cuentas.grabado === 1 ? "" : "s"} como grabado
+                {cuentas.grabado === 1 ? "" : "s"}: no se vuelven a marcar.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            onClick={revisar}
+            disabled={revisando || marcando || lote.validos.length === 0}
+          >
+            {revisando ? "Revisando…" : `Revisar ${lote.validos.length}`}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={marcar}
+            disabled={revisando || marcando || faltan.length === 0}
+          >
+            {marcando
+              ? "Guardando…"
+              : revisados
+                ? `Marcar ${faltan.length} como grabados`
+                : "Marcar como grabados"}
+          </Button>
+        </div>
+        {!revisados && texto.trim() !== "" && (
+          <p className="text-xs text-muted-foreground">
+            Revisá primero para ver qué va a pasar con cada link.
+          </p>
+        )}
       </div>
     </details>
   );
