@@ -37,15 +37,18 @@ en §Agent skills; acá solo se ubican.
 - [core/contracts/run-plan.md](core/contracts/run-plan.md) — cómo el motor **pregunta qué correr** a la fachada del cockpit (`GET /api/engine/run-plan`, ADR-028): hermano de *lectura* de ingesta-registro.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
 - [core/schema/](core/schema/) — migraciones SQL de Supabase. **Se aplican a mano en el SQL Editor, en
-  orden**; el modelo vivo son las migraciones, no su descripción en prosa. Al 2026-08-07 están
-  **aplicadas las 001–027**, medidas contra prod **por su efecto** (PostgREST + `pg_policies`), no por
+  orden**; el modelo vivo son las migraciones, no su descripción en prosa. Al 2026-08-20 están
+  **aplicadas las 001–028**, medidas contra prod **por su efecto** (PostgREST + `pg_policies`), no por
   haberse corrido: *una migración con gate humano no se da por aplicada porque se haya ejecutado,
   sino cuando se mide su efecto.*
-  ⏳ **La [`028`](core/schema/028_grabado.sql) (ADR-069) está escrita y NO aplicada — es la única
-  pendiente.** Agrega `app.transcripciones.grabado_en` (nullable, sin backfill, sin índice) para que
-  el pegote avise *"N de estos ya se grabaron"* antes de pagar. **Va antes que el deploy de la
-  pantalla**: `COLUMNAS` de `lib/transcripciones.ts` ya la pide, y un `select` de una columna
-  inexistente es `42703` — la zona Transcribir entera deja de cargar.
+  ✅ **La [`028`](core/schema/028_grabado.sql) (ADR-069) está aplicada** (Mani, 2026-08-18 — ver
+  [handoff.md cierre 110](docs/agents/handoff.md)). Agrega `app.transcripciones.grabado_en` (nullable,
+  sin backfill, sin índice) para que el pegote avise *"N de estos ya se grabaron"* antes de pagar.
+  **Sin migraciones pendientes por ahora.**
+  📈 **El canario que el cierre 110 pidió vigilar ya se movió:** 0/129 grabadas el 18/08 → **1/129**
+  medido el 20/08 (`select grabado_en from app.transcripciones limit 1` → `200`, ya no `PGRST204`).
+  Primera señal de que el equipo usa el botón *Marcar como grabado* — todavía no alcanza para decir
+  que la decisión fue correcta, pero ya no está en cero.
   *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)
   vive en sus ADRs, en [handoff.md](docs/agents/handoff.md) y en git — acá no se duplica.*
 
