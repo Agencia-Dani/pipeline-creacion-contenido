@@ -100,7 +100,7 @@ al mail (no hay contraseña que recordar).
 | Zona del cockpit | Para qué | Qué hacen ahí |
 |---|---|---|
 | **Curar → Feed** | El tablero de trabajo | Leen los videos y los califican. Es donde viven el 95% del tiempo. |
-| **Curar → Históricos** | El archivo de lo ya elegido | Solo lo consultan. Hay un botón **Descargar CSV** que abre en Excel (y en Numbers), con cada columna en su celda. |
+| **Curar → Históricos** | Sus guiones de todas las semanas, y **cuáles ya grabaron** | Marcan lo grabado, filtran por `Sin grabar / Grabados`, cargan una lista de links ya grabados, y bajan el Excel (dos botones: todo, o solo lo grabado). |
 | **Operar** | Disparar una corrida | El botón **▶ Correr ahora** y el estado de lo que está corriendo. |
 
 > ☠️ **Airtable ya no existe en este sistema, y el Google Sheet "Histórico" tampoco.** Si alguien les
@@ -207,7 +207,7 @@ A la izquierda hay cuatro zonas. Esto es todo lo que hay y qué se toca en cada 
 | **Curar → Voces y proyectos** | Para quién se selecciona y qué se busca (§5.1, §5.2) | todo: nombre, criterios, cuántos videos pide, prendido/apagado |
 | **Curar → Referentes** · **Sugeridos** | El banco de cuentas y la bandeja de propuestas (§5.3, §8.1) | agregar, apagar, aprobar/descartar |
 | **Curar → Ajustes** | Las perillas (§5.5) | los valores |
-| **Curar → Históricos** | El archivo de lo ya elegido | **nada — solo lectura** (+ el botón *Descargar CSV*) |
+| **Curar → Históricos** | El archivo de sus guiones + qué ya grabaron | la **marca de grabado** y la carga de links ya grabados (+ los 2 botones de descarga) |
 | **Entender** | Precisión, salud y costos (§6.2) | **nada — solo lectura** |
 | **Transcribir** | Pegar un link suelto y recibir su texto | el link |
 
@@ -670,22 +670,25 @@ abajo, con un botón para copiar cada uno.
 El script que sale es exactamente el mismo tipo de script que el del Feed: **literal**, el video tal
 cual traducido. La adaptación a la voz sigue siendo de ustedes.
 
-#### El botón "Marcar como grabado" (nuevo, 2026-08-18)
+#### El botón "Marcar como grabado"
 
-Cada fila de la lista tiene ahora un botón **Marcar como grabado**. Cuando graben el video de ese
-guion, apriétenlo. Queda un cartelito **Grabado** en la fila, y si se equivocaron, el mismo botón lo
-saca — no se rompe nada, no pregunta nada.
+Cada fila de la lista tiene un botón **Marcar como grabado**. Cuando graben el video de ese guion,
+apriétenlo. Queda un cartelito **Grabado** en la fila, y si se equivocaron, el mismo botón lo saca —
+no se rompe nada, no pregunta nada.
 
 **Para qué sirve:** la próxima vez que alguien pegue una lista, si adentro hay un video que ustedes
 ya grabaron, la herramienta lo avisa **antes** de procesarlo:
 
-> *"3 ya se grabaron. Alguien del equipo los marcó desde la lista de abajo, así que el guion ya se usó."*
+> *"3 ya se grabaron. Alguien del equipo los marcó, así que el guion ya se usó."*
 
 Y les ofrece sacarlos de la lista con un clic.
 
-🔴 **Ojo, esto es lo primero de Transcribir que NO es automático.** Todo lo demás de esta pestaña se
-marca solo; esto no, porque la herramienta no tiene forma de enterarse de que ustedes grabaron algo.
-Si nadie marca, el aviso no aparece nunca y estamos igual que antes.
+📍 **El mismo botón está ahora en Históricos**, y ahí alcanza **todos** sus guiones — también los que
+trajo la máquina. Da igual dónde marquen: es la misma marca. Ver §8.3.
+
+🔴 **Ojo, esto es lo primero que NO es automático.** Todo lo demás se marca solo; esto no, porque la
+herramienta no tiene forma de enterarse de que ustedes grabaron algo. Si nadie marca, el aviso no
+aparece nunca y estamos igual que antes.
 
 **Por qué lo agregamos:** Majo avisó que en una lista venían videos que el equipo ya había grabado.
 Revisamos y la herramienta **no estaba repitiendo nada** (los 50 links de esa lista entraron por
@@ -693,9 +696,50 @@ primera vez ese día, y el sistema tiene un candado que impide que un video se p
 El problema era otro: **nadie le había dicho nunca a la herramienta qué se grabó.** Esto es esa
 conversación que faltaba.
 
-**Y lo importante:** esto **no arregla las listas viejas.** Empieza a proteger desde la primera vez
-que marquen. Lo que se grabó antes de hoy, la herramienta no lo sabe y no hay forma de que lo
-adivine.
+**Y lo importante:** esto **no arregla las listas viejas** solo. Empieza a proteger desde la primera
+vez que marquen — pero si tienen un Excel con lo que ya grabaron, **eso sí se puede cargar de una**:
+es lo de §8.3.
+
+---
+
+### 8.3 Históricos: qué guiones tenemos y cuáles ya usamos *(nuevo, 2026-08-20)*
+
+**Curar → Históricos** dejó de ser un archivo de solo mirar. Ahora es donde llevan la cuenta.
+
+**Qué ven ahí:** todos sus guiones, de todas las semanas, vengan de donde vengan — los que aprobaron
+en el Feed y los que transcribieron pegando un link. Cada tarjeta dice de dónde salió (**Del Feed** o
+**De Transcribir**).
+
+**Tres cosas nuevas:**
+
+**1. Marcar cualquier guion como grabado.** El mismo botón de Transcribir, pero acá está en *todos*
+los guiones. Antes solo se podían marcar los que ustedes habían pegado a mano; los que traía la
+máquina no tenían dónde marcarse, que eran casi un tercio del archivo.
+
+**2. Los filtros de arriba: `Sin grabar` · `Grabados` · `Todos`.** Con el número al lado. *"¿Qué me
+falta grabar?"* es un clic.
+
+**3. Cargar una lista de lo que ya grabaron.** Arriba de todo hay **Cargar una lista de videos ya
+grabados**. Ábranlo, peguen los links y listo.
+
+> **Cómo se usa con un Excel:** seleccionen la columna de links en su planilla, copien (Cmd+C /
+> Ctrl+C) y peguen en el cuadro. No hay que subir ningún archivo ni acomodar nada: la herramienta
+> saca los links del texto sola y les dice cuántos entendió **antes** de que aprieten el botón.
+> Funciona igual con una lista de WhatsApp, un Google Doc o links sueltos uno por línea.
+
+⚠️ **Esto solo marca. No transcribe nada y no cuesta nada**, aunque peguen 300. Si además querés el
+*guion* de alguno, eso se pide en **Transcribir** como siempre.
+
+Los links que carguen y que la herramienta no conozca aparecen en la lista con borde punteado y el
+cartel **Cargado a mano**: son videos que ustedes grabaron por fuera, así que no tienen guion. Están
+ahí para que la herramienta no se los vuelva a proponer.
+
+**Y los dos botones de descarga:**
+
+| Botón | Qué baja |
+|---|---|
+| **Descargar todo** | El archivo de siempre, con una columna nueva al final: **GRABADO EN**. Las demás columnas quedan donde estaban, así que si alguien armó una planilla encima de este export, le sigue funcionando. |
+| **Descargar solo grabados** | Solamente lo que ya grabaron, incluidos los links que cargaron a mano. Es el parte de *"esto ya salió"*. |
 
 ---
 

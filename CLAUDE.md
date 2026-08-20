@@ -38,17 +38,23 @@ en §Agent skills; acá solo se ubican.
   **La regla que gobierna los dos desde D7 (ADR-035):** *n8n lee su config por la fachada, escribe sus resultados por PostgREST.*
 - [core/schema/](core/schema/) — migraciones SQL de Supabase. **Se aplican a mano en el SQL Editor, en
   orden**; el modelo vivo son las migraciones, no su descripción en prosa. Al 2026-08-20 están
-  **aplicadas las 001–028**, medidas contra prod **por su efecto** (PostgREST + `pg_policies`), no por
+  **aplicadas las 001–029**, medidas contra prod **por su efecto** (PostgREST + `pg_policies`), no por
   haberse corrido: *una migración con gate humano no se da por aplicada porque se haya ejecutado,
   sino cuando se mide su efecto.*
-  ✅ **La [`028`](core/schema/028_grabado.sql) (ADR-069) está aplicada** (Mani, 2026-08-18 — ver
-  [handoff.md cierre 110](docs/agents/handoff.md)). Agrega `app.transcripciones.grabado_en` (nullable,
-  sin backfill, sin índice) para que el pegote avise *"N de estos ya se grabaron"* antes de pagar.
-  **Sin migraciones pendientes por ahora.**
-  📈 **El canario que el cierre 110 pidió vigilar ya se movió:** 0/129 grabadas el 18/08 → **1/129**
-  medido el 20/08 (`select grabado_en from app.transcripciones limit 1` → `200`, ya no `PGRST204`).
-  Primera señal de que el equipo usa el botón *Marcar como grabado* — todavía no alcanza para decir
-  que la decisión fue correcta, pero ya no está en cero.
+  ✅ **La [`028`](core/schema/028_grabado.sql) (ADR-069) y la
+  [`029`](core/schema/029_grabados.sql) (ADR-070) están aplicadas** (Mani, 18/08 y 20/08). La `029`
+  crea `app.grabados` —la marca de *ya se grabó*, **por video** y no por carril— y **jubila** la
+  columna de la `028`.
+  ⏳ **Pendiente: la `030`, que todavía no existe.** Tiene que dropear
+  `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**. Es el paso *contract*
+  del expand/contract y va **después** de que ADR-070 lleve un tiempo en prod: dropearla hoy no
+  rompe nada, pero deja sin red un rollback del deploy.
+  🔴 **El canario de ADR-069/070 sigue en CERO, y lo que parecía moverlo era ruido.** Este doc llegó a
+  decir que la marca del 18/08 era *"primera señal de que el equipo usa el botón"*: **es falso, y se
+  midió el 20/08**. Los 4 eventos `transcribir.grabado` de la base son **los 4 de Mani**, sobre **la
+  misma fila**, en una ventana de 9 minutos — la sesión de verificación, no uso. *Una marca puesta
+  por quien construyó el botón no es evidencia de adopción.* El canario de verdad es
+  `select count(*) from app.grabados` a un mes, contando **marcas de otras personas**.
   *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)
   vive en sus ADRs, en [handoff.md](docs/agents/handoff.md) y en git — acá no se duplica.*
 

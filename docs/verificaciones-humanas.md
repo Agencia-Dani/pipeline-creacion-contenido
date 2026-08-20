@@ -333,9 +333,61 @@ exactamente el mensaje que manda a grabarlo de nuevo. El test de dominio ya cubr
 lista antes de encolarlo. Se puede hacer con cualquier fila real sin consecuencias.
 
 🔴 **Y la mitad que ninguna prueba cierra:** si el equipo no toma el hábito de marcar, el aviso no
-aparece nunca y la columna es peso muerto. El canario está en ADR-069 §Consecuencias — a un mes,
-`select count(*) from app.transcripciones where grabado_en is not null`. Si da 0, la decisión estaba
-equivocada y lo que falta es otra cosa.
+aparece nunca y la columna es peso muerto. El canario se corrió a la tabla nueva con ADR-070 — a un
+mes, `select count(*) from app.grabados`. Si da 0, la decisión estaba equivocada y lo que falta es
+otra cosa.
+
+⚠️ **Esta verificación sigue valiendo tal cual, pero la marca ya no vive donde decía.** Con ADR-070
+se mudó de `app.transcripciones.grabado_en` a `app.grabados`, con clave por video. El circuito de
+los 3 pasos es idéntico de cara al operador; lo que cambió es que ahora **también** se puede hacer
+desde Históricos, que es la §4-quater.
+
+## 4-quater. ⬜ **El registro de grabados en Históricos** *(nuevo del 20/08, ADR-070)*
+
+**Quién:** Mani, y después Majo o Alejo · **5 minutos** · *La mitad que un agente no puede cerrar es
+la misma de siempre: hay que apretar el botón y mirar.*
+
+La `029` **ya está aplicada y verificada por su efecto** (la tabla responde, el backfill trajo la 1
+marca que existía, y `estado` de `transcripciones` quedó idéntico: 128 `listo` + 1 `abandonado`).
+Las formas de escritura también se midieron contra prod con una fila descartable: upsert nuevo → 1
+fila, upsert repetido → **0** (que es como se cuenta *"ya estaban"*), delete → 1.
+
+📏 **Los números esperados en `/retia/reels/curar/historicos`, medidos el 2026-08-20.** Si alguno no
+da, es un síntoma, no un detalle:
+
+| Chip | Esperado | Si da otra cosa |
+|---|---|---|
+| **Todos** | **183** | Si da 0 o mucho menos, es RLS o el grant de `outputs`, no la pantalla |
+| **Grabados** | **1** | Si da 0, la policy de `app.grabados` no deja leer (falso "nadie marcó") |
+| **Sin grabar** | **182** | Los tres tienen que cerrar: sin-grabar + grabados = todos |
+
+Los pasos:
+
+1. Abrir Históricos. Los tres chips dan los números de arriba.
+2. **Marcar un guion que diga *Del Feed*** — son 55 y hasta hoy **no tenían botón en ninguna
+   pantalla**. Tiene que aparecer `✓ Grabado` **sin recargar**, y el contador de *Grabados* subir a 2.
+3. Apretar *Sacar la marca de grabado*. Se va, y el contador vuelve a 1.
+4. Abrir el cuadro **Cargar una lista de videos ya grabados**, pegar 3 links de los que ya están en
+   el histórico (uno de ellos ya marcado). Antes de apretar tiene que decir *"3 videos detectados"*;
+   después, *"2 marcados como grabados · 1 ya estaba"*.
+5. Pegar un link de un video que la herramienta **nunca vio**. Aparece una tarjeta con borde
+   punteado, cartel **Cargado a mano** y sin botón de ver guion. *Esa tarjeta es el pedido de Alejo
+   funcionando: un video grabado por fuera del sistema, que ahora el sistema conoce.*
+6. **La prueba que cierra el circuito entero, y es la que importa:** copiar el link de una fila
+   recién marcada acá, ir a **Transcribir** y pegarlo. Tiene que decir **"1 ya se grabó"** y **no**
+   *"1 ya lo vio el motor"*. Eso confirma que las dos pantallas escriben y leen el mismo lugar —
+   que es toda la razón de ser de ADR-070.
+7. Bajar los dos Excel. **Descargar todo** trae 183 filas y **17 columnas** (la 17 es `GRABADO EN`,
+   al final, con las 16 de siempre en su posición exacta). **Descargar solo grabados** trae menos
+   filas e incluye los cargados a mano, con las celdas de texto vacías.
+
+⚠️ **No gasta plata en ningún paso.** La carga masiva solo escribe la marca: no llama a Supadata ni
+a Haiku, aunque peguen 300 links.
+
+🔴 **Y lo que ninguna prueba cierra, otra vez:** esto depende de un hábito. **El cockpit de Retia
+lleva 11 días sin un solo evento humano**, así que entregar un botón nuevo a un equipo que no está
+entrando probablemente no mueva el número solo. La conversación de por qué dejaron de entrar va
+antes que la función.
 
 ## 5. ✅ **V4 — el re-rank: CERRADO por Mani el 2026-08-07**
 
