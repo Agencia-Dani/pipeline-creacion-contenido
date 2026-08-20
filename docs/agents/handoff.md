@@ -111,6 +111,97 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 📕 2026-08-20 (cierre 111) · LA MARCA DE GRABADO SE MUDA AL VIDEO, Y EL HISTÓRICO PASA DE ARCHIVO A TABLERO
+>
+> **En una línea:** `main` = **`ec92ad1`**. Sale **ADR-070** (`app.grabados`, migración `029`
+> aplicada) + **ADR-071** (el export es un `.xlsx` de verdad). Todo deployado. **n8n: cero cambios**
+> (`n8n:diff` limpio en los 5, verificado dos veces).
+>
+> ### 🩸 El pedido, y el hueco que destapó
+>
+> Alejo Carvajal pidió por audio poder **subir una lista de links ya grabados**, incluidos los que no
+> salieron de la herramienta. Midiendo contra prod apareció que ADR-069 —de dos días antes— no
+> llegaba:
+>
+> | | |
+> |---|---|
+> | Guiones en el histórico (`outputs` aprobados) | **183** |
+> | De Transcribir → tenían dónde marcarse | 128 |
+> | Del Feed/motor → **sin botón en ninguna pantalla** | **55** |
+> | Solapamiento entre carriles | **0** |
+>
+> Y un link traído de afuera **no tiene fila en ninguna tabla**, así que ninguna columna podía
+> representarlo. Ese caso solo ya obliga a una clave por video.
+>
+> ### 🔑 La medición que destrabó todo, y la forma del error
+>
+> ADR-069 §3 dijo *"outputs no tiene clave por video"* mirando la **columna** `external_id`, que está
+> sobrecargada (uuid del candidato en un carril, id del video en el otro). **Cierto de la columna,
+> falso de la fila**: `metadata.url_referente` está poblado **300/300** y `domain/enlace.ts` deriva
+> la clave de ahí en **300/300**, con la función que ADR-031 ya verificó (381/381 IG · 27/27 TT).
+>
+> 🩸 **Se midió la columna y se concluyó sobre la fila.** La segunda señal no compartía mecanismo con
+> la primera y daba lo contrario. *Una columna sobrecargada no prueba que la fila no sea
+> identificable.*
+>
+> ### ✅ Lo que quedó en producción
+>
+> - **`app.grabados`** (`029`, aplicada y verificada por efecto): clave `(instance_id, plataforma,
+>   external_id)`. **La presencia de la fila ES la marca**; desmarcar borra. Cubre los tres carriles.
+> - **`/curar/historicos` dejó de ser solo lectura**: toggle en los 183, filtros
+>   `Sin grabar · Grabados · Todos`, etiqueta de procedencia, filas **huérfanas** (links cargados a
+>   mano, sin guion, dibujadas distinto), y un cuadro de **Revisar / Marcar**.
+> - **Revisar no escribe ni cobra**, y esa es la razón de que exista: preguntar *"¿ya está?"* obligaba
+>   a usar el cuadro de Transcribir, que está a un clic de pagarle a Supadata. El cruce sale de lo que
+>   la pantalla ya tiene en memoria; solo la memoria del motor va al servidor.
+> - **Los dos export son `.xlsx`** (ADR-071), **18 columnas**: `GRABADO` (SÍ/NO) y `GRABADO EN` al
+>   final. Las 16 de siempre **no se movieron** (ADR-057). Números como números, fechas legibles.
+> - **Transcribir** sigue igual de cara al equipo pero escribe en el mismo lugar, así que su aviso
+>   mejoró solo: ahora avisa por videos grabados que vinieron del Feed o se cargaron a mano.
+>
+> ### 🔬 ADR-071 — el CSV murió, y el diagnóstico vale más que el arreglo
+>
+> Mani reportó *"una línea vacía entre cada fila"*. **El archivo no estaba roto**: de los 183 guiones,
+> **0 traen saltos de línea y 0 traen tabs**. La línea vacía es leer los bytes UTF-16LE como si fueran
+> de un byte — cada carácter queda `X\0` y ese `\0` **es** la línea en blanco.
+> 🔑 **El síntoma no dependía del archivo sino de quién lo abría**, y por eso no se arregla escapando
+> mejor. ADR-057 había escrito ese costo el día uno (*"si aparece un lector que no es Excel, es el
+> momento de discutir un `.xlsx` de verdad"*). *Un costo que se escribe cuando se acepta es el que
+> después se puede cobrar sin discutir de nuevo.*
+> `domain/xlsx.ts` no tiene dependencias: 5 XML en un ZIP store. Sus tests **leen el ZIP de verdad**
+> con `node:zlib`, porque acá el modo de falla es binario — un xlsx roto **no abre**, no se ve mal.
+>
+> ### 🩸 Tres bugs de forma encontrados apretando botones (ninguno lo cazaba un test)
+>
+> 1. **El botón de grabado escribía y no repintaba** (ya conocido del 18/08): el estado vive en `Fila`,
+>    el ancestro común de badge y botón. `router.refresh()` no toca estado de cliente.
+> 2. **El acuse de recibo de la carga masiva estaba 183 tarjetas más abajo** del botón. *Un acto sin
+>    acuse de recibo se lee igual que uno roto*, y acá volver a apretar **desmarca**.
+> 3. **El modal se buscaba en `visibles`**, así que *"Ver el guion"* no hacía nada si el filtro
+>    escondía esa fila. Se busca en el registro entero.
+>
+> ### ⏳ Lo que queda
+>
+> - ⬜ **La `030`**: dropear `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**.
+>   Paso *contract* del expand/contract; va después de que ADR-070 lleve tiempo en prod.
+> - ⬜ **[verificaciones-humanas §4-quater](../verificaciones-humanas.md)** — Mani corrió las pruebas
+>   y de ahí salieron los 4 comentarios; **falta re-verificar sobre el build nuevo**, sobre todo el
+>   paso 6 (marcar en Históricos → Transcribir dice *"1 ya se grabó"*) y abrir los dos `.xlsx`.
+> - 🔴 **El canario sigue en CERO.** Las **6** marcas de `app.grabados` son todas de Mani probando.
+>   *Una marca puesta por quien construyó el botón no es evidencia de adopción.* A un mes:
+>   `select count(*) from app.grabados`, contando marcas **de otras personas**.
+> - ⏳ **El domingo 23/08 se borran solos 74 candidatos** sin calificar (los del 01, 02 y 03/08).
+> - 🔴 **El cockpit de Retia sigue frío**: cero eventos humanos del equipo desde el 07/08.
+>   **La reunión de onboarding con Majo y Alejo era hoy 4:30pm** — es de hecho el **D3** del ROADMAP.
+>
+> ### 🧭 Nota de método para el próximo
+>
+> Todo lo que se afirmó acá se midió contra prod antes de escribirlo, y **dos afirmaciones del repo
+> cayeron en el camino**: el CLAUDE.md decía que la marca del 18/08 era *"primera señal de que el
+> equipo usa el botón"* (son los 4 eventos de Mani sobre la misma fila en 9 minutos), y el reporte de
+> IDIOMA vacío resultó ser el build anterior. **Medir la afirmación antes de creerla** siguió siendo
+> el loop que más rindió.
+
 > ## 🎬 2026-08-18 (cierre 110) · LA QUEJA MÁS RUIDOSA ERA FALSA, Y ADENTRO HABÍA UN HECHO VERDADERO QUE EL SISTEMA NO PODÍA SABER
 >
 > **En una línea:** Majo reportó que la herramienta *"saca repetidos y devuelve links rotos"*. Se
