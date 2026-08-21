@@ -91,6 +91,10 @@ const TABLAS = {
   // nuestro sino la del video** —`(plataforma, external_id)`, la misma de `processed_items`— porque
   // el hecho es del video y no del carril por el que entró.
   "app.grabados": { esquema: "app", grano: "instancia" },
+  // Lo que se sabe de un video y ninguna otra tabla guarda (ADR-072, migración `030`). Segunda
+  // tabla del mapa clavada a la llave del video, y por la misma razón que `app.grabados`: el hecho
+  // es del video, no del carril. Grano instancia porque lo que se compró lo pagó un cockpit.
+  "app.videos_meta": { esquema: "app", grano: "instancia" },
   "app.v_metricas_calidad": { esquema: "app", grano: "instancia" },
   "app.v_embudo_semana": { esquema: "app", grano: "instancia" },
   "app.v_embudo_descubrimiento": { esquema: "app", grano: "instancia" },
