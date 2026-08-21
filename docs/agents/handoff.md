@@ -160,10 +160,31 @@
 >
 > ### ⬜ Lo que queda
 >
-> 1. ⚠️ **El enriquecimiento sigue sin verificarse en producción.** Lo único medido es local y la
->    colección de prueba usó videos que **ya** tenían metadata, así que `APIFY_TOKEN` en Vercel
->    **todavía no se ejerció**. Se cierra pegando en el prod deployado un link **sin** metadata y
->    mirando que aparezca la foto (paga un scrape).
+> 1. ✅ **El enriquecimiento CORRE EN PRODUCCIÓN** (verificado el 21/08, 18:27 UTC). Se pegó en el
+>    prod deployado un link **sin** metadata (`instagram.com/p/DOgcUZ4DG6D/`, uno de los 130 de
+>    Transcribir) y volvió completo: miniatura, *"The words you choose shape the respect you
+>    receive."*, `@tanimzamanofficial`, 2.090.840 vistas, 63.070 likes. Confirmado por los dos lados
+>    —la tarjeta en pantalla y la fila en `app.videos_meta` con `fuente: apify`— y con la colección
+>    de prueba borrada después: **la fila de metadata sobrevivió**, otra vez.
+>    ⚠️ **Y con eso el canario de `videos_meta` se corrió de número:** ahora hay **5 filas y las 5
+>    son de verificaciones**, así que **el primer dato de adopción es la fila 6**. *El número del
+>    canario hay que moverlo cada vez que uno mismo lo toca, o el doc empieza a contar sus propias
+>    pruebas como uso.*
+
+> 1b. 🔴 **HUECO ENTRE EL PLAN Y LO CONSTRUIDO, encontrado el 21/08 por una pregunta de Mani:
+>    NO se puede agregar a una colección desde el Feed, Transcribir ni Históricos.** La única puerta
+>    es **pegar links** en el detalle de la colección. El plan sí lo tenía (§Diseño de UI, punto 2:
+>    un botón `Seleccionar` en las tres pantallas + una barra fija con *Agregar a colección*), y
+>    **no se construyó en la Fase 3 ni lo registró ningún doc como faltante** — el cierre 113 lo dio
+>    por cerrado. Medido: `grep` de checkbox/`Seleccionar` en las tres pantallas da cero, y las
+>    acciones de colecciones las importa **un solo archivo**, el detalle de la colección.
+>    *La consecuencia práctica:* para agrupar un video que ya está en pantalla hay que abrirlo,
+>    copiar la url, ir a Colecciones y pegarla — cuatro pasos para lo que el plan resolvía con un
+>    click. Y el lugar natural ya existe: la tarjeta compartida tiene su slot de acciones, vacío en
+>    esas tres pantallas.
+>    🔑 **La forma del error:** *una fase se dio por cerrada porque su pantalla nueva funcionaba, sin
+>    volver a leer qué prometía el plan para las pantallas viejas.* Lo caro no fue no construirlo:
+>    fue que nadie lo anotó como deuda.
 > 2. 🔴 **El canario de ADR-074 nace hoy y hay que contarlo bien.** `app.guiones_limpios` tiene **4
 >    filas y son las 4 de esta verificación**, hechas por quien construyó el botón. Igual que
 >    `videos_meta` y `grabados`: **el primer dato de adopción es la fila 5**. A dos semanas:

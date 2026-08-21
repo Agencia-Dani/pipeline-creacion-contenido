@@ -64,9 +64,12 @@ en §Agent skills; acá solo se ubican.
   §1.1**: el guion limpio es un artefacto nuevo *al lado* del crudo, nunca encima. Verificada por su
   efecto: PostgREST la ve, las 3 voces traen `perfil_limpieza` en null, y el check de texto vacío
   responde `23514`.
-  ⚠️ **`app.videos_meta` tiene 4 filas y las 4 son de la verificación de Mani del 21/08.** Son
-  metadata real y correcta (se dejaron en vez de borrarlas para no pagarlas dos veces), pero **no
-  son uso**: mismo cuidado que el canario de ADR-069. El primer dato de adopción es la fila 5.
+  ⚠️ **`app.videos_meta` tiene 5 filas y las 5 son de verificaciones** (4 de Mani el 21/08 + 1 de la
+  prueba de Apify en producción, ese mismo día). Son metadata real y correcta —se dejaron en vez de
+  borrarlas para no pagarlas dos veces— pero **no son uso**: mismo cuidado que el canario de
+  ADR-069. **El primer dato de adopción es la fila 6.** *Este renglón decía "la fila 5" y hubo que
+  correrlo el mismo día: el número del canario se mueve cada vez que uno mismo lo toca, o el doc
+  termina contando sus propias pruebas como adopción.*
   ⏳ **La [`033`](core/schema/033_grabado_en.sql) (contract de ADR-070) está escrita y
   ⬜ SIN APLICAR.** Dropea `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**
   (las únicas menciones en el repo son comentarios). Medido antes de escribirla, contra prod el
