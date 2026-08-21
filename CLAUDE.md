@@ -59,6 +59,16 @@ en §Agent skills; acá solo se ubican.
   el aislamiento no depende del código), la PK dedupea el mismo video, el `on delete cascade` se
   lleva los miembros, y **`app.videos_meta` sobrevive al borrado de la colección** — la bolsa es
   descartable, lo que se pagó no.
+  🐤 **Su canario es el más limpio de los cuatro porque nace sin ruido: `select count(*) from
+  app.colecciones` daba CERO el 21/08** —la de prueba se borró— así que la primera fila es adopción
+  y no una verificación propia. A revisar el **2026-09-04**, junto con los otros tres
+  ([plan-modo-seleccion §Fase 4](docs/agents/plan-modo-seleccion.md)).
+  ⚠️ **Y la pregunta que ningún `count(*)` contesta —*¿alguien volvió un segundo día?*— se lee de
+  `app.eventos` contando DÍAS DISTINTOS por persona, no eventos.** Medido el 21/08: nadie. Jero 81
+  eventos en un solo día, Juan José 23 en ese mismo día, Majo 2 en el suyo. Desde el 21/08 los
+  eventos del modo selección llevan `origen` (`pegote` | `seleccion`) y calificar en lote emite
+  `candidatos.calificar_masivo`, justamente para que esa lectura siga siendo posible cuando haya
+  dos caminos para el mismo acto.
   ✅ **La [`032`](core/schema/032_guiones_limpios.sql) (ADR-074) está aplicada** (Mani, 21/08) — crea
   `app.guiones_limpios` y le suma `perfil_limpieza` a `app.voces`. **Enmienda ADR-009 y ROADMAP
   §1.1**: el guion limpio es un artefacto nuevo *al lado* del crudo, nunca encima. Verificada por su

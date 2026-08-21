@@ -104,7 +104,7 @@ diseño actual: la barra recibe sus acciones como prop, igual que el slot de la 
 
 Cada fase termina con `npm run typecheck && npm test` en verde y algo verificable en pantalla.
 
-### Fase 0 — Los docs que hoy están mal ⬜
+### Fase 0 — Los docs que hoy están mal ✅
 
 Va primero porque son 15 minutos y porque **dos de ellos disparan una falsa alarma si alguien los usa
 hoy**. Cero código.
@@ -171,7 +171,7 @@ la colección y ver las 3 tarjetas con su guion, (b) volver al Feed y ver que lo
 **Verifica en la base:** `app.colecciones_videos` con 3 filas y `candidatos.calificacion` movida
 solo en los que estaban en `nuevo`.
 
-### Fase 2 — Archivar ahora en el Feed, diciendo la verdad ⬜
+### Fase 2 — Archivar ahora en el Feed, diciendo la verdad ✅
 
 - El botón entra en la cabecera del Feed, al lado de `Seleccionar`.
 - **Antes de disparar, cuenta contra la base** y lo dice: *"Archiva N aprobados y **borra M** sin
@@ -183,7 +183,7 @@ solo en los que estaban en `nuevo`.
 sube 2 y `candidatos` baja 69.
 ⚠️ **Esto gasta y borra: la corrida de verificación la aprieta Mani, no un agente.**
 
-### Fase 3 — Las tres acciones que faltan en la barra ⬜
+### Fase 3 — Las tres acciones que faltan en la barra ✅
 
 Sobre la máquina de la Fase 1, sin tocarla:
 
@@ -195,7 +195,7 @@ Sobre la máquina de la Fase 1, sin tocarla:
 **Verifica:** las 4 pantallas muestran exactamente las acciones de la matriz de arriba, y ninguna
 muestra una que no puede ejecutar.
 
-### Fase 4 — Los canarios, redefinidos para que midan algo ⬜
+### Fase 4 — Los canarios, redefinidos para que midan algo ✅
 
 🔑 **El canario de `app.grabados` se contaminó el mismo día en que se escribió como métrica.** Con
 288 marcas de una carga masiva, `count(*)` ya no distingue adopción de backfill. Los tres se
