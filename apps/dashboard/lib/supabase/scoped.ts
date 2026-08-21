@@ -104,6 +104,10 @@ const TABLAS = {
   // su hermana, que están en `heredado` y por eso traen los pares de todos los tenants.
   "app.colecciones": { esquema: "app", grano: "instancia" },
   "app.colecciones_videos": { esquema: "app", grano: "instancia" },
+  // El guion pulido (ADR-074, migración `032`). Quinta tabla clavada a la llave del video. Grano
+  // instancia: el trabajo de limpiar es del cockpit. **El crudo NO está acá** — sigue en
+  // `app.candidatos.script` y `app.transcripciones.script`, intacto (ADR-009).
+  "app.guiones_limpios": { esquema: "app", grano: "instancia" },
   "app.v_metricas_calidad": { esquema: "app", grano: "instancia" },
   "app.v_embudo_semana": { esquema: "app", grano: "instancia" },
   "app.v_embudo_descubrimiento": { esquema: "app", grano: "instancia" },

@@ -59,7 +59,10 @@ en §Agent skills; acá solo se ubican.
   el aislamiento no depende del código), la PK dedupea el mismo video, el `on delete cascade` se
   lleva los miembros, y **`app.videos_meta` sobrevive al borrado de la colección** — la bolsa es
   descartable, lo que se pagó no.
-  ⏳ **Y el *contract* de ADR-070 pasa a ser la `032`, que todavía no existe.** Tiene que dropear
+  ⏳ **La [`032`](core/schema/032_guiones_limpios.sql) (ADR-074) está escrita y NO aplicada** — crea
+  `app.guiones_limpios` y le suma `perfil_limpieza` a `app.voces`. **Enmienda ADR-009 y ROADMAP
+  §1.1**: el guion limpio es un artefacto nuevo *al lado* del crudo, nunca encima. Gate humano.
+  ⏳ **Y el *contract* de ADR-070 pasa a ser la `033`, que todavía no existe.** Tiene que dropear
   `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**. Va **después** de que
   ADR-070 lleve un tiempo en prod: dropearla hoy no rompe nada, pero deja sin red un rollback del
   deploy. *Se corrió de número dos veces el 21/08, porque `videos_meta` y `colecciones` llegaron
