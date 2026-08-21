@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Copiar } from "@/components/ui/copiar";
 import { haceCuanto } from "@/domain/corrida";
 import type { Transcripcion } from "@/lib/transcripciones";
 import { Abandonar } from "./abandonar";
-import { Copiar } from "./copiar";
 import { Grabado } from "./grabado";
 import { Reintentar } from "./reintentar";
 
@@ -21,7 +21,7 @@ import { Reintentar } from "./reintentar";
 // devolvía una Voz: la ambigüedad es real y la cazó un humano leyendo la pantalla.
 // "Sin transcripción" además es más honesto: el estado no distingue *"el video no tiene habla"* de
 // *"Supadata no pudo"*, y el nombre viejo afirmaba lo primero.
-const ESTADO_LEGIBLE: Record<Transcripcion["estado"], string> = {
+export const ESTADO_LEGIBLE: Record<Transcripcion["estado"], string> = {
   pendiente: "En cola",
   listo: "Listo",
   sin_transcript: "Sin transcripción",
@@ -31,7 +31,7 @@ const ESTADO_LEGIBLE: Record<Transcripcion["estado"], string> = {
   abandonado: "Abandonado",
 };
 
-const BADGE_POR_ESTADO: Record<
+export const BADGE_POR_ESTADO: Record<
   Transcripcion["estado"],
   "default" | "secondary" | "destructive" | "outline"
 > = {
@@ -118,7 +118,7 @@ export function Fila({
           </summary>
           <p className="mt-2 whitespace-pre-wrap text-sm">{t.script}</p>
           <div className="mt-2">
-            <Copiar texto={t.script} />
+            <Copiar texto={t.script} etiqueta="Copiar script" />
           </div>
         </details>
       )}

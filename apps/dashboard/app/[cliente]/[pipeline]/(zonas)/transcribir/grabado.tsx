@@ -42,12 +42,20 @@ export function Grabado({
   enlace,
   grabado,
   onCambio,
+  compacto = false,
 }: {
   // ⚠️ **El VIDEO, no el id de la fila** (ADR-070). Con el id de la transcripción este botón solo
   // podía existir en esta pantalla; con la clave del video, el mismo acto sirve en el histórico.
   enlace: EnlaceVideo;
   grabado: boolean;
   onCambio: (grabado: boolean) => void;
+  /**
+   * Para el pie de una tarjeta, que es angosto. Solo acorta la etiqueta de sacar la marca: los
+   * botones son `whitespace-nowrap`, así que "Sacar la marca de grabado" se desborda de una tarjeta
+   * de grilla. **El botón sigue diciendo qué hace y no en qué estado está**, que es la decisión de
+   * arriba y no cambia.
+   */
+  compacto?: boolean;
 }) {
   const cockpit = usarCockpit();
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +79,7 @@ export function Grabado({
           })
         }
       >
-        {enviando ? "Guardando…" : grabado ? "Sacar la marca de grabado" : "Marcar como grabado"}
+        {enviando ? "Guardando…" : grabado ? (compacto ? "Sacar la marca" : "Sacar la marca de grabado") : "Marcar como grabado"}
       </Button>
       {error && <span className="text-xs text-destructive">{error}</span>}
     </span>

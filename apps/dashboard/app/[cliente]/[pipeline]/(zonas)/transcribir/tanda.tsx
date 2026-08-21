@@ -2,13 +2,17 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { Copiar } from "@/components/ui/copiar";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { GrillaVideos } from "@/components/video/grupos";
 import { claveDe } from "@/domain/enlace";
 import { LARGO_MAX_TITULO, resumenDeTanda, tituloDeTanda } from "@/domain/tanda";
 import type { CabeceraTanda } from "@/lib/tandas";
 import type { Transcripcion } from "@/lib/transcripciones";
 import { cargarTanda, ponerTituloATanda } from "./actions";
-import { Fila } from "./fila";
+import { ESTADO_LEGIBLE } from "./fila";
+import { TarjetaCola } from "./tarjeta-cola";
 import { usarCockpit } from "../usar-cockpit";
 
 // Una tanda: el pegote como cosa que se abre, se cierra y se puede nombrar (ADR-064).
@@ -43,6 +47,9 @@ export function Tanda({
   const [grabadas, setGrabadas] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [cargando, startCarga] = useTransition();
+  // Cuál guion está abierto. Se guarda el **id** y no la fila: `filas` se vuelve a bajar cuando
+  // cambian los contadores, y una fila guardada por valor quedaría mostrando el estado viejo.
+  const [abiertoId, setAbiertoId] = useState<string | null>(null);
 
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState(cabecera.titulo ?? "");
@@ -138,6 +145,10 @@ export function Tanda({
       setError(null);
     });
 
+  // Se deriva de `filas` en cada render: si la tanda las recarga, el modal abierto muestra el dato
+  // nuevo en vez de una copia congelada. Si la fila desapareció, el modal se cierra solo.
+  const abierto = filas?.find((f) => f.id === abiertoId) ?? null;
+
   return (
     <li className="rounded-lg border">
       <details onToggle={(e) => abrir(e.currentTarget.open)}>
@@ -195,21 +206,66 @@ export function Tanda({
           {cargando && !filas ? (
             <p className="text-sm text-muted-foreground">Trayendo los enlaces…</p>
           ) : filas && filas.length > 0 ? (
-            <ul className="space-y-4">
+            <GrillaVideos>
               {filas.map((t) => (
-                <Fila
+                <TarjetaCola
                   key={t.id}
                   t={t}
                   ahora={ahora}
                   grabadaInicial={grabadas.has(claveDe(t))}
+                  onAbrir={() => setAbiertoId(t.id)}
                 />
               ))}
-            </ul>
+            </GrillaVideos>
           ) : filas ? (
             <p className="text-sm text-muted-foreground">Esta tanda se quedó sin enlaces.</p>
           ) : null}
         </div>
       </details>
+
+      {/* UN modal por lista y no uno por tarjeta, que es la regla de uso de `components/ui/modal`.
+          El guion ya está en memoria —bajó con las filas— así que acá no se pide nada. */}
+      <Modal
+        abierto={abierto !== null}
+        onCerrar={() => setAbiertoId(null)}
+        ancho="52rem"
+        titulo={abierto?.url ?? ""}
+        subtitulo={
+          abierto && (
+            <>
+              {ESTADO_LEGIBLE[abierto.estado]}
+              {abierto.idioma && abierto.idioma !== "es" && ` · original en ${abierto.idioma}`}
+              {abierto.script && ` · ${abierto.script.length} caracteres`}
+            </>
+          )
+        }
+        pie={
+          <div className="flex flex-wrap items-center gap-3">
+            <Copiar texto={abierto?.script ?? null} etiqueta="Copiar el guion" />
+            {abierto && (
+              <a
+                href={abierto.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-sm text-muted-foreground underline underline-offset-4"
+              >
+                Ver el video
+              </a>
+            )}
+          </div>
+        }
+      >
+        {abierto?.script ? (
+          <p className="whitespace-pre-wrap text-sm">{abierto.script}</p>
+        ) : (
+          // Sin guion no se ofrece nada acá: las salidas (reintentar, abandonar) están en la
+          // tarjeta, que es donde también se ve el estado que las explica.
+          <p className="text-sm text-muted-foreground">
+            Este enlace todavía no tiene guion.
+            {abierto?.error && ` ${abierto.error}`}
+          </p>
+        )}
+      </Modal>
     </li>
   );
 }
