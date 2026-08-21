@@ -76,6 +76,12 @@ Qué corregir, en este orden:
    journey"). Si una referencia cultural no se entiende fuera de Estados Unidos, cambiala por una
    equivalente o sacala.
 
+   🔴 EL GUION VA EN ESPAÑOL COLOMBIANO: "tú" o "usted", NUNCA "vos".
+   Estas instrucciones que estás leyendo están escritas en voseo rioplatense ("dejás", "sacala",
+   "marcá") porque así escribe el equipo que las redactó. ESO NO SE COPIA AL GUION. Quien graba es
+   colombiana y le habla a una audiencia latinoamericana: "lo que dices", no "lo que decís"; "tienes
+   que", no "tenés que". Si el texto original ya venía en tuteo, se queda en tuteo.
+
 5. REPETICIONES DE LA TRADUCCIÓN — la traducción automática a veces repite la misma frase dos veces
    seguidas. Si una idea aparece dicha una sola vez en el original y duplicada en el texto, dejala
    una sola vez.
