@@ -111,6 +111,80 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🃏 2026-08-21 (cierre 114) · LA TARJETA ÚNICA LLEGA A LAS TRES PANTALLAS, Y LA COLECCIÓN SE BAJA EN WORD (Claude, pedido de Mani)
+>
+> **En una línea:** cerró lo que el cierre 113 dejó abierto — **2b, 2c y la Fase 5** — más la
+> enmienda del ROADMAP y los 5 términos del glosario. `main` = **`a2479ea`**, pusheado y deployando.
+> **Migraciones: ninguna. n8n: cero cambios.**
+>
+> ### ✅ Lo que quedó hecho
+>
+> | Fase | Qué | Verificado |
+> |---|---|---|
+> | 2b | Transcribir: la tanda abierta pasa de `<ul>` de `<Fila>` a `GrillaVideos` + `TarjetaCola`; el guion sale del `<details>` a **un** modal por tanda. Muere `transcribir/copiar.tsx` | 15 tarjetas en una tanda real, badge ✓, cero desborde, el modal trae el guion |
+> | 2c | Históricos agrupa por proyecto con `agrupar()`; las **huérfanas entran por la misma tarjeta** que el resto | 6 proyectos + `(sin proyecto)` (327), plegado y filtros recalculando (4+3+10+12+265 = 294) |
+> | 5 | `domain/zip.ts` (extraído de `xlsx.ts`) + `domain/docx.ts` + el botón `Descargar (Word)` en la colección | Blob `PK`, MIME correcto, los 4 guiones con "Guion limpio"; `file` dice *Microsoft Word 2007+* y `textutil` lo lee entero |
+>
+> Más: **enmienda de ADR-074 en ROADMAP §1 punto 1** (dice qué del norte sigue en pie y qué se suma)
+> y los 5 términos en `context.md` — **colección · guion limpio · perfil de limpieza · llave de video
+> · tarjeta de video**.
+>
+> Verde: `typecheck` · **367 tests** · `build` · `validate` **2380 checks**.
+>
+> ### 🩸 El bucle infinito que solo se veía en el log del server
+>
+> `curar/colecciones/[id]/detalle.tsx` pedía **`vocesParaLimpiar` una vez por segundo, para siempre**.
+> `usarCockpit()` arma `{cliente, pipeline}` nuevo en cada render y el efecto lo tenía como
+> dependencia: pedir → `setVoces` → render → objeto nuevo → pedir. Arreglado (deps = los dos strings)
+> y **medido: de ~15 fetches en 15 s a 1**.
+>
+> 🔑 **La forma del error, que es lo que vale:** *un bucle de render no se ve en la pantalla* — la
+> pantalla se veía perfecta, y por eso pasó la verificación de la Fase 4 sin que nadie lo notara. Lo
+> cazó mirar el log del dev server mientras se probaba otra cosa. Era además el **único**
+> `useEffect` del cockpit con un objeto en las dependencias (`grep "\[cockpit\]"` da uno solo, y ya
+> no está).
+>
+> ### 🔬 Dos mediciones que cambiaron una decisión cada una
+>
+> 1. **`agrupar()` se reusa tal cual, pero el orden de adentro se restaura por fecha.** De las 301
+>    filas de `outputs`, **las 172 del Feed traen heat y proyecto; las 129 de Transcribir no traen
+>    ninguno de los dos**. Ordenar por heat dejaba `(sin proyecto)` —donde caen esas 129 más las ~291
+>    huérfanas— desempatando por uuid, o sea un orden sin significado. El histórico se lee por lo
+>    último que pasó.
+> 2. **La colección de prueba (4 videos ya con metadata) no disparó una sola llamada a Apify.** La PK
+>    de `videos_meta` es la guardia y funciona. De paso quedó probado lo que promete ADR-073: **se
+>    borró la colección y los 4 guiones limpios sobrevivieron** — la bolsa es descartable, lo que se
+>    pagó no.
+>
+> ### ⬜ Lo que queda
+>
+> 1. ⚠️ **El enriquecimiento sigue sin verificarse en producción.** Lo único medido es local y la
+>    colección de prueba usó videos que **ya** tenían metadata, así que `APIFY_TOKEN` en Vercel
+>    **todavía no se ejerció**. Se cierra pegando en el prod deployado un link **sin** metadata y
+>    mirando que aparezca la foto (paga un scrape).
+> 2. 🔴 **El canario de ADR-074 nace hoy y hay que contarlo bien.** `app.guiones_limpios` tiene **4
+>    filas y son las 4 de esta verificación**, hechas por quien construyó el botón. Igual que
+>    `videos_meta` y `grabados`: **el primer dato de adopción es la fila 5**. A dos semanas:
+>    `select count(*) from app.guiones_limpios where creado_por <> '<mani>'`.
+> 3. ⬜ **La `033`** (contract de ADR-070, dropear `transcripciones.grabado_en`) sigue pendiente.
+> 4. 🩹 **ROADMAP §1 punto 7 todavía dice "Descargar CSV"** y desde ADR-071 son dos `.xlsx`. No se
+>    tocó: es de otro cierre y no había que arrastrarlo acá.
+> 5. ⬜ **Abrir el `.docx` en Word con los ojos.** `file` y `textutil` son dos señales de que el
+>    paquete es válido, pero ninguna es Word.
+>
+> ### ⚠️ Cosas que el próximo tiene que saber
+>
+> - **`Fila` de Transcribir sigue viva**, y a propósito: la dibujan las tarjetas de *fallidas* y
+>   *sueltas* de `page.tsx`, que son listas de "esto necesita tu atención" y no una tanda. Lo que se
+>   comparte con la tarjeta son sus dos mapas de estado, exportados desde ahí.
+> - **`Grabado` tiene un prop `compacto`** y solo acorta la etiqueta de sacar la marca: los botones
+>   son `whitespace-nowrap` y "Sacar la marca de grabado" se desborda de una tarjeta de grilla.
+> - **El panel del navegador puede quedar oculto** y ahí `computer` (clicks, screenshots) tira
+>   timeout. `tabs_select` lo trae al frente; mientras tanto, verificar por DOM con `javascript_tool`
+>   funciona igual y es más barato.
+>
+> ---
+>
 > ## 🧺 2026-08-21 (cierre 113) · COLECCIONES, LA TARJETA ÚNICA Y EL GUION LIMPIO (Claude, pedido de Mani)
 >
 > **En una línea:** entró el primitivo que faltaba —la **colección**— más la compra de metadata a
