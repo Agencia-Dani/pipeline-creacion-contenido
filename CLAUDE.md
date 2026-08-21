@@ -63,9 +63,12 @@ en §Agent skills; acá solo se ubican.
   app.colecciones` daba CERO el 21/08** —la de prueba se borró— así que la primera fila es adopción
   y no una verificación propia. A revisar el **2026-09-04**, junto con los otros tres
   ([plan-modo-seleccion §Fase 4](docs/agents/plan-modo-seleccion.md)).
-  ⚠️ **Y la pregunta que ningún `count(*)` contesta —*¿alguien volvió un segundo día?*— se lee de
-  `app.eventos` contando DÍAS DISTINTOS por persona, no eventos.** Medido el 21/08: nadie. Jero 81
-  eventos en un solo día, Juan José 23 en ese mismo día, Majo 2 en el suyo. Desde el 21/08 los
+  ✅ **Y la pregunta que ningún `count(*)` contesta —*¿alguien volvió un segundo día?*— se lee de
+  `app.eventos` contando DÍAS DISTINTOS por persona, no eventos. Al 21/08 21:20 la respuesta es SÍ,
+  una: Majo Duarte, el 20/08 y el 21/08** (37 calificaciones y 6 referentes ese segundo día). Los
+  demás siguen en uno solo: Jero 81 eventos el 07/08, Juan José 23 ese mismo día. *Este renglón
+  decía "nadie" a las 18:55 del 21/08 y era falso tres horas después — Majo estaba adentro mientras
+  se escribía. Un canario se re-mide, no se cita.* Desde el 21/08 los
   eventos del modo selección llevan `origen` (`pegote` | `seleccion`) y calificar en lote emite
   `candidatos.calificar_masivo`, justamente para que esa lectura siga siendo posible cuando haya
   dos caminos para el mismo acto.
@@ -100,8 +103,9 @@ en §Agent skills; acá solo se ubican.
   ⚠️ **Y con eso este canario dejó de servir: `count(*)` ya no distingue adopción de carga masiva.**
   Se redefine por fecha — `select count(*) from app.grabados where grabado_en > '2026-08-21'` — y la
   pregunta que ninguno de los canarios contesta se lee de `app.eventos`: *¿alguien volvió un segundo
-  día?* Medido el 21/08, **nadie**: Jero 81 eventos en un solo día (07/08), Juan José 23 en ese
-  mismo día, Majo 2 en el 20/08. *La adopción acá tiene forma de ráfaga, no de hábito.*
+  día?* **Sí, una: Majo, el 20/08 y el 21/08.** Los demás no (Jero 81 eventos en un solo día, Juan
+  José 23 en ese mismo día). *Se midió dos veces el 21/08 con tres horas de diferencia y dio
+  distinto: a las 18:55 "nadie", a las 21:20 Majo adentro calificando.*
   *Este renglón decía **"sigue en CERO"** y era correcto cuando se escribió el 20/08 a las 16:30;
   Majo entró esa misma noche. Un canario se re-mide, no se cita.*
   *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)

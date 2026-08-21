@@ -27,19 +27,34 @@ No se dedujo de los timestamps: `app.eventos` guarda el autor. Dos filas
 después de los dos statements. **Es el primer uso real del sistema por alguien que no lo
 construyó.**
 
-### 2. La adopción tiene forma de ráfaga, no de hábito
+### 2. 🟢 Majo VOLVIÓ un segundo día — y estaba usando el cockpit mientras se escribía esto
 
-| Persona | Eventos | Días distintos | Qué hizo |
-|---|---|---|---|
-| Jero | 81 | **1** (07/08) | 80 calificaciones |
-| Juan José Gaitán | 23 | **1** (07/08) | 14 reintentar, 8 pegar |
-| **Majo Duarte** | **2** | **1** (20/08) | los 288 grabados |
-| Alejo Carvajal | 2 | 1 (01/08) | auditar, calificar |
-| Alejandro Dávila | 1 | 1 (05/08) | crear una voz |
+> ⚠️ **Este párrafo decía lo contrario hace tres horas, y por eso está escrito así.** Medido a las
+> 18:55 UTC, la conclusión era *"la adopción tiene forma de ráfaga, no de hábito: nadie vuelve"*.
+> Re-medido a las **21:20 UTC del mismo día**, es falso: Majo entró de nuevo y **calificó 37 videos
+> y creó 6 referentes**, con su último evento a las 20:52 — o sea **media hora antes**. *Un canario
+> se re-mide, no se cita: el mío tenía tres horas y ya mentía.*
 
-Nadie vuelve. Cada quien entró un día, resolvió una tarea puntual y no volvió.
+**Días distintos por persona** (la pregunta que ningún `count(*)` contesta), al 21/08 21:20:
+
+| Persona | Días | Cuáles |
+|---|---|---|
+| *(Mani)* | 8 | del 29/07 al 21/08 |
+| **Majo Duarte** | **2** | **20/08 y 21/08** ← la primera persona fuera de Mani que vuelve |
+| Jero | 1 | 07/08 (80 calificaciones de una sentada) |
+| Juan José Gaitán | 1 | 07/08 |
+| Alejandro Dávila | 1 | 05/08 |
+| Alejo Carvajal | 1 | 01/08 |
+
+Lo que queda en pie de la lectura vieja: **los demás siguen sin volver.** Lo que se cayó: que eso
+fuera una propiedad del equipo. Majo, que es quien pidió las features de esta semana, es también la
+única que volvió — *la adopción sigue a lo pedido, no a lo construido.*
+
 *Caveat medido: `app.eventos` registra **escrituras**. Alguien que solo lee el Feed es invisible acá,
 y la descarga de los `.xlsx` de Históricos es la única escritura que no emite evento.*
+
+🔴 **Consecuencia operativa inmediata: hay una persona trabajando en prod.** Un deploy a `main`
+cambia la app abajo de sus pies. Cualquier push de este plan se coordina con ella o espera.
 
 ### 3. 🔴 "Archivar ahora" archiva 2 y borra 67
 
@@ -51,10 +66,13 @@ Pero dispara el workflow entero, y ahí adentro está `Barrer candidatos sin cal
 `estado = nuevo` con más de 20 días:
 
 ```
-candidatos en el feed:   101   (99 sin calificar + 2 aprobados)
-corte del barrido:       2026-08-01 18:55
->>> borraría HOY:         67   (los 67 del 01/08, que cumplieron 20 días justo hoy)
+18:55 UTC →  101 candidatos (99 sin calificar + 2 decididos) ·  archivaría 2, borraría 67
+21:20 UTC →  101 candidatos (64 sin calificar + 37 decididos) · archivaría 37, borraría 41
 ```
+
+**Los dos renglones son del mismo día y la diferencia es Majo calificando en vivo.** Es exactamente
+por eso que el botón cuenta **al apretar** y no muestra un número guardado: cualquier cifra que este
+doc publique nace vieja.
 
 Y el mensaje de éxito del botón dice *"los aprobados aparecen en Históricos y salen del feed"* —
 **no menciona el borrado**. La UI hoy miente por omisión, y eso ya pasa en Operar.
