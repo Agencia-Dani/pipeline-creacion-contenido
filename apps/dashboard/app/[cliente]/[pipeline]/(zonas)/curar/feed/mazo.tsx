@@ -5,6 +5,7 @@ import { usarCockpit } from "../../usar-cockpit";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
 import { cn } from "@/lib/utils";
 import {
   agrupar,
@@ -163,55 +164,29 @@ export function Mazo({
             : "Nada en este filtro."}
         </p>
       ) : (
-        grupos.map((g) => {
-          const plegado = plegados.has(g.proyecto);
-          return (
-            <section key={g.proyecto} className="space-y-3">
-              {/* El título ES el control: los criterios son por proyecto, así que se trabaja de a
-                  un grupo por vez y los demás estorban. El contador se queda visible plegado —
-                  es justo lo que se quiere saber de un grupo cerrado.
-
-                  ⚠️ Ese número es "cuántas de este proyecto hay CARGADAS", no cuántas existen: el
-                  mazo pagina global por heat, así que los grupos se llenan a medida que se carga
-                  más. El número que sí es del universo entero es el del chip, arriba. */}
-              <h2 className="border-b pb-1.5">
-                <button
-                  type="button"
-                  onClick={() => alternarPlegado(g.proyecto)}
-                  aria-expanded={!plegado}
-                  className="flex w-full items-baseline gap-2 text-left hover:text-primary"
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "text-xs text-muted-foreground transition-transform",
-                      plegado ? "-rotate-90" : "",
-                    )}
-                  >
-                    ▼
-                  </span>
-                  <span className="font-medium">{g.proyecto}</span>
-                  <span className="text-sm text-muted-foreground">{g.candidatos.length}</span>
-                </button>
-              </h2>
-              {!plegado && (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {g.candidatos.map((c) => (
-                    <Tarjeta
-                      key={c.id}
-                      candidato={c}
-                      puesta={efectiva(c)}
-                      enviando={enviando.has(c.id)}
-                      error={errores[c.id] ?? null}
-                      onCalificar={(cal) => calificar(c, cal)}
-                      onAbrir={() => setAbiertoId(c.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })
+        grupos.map((g) => (
+          <GrupoPlegable
+            key={g.proyecto}
+            titulo={g.proyecto}
+            conteo={g.candidatos.length}
+            plegado={plegados.has(g.proyecto)}
+            onAlternar={() => alternarPlegado(g.proyecto)}
+          >
+            <GrillaVideos>
+              {g.candidatos.map((c) => (
+                <Tarjeta
+                  key={c.id}
+                  candidato={c}
+                  puesta={efectiva(c)}
+                  enviando={enviando.has(c.id)}
+                  error={errores[c.id] ?? null}
+                  onCalificar={(cal) => calificar(c, cal)}
+                  onAbrir={() => setAbiertoId(c.id)}
+                />
+              ))}
+            </GrillaVideos>
+          </GrupoPlegable>
+        ))
       )}
 
       {errorLista && <p className="text-sm text-destructive">{errorLista}</p>}
