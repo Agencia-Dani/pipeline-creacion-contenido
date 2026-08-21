@@ -371,21 +371,25 @@ marca que existía, y `estado` de `transcripciones` quedó idéntico: 128 `listo
 Las formas de escritura también se midieron contra prod con una fila descartable: upsert nuevo → 1
 fila, upsert repetido → **0** (que es como se cuenta *"ya estaban"*), delete → 1.
 
-📏 **Los números esperados en `/retia/reels/curar/historicos`, re-medidos contra prod el 2026-08-20
-16:30.** La tabla anterior decía 183 · 1 · 182 y ya no aplica: **la movió la propia verificación de
-Mani** de esa tarde (5 marcas nuevas y 1 link cargado a mano). Si alguno no da, es un síntoma, no un
-detalle:
+📏 **Los números esperados en `/retia/reels/curar/historicos`, re-medidos contra prod el 2026-08-21
+19:10.** La tabla anterior decía **184 · 6 · 178** y estaba **muy** mal: la movió Majo Duarte el
+20/08 a las 23:10 UTC, cargando **288 links** en dos tandas de 166 y 122. Si alguno no da, es un
+síntoma, no un detalle:
 
 | Chip | Esperado | Si da otra cosa |
 |---|---|---|
-| **Todos** | **184** | 183 guiones **+ 1 huérfana** (el link del paso 5). Si da 0 o mucho menos, es RLS o el grant de `outputs`, no la pantalla |
-| **Grabados** | **6** | Si da 0, la policy de `app.grabados` no deja leer (falso "nadie marcó"). Si da menos de 6, alguien desmarcó |
-| **Sin grabar** | **178** | Los tres tienen que cerrar: sin-grabar + grabados = todos |
+| **Todos** | **411** | 184 guiones aprobados **+ 227 huérfanas**. Si da 0 o mucho menos, es RLS o el grant de `outputs`, no la pantalla |
+| **Grabados** | **294** | Si da 0, la policy de `app.grabados` no deja leer (falso "nadie marcó"). Si da ~6, la pantalla no está viendo la carga de Majo |
+| **Sin grabar** | **117** | Los tres tienen que cerrar: **117 + 294 = 411** |
 
-⚠️ **Las 6 marcas son de Mani probando** (5 el 20/08 entre 20:14 y 20:15 UTC, 1 del 18/08); ninguna
-es uso del equipo. Y el número se mueve con cada marca, así que **no se lee de esta tabla: se
-re-mide** antes de usarlo como criterio — *un número esperado que envejece dispara falsas alarmas,
-que es exactamente lo que este doc corrigió el 06/08*:
+🟢 **De las 294, 288 son de Majo y son USO REAL** — el primer uso del sistema por alguien que no lo
+construyó. Las otras 6 son de Mani probando (5 el 20/08 entre 20:14 y 20:15 UTC, 1 del 18/08).
+*El renglón anterior decía "las 6 marcas son de Mani, ninguna es uso del equipo": era cierto a las
+16:30 del 20/08 y dejó de serlo esa misma noche.*
+
+⚠️ **Y por eso mismo el número no se lee de esta tabla: se re-mide** antes de usarlo como criterio —
+*un número esperado que envejece dispara falsas alarmas, que es exactamente lo que este doc corrigió
+el 06/08, y le volvió a pasar en 30 horas*:
 
 ```bash
 curl -s -H "apikey: $SUPABASE_SERVICE_ROLE" -H "Accept-Profile: app" \
@@ -396,8 +400,8 @@ Los pasos:
 
 1. Abrir Históricos. Los tres chips dan los números de arriba.
 2. **Marcar un guion que diga *Del Feed*** — son 55 y hasta hoy **no tenían botón en ninguna
-   pantalla**. Tiene que aparecer `✓ Grabado` **sin recargar**, y el contador de *Grabados* subir a 2.
-3. Apretar *Sacar la marca de grabado*. Se va, y el contador vuelve a 1.
+   pantalla**. Tiene que aparecer `✓ Grabado` **sin recargar**, y el contador de *Grabados* subir a **295**.
+3. Apretar *Sacar la marca de grabado*. Se va, y el contador vuelve a **294**.
 4. Abrir el cuadro **Cargar una lista de videos ya grabados**, pegar 3 links de los que ya están en
    el histórico (uno de ellos ya marcado). Antes de apretar tiene que decir *"3 videos detectados"*;
    después, *"2 marcados como grabados · 1 ya estaba"*.
@@ -409,21 +413,25 @@ Los pasos:
    *"1 ya lo vio el motor"*. Eso confirma que las dos pantallas escriben y leen el mismo lugar —
    que es toda la razón de ser de ADR-070.
 7. Bajar los dos archivos. Desde ADR-071 son **`.xlsx` de verdad**, no CSV: doble clic y abren.
-   **Descargar todo** trae 183 filas y **17 columnas** (la 17 es `GRABADO EN`, al final, con las 16
+   **Descargar todo** trae **184** filas y **17 columnas** (la 17 es `GRABADO EN`, al final, con las 16
    de siempre en su posición exacta). **Descargar solo grabados** trae menos filas e incluye los
    cargados a mano, con las celdas de texto vacías.
-   ✅ **Ya verificado por máquina** contra los 183 guiones de prod: abre con un lector real de Excel
-   (`openpyxl`), 184×17, CRCs válidos, acentos y emoji intactos, y `VIEWS`/`HEAT SCORE` como número
+   ✅ **Ya verificado por máquina** contra los 183 guiones que había entonces: abre con un lector
+   real de Excel (`openpyxl`), 184×17, CRCs válidos, acentos y emoji intactos, y `VIEWS`/`HEAT SCORE` como número
    y no como texto. Lo que falta es **abrirlo en el Excel de Mani** — un `.xlsx` roto no se ve mal,
    directamente no abre, así que la prueba es binaria y de 5 segundos.
 
 ⚠️ **No gasta plata en ningún paso.** La carga masiva solo escribe la marca: no llama a Supadata ni
 a Haiku, aunque peguen 300 links.
 
-🔴 **Y lo que ninguna prueba cierra, otra vez:** esto depende de un hábito. **El cockpit de Retia
-lleva 11 días sin un solo evento humano**, así que entregar un botón nuevo a un equipo que no está
-entrando probablemente no mueva el número solo. La conversación de por qué dejaron de entrar va
-antes que la función.
+🟢 **Y esto sí lo movió un hábito, que es lo que ninguna prueba podía cerrar.** Este renglón decía
+que *"el cockpit de Retia lleva 11 días sin un solo evento humano"*, y **el botón nuevo movió el
+número solo**: Majo entró el 20/08 y cargó 288 links.
+
+🔴 **Pero la forma de la adopción sigue siendo el problema, y ahora se puede medir.** Nadie volvió un
+segundo día — Jero 81 eventos todos el 07/08, Juan José 23 ese mismo día, Majo 2 el 20/08. *La
+pregunta ya no es "¿entran?" sino "¿vuelven?"*, y se lee contando **días distintos por persona** en
+`app.eventos`, no eventos.
 
 ## 5. ✅ **V4 — el re-rank: CERRADO por Mani el 2026-08-07**
 

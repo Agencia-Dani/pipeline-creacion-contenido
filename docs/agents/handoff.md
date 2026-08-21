@@ -125,7 +125,7 @@
 > | 2c | Históricos agrupa por proyecto con `agrupar()`; las **huérfanas entran por la misma tarjeta** que el resto | 6 proyectos + `(sin proyecto)` (327), plegado y filtros recalculando (4+3+10+12+265 = 294) |
 > | 5 | `domain/zip.ts` (extraído de `xlsx.ts`) + `domain/docx.ts` + el botón `Descargar (Word)` en la colección | Blob `PK`, MIME correcto, los 4 guiones con "Guion limpio"; `file` dice *Microsoft Word 2007+* y `textutil` lo lee entero |
 > | 5b | **Los videos van numerados** (`1. Título`), pedido de Mani mirando el primer archivo | Test: un video sin guion **no se saltea el número** |
-> | — | **`core/schema/033_grabado_en.sql`**: el paso *contract* de ADR-070 | ⬜ escrita, **sin aplicar** (gate humano, va al SQL Editor) |
+> | — | **`core/schema/033_grabado_en.sql`**: el paso *contract* de ADR-070 | ✅ **aplicada** (Mani, 21/08). Medida por su efecto: PostgREST da `42703` sobre `grabado_en`, y `grabados` + el resto de `transcripciones` siguen respondiendo — se fue la columna, no la tabla |
 >
 > Más: **enmienda de ADR-074 en ROADMAP §1 punto 1** (dice qué del norte sigue en pie y qué se suma)
 > y los 5 términos en `context.md` — **colección · guion limpio · perfil de limpieza · llave de video
@@ -189,7 +189,7 @@
 >    filas y son las 4 de esta verificación**, hechas por quien construyó el botón. Igual que
 >    `videos_meta` y `grabados`: **el primer dato de adopción es la fila 5**. A dos semanas:
 >    `select count(*) from app.guiones_limpios where creado_por <> '<mani>'`.
-> 3. ⬜ **Aplicar la `033`** en el SQL Editor (está escrita; ver abajo).
+> 3. ✅ **La `033` quedó aplicada** el 21/08. Falta el paso 3 de su verificación: abrir Transcribir y ver que los badges *"✓ Grabado"* siguen ahí.
 > 4. 🩹 **ROADMAP §1 punto 7 todavía dice "Descargar CSV"** y desde ADR-071 son dos `.xlsx`. No se
 >    tocó: es de otro cierre y no había que arrastrarlo acá.
 > 5. ⬜ **Abrir el `.docx` en Word con los ojos.** `file` y `textutil` son dos señales de que el

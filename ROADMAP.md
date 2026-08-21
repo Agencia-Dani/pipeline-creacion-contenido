@@ -65,9 +65,13 @@ Los 7 puntos, con qué cambia cada uno:
    el orden por `heat_score` desc que la pantalla ya trae. Se "rehace" solo.
 6. **El sistema aprende de la selección** *(redirige ADR-008)* — la curación alimenta el scoring
    (`v_senal_seleccion`), no la escritura.
-7. **Histórico exportable** *(nuevo)* — se materializa en `/curar/historicos` con su botón
-   **Descargar CSV** (abre nativo en Excel). *Fue un Google Sheet hasta ADR-057, que lo mató: dejaba
-   el histórico de cada empresa en un archivo de Google donde el aislamiento del cockpit no llega.*
+7. **Histórico exportable** *(nuevo)* — se materializa en `/curar/historicos` con sus **dos
+   botones de descarga** (todo · solo grabados), que bajan un **`.xlsx` de verdad** desde
+   [ADR-071](./docs/adr/ADR-071-el-export-es-un-xlsx-de-verdad.md): doble clic y abre. *Este renglón
+   dijo **"Descargar CSV"** hasta el 2026-08-21, y el CSV no existe desde ADR-071 — arrastró tres
+   cierres porque nadie lee el norte para saber qué botón apretar.* *Fue un Google Sheet hasta
+   ADR-057, que lo mató: dejaba el histórico de cada empresa en un archivo de Google donde el
+   aislamiento del cockpit no llega.*
    Supabase sigue siendo la fuente de verdad del historial.
 
 **Transversal:** el cockpit es **el punto de entrada único** de quienes manejan el pipeline
@@ -232,7 +236,7 @@ script en español, `idioma`, `thumbnail` y la razón de relevancia, y su rastro
 - [x] ~~**C1. Sheet "Histórico":** crear el Google Sheet del histórico de seleccionados (columnas =
       `v_historico_seleccionados`).~~ ☠️ **MUERTO el 2026-08-05**
       ([ADR-057](./docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)). Su reemplazo es
-      **Descargar CSV** en `/curar/historicos`, con las mismas 15 columnas en el mismo orden y
+      la descarga de `/curar/historicos` (un **`.xlsx`** desde ADR-071, 17 columnas) en el mismo orden y
       **por instancia** — que es lo que el Sheet no podía ser: era uno solo y global, así que la
       segunda empresa iba a appendear sus aprobados al de Retia.
       *(✅ medido 06/08: el archivado son **17 nodos** y **cero nodos de Google** en los 5 workflows.)*

@@ -28,7 +28,7 @@ en §Agent skills; acá solo se ubican.
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–069, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–075, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -70,8 +70,11 @@ en §Agent skills; acá solo se ubican.
   ADR-069. **El primer dato de adopción es la fila 6.** *Este renglón decía "la fila 5" y hubo que
   correrlo el mismo día: el número del canario se mueve cada vez que uno mismo lo toca, o el doc
   termina contando sus propias pruebas como adopción.*
-  ⏳ **La [`033`](core/schema/033_grabado_en.sql) (contract de ADR-070) está escrita y
-  ⬜ SIN APLICAR.** Dropea `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**
+  ✅ **La [`033`](core/schema/033_grabado_en.sql) (contract de ADR-070) está aplicada** (Mani,
+  21/08). Verificada por su efecto y no por haber corrido: PostgREST responde **`42703` — *column
+  transcripciones.grabado_en does not exist*** — y `app.grabados` y el resto de `transcripciones`
+  siguen contestando, o sea que se fue la columna y no la tabla. Dropeó `grabado_en`, que ya **no la
+  leía ni la escribía nadie**
   (las únicas menciones en el repo son comentarios). Medido antes de escribirla, contra prod el
   21/08: **130 transcripciones, 1 sola con `grabado_en`, y esa 1 está en `app.grabados`** ⇒ cero
   marcas viven solo en la columna. 🔒 **Aun así el drop es condicional:** la migración rehace esa
@@ -79,12 +82,18 @@ en §Agent skills; acá solo se ubican.
   insert de rescate al lado. *Medir el martes no autoriza a borrar el jueves.*
   *Se corrió de número dos veces el 21/08, porque `videos_meta` y `colecciones` llegaron antes — que
   es la regla escrita: **el número se toma cuando el archivo existe, no cuando un doc lo reserva**.*
-  🔴 **El canario de ADR-069/070 sigue en CERO, y lo que parecía moverlo era ruido.** Este doc llegó a
-  decir que la marca del 18/08 era *"primera señal de que el equipo usa el botón"*: **es falso, y se
-  midió el 20/08**. Los 4 eventos `transcribir.grabado` de la base son **los 4 de Mani**, sobre **la
-  misma fila**, en una ventana de 9 minutos — la sesión de verificación, no uso. *Una marca puesta
-  por quien construyó el botón no es evidencia de adopción.* El canario de verdad es
-  `select count(*) from app.grabados` a un mes, contando **marcas de otras personas**.
+  🟢 **El canario de ADR-069/070 SE DESPERTÓ el 20/08, y es el primer uso real del sistema por
+  alguien que no lo construyó.** `app.grabados` tiene **294 filas**: **288 las cargó Majo Duarte**,
+  en dos escrituras de 166 y 122. No se dedujo de los timestamps —eso es una sola señal— sino de
+  `app.eventos`, que guarda el autor: dos filas `historicos.marcar_masivo` con su `usuario_id` y
+  `{nuevos: 166}` / `{nuevos: 122}`, ~50 ms después de los dos statements.
+  ⚠️ **Y con eso este canario dejó de servir: `count(*)` ya no distingue adopción de carga masiva.**
+  Se redefine por fecha — `select count(*) from app.grabados where grabado_en > '2026-08-21'` — y la
+  pregunta que ninguno de los canarios contesta se lee de `app.eventos`: *¿alguien volvió un segundo
+  día?* Medido el 21/08, **nadie**: Jero 81 eventos en un solo día (07/08), Juan José 23 en ese
+  mismo día, Majo 2 en el 20/08. *La adopción acá tiene forma de ráfaga, no de hábito.*
+  *Este renglón decía **"sigue en CERO"** y era correcto cuando se escribió el 20/08 a las 16:30;
+  Majo entró esa misma noche. Un canario se re-mide, no se cita.*
   *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)
   vive en sus ADRs, en [handoff.md](docs/agents/handoff.md) y en git — acá no se duplica.*
 
@@ -140,7 +149,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..069).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..075).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

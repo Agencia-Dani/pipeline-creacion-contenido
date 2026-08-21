@@ -226,12 +226,25 @@ es que **degrada sin mentir** — lo que el sistema no sabe se dibuja como falta
 inicial del referente) y nunca se completa inventando, que es lo que permite que las tres fuentes
 —que saben cosas distintas— compartan una misma forma.
 
+**Modo selección**:
+Cómo se actúa sobre **varios videos a la vez** sin que la pantalla lo pida siempre. Apagado —que es
+como está en reposo— no existe: ni casillas ni barras. Encendido, cada **tarjeta de video** muestra
+su casilla y aparece una barra con lo que esa pantalla puede hacerle a lo marcado, que **no es lo
+mismo en todas**: en el Feed se califica y se archiva, en Transcribir e Históricos se marca grabado,
+y en las tres se agrega a una **colección**. *Existe porque la única puerta a una colección era
+pegar links: para agrupar un video que ya estaba en pantalla había que abrirlo, copiar su url e ir
+a otra pantalla a pegarla.*
+
 **Colección**:
 Una bolsa de videos con nombre, armada a mano para trabajarlos juntos (ADR-073). Puede mezclar los
 tres orígenes, apunta a la **llave de video** —así que no se vacía cuando el archivado barre el
 Feed— y es **descartable**: borrarla no borra nada de lo que se pagó por sus videos. Es además el
 momento en que el sistema **compra la metadata** que le falta a un video, porque agrupar es la señal
 de que alguien lo va a usar de verdad.
+*Y esa señal se registra: desde ADR-075 **agrupar es aprobar** — meter a una colección un video del
+Feed que nadie calificó lo deja en 👍, nunca pisando un juicio que ya estaba. No es cosmético: un
+video sin calificar lo borra el barrido a los 20 días y con él se va su guion crudo, porque solo lo
+aprobado llega al histórico.*
 
 **Guion limpio**:
 Una versión pulida del guion, **al lado del crudo y nunca encima** (ADR-074): el guion literal que
