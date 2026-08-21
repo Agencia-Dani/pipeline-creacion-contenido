@@ -95,6 +95,27 @@ export async function crearColeccion(
   return z.object({ id: z.string() }).parse(data).id;
 }
 
+/**
+ * Una colección por id, o `null` si no existe **o no es de este cockpit**.
+ *
+ * 🔒 El `null` cubre los dos casos con la misma respuesta a propósito: `scoped` filtra por
+ * `instance_id`, así que el id de otra empresa simplemente no aparece. Distinguir *"no existe"* de
+ * *"no es tuya"* le confirmaría a alguien que ese id existe en algún lado.
+ */
+export async function leerColeccion(
+  ctx: TenantContext,
+  id: string,
+): Promise<{ id: string; nombre: string } | null> {
+  const { data, error } = await (await scoped(ctx))
+    .select("app.colecciones", "id, nombre, creado_en")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`Supabase respondió con error: ${error.message}`);
+  if (!data) return null;
+  const fila = filaColeccion.parse(data);
+  return { id: fila.id, nombre: fila.nombre };
+}
+
 /** Los videos de una colección. */
 export async function leerMiembros(
   ctx: TenantContext,

@@ -37,8 +37,17 @@ export type Video = {
   heat: number | null;
 };
 
-/** Lo que aporta UNA fuente sobre un video. Todo opcional menos la identidad. */
-export type ParteVideo = Partial<Omit<Video, "clave" | "plataforma" | "external_id">> & {
+/**
+ * Lo que aporta UNA fuente sobre un video. Todo opcional menos la identidad.
+ *
+ * Los campos admiten `null` además de `undefined` y no es laxitud: las fuentes son filas de
+ * Postgres, donde "no lo sé" **es** `null`. Un `Partial<Video>` a secas daría `string | undefined`
+ * y obligaría a cada llamador a traducir sus nulls, que es una conversión de más por fuente y una
+ * chance de más de equivocarse. `fusionar` los trata igual (`?? null`).
+ */
+export type ParteVideo = {
+  [K in keyof Omit<Video, "clave" | "plataforma" | "external_id">]?: Video[K] | null;
+} & {
   plataforma: Plataforma;
   external_id: string;
 };

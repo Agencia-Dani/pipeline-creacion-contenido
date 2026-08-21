@@ -132,6 +132,10 @@ export const PANTALLAS_CURAR = [
   "feed",
   "descartes",
   "historicos",
+  // Va acá y no al final: el orden es el de las tarjetas del índice, y el recorrido natural es
+  // calificar → auditar → consultar el archivo → **apartar un lote para trabajarlo**. Lo de abajo
+  // (voces, referentes, sugeridos) es configuración, que se toca mucho menos seguido.
+  "colecciones",
   "voces",
   "referentes",
   "sugeridos",
@@ -141,10 +145,12 @@ export type PantallaCurar = (typeof PANTALLAS_CURAR)[number];
 
 const CURAR_POR_PIPELINE: Record<Pipeline, readonly PantallaCurar[]> = {
   "short-form-content": PANTALLAS_CURAR,
-  // LinkedIn tiene CUATRO de las seis. Las dos que faltan no son un pendiente: `historicos` y
+  // LinkedIn tiene CUATRO de las SIETE. Las tres que faltan no son un pendiente: `historicos` y
   // `sugeridos` **no tienen escritor** (el archivado que llena `outputs` es de reels y su pantalla
-  // lee columnas de video; no hay descubrimiento de LinkedIn). ADR-066 lo ratifica para que no se
-  // re-litigue cada vez que alguien mire la lista y las eche de menos.
+  // lee columnas de video; no hay descubrimiento de LinkedIn), y `colecciones` es literalmente una
+  // bolsa de **videos** — su llave es `(plataforma, external_id)` con `app.plataforma` limitado a
+  // instagram y tiktok, que ADR-049 §3 prohíbe extender a LinkedIn. ADR-066 lo ratifica para que no
+  // se re-litigue cada vez que alguien mire la lista y las eche de menos.
   //
   // El orden del array es el de las tarjetas del índice, y **no es el de reels a propósito**: acá
   // va primero lo que se configura (`voces`, `referentes`) y después lo que se cura (`feed`,

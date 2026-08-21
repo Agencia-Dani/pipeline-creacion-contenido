@@ -51,6 +51,11 @@ const COPY: Record<PantallaCurar, Copy> = {
     descripcion:
       "Todo lo aprobado, de todas las semanas, con su transcripción. El feed se vacía; esto no.",
   },
+  colecciones: {
+    titulo: "Colecciones",
+    descripcion:
+      "Apartá los videos que vas a trabajar juntos, vengan del feed, de transcribir o pegados a mano. Sobre una colección se limpian los guiones y se baja el documento.",
+  },
   voces: {
     titulo: "Voces y proyectos",
     descripcion:
