@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { queFaltaEnriquecer, validarNombre } from "@/domain/colecciones";
+import type { GuionParaDocumento } from "@/domain/docx";
 import { huellaDeCriterios } from "@/domain/limpieza";
 import { parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
@@ -12,6 +13,7 @@ import {
   agregarMiembros,
   borrarColeccion,
   crearColeccion,
+  leerColeccion,
   leerMiembros,
   quitarMiembro,
 } from "@/lib/colecciones";
@@ -427,4 +429,78 @@ export async function tirarLimpio(
   });
   revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
   return { ok: true, mensaje: "Limpio borrado. El guion original sigue igual." };
+}
+
+
+// ─────────────────────────── La descarga (Fase 5) ───────────────────────────
+
+/** Mismo presupuesto que la limpieza, y por lo mismo: `maxDuration` es 60. */
+const PRESUPUESTO_DESCARGA_MS = 45_000;
+
+/**
+ * Los guiones de una colección, listos para volverse un `.docx`.
+ *
+ * 🔑 **Devuelve DATOS, no un archivo**, que es el patrón de descarga que ya usa Históricos: el
+ * `.docx` se arma en el cliente con `domain/docx.ts`. Así no viaja un blob por la red, no hace falta
+ * una route nueva, y la descarga pasa por la misma guardia de tenant que todo lo demás.
+ *
+ * Prefiere el **limpio** cuando existe y cae al crudo cuando no, y el documento dice cuál es (ADR-074).
+ * Buscar el limpio primero además ahorra trabajo: solo se va a buscar el crudo de lo que no se limpió.
+ *
+ * ⏳ **Con presupuesto, como la limpieza.** `leerCrudo` puede terminar barriendo `outputs` por cada
+ * video sin transcripción propia, así que una colección grande podría pasarse del techo de Vercel.
+ * Se corta y **se avisa** con `truncado`, en vez de tumbar el request en silencio.
+ */
+export async function descargar(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+): Promise<
+  | { ok: true; nombre: string; guiones: GuionParaDocumento[]; truncado: boolean }
+  | { ok: false; mensaje: string }
+> {
+  const { usuario, ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (!uuid.safeParse(coleccionId).success) return { ok: false, mensaje: "Esa colección no existe." };
+
+  try {
+    const coleccion = await leerColeccion(ctx, coleccionId);
+    if (!coleccion) return { ok: false, mensaje: "Esa colección no existe." };
+
+    const [miembros, seSabe, limpios] = await Promise.all([
+      leerMiembros(ctx, coleccionId),
+      leerLoQueSeSabe(ctx),
+      leerLimpios(ctx),
+    ]);
+
+    const hasta = Date.now() + PRESUPUESTO_DESCARGA_MS;
+    const guiones: GuionParaDocumento[] = [];
+    let truncado = false;
+
+    for (const m of miembros) {
+      const video = seSabe.get(m.clave);
+      const limpio = limpios.get(m.clave)?.texto ?? null;
+      if (limpio === null && Date.now() > hasta) {
+        truncado = true;
+        break;
+      }
+      guiones.push({
+        titulo: video?.titulo ?? null,
+        referente: video?.referente ?? null,
+        url: m.url,
+        texto: limpio ?? (await leerCrudo(ctx, m.plataforma, m.external_id)),
+        limpio: limpio !== null,
+      });
+    }
+
+    await registrarEvento(ctx, usuario.id, "colecciones.descargar", {
+      coleccion: coleccionId,
+      videos: guiones.length,
+      limpios: guiones.filter((g) => g.limpio).length,
+      truncado,
+    });
+
+    return { ok: true, nombre: coleccion.nombre, guiones, truncado };
+  } catch (e) {
+    console.error("[colecciones] falló preparar la descarga:", e);
+    return { ok: false, mensaje: "No se pudo preparar el documento. Probá de nuevo." };
+  }
 }

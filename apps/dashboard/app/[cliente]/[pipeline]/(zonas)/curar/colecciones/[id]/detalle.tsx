@@ -7,9 +7,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { GrillaVideos } from "@/components/video/grupos";
 import { TarjetaVideo } from "@/components/video/tarjeta";
 import { necesitaEnriquecer } from "@/domain/colecciones";
+import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
 import type { Video } from "@/domain/video";
 import { usarCockpit } from "../../../usar-cockpit";
-import { agregarPegados, identificarFaltantes, limpiarFaltantes, quitar, vocesParaLimpiar } from "../actions";
+import {
+  agregarPegados,
+  descargar,
+  identificarFaltantes,
+  limpiarFaltantes,
+  quitar,
+  vocesParaLimpiar,
+} from "../actions";
 import { Guiones } from "./guiones";
 import { Identificador } from "./identificador";
 
@@ -44,9 +52,15 @@ export function Detalle({
   const sinIdentificar = videos.filter(necesitaEnriquecer).length;
   const sinLimpiar = videos.filter((v) => !limpios.has(v.clave)).length;
 
+  // 🩸 **Las dependencias son los dos strings, NO el objeto** (encontrado el 2026-08-21 mirando el
+  // log del dev server: esta pantalla pedía las voces ~una vez por segundo, para siempre).
+  // `usarCockpit()` arma `{cliente, pipeline}` en cada render, así que con `[cockpit]` el efecto veía
+  // una dependencia nueva cada vez: pedir → `setVoces` → render → objeto nuevo → pedir. Un bucle que
+  // no se nota en pantalla y le pega al servidor sin parar.
+  const { cliente, pipeline } = cockpit;
   useEffect(() => {
-    vocesParaLimpiar(cockpit).then(setVoces);
-  }, [cockpit]);
+    vocesParaLimpiar({ cliente, pipeline }).then(setVoces);
+  }, [cliente, pipeline]);
 
   function pegar() {
     if (trabajando || texto.trim() === "") return;
@@ -82,6 +96,39 @@ export function Detalle({
         quedan = pasada.quedan;
       }
       setAviso({ ok: true, mensaje: `${total} limpiados.` });
+    });
+  }
+
+  /**
+   * Baja los guiones en un `.docx`.
+   *
+   * 📦 **El archivo se arma ACÁ**, con los datos que devuelve la acción — mismo patrón que los dos
+   * export de Históricos (ADR-071). Nunca un blob cruzando la red ni una route nueva: así la
+   * descarga pasa por la misma guardia de tenant que el resto.
+   */
+  function bajar() {
+    if (trabajando) return;
+    startTransition(async () => {
+      const r = await descargar(cockpit, coleccionId);
+      if (!r.ok) {
+        setAviso(r);
+        return;
+      }
+      const url = URL.createObjectURL(
+        new Blob([aDocx(documentoDeGuiones(r.nombre, r.guiones))], { type: TIPO_DOCX }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      // Sin caracteres que un sistema de archivos pueda rechazar. El nombre de la colección es libre.
+      a.download = `${r.nombre.replace(/[/\\:*?"<>|]/g, " ").trim() || "guiones"}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setAviso({
+        ok: true,
+        mensaje: r.truncado
+          ? `El documento trae ${r.guiones.length} guiones: la colección es grande y quedó cortada. Bajala en dos colecciones más chicas.`
+          : `${r.guiones.length} ${r.guiones.length === 1 ? "guion" : "guiones"} en el documento.`,
+      });
     });
   }
 
@@ -163,6 +210,11 @@ export function Detalle({
                 : sinLimpiar === 0
                   ? "Todos limpios"
                   : `Limpiar ${sinLimpiar}`}
+            </Button>
+            {/* Word y no Excel: un guion es prosa de 1000+ caracteres y en una celda se lee mal.
+                Los dos export de Históricos siguen siendo `.xlsx` — ese archivo es una tabla. */}
+            <Button variant="outline" onClick={bajar} disabled={trabajando}>
+              {trabajando ? "Preparando…" : "Descargar (Word)"}
             </Button>
           </div>
           {/* Se avisa acá y no después de gastar: una voz sin perfil limpia solo con los criterios
