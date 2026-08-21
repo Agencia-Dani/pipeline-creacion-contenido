@@ -1,0 +1,79 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { necesitaEnriquecer, queFaltaEnriquecer, validarNombre } from "./colecciones.ts";
+import type { Video } from "./video.ts";
+
+const video = (p: Partial<Video> = {}): Video => ({
+  clave: "instagram:abc",
+  plataforma: "instagram",
+  external_id: "abc",
+  url: "https://www.instagram.com/p/AAA/",
+  titulo: null, referente: null, thumbnail: null,
+  views: null, likes: null, seguidores: null, idioma: null, heat: null,
+  ...p,
+});
+
+// ── El nombre ────────────────────────────────────────────────────────────────
+
+test("el nombre se guarda trimmeado", () => {
+  // Sin esto el unique (instance_id, nombre) deja pasar dos colecciones visualmente idénticas.
+  const r = validarNombre("   Guiones de Milena   ");
+  assert.deepEqual(r, { ok: true, nombre: "Guiones de Milena" });
+});
+
+test("un nombre en blanco no es un nombre", () => {
+  assert.equal(validarNombre("     ").ok, false);
+  assert.equal(validarNombre("").ok, false);
+});
+
+test("el tope es 80, igual que el check de la 031", () => {
+  assert.equal(validarNombre("x".repeat(80)).ok, true);
+  assert.equal(validarNombre("x".repeat(81)).ok, false);
+});
+
+// ── La factura de Apify ──────────────────────────────────────────────────────
+
+test("un link pelado se enriquece: son los 130 de Transcribir", () => {
+  assert.equal(necesitaEnriquecer(video()), true);
+});
+
+test("con título Y referente NO se paga: ya se identifica", () => {
+  assert.equal(necesitaEnriquecer(video({ titulo: "Un título", referente: "@milena" })), false);
+});
+
+test("con título pero sin referente TAMPOCO se paga", () => {
+  // Basta con poder saber qué es sin abrirlo. Pagar por completar es comprar cosmética.
+  assert.equal(necesitaEnriquecer(video({ titulo: "Un título" })), false);
+});
+
+test("con referente pero sin título tampoco", () => {
+  assert.equal(necesitaEnriquecer(video({ referente: "@rochi" })), false);
+});
+
+test("la miniatura sola NO justifica pagar", () => {
+  // 🔑 Es la decisión de costo de las 55 filas guion_reel del histórico: tienen título y referente
+  // y ninguna imagen, porque outputs nunca la guardó. Serían 55 llamadas por una imagen que no
+  // cambia ninguna decisión — la tarjeta ya dibuja la inicial del referente.
+  const conIdentidadSinFoto = video({ titulo: "Un título", referente: "@milena", thumbnail: null });
+  assert.equal(necesitaEnriquecer(conIdentidadSinFoto), false);
+});
+
+test("el mismo video repetido se paga UNA vez", () => {
+  // Agregar el mismo link dos veces en el mismo lote no puede costar doble.
+  const falta = queFaltaEnriquecer([video(), video(), video()]);
+  assert.equal(falta.length, 1);
+});
+
+test("solo se manda lo que falta, y en orden", () => {
+  const falta = queFaltaEnriquecer([
+    video({ clave: "instagram:a", external_id: "a" }),
+    video({ clave: "instagram:b", external_id: "b", titulo: "ya se sabe", referente: "@x" }),
+    video({ clave: "instagram:c", external_id: "c" }),
+  ]);
+  assert.deepEqual(falta.map((v) => v.external_id), ["a", "c"]);
+});
+
+test("sin nada que enriquecer, no se llama a nadie", () => {
+  const todos = [video({ titulo: "t", referente: "@r" })];
+  assert.deepEqual(queFaltaEnriquecer(todos), []);
+});

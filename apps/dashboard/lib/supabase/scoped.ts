@@ -95,6 +95,15 @@ const TABLAS = {
   // tabla del mapa clavada a la llave del video, y por la misma razón que `app.grabados`: el hecho
   // es del video, no del carril. Grano instancia porque lo que se compró lo pagó un cockpit.
   "app.videos_meta": { esquema: "app", grano: "instancia" },
+  // La bolsa de videos y sus miembros (ADR-073, migración `031`).
+  //
+  // 🔑 **`colecciones_videos` es puente y aun así entra con grano INSTANCIA, no `heredado`.** Lleva
+  // su propio `instance_id` denormalizado, atado al de su colección por un FK compuesto contra
+  // `colecciones (id, instance_id)`. O sea que la Capa 1 puede filtrar sin subconsulta y **Postgres
+  // garantiza que no puede mentir** — que es más de lo que consiguen `app.referentes_proyectos` y
+  // su hermana, que están en `heredado` y por eso traen los pares de todos los tenants.
+  "app.colecciones": { esquema: "app", grano: "instancia" },
+  "app.colecciones_videos": { esquema: "app", grano: "instancia" },
   "app.v_metricas_calidad": { esquema: "app", grano: "instancia" },
   "app.v_embudo_semana": { esquema: "app", grano: "instancia" },
   "app.v_embudo_descubrimiento": { esquema: "app", grano: "instancia" },

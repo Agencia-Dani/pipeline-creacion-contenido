@@ -45,13 +45,20 @@ en §Agent skills; acá solo se ubican.
   [`029`](core/schema/029_grabados.sql) (ADR-070) están aplicadas** (Mani, 18/08 y 20/08). La `029`
   crea `app.grabados` —la marca de *ya se grabó*, **por video** y no por carril— y **jubila** la
   columna de la `028`.
-  ⏳ **La [`030`](core/schema/030_videos_meta.sql) (ADR-072) está escrita y NO aplicada** — crea
+  ✅ **La [`030`](core/schema/030_videos_meta.sql) (ADR-072) está aplicada** (Mani, 21/08) — crea
   `app.videos_meta`, la metadata que se le compra a Apify porque ninguna otra tabla la tiene
-  (medido: 0 de 130 en Transcribir, 3 de 294 en los links cargados a mano). Gate humano: SQL Editor.
-  ⏳ **Y el *contract* de ADR-070 pasa a ser la `031`, que todavía no existe.** Tiene que dropear
+  (medido: 0 de 130 en Transcribir, 3 de 294 en los links cargados a mano). Verificada por su
+  efecto, no por haber corrido: PostgREST devuelve `[]` y no un 404, y un insert de prueba rebota
+  con `23503` contra la FK de `instances`. *Falta mirar `pg_policies` en el SQL Editor: PostgREST
+  no lo expone, así que esa pata queda sin medir.*
+  ⏳ **La [`031`](core/schema/031_colecciones.sql) (ADR-073) está escrita y NO aplicada** — crea
+  `app.colecciones` + `app.colecciones_videos`, la bolsa de videos que apunta a la llave y por eso
+  **sobrevive al barrido del archivado**. Gate humano: SQL Editor.
+  ⏳ **Y el *contract* de ADR-070 pasa a ser la `032`, que todavía no existe.** Tiene que dropear
   `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**. Va **después** de que
   ADR-070 lleve un tiempo en prod: dropearla hoy no rompe nada, pero deja sin red un rollback del
-  deploy. *Se corrió de número el 21/08 porque `videos_meta` llegó primero, que es la regla escrita:
+  deploy. *Se corrió de número dos veces el 21/08, porque `videos_meta` y `colecciones` llegaron
+  antes — que es la regla escrita:
   **el número se toma cuando el archivo existe, no cuando un doc lo reserva**.*
   🔴 **El canario de ADR-069/070 sigue en CERO, y lo que parecía moverlo era ruido.** Este doc llegó a
   decir que la marca del 18/08 era *"primera señal de que el equipo usa el botón"*: **es falso, y se
