@@ -204,8 +204,10 @@
 > - **`app.videos_meta` tiene 4 filas y las 4 son de la verificación**, no uso. Se dejaron para no
 >   pagarlas dos veces. **El primer dato de adopción es la fila 5** (la lección del canario de
 >   ADR-069: una marca puesta por quien construyó el botón no es evidencia de adopción).
-> - **`APIFY_TOKEN` se agregó a `apps/dashboard/.env.local`** (Next no lee el `.env` de la raíz).
->   ⬜ **Falta agregarlo en Vercel**, o el enriquecimiento no corre en producción.
+> - **`APIFY_TOKEN` está en los dos lados: `apps/dashboard/.env.local` y Vercel** (Mani, 21/08).
+>   Next no lee el `.env` de la raíz, y ese fue el primer motivo por el que el enriquecimiento
+>   devolvió cero en silencio. ⬜ **Sin verificar en producción todavía**: lo único medido es el
+>   local.
 > - **El slug del pipeline en la URL es `reels`**, no `short-form-content`.
 > - **Ningún guion es editable** en ninguna pantalla, y el limpio tampoco. Fuera de alcance a
 >   propósito.
