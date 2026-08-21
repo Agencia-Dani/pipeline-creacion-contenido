@@ -67,12 +67,15 @@ en §Agent skills; acá solo se ubican.
   ⚠️ **`app.videos_meta` tiene 4 filas y las 4 son de la verificación de Mani del 21/08.** Son
   metadata real y correcta (se dejaron en vez de borrarlas para no pagarlas dos veces), pero **no
   son uso**: mismo cuidado que el canario de ADR-069. El primer dato de adopción es la fila 5.
-  ⏳ **Y el *contract* de ADR-070 pasa a ser la `033`, que todavía no existe.** Tiene que dropear
-  `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**. Va **después** de que
-  ADR-070 lleve un tiempo en prod: dropearla hoy no rompe nada, pero deja sin red un rollback del
-  deploy. *Se corrió de número dos veces el 21/08, porque `videos_meta` y `colecciones` llegaron
-  antes — que es la regla escrita:
-  **el número se toma cuando el archivo existe, no cuando un doc lo reserva**.*
+  ⏳ **La [`033`](core/schema/033_grabado_en.sql) (contract de ADR-070) está escrita y
+  ⬜ SIN APLICAR.** Dropea `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**
+  (las únicas menciones en el repo son comentarios). Medido antes de escribirla, contra prod el
+  21/08: **130 transcripciones, 1 sola con `grabado_en`, y esa 1 está en `app.grabados`** ⇒ cero
+  marcas viven solo en la columna. 🔒 **Aun así el drop es condicional:** la migración rehace esa
+  cuenta **en el momento de correr** y, si aparece alguna huérfana, **no borra y avisa** con el
+  insert de rescate al lado. *Medir el martes no autoriza a borrar el jueves.*
+  *Se corrió de número dos veces el 21/08, porque `videos_meta` y `colecciones` llegaron antes — que
+  es la regla escrita: **el número se toma cuando el archivo existe, no cuando un doc lo reserva**.*
   🔴 **El canario de ADR-069/070 sigue en CERO, y lo que parecía moverlo era ruido.** Este doc llegó a
   decir que la marca del 18/08 era *"primera señal de que el equipo usa el botón"*: **es falso, y se
   midió el 20/08**. Los 4 eventos `transcribir.grabado` de la base son **los 4 de Mani**, sobre **la

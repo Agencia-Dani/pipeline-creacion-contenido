@@ -124,6 +124,8 @@
 > | 2b | Transcribir: la tanda abierta pasa de `<ul>` de `<Fila>` a `GrillaVideos` + `TarjetaCola`; el guion sale del `<details>` a **un** modal por tanda. Muere `transcribir/copiar.tsx` | 15 tarjetas en una tanda real, badge ✓, cero desborde, el modal trae el guion |
 > | 2c | Históricos agrupa por proyecto con `agrupar()`; las **huérfanas entran por la misma tarjeta** que el resto | 6 proyectos + `(sin proyecto)` (327), plegado y filtros recalculando (4+3+10+12+265 = 294) |
 > | 5 | `domain/zip.ts` (extraído de `xlsx.ts`) + `domain/docx.ts` + el botón `Descargar (Word)` en la colección | Blob `PK`, MIME correcto, los 4 guiones con "Guion limpio"; `file` dice *Microsoft Word 2007+* y `textutil` lo lee entero |
+> | 5b | **Los videos van numerados** (`1. Título`), pedido de Mani mirando el primer archivo | Test: un video sin guion **no se saltea el número** |
+> | — | **`core/schema/033_grabado_en.sql`**: el paso *contract* de ADR-070 | ⬜ escrita, **sin aplicar** (gate humano, va al SQL Editor) |
 >
 > Más: **enmienda de ADR-074 en ROADMAP §1 punto 1** (dice qué del norte sigue en pie y qué se suma)
 > y los 5 términos en `context.md` — **colección · guion limpio · perfil de limpieza · llave de video
@@ -166,13 +168,28 @@
 >    filas y son las 4 de esta verificación**, hechas por quien construyó el botón. Igual que
 >    `videos_meta` y `grabados`: **el primer dato de adopción es la fila 5**. A dos semanas:
 >    `select count(*) from app.guiones_limpios where creado_por <> '<mani>'`.
-> 3. ⬜ **La `033`** (contract de ADR-070, dropear `transcripciones.grabado_en`) sigue pendiente.
+> 3. ⬜ **Aplicar la `033`** en el SQL Editor (está escrita; ver abajo).
 > 4. 🩹 **ROADMAP §1 punto 7 todavía dice "Descargar CSV"** y desde ADR-071 son dos `.xlsx`. No se
 >    tocó: es de otro cierre y no había que arrastrarlo acá.
 > 5. ⬜ **Abrir el `.docx` en Word con los ojos.** `file` y `textutil` son dos señales de que el
 >    paquete es válido, pero ninguna es Word.
 >
-> ### ⚠️ Cosas que el próximo tiene que saber
+> ### 🧹 La `033`, y por qué el drop no es un drop a ciegas
+>
+> Dropea `app.transcripciones.grabado_en`. **Medido contra prod antes de escribir una línea:** 130
+> transcripciones, **1 sola** con `grabado_en`, y esa 1 **está** en `app.grabados` ⇒ **0 marcas viven
+> solo en la columna**. (La única que había es del canario del 18/08, o sea Mani probando el botón.)
+>
+> 🔒 **Y aun así el `alter table` es condicional.** El §1 rehace esa misma cuenta **en el momento de
+> correr** y solo borra si da cero; si aparece una huérfana **no borra y avisa**, con el insert de
+> rescate comentado al lado. *Medir el martes no autoriza a borrar el jueves* — la medición vale
+> para el día que se hizo, y quien aprieta Run es otro momento y a veces otra base.
+>
+> Va con gate humano al SQL Editor, como todas. Su verificación está al pie del archivo, y el paso 3
+> es el que importa: **abrir Transcribir y ver que los badges "✓ Grabado" siguen ahí** — la prueba de
+> que nadie leía la columna, medida donde se ve y no en el código.
+>
+> > ### ⚠️ Cosas que el próximo tiene que saber
 >
 > - **`Fila` de Transcribir sigue viva**, y a propósito: la dibujan las tarjetas de *fallidas* y
 >   *sueltas* de `page.tsx`, que son listas de "esto necesita tu atención" y no una tanda. Lo que se
