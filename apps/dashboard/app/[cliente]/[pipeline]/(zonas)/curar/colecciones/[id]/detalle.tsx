@@ -9,6 +9,7 @@ import { necesitaEnriquecer } from "@/domain/colecciones";
 import type { Video } from "@/domain/video";
 import { usarCockpit } from "../../../usar-cockpit";
 import { agregarPegados, identificarFaltantes, quitar } from "../actions";
+import { Identificador } from "./identificador";
 
 // El contenido de una colección.
 //
@@ -51,6 +52,10 @@ export function Detalle({ coleccionId, videos }: { coleccionId: string; videos: 
 
   return (
     <div className="space-y-6">
+      {/* Invisible: dispara las pasadas de identificación solo. El botón de abajo se queda como
+          salida manual para cuando el bucle cortó porque una pasada trajo cero. */}
+      <Identificador coleccionId={coleccionId} faltan={sinIdentificar} />
+
       <div className="space-y-2 rounded-lg border p-4">
         <p className="text-sm font-medium">Agregar videos</p>
         <p className="text-sm text-muted-foreground">
@@ -72,7 +77,7 @@ export function Detalle({ coleccionId, videos }: { coleccionId: string; videos: 
               invitación a apretarlo y gastar plata en nada. */}
           {sinIdentificar > 0 && (
             <Button variant="outline" onClick={identificar} disabled={trabajando}>
-              {trabajando ? "Buscando…" : `Identificar ${sinIdentificar}`}
+              {trabajando ? "Buscando…" : `Reintentar los ${sinIdentificar} que faltan`}
             </Button>
           )}
         </div>
@@ -85,9 +90,9 @@ export function Detalle({ coleccionId, videos }: { coleccionId: string; videos: 
 
       {sinIdentificar > 0 && (
         <p className="text-sm text-muted-foreground">
-          {sinIdentificar} {sinIdentificar === 1 ? "video no se pudo" : "videos no se pudieron"}{" "}
-          identificar todavía. Están en la colección igual y funcionan; lo que falta es la foto y el
-          título. <strong>Identificar</strong> se los pide al scraper.
+          Buscándole la foto y el título a {sinIdentificar}{" "}
+          {sinIdentificar === 1 ? "video" : "videos"}. Puede tardar un minuto y la página se
+          actualiza sola. Están en la colección igual y funcionan sin eso.
         </p>
       )}
 

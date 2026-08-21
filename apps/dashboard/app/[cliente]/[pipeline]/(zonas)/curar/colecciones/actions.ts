@@ -81,8 +81,15 @@ export async function borrar(enRuta: CockpitEnRuta, id: string): Promise<Resulta
  * Agrega videos pegando links, que es el idioma que esta app ya usa para *"hacer algo con muchos
  * ítems"* (el pegote de Transcribir, la carga masiva de Históricos).
  *
- * 🔴 **El orden importa: primero entran, después se enriquecen.** Si Apify se cae, los videos ya
- * están en la colección. Enriquecer es el adorno; agrupar es el trabajo (ADR-073 §5).
+ * 🔴 **NO enriquece: solo agrega, y por eso es instantáneo.** El primer diseño llamaba a Apify acá
+ * mismo, y medido contra el actor real eso tardó **~45 s con dos links** (el costo dominante es
+ * arrancar el actor, no los items). Contra un presupuesto de 45 s y un `maxDuration` de 60, eso es
+ * una carrera contra la plataforma que se pierde la mitad de las veces — y cuando se pierde, quien
+ * pegó los links ve "0 identificados" sin entender por qué.
+ *
+ * El enriquecimiento se mudó a `identificarFaltantes`, que corre en pasadas con su propio
+ * presupuesto y lo dispara solo `<Identificador>`. Es el mismo patrón que vacía la cola de
+ * Transcribir (`procesador.tsx`), y por la misma razón.
  */
 export async function agregarPegados(
   enRuta: CockpitEnRuta,
@@ -114,15 +121,12 @@ export async function agregarPegados(
     return { ok: false, mensaje: "No se pudieron agregar los videos. Probá de nuevo." };
   }
 
-  const traidos = await enriquecerLote(ctx, validos);
-
   await registrarEvento(ctx, usuario.id, "colecciones.agregar", {
     coleccion: coleccionId,
     detectados: validos.length,
     nuevos: resultado.nuevos,
     ya_estaban: resultado.yaEstaban,
     no_reconocidos: invalidos.length,
-    enriquecidos: traidos,
   });
 
   revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
@@ -130,7 +134,6 @@ export async function agregarPegados(
   const partes = [`${resultado.nuevos} agregados`];
   if (resultado.yaEstaban > 0) partes.push(`${resultado.yaEstaban} ya estaban`);
   if (invalidos.length > 0) partes.push(`${invalidos.length} no reconocidos`);
-  if (traidos > 0) partes.push(`${traidos} identificados`);
   return { ok: true, mensaje: partes.join(" · ") + "." };
 }
 
@@ -161,38 +164,49 @@ export async function quitar(
 }
 
 /**
- * Vuelve a intentar identificar los videos que quedaron pelados.
+ * Una pasada de identificación: le compra a Apify hasta `TOPE_POR_LOTE` videos de los que están
+ * pelados, y devuelve cuántos trajo y cuántos siguen faltando.
  *
- * Existe porque el enriquecimiento es **best-effort con presupuesto**: si Apify tardó, si el lote
- * era más grande que `TOPE_POR_LOTE`, o si estaba caído, quedan videos sin identificar. Sin este
- * botón la única salida sería sacarlos y volver a agregarlos.
+ * 🔑 **Devuelve conteos y no solo un mensaje** porque quien la llama es un bucle
+ * (`<Identificador>`): necesita saber si la pasada movió la aguja para decidir si sigue o corta.
+ * Una pasada que trae 0 corta el bucle — mejor eso que girar en vacío gastando llamadas.
  */
 export async function identificarFaltantes(
   enRuta: CockpitEnRuta,
   coleccionId: string,
-): Promise<ResultadoAccion> {
+): Promise<ResultadoAccion & { identificados: number; quedan: number }> {
   const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
-  if (!uuid.safeParse(coleccionId).success) return { ok: false, mensaje: "Esa colección no existe." };
+  if (!uuid.safeParse(coleccionId).success) {
+    return { ok: false, mensaje: "Esa colección no existe.", identificados: 0, quedan: 0 };
+  }
 
   let miembros;
   try {
     miembros = await leerMiembros(ctx, coleccionId);
   } catch (e) {
     console.error("[colecciones] falló leer para identificar:", e);
-    return { ok: false, mensaje: "No se pudo leer la colección. Probá de nuevo." };
+    return { ok: false, mensaje: "No se pudo leer la colección.", identificados: 0, quedan: 0 };
   }
 
-  const traidos = await enriquecerLote(ctx, miembros);
+  const { traidos, faltaban } = await enriquecerLote(ctx, miembros);
+  const quedan = Math.max(0, faltaban - traidos);
+
   await registrarEvento(ctx, usuario.id, "colecciones.identificar", {
     coleccion: coleccionId,
     enriquecidos: traidos,
+    quedan,
   });
   revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
 
   if (traidos === 0) {
-    return { ok: false, mensaje: "No se pudo identificar ninguno. Probá de nuevo en un rato." };
+    return {
+      ok: false,
+      mensaje: "No se pudo identificar ninguno. Probá de nuevo en un rato.",
+      identificados: 0,
+      quedan,
+    };
   }
-  return { ok: true, mensaje: `${traidos} identificados.` };
+  return { ok: true, mensaje: `${traidos} identificados.`, identificados: traidos, quedan };
 }
 
 /**
@@ -206,7 +220,7 @@ export async function identificarFaltantes(
 async function enriquecerLote(
   ctx: Awaited<ReturnType<typeof exigirTenant>>["ctx"],
   enlaces: readonly (EnlaceVideo | { url: string; plataforma: "instagram" | "tiktok"; external_id: string })[],
-): Promise<number> {
+): Promise<{ traidos: number; faltaban: number }> {
   try {
     const seSabe = await leerLoQueSeSabe(ctx);
     const comoVideos = enlaces.map(
@@ -221,14 +235,15 @@ async function enriquecerLote(
         },
     );
 
-    const faltan = queFaltaEnriquecer(comoVideos).slice(0, TOPE_POR_LOTE);
-    if (faltan.length === 0) return 0;
+    const todosLosQueFaltan = queFaltaEnriquecer(comoVideos);
+    if (todosLosQueFaltan.length === 0) return { traidos: 0, faltaban: 0 };
 
-    const metas = await traerMetadata(faltan.map((v) => v.url));
+    const lote = todosLosQueFaltan.slice(0, TOPE_POR_LOTE);
+    const metas = await traerMetadata(lote.map((v) => v.url));
     await guardarMeta(ctx, metas);
-    return metas.length;
+    return { traidos: metas.length, faltaban: todosLosQueFaltan.length };
   } catch (e) {
     console.error("[colecciones] el enriquecimiento falló entero:", e);
-    return 0;
+    return { traidos: 0, faltaban: 0 };
   }
 }
