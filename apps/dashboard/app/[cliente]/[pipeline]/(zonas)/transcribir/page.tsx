@@ -9,6 +9,8 @@ import {
 import { exigirTenant } from "@/lib/auth";
 import { fechaHora } from "@/lib/fechas";
 import { leerAutores, leerCabeceras } from "@/lib/tandas";
+import { claveDe } from "@/domain/enlace";
+import { cualesGrabadas } from "@/lib/grabados";
 import { leerFallidas, leerSueltas } from "@/lib/transcripciones";
 import { Fila } from "./fila";
 import { PegarEnlaces } from "./pegar-enlaces";
@@ -54,6 +56,17 @@ export default async function TranscribirPage({
   });
 
   const autores = await leerAutores();
+
+  // Las marcas de grabado de las dos listas que esta página dibuja en el server (ADR-070). Las de
+  // una tanda abierta NO salen de acá: bajan con sus filas en `cargarTanda`, porque una tanda se
+  // dibuja en el cliente. Sumidero: si esto falla, la pantalla se ve sin marcas en vez de no verse.
+  const grabadas = await cualesGrabadas(
+    ctx,
+    [...fallidas, ...sueltas].map((t) => t.external_id),
+  ).catch((e) => {
+    console.error("[transcribir] no se pudieron leer las marcas de grabado:", e);
+    return new Set<string>();
+  });
 
   // Las sueltas se suman: si `asignarTanda` falló, sus pendientes no están en ninguna cabecera y el
   // `Procesador` —que arranca solo cuando este número es > 0— nunca los levantaría.
@@ -101,7 +114,7 @@ export default async function TranscribirPage({
           <CardContent>
             <ul className="space-y-4">
               {fallidas.map((t) => (
-                <Fila key={t.id} t={t} ahora={ahora} />
+                <Fila key={t.id} t={t} ahora={ahora} grabadaInicial={grabadas.has(claveDe(t))} />
               ))}
             </ul>
           </CardContent>
@@ -159,7 +172,7 @@ export default async function TranscribirPage({
           <CardContent>
             <ul className="space-y-4">
               {sueltas.map((t) => (
-                <Fila key={t.id} t={t} ahora={ahora} />
+                <Fila key={t.id} t={t} ahora={ahora} grabadaInicial={grabadas.has(claveDe(t))} />
               ))}
             </ul>
           </CardContent>

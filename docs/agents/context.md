@@ -189,6 +189,26 @@ El archivo de guiones del equipo: **todo guion que el equipo quiso guardar**, de
 venga de donde venga — un Candidato que aprobó en el feed o un **enlace pegado** que transcribió a
 mano. Es lo que se descarga en el CSV, y cada fila dice de qué **origen** vino. *No es "lo aprobado"*:
 ese era su significado mientras el archivado era su único escritor (ADR-062, que enmienda ADR-014).
+Desde ADR-070 es además la superficie donde se marca lo **grabado**: dejó de ser solo lectura.
+
+**Grabado**:
+Que el equipo ya usó ese video para producir contenido. Es un hecho **del video**, no del guion ni
+del carril por el que entró: vive en `app.grabados` con clave `(plataforma, external_id)`, y la
+**presencia de la fila es la marca** — desmarcar la borra (ADR-070).
+
+⚠️ **Es ortogonal a Transcrito, y confundirlos es el error que la palabra existe para evitar.**
+*Transcrito* dice que existe el texto de ese video en el sistema; *grabado* dice que el equipo lo
+usó. Las cuatro combinaciones son reales, y la cuarta es la que obligó a que esto fuera una tabla y
+no una columna: un video **grabado y no transcrito** es un link que el equipo grabó por fuera de la
+herramienta y cargó a mano, y no tiene fila en ninguna otra tabla donde colgarle la marca.
+
+*Nació en ADR-069 como columna de `app.transcripciones`, o sea alcanzando un solo carril; ADR-070 la
+mudó al video porque 55 de los 183 guiones del histórico venían del Feed y no tenían dónde marcarse.*
+
+**Marca huérfana**:
+Un **grabado** sin guion: el equipo grabó ese video por fuera del sistema y cargó su link a mano. En
+el histórico se dibuja distinto —sin título, sin proyecto y sin botón de ver guion— porque pintarla
+como una fila normal con los campos vacíos afirmaría que existe un texto que no existe (ADR-070).
 
 **El transcriptor**:
 Cómo se llama de cara al equipo la máquina que atiende los enlaces pegados, en la familia de *el

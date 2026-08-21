@@ -26,13 +26,17 @@ const filaTranscripcion = z.object({
   error: z.string().nullable(),
   creado_en: z.string(),
   procesado_en: z.string().nullable(),
-  // ADR-069: ortogonal a `estado`. NULL = no grabado, que es el estado normal de casi toda fila.
-  grabado_en: z.string().nullable(),
 });
 export type Transcripcion = z.infer<typeof filaTranscripcion>;
 
+// ⚠️ **`grabado_en` salió de acá con ADR-070** y no es una poda cosmética: la marca se mudó a
+// `app.grabados`, con clave por VIDEO, porque como columna de esta tabla solo alcanzaba a los links
+// pegados a mano (128 de los 183 guiones del histórico, medido el 2026-08-20). La columna sigue
+// existiendo en el esquema hasta la `030` — expand/contract — pero **ya no se lee ni se escribe**.
+// Quién quiera saber si una fila está grabada le pregunta a `lib/grabados.ts` por su
+// `(plataforma, external_id)`, que es la clave que sirve para los tres carriles.
 const COLUMNAS =
-  "id, plataforma, external_id, url, estado, script, idioma, error, creado_en, procesado_en, grabado_en";
+  "id, plataforma, external_id, url, estado, script, idioma, error, creado_en, procesado_en";
 
 /** Los dos estados de los que solo se sale por el botón `Reintentar`. */
 export const ESTADOS_FALLIDOS = ["fallo", "sin_transcript"] as const;
@@ -321,39 +325,11 @@ export async function cualesFallidas(ctx: TenantContext, ids: string[]): Promise
   return claves;
 }
 
-/**
- * Cuáles de esos links **ya se grabaron** (ADR-069).
- *
- * 🔑 **Es la única de las cuatro preguntas que responde "no lo vuelvas a mandar".** Las otras tres
- * describen dónde está el link (en la cola, fallado, visto por el motor) y todas admiten un "pero
- * transcribilo igual" razonable. Esta no: el guion ya se usó. Por eso `repartirEnlaces` le da
- * precedencia sobre las tres.
- *
- * Pregunta por `grabado_en is not null` y no por una columna booleana: la marca guarda **cuándo**,
- * porque es la pregunta que sigue siempre a "¿ya se grabó?" y cuesta lo mismo.
- *
- * Mismo troceo de 200 que sus hermanas: 400 links en un `in.()` arman una URL de varios KB y el
- * límite del que se entera uno es el 414 en producción.
- */
-export async function cualesGrabadas(ctx: TenantContext, ids: string[]): Promise<Set<string>> {
-  if (ids.length === 0) return new Set();
-  const s = await scoped(ctx);
-  const claves = new Set<string>();
-
-  for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await s
-      .select("app.transcripciones", "plataforma, external_id")
-      .in("external_id", ids.slice(i, i + 200))
-      .not("grabado_en", "is", null);
-    if (error)
-      throw new Error(`Supabase respondió con error consultando las grabadas: ${error.message}`);
-    for (const fila of z
-      .array(z.object({ plataforma: z.string(), external_id: z.string() }))
-      .parse(data ?? []))
-      claves.add(`${fila.plataforma}:${fila.external_id}`);
-  }
-  return claves;
-}
+// `cualesGrabadas` vivía acá y se mudó a `lib/grabados.ts` con ADR-070. Preguntaba
+// `where external_id in (...) and grabado_en is not null` sobre ESTA tabla, así que solo podía
+// contestar por links que ya estaban en la cola del transcriptor: un video grabado que vino del Feed
+// caía en `vistosPorElMotor` (*"eso no garantiza que exista el guion"*) — verdad, y el mensaje
+// equivocado. Ahora pregunta a `app.grabados`, que es por video, y contesta por los tres carriles.
 
 export async function cualesVistosPorElMotor(
   ctx: TenantContext,
@@ -437,32 +413,7 @@ export async function abandonar(ctx: TenantContext, id: string): Promise<boolean
   return (data?.length ?? 0) > 0;
 }
 
-/**
- * Prende o apaga la marca de "ya se grabó" (ADR-069 §5).
- *
- * 🔓 **Las dos direcciones en la misma función, y sin guardia de estado.** Es deliberado y es lo
- * contrario de `abandonar` y `reencolar`, que sí filtran por `estado`: ahí el `.in(...)` impide que
- * un POST a mano destruya un guion pagado. Acá no hay nada que destruir — desmarcar devuelve el
- * estado exacto de antes — así que una guardia solo agregaría un modo de falla ("no se pudo marcar")
- * sobre un acto que no tiene consecuencias.
- *
- * Tampoco filtra por `estado = 'listo'`: marcar un `pendiente` como grabado es raro pero no es un
- * error del sistema. Si alguien grabó el video antes de que llegara su transcripción, la herramienta
- * no tiene por qué discutírselo.
- *
- * Devuelve `false` cuando no tocó ninguna fila: o no existe, o no es de este cockpit (el filtro de
- * `scoped` entra en el `update`). Las dos se contestan igual, y ninguna es un error del servidor.
- */
-export async function marcarGrabado(
-  ctx: TenantContext,
-  id: string,
-  grabado: boolean,
-): Promise<boolean> {
-  const { data, error } = await (await scoped(ctx))
-    .update("app.transcripciones", { grabado_en: grabado ? new Date().toISOString() : null })
-    .eq("id", id)
-    .select("id");
-  if (error)
-    throw new Error(`Supabase respondió con error marcando lo grabado: ${error.message}`);
-  return (data?.length ?? 0) > 0;
-}
+// `marcarGrabado` vivía acá (ADR-069 §5) y lo reemplazaron `marcar` / `desmarcar` de
+// `lib/grabados.ts`. Recibía el `id` de la transcripción, que es la razón por la que no servía para
+// nada más: un guion del Feed no tiene fila en esta tabla y un link cargado a mano tampoco. Las dos
+// funciones nuevas reciben `(plataforma, external_id)`, o sea la identidad del **video**.

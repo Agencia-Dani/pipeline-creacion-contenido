@@ -86,6 +86,11 @@ const TABLAS = {
   // de 50 (la lista vieja traía 50 de 110 y no lo decía).
   "app.tandas": { esquema: "app", grano: "instancia" },
   "app.v_tandas": { esquema: "app", grano: "instancia" },
+  // La marca "ya se grabó" (ADR-070, migración `029`). Grano instancia como todo lo que rodea a las
+  // transcripciones: una marca es del cockpit. **Es la única tabla del mapa cuya clave no es un `id`
+  // nuestro sino la del video** —`(plataforma, external_id)`, la misma de `processed_items`— porque
+  // el hecho es del video y no del carril por el que entró.
+  "app.grabados": { esquema: "app", grano: "instancia" },
   "app.v_metricas_calidad": { esquema: "app", grano: "instancia" },
   "app.v_embudo_semana": { esquema: "app", grano: "instancia" },
   "app.v_embudo_descubrimiento": { esquema: "app", grano: "instancia" },

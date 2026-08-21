@@ -45,3 +45,26 @@ export function fecha(iso: string, conAnio = false): string {
 export function diaISO(momento: Date): string {
   return momento.toLocaleDateString("en-CA", { timeZone: ZONA });
 }
+
+/**
+ * `YYYY-MM-DD HH:mm` en la zona del equipo — el formato de las fechas **dentro del Excel**.
+ *
+ * 🩸 Antes iban crudas del `timestamptz`: `2026-08-20T20:14:47.421495+00:00`. Ilegible, con
+ * microsegundos que no le importan a nadie, y **corrido 5 horas** para quien lo lee en Bogotá.
+ *
+ * Ordena bien igual siendo texto, que es lo que se necesita en una planilla: `YYYY-MM-DD HH:mm` es
+ * lexicográficamente creciente. Una celda de fecha de verdad pediría `styles.xml` con su formato
+ * numérico, y eso es contenedor nuevo para un problema que esto ya resuelve.
+ */
+export function fechaHoraPlana(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dia = d.toLocaleDateString("en-CA", { timeZone: ZONA });
+  const hora = d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: ZONA,
+  });
+  return `${dia} ${hora}`;
+}
