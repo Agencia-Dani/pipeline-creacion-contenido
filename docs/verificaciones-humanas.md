@@ -327,9 +327,19 @@ el circuito entero, de punta a punta:
 > fuerte (`✓ Grabado`), la acción se ofrece callada (`Sacar la marca de grabado`)**.
 > *Generalizable: un indicador nuevo se elige contra los que YA están en esa línea, no en abstracto.*
 >
-> ⚠️ **`Reintentar` y `Abandonar` tienen el MISMO bug dentro de una tanda abierta** y sigue vivo:
-> los dos hacen `router.refresh()`. No se notó porque esos botones también salen en la **tarjeta de
-> fallidas**, que sí es server-rendered y ahí el refresh funciona. Pendiente de decisión de Mani.
+> ✅ **`Reintentar` y `Abandonar` tenían el MISMO bug dentro de una tanda abierta, y se cerró el
+> 20/08** ([PR #4](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/4), cierre 112):
+> los dos hacen `router.refresh()`, que no toca el `useState` de `tanda.tsx`. No se notó antes
+> porque esos botones también salen en la **tarjeta de fallidas**, que sí es server-rendered y ahí
+> el refresh funciona. El arreglo: `tanda.tsx` recarga sus filas cuando cambian los contadores de la
+> cabecera, sin importar qué botón los cambió. **Falta la verificación con los ojos** — el PR trae
+> automático (typecheck, 320 tests, build) pero nadie lo apretó en prod todavía:
+> 1. Abrir una tanda con una fila **Falló** / **Sin transcripción** → **Reintentar** → pasa a
+>    **En cola** y los botones desaparecen, sin recargar la página.
+> 2. Esperar al procesador → la fila llega a **Listo** sola.
+> 3. Con esa tanda abierta, **Reintentar** desde la tarjeta *"N no salieron"* de arriba → la fila de
+>    abajo cambia también (antes se contradecían: una desaparecía arriba y quedaba igual abajo).
+> 4. **Abandonar** (dos clics) → la fila pasa a **Abandonado** y los botones se van.
 
 🔑 **El punto 3 es toda la prueba.** Los otros dos solo confirman que el botón guarda; el 3 confirma
 que **el montón nuevo le gana en precedencia a `enCola`** (ADR-069 §4). Un video grabado está
