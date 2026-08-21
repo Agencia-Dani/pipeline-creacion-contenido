@@ -9,11 +9,38 @@
 
 ## Cómo lo usa Majo hoy (sin código)
 
-1. Copiar el bloque **BASE** de abajo.
-2. Pegar debajo el bloque **VOZ** de la creadora (Milena o Rosario).
-3. Pegar el guion crudo al final, después de `--- GUION CRUDO ---`.
-4. Lo que devuelve Claude es el guion limpio. **El crudo no se tira**: es contra lo que se compara
-   cuando algo suena raro.
+**Los bloques van en dos mensajes distintos, no en uno.** El primero configura, el segundo trabaja.
+
+### Opción A — un chat por creadora (lo más rápido de arrancar)
+
+1. En [claude.ai](https://claude.ai), **chat nuevo**.
+2. **Primer mensaje:** pegar el bloque **BASE** y, justo debajo, el bloque **VOZ** de la creadora
+   (Milena o Rosario). Enviar. Claude va a contestar algo corto tipo *"listo, mandame el guion"*.
+3. **Segundo mensaje:** pegar **solo el guion crudo**, sin nada más alrededor. Lo que devuelve es el
+   guion limpio.
+4. **Para el guion siguiente: mismo chat, pegar el próximo guion crudo y ya.** BASE y VOZ no se
+   repiten: ya están arriba en la conversación.
+5. **Para la otra creadora: chat nuevo**, con su bloque VOZ. Nunca mezclar dos voces en un chat: el
+   modelo arrastra el tono del anterior.
+
+### Opción B — un Proyecto por creadora (mejor si va a hacer muchos)
+
+1. En claude.ai, panel izquierdo → **Projects** → **New project**, nombre *"Guiones Milena"*.
+2. En **Set project instructions** (o *Instrucciones del proyecto*), pegar **BASE + VOZ**. Se guarda
+   una sola vez.
+3. Cada guion es un **chat nuevo dentro del proyecto**, y el mensaje es solo el guion crudo.
+
+Ventaja sobre la A: no se le alarga el chat, y cada guion arranca limpio sin arrastrar el anterior.
+Es lo que conviene si va a limpiar 20 o 50 de una sentada.
+
+### En los dos casos
+
+- **El crudo no se tira.** Es contra lo que se compara cuando algo suena raro, y es lo que la
+  herramienta va a seguir entregando siempre.
+- **Si el resultado trae una línea con ⚠️ al final, leerla.** Es el prompt avisando que tomó una
+  decisión discutible (no supo cuántas voces había, sacó una frase entera).
+- **Anotar cada corrección que haya que hacerle a mano.** Eso es el material que después llena el
+  campo `perfil_limpieza` de cada voz en el cockpit (ver el final de este doc).
 
 ---
 
