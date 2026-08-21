@@ -74,8 +74,15 @@ export function documentoDeGuiones(
     ]),
   ];
 
-  for (const g of guiones) {
-    parrafos.push(parrafo([{ texto: g.titulo ?? "Sin título", negrita: true, tamano: 28 }], 360));
+  // 🔢 **Numerados, y con el número escrito en el texto** (pedido de Mani el 21/08, mirando el
+  // primer archivo). No una lista de Word (`numPr`): eso pide `numbering.xml` con su definición de
+  // niveles, o sea dos partes más en el paquete y una cosa más que un lector puede interpretar
+  // distinto. Acá el número es parte del título, así que se ve igual en Word, en Docs y en Pages, y
+  // sobrevive a copiar y pegar el documento en cualquier lado.
+  guiones.forEach((g, i) => {
+    parrafos.push(
+      parrafo([{ texto: `${i + 1}. ${g.titulo ?? "Sin título"}`, negrita: true, tamano: 28 }], 360),
+    );
     parrafos.push(
       parrafo([{ texto: [g.referente ?? "sin referente", g.url].join(" · "), italica: true }]),
     );
@@ -89,7 +96,7 @@ export function documentoDeGuiones(
           },
         ]),
       );
-      continue;
+      return;
     }
 
     parrafos.push(
@@ -98,7 +105,7 @@ export function documentoDeGuiones(
     // Un párrafo por línea: en Word un salto de línea dentro de un `<w:t>` no existe, y meter todo
     // en uno solo devolvería el texto como un bloque corrido.
     for (const linea of g.texto.split("\n")) parrafos.push(parrafo([{ texto: linea }]));
-  }
+  });
 
   return parrafos;
 }

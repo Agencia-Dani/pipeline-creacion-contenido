@@ -77,8 +77,25 @@ describe("documentoDeGuiones", () => {
 
   test("sin título dice que no lo tiene, nunca la url disfrazada (ADR-072)", () => {
     const xml = doc(aDocx(documentoDeGuiones("C", [guion({ titulo: null, referente: null })])));
-    assert.ok(xml.includes("Sin título"));
+    assert.ok(xml.includes("1. Sin título"));
     assert.ok(xml.includes("sin referente"));
+  });
+
+  // Numerados para poder decir "grabá el 3" sin leer el título entero. El número va **en el texto**
+  // del título y no como lista de Word: así no depende de que el lector resuelva `numbering.xml`.
+  test("numera los videos, y sigue numerando los que no tienen guion", () => {
+    const xml = doc(
+      aDocx(
+        documentoDeGuiones("C", [
+          guion({ titulo: "Uno" }),
+          guion({ titulo: "Dos", texto: null }),
+          guion({ titulo: "Tres" }),
+        ]),
+      ),
+    );
+    assert.ok(xml.includes("1. Uno"));
+    assert.ok(xml.includes("2. Dos"), "un video sin guion no puede saltearse el número");
+    assert.ok(xml.includes("3. Tres"));
   });
 
   test("una colección vacía sigue siendo un documento válido", () => {
