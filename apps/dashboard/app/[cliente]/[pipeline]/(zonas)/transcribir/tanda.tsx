@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
 import { GrillaVideos } from "@/components/video/grupos";
+import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { claveDe } from "@/domain/enlace";
 import { LARGO_MAX_TITULO, resumenDeTanda, tituloDeTanda } from "@/domain/tanda";
 import type { CabeceraTanda } from "@/lib/tandas";
@@ -46,6 +48,12 @@ export function Tanda({
   // por otro lado: la marca ya no es una columna de la fila y esta lista se dibuja en el cliente.
   const [grabadas, setGrabadas] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  // 🔑 **La selección es POR TANDA y no de la pantalla entera, y no es una simplificación.** Las
+  // filas de cada tanda bajan al expandirla (`cargarTanda`), así que una selección global podría
+  // tener marcadas claves cuyas filas ni siquiera están en memoria. La tanda ya es la unidad de
+  // trabajo acá; la selección la respeta.
+  const seleccion = usarSeleccion();
+  const [avisoSeleccion, setAvisoSeleccion] = useState<string | null>(null);
   const [cargando, startCarga] = useTransition();
   // Cuál guion está abierto. Se guarda el **id** y no la fila: `filas` se vuelve a bajar cuando
   // cambian los contadores, y una fila guardada por valor quedaría mostrando el estado viejo.
@@ -199,7 +207,18 @@ export function Tanda({
                 {titulo ? "Cambiar el nombre" : "Ponerle nombre"}
               </Button>
             )}
+            {filas && filas.length > 0 && (
+              <span className="ml-auto">
+                <BotonSeleccionar seleccion={seleccion} />
+              </span>
+            )}
           </div>
+
+          {avisoSeleccion && (
+            <p className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+              {avisoSeleccion}
+            </p>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -214,12 +233,25 @@ export function Tanda({
                   ahora={ahora}
                   grabadaInicial={grabadas.has(claveDe(t))}
                   onAbrir={() => setAbiertoId(t.id)}
+                  seleccion={
+                    seleccion.activo
+                      ? { marcado: seleccion.marcado(t.id), onAlternar: () => seleccion.alternar(t.id) }
+                      : undefined
+                  }
                 />
               ))}
             </GrillaVideos>
           ) : filas ? (
             <p className="text-sm text-muted-foreground">Esta tanda se quedó sin enlaces.</p>
           ) : null}
+
+          <BarraSeleccion seleccion={seleccion}>
+            <AgregarAColeccion
+              seleccion={seleccion}
+              urlPorClave={(id) => filas?.find((f) => f.id === id)?.url ?? null}
+              onListo={setAvisoSeleccion}
+            />
+          </BarraSeleccion>
         </div>
       </details>
 

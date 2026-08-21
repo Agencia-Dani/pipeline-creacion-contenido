@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
+import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
 import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
+import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { TarjetaVideo } from "@/components/video/tarjeta";
 import { agrupar, SIN_PROYECTO } from "@/domain/feed";
 import { fusionar, type ParteVideo, type Video } from "@/domain/video";
@@ -103,6 +105,7 @@ export function Lista({
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const seleccion = usarSeleccion();
   const [bajando, startBajar] = useTransition();
 
   const registro = useMemo(() => armarRegistro(guiones, marcas), [guiones, marcas]);
@@ -171,6 +174,23 @@ export function Lista({
         fechaDeFila(b.fila).localeCompare(fechaDeFila(a.fila)),
       ),
     }));
+  }, [visibles]);
+
+  /**
+   * `id de fila → url del video`, para el modo selección.
+   *
+   * Se arma acá y no en la tarjeta porque la barra de abajo no tiene las filas a la vista: recibe
+   * las claves marcadas y nada más. Sale de `visibles` —lo que el filtro está mostrando— así que una
+   * clave marcada siempre tiene su url mientras la tarjeta esté en pantalla.
+   */
+  const urlPorId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const fila of visibles) {
+      const id = fila.tipo === "huerfana" ? fila.marca.clave : fila.guion.id;
+      const url = fila.tipo === "huerfana" ? fila.marca.url : fila.guion.urlReferente;
+      if (url) m.set(id, url);
+    }
+    return m;
   }, [visibles]);
 
   /** Optimista: se pinta ya y se revierte si el server dice que no. */
@@ -269,6 +289,7 @@ export function Lista({
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
+          <BotonSeleccionar seleccion={seleccion} />
           <Button variant="outline" size="sm" onClick={() => bajar(false)} disabled={bajando}>
             {bajando ? "Preparando…" : "Descargar todo (Excel)"}
           </Button>
@@ -312,12 +333,25 @@ export function Lista({
                   video={videos.get(fila.tipo === "huerfana" ? fila.marca.clave : (fila.clave ?? ""))}
                   onAbrir={() => setAbiertoId(id)}
                   onAlternar={() => fila.tipo === "guion" && alternar(fila)}
+                  seleccion={
+                    seleccion.activo
+                      ? { marcado: seleccion.marcado(id), onAlternar: () => seleccion.alternar(id) }
+                      : undefined
+                  }
                 />
               ))}
             </GrillaVideos>
           </GrupoPlegable>
         ))}
       </div>
+
+      <BarraSeleccion seleccion={seleccion}>
+        <AgregarAColeccion
+          seleccion={seleccion}
+          urlPorClave={(id) => urlPorId.get(id) ?? null}
+          onListo={setAviso}
+        />
+      </BarraSeleccion>
 
       {visibles.length === 0 && (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -363,12 +397,14 @@ function TarjetaHistorico({
   video,
   onAbrir,
   onAlternar,
+  seleccion,
 }: {
   fila: FilaRegistro<Historico>;
   /** Lo que se sabe del video. `undefined` si su url no se pudo interpretar. */
   video: Video | undefined;
   onAbrir: () => void;
   onAlternar: () => void;
+  seleccion?: { marcado: boolean; onAlternar: () => void };
 }) {
   const h = fila.tipo === "guion" ? fila.guion : null;
   const grabado = fila.tipo === "huerfana" || fila.grabadoEn !== null;
@@ -393,6 +429,7 @@ function TarjetaHistorico({
         )
       }
       onAbrir={onAbrir}
+      seleccion={seleccion}
       pie={
         <div className="flex w-full flex-wrap items-center gap-1.5">
           {/* 🎨 El badge va en `default` (color de acento) y NO en `secondary`: es la lección del

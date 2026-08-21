@@ -26,12 +26,14 @@ export function TarjetaCola({
   ahora,
   grabadaInicial = false,
   onAbrir,
+  seleccion,
 }: {
   t: Transcripcion;
   ahora: Date;
   /** Si el video ya está marcado como grabado. Llega como prop desde ADR-070; ver `Fila`. */
   grabadaInicial?: boolean;
   onAbrir: () => void;
+  seleccion?: { marcado: boolean; onAlternar: () => void };
 }) {
   // Mismo optimista-sobre-el-prop que `Fila`, y por la misma razón: las filas de una tanda abierta
   // viven en el `useState` de `tanda.tsx`, así que ningún refresh del server las repinta. Y cuando
@@ -54,6 +56,7 @@ export function TarjetaCola({
       subtitulo={t.url}
       error={t.error}
       onAbrir={onAbrir}
+      seleccion={seleccion}
       pie={
         <div className="flex w-full flex-wrap items-center gap-1.5">
           <Badge variant={BADGE_POR_ESTADO[t.estado]}>{ESTADO_LEGIBLE[t.estado]}</Badge>
