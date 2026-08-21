@@ -41,6 +41,16 @@ Los 7 puntos, con qué cambia cada uno:
 1. **Scripts literales, no reescritura** *(reemplaza lo anterior)* — el script es la
    transcripción del video, **traducida al español solo si hace falta**. Claude pasa de escritor
    a traductor literal. El few-shot por voz queda en pausa (ADR-009).
+
+   > **Enmienda 2026-08-21 ([ADR-074](./docs/adr/ADR-074-el-guion-limpio-es-un-artefacto-nuevo.md)):**
+   > el equipo puede pedir un **guion limpio**, y este punto sigue en pie igual. Lo que la corrida
+   > entrega no cambia: `app.candidatos.script` y `app.transcripciones.script` **siguen siendo la
+   > transcripción literal**, y el nodo `Traducir` sigue diciendo *"sin reescribir, sin resumir, sin
+   > embellecer"*. Lo que se suma es una capa **derivada y opcional**, en una tabla aparte
+   > (`app.guiones_limpios`): el limpio queda **al lado** del crudo, nunca encima, y las dos versiones
+   > se ven juntas en el cockpit. Es la puerta que ADR-009 dejó abierta —*"si vuelve, es un perfil
+   > más de la etapa GENERAR"*— y se abre sin tocar lo que ya se entrega. El limpio se puede tirar y
+   > rehacer; el crudo no se puede perder.
 2. **Prioridad multiidioma** *(complementa)* — referentes en EN/PT/IT/FR en la semilla y boost
    de idioma en el heat-score.
 3. **Histórico de selecciones** *(requisito visible)* — "el lunes 20 seleccionaron 5 videos para

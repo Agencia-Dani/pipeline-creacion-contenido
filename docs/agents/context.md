@@ -206,9 +206,45 @@ herramienta y cargó a mano, y no tiene fila en ninguna otra tabla donde colgarl
 mudó al video porque 55 de los 183 guiones del histórico venían del Feed y no tenían dónde marcarse.*
 
 **Marca huérfana**:
-Un **grabado** sin guion: el equipo grabó ese video por fuera del sistema y cargó su link a mano. En
-el histórico se dibuja distinto —sin título, sin proyecto y sin botón de ver guion— porque pintarla
-como una fila normal con los campos vacíos afirmaría que existe un texto que no existe (ADR-070).
+Un **grabado** sin guion: el equipo grabó ese video por fuera del sistema y cargó su link a mano. Lo
+que afirma es *"esto lo grabamos"* y nada más: no tiene título, ni proyecto, ni texto que mostrar.
+*Hasta ADR-072 se dibujaba con una tarjeta propia para no afirmar lo que no sabe; hoy usa la misma
+**tarjeta de video** que el resto, porque esa tarjeta ya dibuja lo que falta como falta.*
+
+**Llave de video**:
+La identidad de un video en todo el sistema: `(instance_id, plataforma, external_id)`, con
+`external_id` derivado siempre de la URL. Es la misma en los tres orígenes —el Feed, un enlace pegado
+y un link cargado a mano— y por eso es la llave de todo lo que se le cuelga a un video sin importar
+por dónde entró: el **grabado** (ADR-070), su metadata comprada, su **guion limpio** y su pertenencia
+a una **colección** (ADR-072). Lo que se guarda contra la llave **sobrevive al barrido del
+archivado**, porque no apunta a la fila del candidato.
+
+**Tarjeta de video**:
+Cómo se ve un video en el cockpit, y es **una sola en todas las pantallas** (ADR-072): miniatura,
+título, referente y un pie que cambia según lo que ahí se pueda hacer con él. Su propiedad definitoria
+es que **degrada sin mentir** — lo que el sistema no sabe se dibuja como falta ("sin título", la
+inicial del referente) y nunca se completa inventando, que es lo que permite que las tres fuentes
+—que saben cosas distintas— compartan una misma forma.
+
+**Colección**:
+Una bolsa de videos con nombre, armada a mano para trabajarlos juntos (ADR-073). Puede mezclar los
+tres orígenes, apunta a la **llave de video** —así que no se vacía cuando el archivado barre el
+Feed— y es **descartable**: borrarla no borra nada de lo que se pagó por sus videos. Es además el
+momento en que el sistema **compra la metadata** que le falta a un video, porque agrupar es la señal
+de que alguien lo va a usar de verdad.
+
+**Guion limpio**:
+Una versión pulida del guion, **al lado del crudo y nunca encima** (ADR-074): el guion literal que
+entrega la corrida se sigue guardando igual y se sigue viendo. Es derivado, opcional y desechable —
+se puede tirar y rehacer— y el cockpit muestra los dos, porque una limpieza puede romper la
+estructura de lo que se dijo (el caso real: un video de dos voces convertido en monólogo) y eso hay
+que poder verlo antes de grabar. Enmienda ADR-009 sin retirarlo.
+
+**Perfil de limpieza**:
+Cómo habla una Voz, escrito para que el limpiador la imite (ADR-074). Es de la **empresa** y no del
+cockpit —cómo habla Milena no depende del pipeline abierto— y es independiente de los **criterios de
+relevancia**, que dicen qué videos sirven y no cómo suena el texto. Sin él la limpieza sale correcta
+pero neutra, y el cockpit lo avisa **antes** de gastar.
 
 **El transcriptor**:
 Cómo se llama de cara al equipo la máquina que atiende los enlaces pegados, en la familia de *el
