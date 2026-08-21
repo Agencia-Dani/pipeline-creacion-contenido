@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
 import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
+import { BotonArchivar } from "../../operar/boton-archivar";
 import { cn } from "@/lib/utils";
 import {
   agrupar,
@@ -159,11 +160,13 @@ export function Mazo({
             {ETIQUETA_FILTRO[f]} <span className="text-muted-foreground">{ajustadas[f]}</span>
           </button>
         ))}
-        {cargados.length > 0 && (
-          <span className="ml-auto">
-            <BotonSeleccionar seleccion={seleccion} />
-          </span>
-        )}
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Archivar vive acá y en Operar, el mismo componente (ver `boton-archivar.tsx`). Acá
+              porque es donde alguien termina de calificar: hasta hoy, para que lo calificado
+              llegara al histórico había que esperar al domingo o descubrir que existe otra zona. */}
+          <BotonArchivar variante="feed" />
+          {cargados.length > 0 && <BotonSeleccionar seleccion={seleccion} />}
+        </span>
       </div>
 
       {avisoSeleccion && (

@@ -273,7 +273,7 @@ export default async function OperarPage({
           <CardTitle>Archivar lo calificado</CardTitle>
           <CardDescription>
             El archivador corre solo los domingos a las 18:00 y es el que manda lo aprobado a
-            Históricos. Apretalo si querés el CSV hoy, sin esperar al domingo.
+            Históricos. Apretalo si querés bajar el Excel hoy, sin esperar al domingo.
           </CardDescription>
         </CardHeader>
         <CardContent>

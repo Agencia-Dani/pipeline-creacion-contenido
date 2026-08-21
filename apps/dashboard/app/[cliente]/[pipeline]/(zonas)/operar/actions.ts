@@ -4,6 +4,7 @@ import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
 import { hayCorridaViva } from "@/domain/corrida";
 import { exigirTenant } from "@/lib/auth";
+import { queHariaArchivar } from "@/lib/candidatos";
 import { hayBusquedaViva } from "@/lib/descubrimiento";
 import { registrarEvento } from "@/lib/eventos";
 import { ultimasCorridasMotor } from "@/lib/runs";
@@ -196,6 +197,28 @@ export async function buscarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDispa
 // credencial de n8n (`Webhook Motor Header`, verificado en los dos `workflow.json`), así que lo
 // único que cambia es la URL. Inventarle un par propio de env vars sería pedir que alguien cargue
 // dos valores que tienen que ser idénticos, y el día que difieran el fallo es un 403 silencioso.
+/**
+ * Los dos números que el botón dice **antes** de disparar: cuántos archiva y cuántos borra.
+ *
+ * Se pide al apretar y no al pintar la pantalla: es una consulta que solo importa cuando hay
+ * intención, y un número que se leyó hace diez minutos ya no es el que va a pasar.
+ *
+ * Fail-open a `null`: si la cuenta no se puede hacer, la confirmación cae a la frase sin números.
+ * Perder el número no puede impedir archivar — eso convertiría un adorno en una dependencia
+ * (invariante #1 de PLAN §2.5).
+ */
+export async function queHariaElArchivado(
+  enRuta: CockpitEnRuta,
+): Promise<{ aprobados: number; aBorrar: number } | null> {
+  const { ctx } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
+  try {
+    return await queHariaArchivar(ctx);
+  } catch (e) {
+    console.error("[operar] no se pudo contar qué haría el archivado:", e);
+    return null;
+  }
+}
+
 export async function archivarAhora(enRuta: CockpitEnRuta): Promise<ResultadoDisparo> {
   const { usuario, ctx, cockpit } = await exigirTenant("operar", enRuta.cliente, enRuta.pipeline);
 

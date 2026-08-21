@@ -147,6 +147,52 @@ export async function contarFeed(ctx: TenantContext): Promise<Record<Filtro, num
 }
 
 /**
+ * Qué haría el archivado si se disparara **ahora mismo**: cuántos manda al histórico y cuántos borra.
+ *
+ * 🔴 **Existe porque el botón sin números no alcanza.** La confirmación de `<BotonArchivar>` ya
+ * decía que descarta lo que quedó sin calificar hace más de 20 días, y aun así es una frase: medido
+ * contra prod el 2026-08-21, apretarlo archivaba **2** y borraba **67** — dos tercios del feed. La
+ * diferencia entre *"descarta lo viejo"* y *"borra 67"* es si alguien lee la advertencia.
+ *
+ * ⚠️ **`DIAS_ANTES_DE_BARRER` es la MISMA regla que el nodo `Barrer candidatos sin calificar` de
+ * `Workflows/workflow-archivado/workflow.json`, escrita dos veces.** Es la única forma que hay de
+ * anticipar lo que va a hacer n8n desde acá —no hay a quién preguntarle— y por eso la duplicación es
+ * consciente, no un descuido. **Si alguien cambia el `days: 20` del nodo y no cambia esto, el botón
+ * pasa a mentir con precisión**, que es peor que la frase vaga que reemplazó. Quien toque uno tiene
+ * que tocar el otro.
+ *
+ * Se cuenta **en el momento de apretar** y no se cachea: los 67 de hoy son los que cumplieron 20
+ * días hoy. *Medir el martes no autoriza a borrar el jueves.*
+ */
+export const DIAS_ANTES_DE_BARRER = 20;
+
+export async function queHariaArchivar(
+  ctx: TenantContext,
+): Promise<{ aprobados: number; aBorrar: number }> {
+  const s = await scoped(ctx);
+  const corte = new Date(Date.now() - DIAS_ANTES_DE_BARRER * 24 * 60 * 60 * 1000).toISOString();
+
+  const [decididos, viejos] = await Promise.all([
+    s.select("app.candidatos", "id", { count: "exact", head: true }).neq("estado", "nuevo"),
+    s
+      .select("app.candidatos", "id", { count: "exact", head: true })
+      .eq("estado", "nuevo")
+      .lt("creado_en", corte),
+  ]);
+
+  if (decididos.error || viejos.error) {
+    throw new Error(
+      `Supabase respondió con error mirando qué haría el archivado: ${
+        decididos.error?.message ?? viejos.error?.message
+      }`,
+    );
+  }
+  // `neq("estado","nuevo")` y no `eq("estado","aprobado")`: es literalmente lo que lee el nodo
+  // `Leer Candidatos calificados`, que se lleva los descartados también.
+  return { aprobados: decididos.count ?? 0, aBorrar: viejos.count ?? 0 };
+}
+
+/**
  * Los tres campos largos de UN candidato, para cuando alguien abre su tarjeta.
  *
  * Fail-loud si ya no está, igual que `actualizar` y por lo mismo: el barrido del domingo pudo
