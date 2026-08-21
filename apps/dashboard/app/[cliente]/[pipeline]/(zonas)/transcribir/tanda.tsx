@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { claveDe } from "@/domain/enlace";
@@ -51,8 +51,7 @@ export function Tanda({
   const [titulo, setTitulo] = useState(cabecera.titulo);
   const [guardando, startGuardado] = useTransition();
 
-  const abrir = (abierto: boolean) => {
-    if (!abierto || filas || cargando) return;
+  const traerFilas = () =>
     startCarga(async () => {
       const r = await cargarTanda(cockpit, cabecera.id);
       if (r.ok) {
@@ -63,7 +62,69 @@ export function Tanda({
         setError(r.mensaje);
       }
     });
+
+  // Se recuerda si está desplegada porque `filas` no alcanza para saberlo: cerrar un `<details>` no
+  // las borra. Sin esto, una tanda que se abrió y se cerró seguiría recargando sus scripts en cada
+  // cambio de contadores sin que nadie los mire — el mismo gasto que la carga-una-sola-vez de
+  // `abrir()` viene evitando desde ADR-064.
+  const [abierta, setAbierta] = useState(false);
+
+  // 🩸 **Las filas cargadas se vuelven mentira cuando alguien cambia un `estado`, y hasta acá nada
+  // las volvía a bajar** (encontrado el 2026-08-18 revisando el bug que el cierre 110 dejó señalado).
+  // `Reintentar` y `Abandonar` hacen `router.refresh()`, que re-renderiza **server components**: la
+  // tarjeta de fallidas de `page.tsx` sí se repinta, pero estas filas viven en el `useState` de acá y
+  // `abrir()` tiene un `if (filas) return`. La fila seguía diciendo "Falló" con sus dos botones, y el
+  // segundo clic devolvía **"Ese enlace ya no se puede reintentar"** — un error sobre una operación
+  // que había salido bien (`reencolar` filtra por `estado`, y la fila ya estaba en `pendiente`).
+  //
+  // 🔑 **El disparador es la cabecera, no un callback desde el botón, y esa es la decisión.** La
+  // cabecera baja del server con los contadores por estado en cada refresh: si cambiaron, estas filas
+  // están viejas — sin importar **quién** las cambió. Un callback solo cubriría los botones de acá
+  // adentro y dejaría vivo el caso que se ve peor: la misma fila fallada se dibuja **dos veces** (en
+  // la tarjeta de arriba y acá), así que reintentar arriba la hacía desaparecer de arriba y la dejaba
+  // intacta abajo — la pantalla contradiciéndose a sí misma.
+  //
+  // ⚠️ **Y por eso no alcanzaba el estado optimista de `Grabado`.** `grabado_en` solo cambia si
+  // alguien aprieta ese botón; `estado` lo cambia el `Procesador` por atrás (`pendiente` → `listo` |
+  // `fallo`). Un optimista "En cola" se quedaría congelado ahí para siempre: otra mentira, no un
+  // arreglo. Esto pide el dato real.
+  //
+  // Solo recarga una tanda **desplegada y con filas ya traídas**: una cerrada no tiene nada que
+  // repintar, y al volver a abrirla `abrir()` decide con su propia regla.
+  //
+  // ponytail: sin guardia de concurrencia. Dos cambios de contadores muy seguidos disparan dos
+  // cargas y gana la que llegue última, que puede ser la vieja. Se corrige sola en el refresh
+  // siguiente y el `Procesador` refresca seguido mientras hay cola. Si alguna vez se ve una fila
+  // atrasada, el upgrade es descartar por firma: guardar la pedida en el ref y aplicar el resultado
+  // solo si sigue siendo la vigente.
+  const contadores = `${cabecera.total}·${cabecera.pendientes}·${cabecera.listos}·${cabecera.fallidas}·${cabecera.abandonadas}`;
+  const contadoresAplicados = useRef(contadores);
+
+  // La firma se marca **antes** de pedir y solo cuando se pide de verdad. Si se marcara igual sin
+  // traer, una tanda cerrada mientras cambian los contadores se daría por al día y al abrirla
+  // mostraría las filas viejas: la deuda quedaría pagada sin haber cobrado.
+  const traerAlDia = () => {
+    if (cargando) return;
+    contadoresAplicados.current = contadores;
+    traerFilas();
   };
+
+  const abrir = (abierto: boolean) => {
+    setAbierta(abierto);
+    if (!abierto) return;
+    // Nunca trajo, o quedó vieja mientras estaba cerrada.
+    if (!filas || contadoresAplicados.current !== contadores) traerAlDia();
+  };
+
+  useEffect(() => {
+    if (contadoresAplicados.current === contadores) return;
+    // Cerrada o sin filas: la firma queda SIN aplicar a propósito, y la cobra `abrir`.
+    if (!abierta || !filas) return;
+    traerAlDia();
+    // `traerAlDia` se recrea en cada render y meterla acá volvería el efecto un bucle; lo que
+    // gobierna es la firma.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contadores, abierta, filas]);
 
   const guardar = () =>
     startGuardado(async () => {

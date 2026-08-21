@@ -190,7 +190,12 @@
 > - 🔴 **El canario sigue en CERO.** Las **6** marcas de `app.grabados` son todas de Mani probando.
 >   *Una marca puesta por quien construyó el botón no es evidencia de adopción.* A un mes:
 >   `select count(*) from app.grabados`, contando marcas **de otras personas**.
-> - ⏳ **El domingo 23/08 se borran solos 74 candidatos** sin calificar (los del 01, 02 y 03/08).
+> - ⏳ **El domingo 23/08 se borran solos 85 candidatos** sin calificar (los del 01, 02 y 03/08).
+>   🩸 **Este renglón decía 74 y estaba mal** (re-medido el 20/08 16:30, contra prod y contra el
+>   `workflow.json`): hay **100** `nuevo`, y el corte del barrido es la hora de la corrida menos
+>   20 días ⇒ **03/08 18:00**, que se lleva los 12 del 03/08 enteros. El 74 salió de cortar en el
+>   **día** y no en la **hora**. *El predicado del barrido es `creado_en < now-20d`, no "los de
+>   antes de tal fecha": el que cuenta candidatos por día cuenta de menos.*
 > - 🔴 **El cockpit de Retia sigue frío**: cero eventos humanos del equipo desde el 07/08.
 >   **La reunión de onboarding con Majo y Alejo era hoy 4:30pm** — es de hecho el **D3** del ROADMAP.
 >
@@ -289,7 +294,7 @@
 > el 10/08, 5 el 17/08) y el aviso de la corrida del 17/08 —*"posible caida de Supadata: 76% de
 > transcripciones vacias esta corrida"*— **no lo vio nadie**.
 > ⏳ **Con fecha:** el nodo `Barrer candidatos sin calificar` del archivado borra los `nuevo` de más
-> de 20 días, y el archivado corre los domingos 23:00 ⇒ **en la corrida del ~23/08 se borran solos
+> de 20 días, y el archivado corre los domingos **18:00** (`0 18 * * 0`; este renglón dijo 23:00) ⇒ **en la corrida del ~23/08 se borran solos
 > unos 86 candidatos** (los del 01, 02 y 03 de agosto) sin que nadie los haya mirado. Calificar antes,
 > o pausar ese nodo.
 > **Esto importa para el onboarding:** mandarle un botón nuevo a un equipo que no abre la herramienta

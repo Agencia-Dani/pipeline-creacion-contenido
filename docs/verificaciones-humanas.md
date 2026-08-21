@@ -361,14 +361,26 @@ marca que existía, y `estado` de `transcripciones` quedó idéntico: 128 `listo
 Las formas de escritura también se midieron contra prod con una fila descartable: upsert nuevo → 1
 fila, upsert repetido → **0** (que es como se cuenta *"ya estaban"*), delete → 1.
 
-📏 **Los números esperados en `/retia/reels/curar/historicos`, medidos el 2026-08-20.** Si alguno no
-da, es un síntoma, no un detalle:
+📏 **Los números esperados en `/retia/reels/curar/historicos`, re-medidos contra prod el 2026-08-20
+16:30.** La tabla anterior decía 183 · 1 · 182 y ya no aplica: **la movió la propia verificación de
+Mani** de esa tarde (5 marcas nuevas y 1 link cargado a mano). Si alguno no da, es un síntoma, no un
+detalle:
 
 | Chip | Esperado | Si da otra cosa |
 |---|---|---|
-| **Todos** | **183** | Si da 0 o mucho menos, es RLS o el grant de `outputs`, no la pantalla |
-| **Grabados** | **1** | Si da 0, la policy de `app.grabados` no deja leer (falso "nadie marcó") |
-| **Sin grabar** | **182** | Los tres tienen que cerrar: sin-grabar + grabados = todos |
+| **Todos** | **184** | 183 guiones **+ 1 huérfana** (el link del paso 5). Si da 0 o mucho menos, es RLS o el grant de `outputs`, no la pantalla |
+| **Grabados** | **6** | Si da 0, la policy de `app.grabados` no deja leer (falso "nadie marcó"). Si da menos de 6, alguien desmarcó |
+| **Sin grabar** | **178** | Los tres tienen que cerrar: sin-grabar + grabados = todos |
+
+⚠️ **Las 6 marcas son de Mani probando** (5 el 20/08 entre 20:14 y 20:15 UTC, 1 del 18/08); ninguna
+es uso del equipo. Y el número se mueve con cada marca, así que **no se lee de esta tabla: se
+re-mide** antes de usarlo como criterio — *un número esperado que envejece dispara falsas alarmas,
+que es exactamente lo que este doc corrigió el 06/08*:
+
+```bash
+curl -s -H "apikey: $SUPABASE_SERVICE_ROLE" -H "Accept-Profile: app" \
+  "$SUPABASE_URL/rest/v1/grabados?select=url,grabado_en&order=grabado_en"
+```
 
 Los pasos:
 

@@ -67,6 +67,23 @@ export function Fila({
   // de esta línea y el botón de abajo. `Fila` es el ancestro común más chico.
   const [grabado, setGrabado] = useState(grabadaInicial);
 
+  // 🔁 **Y cuando el prop trae un dato nuevo, gana el prop.** Desde que `tanda.tsx` recarga sus filas
+  // al cambiar los contadores, un `grabadaInicial` nuevo puede llegar sin que React remonte nada: la
+  // `key` es `t.id` y no cambia, así que este `useState` se quedaría con el valor con el que nació.
+  // Importa por el mismo caso de doble superficie que motivó la recarga — una fila fallada se dibuja
+  // **dos veces** (tarjeta de fallidas y tanda abierta), cada copia con su propio estado, y marcar
+  // grabado en una dejaba a la otra mintiendo. Es el patrón de React de ajustar estado durante el
+  // render: más barato que un efecto, que repintaría dos veces.
+  //
+  // 🩹 Hasta el merge con ADR-070 esto miraba `t.grabado_en`: ese campo salió del tipo `Transcripcion`
+  // cuando la marca se mudó a `app.grabados` (20/08), así que la señal de "llegó un dato nuevo" pasa
+  // a ser el prop que la reemplaza. Mismo patrón, misma razón, apuntado a la fuente que se movió.
+  const [visto, setVisto] = useState(grabadaInicial);
+  if (visto !== grabadaInicial) {
+    setVisto(grabadaInicial);
+    setGrabado(grabadaInicial);
+  }
+
   return (
     <li className="space-y-2 border-b pb-4 last:border-0 last:pb-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
