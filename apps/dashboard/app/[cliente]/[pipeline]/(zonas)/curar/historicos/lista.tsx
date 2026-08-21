@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
+import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
+import { TarjetaVideo } from "@/components/video/tarjeta";
+import { agrupar, SIN_PROYECTO } from "@/domain/feed";
+import { fusionar, type ParteVideo, type Video } from "@/domain/video";
 import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
 import { parsearEnlaces } from "@/domain/enlace";
 import {
   armarRegistro,
+  fechaDeFila,
   contarRegistro,
   contarRevision,
   filtrarRegistro,
@@ -42,8 +47,10 @@ import {
 // listado casi lo mismo y obligado al equipo a aprender cuál mirar — que es exactamente lo que el
 // pedido original decía que no quería.
 //
-// Sin miniatura: el thumbnail era un attachment de Airtable que muere con el record y nunca se
-// archivó. El histórico es texto.
+// 🖼️ **Y desde ADR-072 tiene miniatura, con una salvedad.** El thumbnail nunca se archivó (el
+// `metadata` de `outputs` tiene 19 claves y ninguna es la foto), así que la única fuente es
+// `app.videos_meta`: lo que se le compró a Apify al agrupar un video en una colección. Un guion
+// que nadie agrupó se sigue viendo sin foto, y la tarjeta ya sabe dibujar eso sin mentir.
 
 const fechaDe = (iso: string | null) => (iso ? fecha(iso, true) : "—");
 
@@ -70,10 +77,17 @@ const ETIQUETA_REVISION: Record<EstadoRevision, string> = {
 export function Lista({
   guiones,
   marcasIniciales,
+  metas,
   truncado,
 }: {
   guiones: Historico[];
   marcasIniciales: MarcaGrabado[];
+  /**
+   * Lo comprado a Apify (`app.videos_meta`). Es lo único que aporta **miniatura**, y para una
+   * huérfana —un link cargado a mano— también el título y el referente, que no tiene de ningún
+   * otro lado.
+   */
+  metas: ParteVideo[];
   truncado: boolean;
 }) {
   const cockpit = usarCockpit();
@@ -84,6 +98,8 @@ export function Lista({
   // igual que un botón roto, y el operador vuelve a apretarlo (acá eso es DESMARCAR sin querer).
   const [marcas, setMarcas] = useState(() => new Map(marcasIniciales.map((m) => [m.clave, m])));
   const [filtro, setFiltro] = useState<FiltroRegistro>("todos");
+  /** Qué proyectos están cerrados. Vacío = todos abiertos, que es la pantalla de hoy. */
+  const [plegados, setPlegados] = useState<ReadonlySet<string>>(new Set());
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -92,6 +108,70 @@ export function Lista({
   const registro = useMemo(() => armarRegistro(guiones, marcas), [guiones, marcas]);
   const cuentas = useMemo(() => contarRegistro(registro), [registro]);
   const visibles = useMemo(() => filtrarRegistro(registro, filtro), [registro, filtro]);
+
+  /**
+   * Lo que se sabe de cada video, por clave.
+   *
+   * Se arma con `fusionar` (ADR-072) y no a mano: el orden del arreglo **es** la precedencia, y es
+   * el mismo que usa `lib/videos.ts` — primero lo comprado, después el archivo. Fusionar campo a
+   * campo importa acá más que en ningún lado: `outputs` tiene título y referente y **nunca**
+   * miniatura, `videos_meta` tiene miniatura. Y `fusionar` es quien descarta las urls disfrazadas
+   * de título (las 129 filas de `transcripcion_a_pedido`), que es justo lo que esta pantalla
+   * dibujaba como si fuera un nombre.
+   */
+  const videos = useMemo(() => {
+    const partes: ParteVideo[] = [...metas];
+    for (const f of registro) {
+      const url = f.tipo === "huerfana" ? f.marca.url : f.guion.urlReferente;
+      const { validos } = parsearEnlaces(url ?? "");
+      if (validos.length !== 1) continue;
+      const id = { plataforma: validos[0].plataforma, external_id: validos[0].external_id };
+      partes.push(
+        f.tipo === "huerfana"
+          ? { ...id, url: validos[0].url }
+          : {
+              ...id,
+              url: validos[0].url,
+              titulo: f.guion.titulo,
+              referente: f.guion.referente,
+              views: f.guion.views,
+              likes: f.guion.likes,
+              seguidores: f.guion.seguidores,
+              idioma: f.guion.idioma,
+              heat: f.guion.heat,
+            },
+      );
+    }
+    return new Map(fusionar(partes).map((v) => [v.clave, v]));
+  }, [metas, registro]);
+
+  /**
+   * Las filas visibles, agrupadas por proyecto.
+   *
+   * 🔑 **`agrupar()` se reusa tal cual** (`domain/feed.ts`), y lo que se le pide es el criterio:
+   * grupos por nombre y `(sin proyecto)` último, *"un dato roto, no una categoría"*.
+   *
+   * 🩸 **Pero el orden de adentro se restaura por fecha, y eso no es capricho.** `agrupar` ordena
+   * por heat descendente, que es lo correcto en el Feed y ruido acá: medido contra prod el
+   * 2026-08-21, de las 301 filas de `outputs` **las 172 del Feed traen heat y proyecto y las 129 de
+   * Transcribir no traen ninguno de los dos**. O sea que en `(sin proyecto)` —donde caen esas 129 y
+   * las ~291 huérfanas— el heat es `null` en todas y el desempate termina siendo el uuid, que es un
+   * orden sin significado. El histórico se lee por lo último que pasó, que es como venía ordenado.
+   */
+  const grupos = useMemo(() => {
+    const items = visibles.map((fila) => ({
+      id: fila.tipo === "huerfana" ? fila.marca.clave : fila.guion.id,
+      proyecto: (fila.tipo === "huerfana" ? null : fila.guion.proyecto) ?? "",
+      heat: null,
+      fila,
+    }));
+    return agrupar(items).map((g) => ({
+      ...g,
+      candidatos: [...g.candidatos].sort((a, b) =>
+        fechaDeFila(b.fila).localeCompare(fechaDeFila(a.fila)),
+      ),
+    }));
+  }, [visibles]);
 
   /** Optimista: se pinta ya y se revierte si el server dice que no. */
   function alternar(fila: Extract<FilaRegistro<Historico>, { tipo: "guion" }>) {
@@ -156,7 +236,10 @@ export function Lista({
   // puede abrir un guion que el filtro de arriba está escondiendo (revisás un link, el chip está en
   // «Grabados» y ese guion todavía no lo está). Contra `visibles`, el botón «Ver el guion» no haría
   // nada — un botón que a veces funciona es peor que uno que no está.
-  const abierto = registro.find((f) => f.tipo === "guion" && f.guion.id === abiertoId) ?? null;
+  const abierto =
+    registro.find((f) =>
+      f.tipo === "guion" ? f.guion.id === abiertoId : f.marca.clave === abiertoId,
+    ) ?? null;
 
   return (
     <div className="space-y-4">
@@ -206,19 +289,34 @@ export function Lista({
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {visibles.map((f) =>
-          f.tipo === "huerfana" ? (
-            <Huerfana key={f.marca.clave} marca={f.marca} />
-          ) : (
-            <Tarjeta
-              key={f.guion.id}
-              fila={f}
-              onAbrir={() => setAbiertoId(f.guion.id)}
-              onAlternar={() => alternar(f)}
-            />
-          ),
-        )}
+      <div className="space-y-6">
+        {grupos.map((g) => (
+          <GrupoPlegable
+            key={g.proyecto}
+            titulo={g.proyecto}
+            conteo={g.candidatos.length}
+            plegado={plegados.has(g.proyecto)}
+            onAlternar={() =>
+              setPlegados((p) => {
+                const copia = new Set(p);
+                if (!copia.delete(g.proyecto)) copia.add(g.proyecto);
+                return copia;
+              })
+            }
+          >
+            <GrillaVideos>
+              {g.candidatos.map(({ id, fila }) => (
+                <TarjetaHistorico
+                  key={id}
+                  fila={fila}
+                  video={videos.get(fila.tipo === "huerfana" ? fila.marca.clave : (fila.clave ?? ""))}
+                  onAbrir={() => setAbiertoId(id)}
+                  onAlternar={() => fila.tipo === "guion" && alternar(fila)}
+                />
+              ))}
+            </GrillaVideos>
+          </GrupoPlegable>
+        ))}
       </div>
 
       {visibles.length === 0 && (
@@ -232,10 +330,7 @@ export function Lista({
       {error && <p className="text-sm text-destructive">{error}</p>}
       {aviso && <p className="text-sm text-muted-foreground">{aviso}</p>}
 
-      <Detalle
-        fila={abierto?.tipo === "guion" ? abierto : null}
-        onCerrar={() => setAbiertoId(null)}
-      />
+      <Detalle fila={abierto} video={abierto && videos.get(claveDeFila(abierto))} onCerrar={() => setAbiertoId(null)} />
     </div>
   );
 }
@@ -249,106 +344,84 @@ function enlaceDe(fila: Extract<FilaRegistro<Historico>, { tipo: "guion" }>) {
   return { clave: fila.clave as string, url: validos[0].url, enlace: validos[0] };
 }
 
-function Tarjeta({
-  fila,
-  onAbrir,
-  onAlternar,
-}: {
-  fila: Extract<FilaRegistro<Historico>, { tipo: "guion" }>;
-  onAbrir: () => void;
-  onAlternar: () => void;
-}) {
-  const h = fila.guion;
-  const grabado = fila.grabadoEn !== null;
-
-  return (
-    <div className="flex flex-col gap-1.5 rounded-lg border bg-card p-3">
-      <button type="button" onClick={onAbrir} className="space-y-1.5 text-left">
-        <div className="flex items-start justify-between gap-2">
-          <p className="line-clamp-2 text-sm font-medium leading-snug">{h.titulo}</p>
-          {h.calificacion && <span className="shrink-0 text-lg">{h.calificacion}</span>}
-        </div>
-        <p className="truncate text-xs text-muted-foreground">
-          {h.proyecto ?? "(sin proyecto)"}
-          {h.referente && ` · ${h.referente}`}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {fechaDe(h.calificadoEn)}
-          {h.views !== null && ` · ${miles(h.views)} vistas`}
-        </p>
-      </button>
-
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        {/* 🎨 El badge va en `default` (color de acento) y NO en `secondary`: es la lección del
-            18/08 en Transcribir, donde la marca quedó como una segunda pastilla gris idéntica a la
-            de al lado — presente en el DOM e invisible para el ojo. **El estado se muestra fuerte,
-            la acción se ofrece callada.** */}
-        {grabado && <Badge>✓ Grabado</Badge>}
-        {/* La procedencia, que es el "dónde está" del pedido. Para lo que vino de Transcribir el
-            link lleva a esa zona, donde la tanda todavía existe. Para lo del Feed no se dibuja
-            link: el candidato SE BORRA al archivarse (migración `013`), así que apuntaría a una
-            fila que no está. Prometer solo lo que existe. */}
-        <Badge variant="outline">{ETIQUETA_ORIGEN[h.origen]}</Badge>
-        {h.urlReferente && (
-          <a
-            href={h.urlReferente}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted-foreground underline underline-offset-4"
-          >
-            ver el video ↗
-          </a>
-        )}
-      </div>
-
-      {fila.clave === null ? (
-        <p className="text-xs text-muted-foreground">
-          Sin link reconocible: este no se puede marcar.
-        </p>
-      ) : (
-        <Button
-          variant={grabado ? "ghost" : "outline"}
-          size="sm"
-          className="self-start"
-          onClick={onAlternar}
-        >
-          {grabado ? "Sacar la marca de grabado" : "Marcar como grabado"}
-        </Button>
-      )}
-    </div>
-  );
+/** La clave de video de una fila, que es con lo que se busca su metadata. */
+function claveDeFila(fila: FilaRegistro<Historico>): string {
+  return fila.tipo === "huerfana" ? fila.marca.clave : (fila.clave ?? "");
 }
 
 /**
- * Un link que el equipo grabó por fuera de la herramienta.
+ * Una fila del registro como tarjeta estándar (ADR-072).
  *
- * 🔑 **Se dibuja distinto a propósito.** No tiene guion, ni proyecto, ni calificación: pintarlo como
- * una tarjeta normal con los campos vacíos diría que hay un texto que no existe. Lo único que
- * afirma es *"esto lo grabamos"*, y eso es todo lo que muestra.
+ * 🔑 **Las huérfanas entran por la misma puerta, y eso es lo que 2c cambió.** Hasta acá se dibujaban
+ * distinto a propósito, con el argumento de que pintarlas como una tarjeta vacía diría que hay un
+ * texto que no existe. El argumento sigue siendo válido y la tarjeta estándar lo respeta sola: sin
+ * título dice *"sin título"*, sin miniatura dibuja la inicial. **Lo que falta se dibuja como falta**,
+ * así que ya no hace falta una segunda forma de tarjeta para decir lo mismo.
  */
-function Huerfana({ marca }: { marca: MarcaGrabado }) {
+function TarjetaHistorico({
+  fila,
+  video,
+  onAbrir,
+  onAlternar,
+}: {
+  fila: FilaRegistro<Historico>;
+  /** Lo que se sabe del video. `undefined` si su url no se pudo interpretar. */
+  video: Video | undefined;
+  onAbrir: () => void;
+  onAlternar: () => void;
+}) {
+  const h = fila.tipo === "guion" ? fila.guion : null;
+  const grabado = fila.tipo === "huerfana" || fila.grabadoEn !== null;
+  const url = h ? h.urlReferente : fila.tipo === "huerfana" ? fila.marca.url : null;
+
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-dashed bg-muted/30 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-2 break-all text-sm font-medium leading-snug">{marca.url}</p>
-      </div>
-      <p className="text-xs text-muted-foreground">Marcado el {fechaDe(marca.grabadoEn)}</p>
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        <Badge>✓ Grabado</Badge>
-        <Badge variant="outline">Cargado a mano</Badge>
-        <a
-          href={marca.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-muted-foreground underline underline-offset-4"
-        >
-          ver el video ↗
-        </a>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Sin guion en la herramienta. Si lo querés, pegalo en Transcribir.
-      </p>
-    </div>
+    <TarjetaVideo
+      video={{
+        titulo: video?.titulo ?? null,
+        referente: video?.referente ?? null,
+        thumbnail: video?.thumbnail ?? null,
+      }}
+      badge={h?.calificacion ?? undefined}
+      subtitulo={
+        h ? (
+          <>
+            {video?.referente ?? "sin referente"}
+            {` · ${fechaDe(h.calificadoEn)}`}
+          </>
+        ) : (
+          `marcado el ${fechaDe(fila.tipo === "huerfana" ? fila.marca.grabadoEn : null)}`
+        )
+      }
+      onAbrir={onAbrir}
+      pie={
+        <div className="flex w-full flex-wrap items-center gap-1.5">
+          {/* 🎨 El badge va en `default` (color de acento) y NO en `secondary`: es la lección del
+              18/08 en Transcribir, donde la marca quedó como una segunda pastilla gris idéntica a la
+              de al lado — presente en el DOM e invisible para el ojo. **El estado se muestra fuerte,
+              la acción se ofrece callada.** */}
+          {grabado && <Badge>✓ Grabado</Badge>}
+          <Badge variant="outline">{h ? ETIQUETA_ORIGEN[h.origen] : "Cargado a mano"}</Badge>
+          {h &&
+            (fila.tipo === "guion" && fila.clave === null ? (
+              <span className="text-xs text-muted-foreground">Sin link: no se puede marcar.</span>
+            ) : (
+              <Button variant={grabado ? "ghost" : "outline"} size="sm" onClick={onAlternar}>
+                {grabado ? "Sacar la marca" : "Marcar como grabado"}
+              </Button>
+            ))}
+          {!h && url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground underline underline-offset-4"
+            >
+              ver el video ↗
+            </a>
+          )}
+        </div>
+      }
+    />
   );
 }
 
@@ -568,32 +641,59 @@ function RevisarYMarcar({
 
 function Detalle({
   fila,
+  video,
   onCerrar,
 }: {
-  fila: Extract<FilaRegistro<Historico>, { tipo: "guion" }> | null;
+  fila: FilaRegistro<Historico> | null;
+  video: Video | undefined | null;
   onCerrar: () => void;
 }) {
-  const h = fila?.guion ?? null;
+  const h = fila?.tipo === "guion" ? fila.guion : null;
+  const huerfana = fila?.tipo === "huerfana" ? fila.marca : null;
 
   return (
     <Modal
-      abierto={h !== null}
+      abierto={fila !== null}
       onCerrar={onCerrar}
-      titulo={h?.titulo ?? ""}
+      titulo={h?.titulo ?? video?.titulo ?? huerfana?.url ?? ""}
       subtitulo={
-        h && (
+        h ? (
           <>
-            {h.proyecto ?? "(sin proyecto)"}
+            {h.proyecto ?? SIN_PROYECTO}
             {h.voz && ` · ${h.voz}`}
             {` · aprobado el ${fechaDe(h.calificadoEn)}`}
-            {fila?.grabadoEn && ` · grabado el ${fechaDe(fila.grabadoEn)}`}
+            {fila?.tipo === "guion" && fila.grabadoEn && ` · grabado el ${fechaDe(fila.grabadoEn)}`}
           </>
+        ) : (
+          huerfana && `Cargado a mano · marcado el ${fechaDe(huerfana.grabadoEn)}`
         )
       }
     >
       {/* `key` para que el contenido se remonte por fila: así el efecto que trae el guion corre una
           vez por apertura y no hay que resetear nada a mano. Mismo patrón que el detalle del feed. */}
-      {fila && h && <Contenido key={h.id} fila={fila} />}
+      {fila?.tipo === "guion" && h && <Contenido key={h.id} fila={fila} />}
+
+      {/* Una huérfana NUNCA tuvo guion: se grabó por fuera de la herramienta. No hay nada que
+          reintentar, así que se dice y no se ofrece un botón que pierde siempre. */}
+      {huerfana && (
+        <div className="space-y-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge>✓ Grabado</Badge>
+            <Badge variant="outline">Cargado a mano</Badge>
+            <a
+              href={huerfana.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-4"
+            >
+              ver el video ↗
+            </a>
+          </div>
+          <p className="text-muted-foreground">
+            Sin guion en la herramienta. Si lo querés, pegalo en Transcribir.
+          </p>
+        </div>
+      )}
     </Modal>
   );
 }

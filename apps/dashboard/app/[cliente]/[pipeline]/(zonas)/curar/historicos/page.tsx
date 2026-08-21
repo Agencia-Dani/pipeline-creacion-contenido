@@ -3,6 +3,7 @@ import Link from "next/link";
 import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerMarcas } from "@/lib/grabados";
 import { leerHistoricoCompleto } from "@/lib/historicos";
+import { leerMeta } from "@/lib/videos";
 import { Lista } from "./lista";
 
 // El histórico de aprobados. Lee `outputs` de Supabase, no Airtable: el archivado borra el
@@ -25,9 +26,16 @@ export default async function HistoricosPage({
   // Los dos lados del registro (ADR-070). Van en paralelo porque no dependen entre sí, y el cruce
   // lo hace `armarRegistro` en el cliente — la misma función que usa el CSV, para que el archivo y
   // lo que se ve no puedan divergir.
-  const [{ filas, truncado }, marcas] = await Promise.all([
+  // La metadata comprada va en el mismo paralelo (ADR-072): es lo único que aporta miniatura, y
+  // para un link cargado a mano también su título. **Sumidero:** si falla, la pantalla se dibuja sin
+  // fotos en vez de no dibujarse — el histórico no depende de haber pagado ningún scrape.
+  const [{ filas, truncado }, marcas, metas] = await Promise.all([
     leerHistoricoCompleto(ctx),
     leerMarcas(ctx),
+    leerMeta(ctx).catch((e) => {
+      console.error("[historicos] no se pudo leer la metadata comprada:", e);
+      return [];
+    }),
   ]);
 
   return (
@@ -52,7 +60,12 @@ export default async function HistoricosPage({
           se archiva.
         </p>
       ) : (
-        <Lista guiones={filas} marcasIniciales={[...marcas.values()]} truncado={truncado} />
+        <Lista
+          guiones={filas}
+          marcasIniciales={[...marcas.values()]}
+          metas={metas}
+          truncado={truncado}
+        />
       )}
     </div>
   );
