@@ -5,7 +5,9 @@ import { usarCockpit } from "../../usar-cockpit";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
 import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
+import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { cn } from "@/lib/utils";
 import {
   agrupar,
@@ -50,6 +52,8 @@ export function Mazo({
   descartesPendientes: number;
 }) {
   const cockpit = usarCockpit();
+  const seleccion = usarSeleccion();
+  const [avisoSeleccion, setAvisoSeleccion] = useState<string | null>(null);
   const [cargados, setCargados] = useState(inicial);
   const [filtro, setFiltro] = useState<Filtro>(FILTRO_INICIAL);
   const [puestas, setPuestas] = useState<Record<string, Calificacion>>({});
@@ -155,7 +159,18 @@ export function Mazo({
             {ETIQUETA_FILTRO[f]} <span className="text-muted-foreground">{ajustadas[f]}</span>
           </button>
         ))}
+        {cargados.length > 0 && (
+          <span className="ml-auto">
+            <BotonSeleccionar seleccion={seleccion} />
+          </span>
+        )}
       </div>
+
+      {avisoSeleccion && (
+        <p className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          {avisoSeleccion}
+        </p>
+      )}
 
       {cargados.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -182,12 +197,25 @@ export function Mazo({
                   error={errores[c.id] ?? null}
                   onCalificar={(cal) => calificar(c, cal)}
                   onAbrir={() => setAbiertoId(c.id)}
+                  seleccion={
+                    seleccion.activo
+                      ? { marcado: seleccion.marcado(c.id), onAlternar: () => seleccion.alternar(c.id) }
+                      : undefined
+                  }
                 />
               ))}
             </GrillaVideos>
           </GrupoPlegable>
         ))
       )}
+
+      <BarraSeleccion seleccion={seleccion}>
+        <AgregarAColeccion
+          seleccion={seleccion}
+          urlPorClave={(id) => cargados.find((c) => c.id === id)?.urlReferente ?? null}
+          onListo={(mensaje) => setAvisoSeleccion(mensaje)}
+        />
+      </BarraSeleccion>
 
       {errorLista && <p className="text-sm text-destructive">{errorLista}</p>}
 

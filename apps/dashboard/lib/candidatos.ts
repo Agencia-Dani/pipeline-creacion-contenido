@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { claveDe, parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import {
   camposDeCalificacion,
   condicionDeFiltro,
@@ -188,6 +189,67 @@ export async function calificar(
 ): Promise<void> {
   await actualizar(ctx, id, camposDeCalificacion(calificacion));
 }
+
+/**
+ * Agrupar es aprobar (ADR-075): los videos que entran a una colección y **están sin calificar**
+ * quedan en 👍.
+ *
+ * 🩸 **Tapa un hueco que se descubre a los 20 días y no antes.** El archivado manda a `outputs` lo
+ * que tiene `estado <> nuevo`, y su nodo `Barrer candidatos sin calificar` **borra** lo que sigue en
+ * `nuevo` pasados 20 días. Un video sin calificar metido a una colección cae justo en el medio: la
+ * colección sobrevive (apunta a la llave del video, ADR-073) pero **su guion crudo desaparece** —
+ * `leerCrudo` busca en `transcripciones → candidatos → outputs` y ya no queda ninguno de los tres.
+ * Un aprobado, en cambio, llega a `outputs` y su guion vive para siempre.
+ *
+ * 👍 y **no** 🔥: `Destilar criterios` (ADR-022) le pasa los 🔥 a Haiku como los ejemplos con los
+ * que redefine el criterio de búsqueda del proyecto. Agrupar 40 videos para bajarlos en un Word le
+ * reescribiría el norte al motor. Agrupar es una señal positiva **débil** y se registra como tal.
+ *
+ * 🔒 **Nunca pisa un juicio que ya estaba.** El filtro es `estado = nuevo`, así que un 👎 metido a
+ * una colección sigue siendo 👎 — que es un caso legítimo ("guardá los malos para mostrarlos").
+ *
+ * Devuelve cuántos aprobó. **Es sumidero: no tira.** Aprobar es el efecto secundario de agregar, y
+ * fallar acá no puede impedir lo que la persona pidió (invariante #1 de PLAN §2.5).
+ */
+export async function aprobarSiEstanSinCalificar(
+  ctx: TenantContext,
+  enlaces: readonly EnlaceVideo[],
+): Promise<number> {
+  if (enlaces.length === 0) return 0;
+  const buscadas = new Set(enlaces.map(claveDe));
+
+  try {
+    const s = await scoped(ctx);
+    // `external_id` alcanza para acotar la lectura, pero **no** para decidir: `app.candidatos` no
+    // tiene columna `plataforma`, y un id de Instagram y uno de TikTok son los dos enteros de 19
+    // dígitos (ver `claveDe`). La plataforma se deriva de `url_referente`, que es la misma
+    // derivación que usa todo el resto — no una segunda.
+    const { data, error } = await s
+      .select("app.candidatos", "id, url_referente")
+      .eq("estado", "nuevo")
+      .in("external_id", [...new Set(enlaces.map((e) => e.external_id))]);
+    if (error) throw new Error(error.message);
+
+    const ids: string[] = [];
+    for (const fila of z.array(filaParaAprobar).parse(data ?? [])) {
+      const { validos } = parsearEnlaces(fila.url_referente ?? "");
+      if (validos.length === 1 && buscadas.has(claveDe(validos[0]))) ids.push(fila.id);
+    }
+    if (ids.length === 0) return 0;
+
+    const { data: tocados, error: errorUpdate } = await s
+      .update("app.candidatos", camposDeCalificacion("👍"))
+      .in("id", ids)
+      .select("id");
+    if (errorUpdate) throw new Error(errorUpdate.message);
+    return (tocados ?? []).length;
+  } catch (e) {
+    console.error("[candidatos] no se pudo aprobar lo agrupado (ADR-075):", e);
+    return 0;
+  }
+}
+
+const filaParaAprobar = z.object({ id: z.string(), url_referente: z.string().nullable() });
 
 /**
  * Las notas son la válvula de escape de ADR-034: "buen video pero no lo quiero" dejó de ser

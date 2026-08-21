@@ -9,11 +9,13 @@ import { parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { traerMetadata, TOPE_POR_LOTE } from "@/lib/apify";
 import { exigirTenant } from "@/lib/auth";
+import { aprobarSiEstanSinCalificar } from "@/lib/candidatos";
 import {
   agregarMiembros,
   borrarColeccion,
   crearColeccion,
   leerColeccion,
+  leerColecciones,
   leerMiembros,
   quitarMiembro,
 } from "@/lib/colecciones";
@@ -145,6 +147,115 @@ export async function agregarPegados(
   if (resultado.yaEstaban > 0) partes.push(`${resultado.yaEstaban} ya estaban`);
   if (invalidos.length > 0) partes.push(`${invalidos.length} no reconocidos`);
   return { ok: true, mensaje: partes.join(" · ") + "." };
+}
+
+/**
+ * Agregar a una colección lo que está **seleccionado en pantalla** (el modo selección).
+ *
+ * Es la puerta que faltaba: hasta el 2026-08-21 la única forma de armar una colección era pegar
+ * links, así que agrupar un video que ya estaba a la vista costaba abrirlo, copiar su url, ir a
+ * Colecciones y pegarla. Sirve a las cuatro pantallas que dibujan tarjetas, y por eso vive acá
+ * —donde vive el sustantivo— y no repetida en cada zona.
+ *
+ * 🔒 **Recibe URLS, no llaves ya derivadas, y eso es deliberado.** El cliente podría mandar
+ * `{plataforma, external_id}` armados, y sería una segunda derivación de la identidad viviendo en el
+ * browser: confiable hasta que alguien edite el payload, y desincronizable de `parsearEnlaces` para
+ * siempre. La identidad se calcula **acá**, con la misma función que usan el pegote, la cola y el
+ * motor.
+ *
+ * `nombreNuevo` crea la colección en el mismo acto. Es lo que hace que agrupar desde el Feed sea un
+ * gesto y no un trámite: quien está mirando un video no debería tener que irse a otra pantalla a
+ * fabricar la bolsa antes de poder usarla.
+ */
+export async function agregarSeleccionados(
+  enRuta: CockpitEnRuta,
+  destino: { coleccionId: string } | { nombreNuevo: string },
+  urls: readonly string[],
+): Promise<ResultadoAccion> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+
+  const lista = z.array(z.string().max(2_000)).max(1_000).safeParse(urls);
+  if (!lista.success || lista.data.length === 0) {
+    return { ok: false, mensaje: "No hay videos seleccionados." };
+  }
+
+  const { validos } = parsearEnlaces(lista.data.join("\n"));
+  if (validos.length === 0) {
+    return { ok: false, mensaje: "Ninguno de los videos seleccionados tiene un link reconocible." };
+  }
+
+  // Resolver el destino primero: crear y que después falle el agregado deja una colección vacía,
+  // que es visible y se borra; agregar contra una colección que no existe no deja nada que arreglar.
+  let coleccionId: string;
+  let creada = false;
+  if ("nombreNuevo" in destino) {
+    const nombre = validarNombre(destino.nombreNuevo);
+    if (!nombre.ok) return { ok: false, mensaje: nombre.motivo };
+    try {
+      coleccionId = await crearColeccion(ctx, nombre.nombre, usuario.id);
+      creada = true;
+    } catch (e) {
+      if (e instanceof Error && e.message === "YA_EXISTE") {
+        return { ok: false, mensaje: "Ya existe una colección con ese nombre." };
+      }
+      console.error("[colecciones] falló crear al agregar seleccionados:", e);
+      return { ok: false, mensaje: "No se pudo crear la colección. Probá de nuevo." };
+    }
+    await registrarEvento(ctx, usuario.id, "colecciones.crear", { coleccion: coleccionId });
+  } else {
+    if (!uuid.safeParse(destino.coleccionId).success) {
+      return { ok: false, mensaje: "Esa colección no existe." };
+    }
+    coleccionId = destino.coleccionId;
+  }
+
+  let resultado;
+  try {
+    resultado = await agregarMiembros(ctx, coleccionId, validos);
+  } catch (e) {
+    console.error("[colecciones] falló agregar seleccionados:", e);
+    return { ok: false, mensaje: "No se pudieron agregar los videos. Probá de nuevo." };
+  }
+
+  // ADR-075: agrupar es aprobar. Va **después** del agregado y es sumidero — si esto falla, el
+  // video ya está en la colección, que es lo que la persona pidió.
+  const aprobados = await aprobarSiEstanSinCalificar(ctx, validos);
+
+  await registrarEvento(ctx, usuario.id, "colecciones.agregar", {
+    coleccion: coleccionId,
+    origen: "seleccion",
+    detectados: validos.length,
+    nuevos: resultado.nuevos,
+    ya_estaban: resultado.yaEstaban,
+    aprobados,
+  });
+
+  const ruta = comoRuta(cockpit);
+  revalidatePath(rutaDe(ruta, `curar/colecciones/${coleccionId}`));
+  revalidatePath(rutaDe(ruta, "curar/colecciones"));
+  // El Feed cambia si se aprobó algo: esas tarjetas salen del filtro "sin calificar".
+  if (aprobados > 0) revalidatePath(rutaDe(ruta, "curar/feed"));
+
+  const partes = [`${resultado.nuevos} agregados`];
+  if (resultado.yaEstaban > 0) partes.push(`${resultado.yaEstaban} ya estaban`);
+  if (aprobados > 0) partes.push(`${aprobados} quedaron en 👍`);
+  return {
+    ok: true,
+    mensaje: (creada ? "Colección creada · " : "") + partes.join(" · ") + ".",
+  };
+}
+
+/** Para el selector del modo selección: qué colecciones hay para elegir. */
+export async function coleccionesParaElegir(
+  enRuta: CockpitEnRuta,
+): Promise<{ id: string; nombre: string }[]> {
+  const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  try {
+    return (await leerColecciones(ctx)).map((c) => ({ id: c.id, nombre: c.nombre }));
+  } catch (e) {
+    console.error("[colecciones] no se pudieron listar para elegir:", e);
+    return [];
+  }
 }
 
 export async function quitar(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { CasillaSeleccion } from "@/components/video/seleccion";
 import { cn } from "@/lib/utils";
 
 // La tarjeta de video del sistema. **Una sola, en las tres pantallas** (ADR-072).
@@ -74,6 +75,7 @@ export function TarjetaVideo({
   atenuada = false,
   error = null,
   onAbrir,
+  seleccion,
 }: {
   video: VideoEnTarjeta;
   /** Sobre la miniatura, arriba a la derecha: la calificación, "✓ grabado", el estado. */
@@ -86,24 +88,41 @@ export function TarjetaVideo({
   atenuada?: boolean;
   error?: string | null;
   onAbrir: () => void;
+  /**
+   * Modo selección prendido: la tarjeta **marca en vez de abrir**.
+   *
+   * 🔑 Es un solo control y no dos, a propósito. Una casilla chiquita al lado de una tarjeta que
+   * sigue abriendo obliga a apuntar a 20×20 px para hacer lo único que se está haciendo en ese
+   * momento; con el modo prendido, el blanco es la tarjeta entera. Es el patrón que ya conocen de
+   * las fotos del teléfono. Sin esta prop la tarjeta se comporta exactamente como antes.
+   */
+  seleccion?: { marcado: boolean; onAlternar: () => void };
 }) {
+  const marcado = seleccion?.marcado ?? false;
   return (
     <div
       className={cn(
         "flex flex-col overflow-hidden rounded-lg border bg-card transition-opacity",
         atenuada && "opacity-60",
+        marcado && "ring-2 ring-primary",
       )}
     >
       <button
         type="button"
-        onClick={onAbrir}
+        onClick={seleccion ? seleccion.onAlternar : onAbrir}
         className="group text-left"
+        // En modo selección el botón no navega: es un interruptor, y `aria-pressed` es lo que se lo
+        // dice al lector de pantalla (la casilla es decorativa, ver `CasillaSeleccion`).
+        aria-pressed={seleccion ? marcado : undefined}
         // Sin título el `aria-label` diría "Abrir" a secas. El referente es lo siguiente que
         // identifica al video para quien navega con lector de pantalla.
-        aria-label={`Abrir ${video.titulo ?? video.referente ?? "el video"}`}
+        aria-label={`${seleccion ? (marcado ? "Quitar de la selección" : "Seleccionar") : "Abrir"} ${
+          video.titulo ?? video.referente ?? "el video"
+        }`}
       >
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
           <Miniatura video={video} />
+          {seleccion && <CasillaSeleccion marcado={marcado} />}
           {badge && (
             <span className="absolute right-1.5 top-1.5 rounded-md bg-background/90 px-1.5 py-0.5 text-lg shadow-sm">
               {badge}

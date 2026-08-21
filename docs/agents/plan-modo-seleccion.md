@@ -120,7 +120,39 @@ hoy**. Cero código.
 
 **Verifica:** `npm run validate` en verde, y `grep -c "^| \[ADR-" docs/adr/README.md` da 75.
 
-### Fase 1 — El modo selección, con una sola acción ⬜
+### Fase 1 — El modo selección, con una sola acción 🔧 EN CURSO
+
+> **⏸️ Cortada a mitad el 2026-08-21 (Mani tuvo que cerrar el computador). El repo compila, los 368
+> tests pasan y el build sale — es seguro retomar desde acá.**
+>
+> **Hecho y commiteado:**
+> - `components/video/seleccion.tsx` — `usarSeleccion()` (el estado, con `Set` para que `marcado()`
+>   no sea lineal en 400 tarjetas), `BotonSeleccionar`, `CasillaSeleccion`, `BarraSeleccion`.
+> - `components/video/tarjeta.tsx` — prop `seleccion` opcional: con ella la tarjeta **marca en vez
+>   de abrir** y el blanco es la tarjeta entera, no una casilla de 20 px. Sin ella se comporta
+>   idéntico a antes.
+> - `lib/candidatos.ts` — `aprobarSiEstanSinCalificar()`, o sea ADR-075. Es **sumidero**: si falla,
+>   el video igual quedó en la colección.
+> - `curar/colecciones/actions.ts` — `agregarSeleccionados()` (crea la colección en el mismo acto si
+>   le pasás `nombreNuevo`) y `coleccionesParaElegir()`.
+> - `components/video/agregar-a-coleccion.tsx` — el diálogo, compartido por las cuatro pantallas.
+> - **El Feed ya está cableado entero** (`curar/feed/mazo.tsx` + `tarjeta.tsx`).
+>
+> **Lo que falta, en orden:**
+> 1. **Verificarlo en el navegador.** Nada de esto se probó en pantalla todavía — es lo primero.
+>    (Mani tiene que entrar él y dejar la sesión abierta.)
+> 2. **Cablear Transcribir** (`transcribir/tanda.tsx` + `tarjeta-cola.tsx`) y **Históricos**
+>    (`curar/historicos/lista.tsx`). Las dos ya dibujan `TarjetaVideo`, así que es pasarle la prop
+>    `seleccion` y montar `BarraSeleccion` + `AgregarAColeccion`. **Ojo con la clave**: el Feed usa
+>    el `id` del candidato como clave de selección y resuelve la url por `urlPorClave`; esas dos
+>    pantallas tienen `Video`, así que su clave natural es `v.clave` y la url sale de `v.url`.
+> 3. **El detalle de la colección**, que hoy tiene su propio mecanismo de marcado para
+>    `Quitar seleccionados` — unificarlo es la Fase 3.
+>
+> ⚠️ **Antes de dar la fase por cerrada, releer qué promete el plan para las pantallas que no se
+> tocaron.** Es exactamente así como se perdió el modo selección la primera vez.
+
+
 
 El corazón. Se construye **completo pero con una sola acción en la barra** (*Agregar a colección*),
 que es lo que destraba el pedido de Majo. Las otras tres entran en la Fase 3 sobre la misma máquina.

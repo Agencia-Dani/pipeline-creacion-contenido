@@ -68,6 +68,7 @@ export function Tarjeta({
   error,
   onCalificar,
   onAbrir,
+  seleccion,
 }: {
   candidato: CandidatoFeed;
   puesta: Calificacion | null;
@@ -75,6 +76,8 @@ export function Tarjeta({
   error: string | null;
   onCalificar: (c: Calificacion) => void;
   onAbrir: () => void;
+  /** Modo selección prendido: la tarjeta marca en vez de abrir. Ver `components/video/seleccion`. */
+  seleccion?: { marcado: boolean; onAlternar: () => void };
 }) {
   return (
     <TarjetaVideo
@@ -83,6 +86,7 @@ export function Tarjeta({
       badge={puesta}
       error={error}
       onAbrir={onAbrir}
+      seleccion={seleccion}
       // `high-end` va en el subtítulo y no como badge sobre la miniatura: lo tiene buena parte del
       // feed, así que flotando era ruido en vez de señal. Es una marca, no cambia el orden.
       subtitulo={
