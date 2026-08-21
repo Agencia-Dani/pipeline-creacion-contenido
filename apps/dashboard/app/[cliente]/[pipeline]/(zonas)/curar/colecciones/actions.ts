@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { queFaltaEnriquecer, validarNombre } from "@/domain/colecciones";
+import { huellaDeCriterios } from "@/domain/limpieza";
 import { parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { traerMetadata, TOPE_POR_LOTE } from "@/lib/apify";
@@ -15,7 +16,14 @@ import {
   quitarMiembro,
 } from "@/lib/colecciones";
 import { registrarEvento } from "@/lib/eventos";
+import { borrarLimpio, guardarLimpio, leerLimpios } from "@/lib/guiones-limpios";
+import { leerCrudo } from "@/lib/guiones";
+import { limpiar, MODELO } from "@/lib/limpiar";
+import { leerVoces } from "@/lib/proyectos";
 import { guardarMeta, leerLoQueSeSabe } from "@/lib/videos";
+
+/** Presupuesto de una pasada de limpieza. Igual que el de Apify y por lo mismo: `maxDuration` es 60. */
+const PRESUPUESTO_LIMPIEZA_MS = 45_000;
 
 // Las acciones de Colecciones (ADR-073).
 //
@@ -246,4 +254,177 @@ async function enriquecerLote(
     console.error("[colecciones] el enriquecimiento falló entero:", e);
     return { traidos: 0, faltaban: 0 };
   }
+}
+
+// ─────────────────────────── La limpieza (ADR-074) ───────────────────────────
+
+/**
+ * Los dos guiones de un video, para el interruptor Crudo / Limpio.
+ *
+ * 🔑 **Se piden al abrir, no vienen con la grilla.** Es la regla del payload de `domain/feed.ts`,
+ * medida en su momento: los textos largos eran 240 KB de los 337 que viajaban en cada carga, para
+ * dibujar tarjetas que no los muestran. El limpio entra en el mismo saco.
+ */
+export async function verGuiones(
+  enRuta: CockpitEnRuta,
+  plataforma: "instagram" | "tiktok",
+  externalId: string,
+): Promise<{ crudo: string | null; limpio: string | null }> {
+  const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (!z.string().min(1).max(30).safeParse(externalId).success) return { crudo: null, limpio: null };
+
+  try {
+    const [crudo, limpios] = await Promise.all([
+      leerCrudo(ctx, plataforma, externalId),
+      leerLimpios(ctx),
+    ]);
+    return { crudo, limpio: limpios.get(`${plataforma}:${externalId}`)?.texto ?? null };
+  } catch (e) {
+    console.error("[colecciones] falló leer los guiones:", e);
+    return { crudo: null, limpio: null };
+  }
+}
+
+/** Las voces de la empresa, para elegir con cuál limpiar. */
+export async function vocesParaLimpiar(
+  enRuta: CockpitEnRuta,
+): Promise<{ id: string; nombre: string; tienePerfil: boolean }[]> {
+  const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  try {
+    // 🔴 **Se listan TODAS, activas y apagadas.** `voces.activo` significa de facto "corre en
+    // reels" y lo consume el plan del motor: filtrar por él acá escondería una voz perfectamente
+    // válida para limpiar. Es la misma trampa que ADR-067 §2 documentó para LinkedIn.
+    return (await leerVoces(ctx)).map((v) => ({
+      id: v.id,
+      nombre: v.nombre,
+      tienePerfil: (v.perfil_limpieza ?? "").trim() !== "",
+    }));
+  } catch (e) {
+    console.error("[colecciones] falló leer las voces:", e);
+    return [];
+  }
+}
+
+/**
+ * Una pasada de limpieza sobre los videos de la colección que todavía no tienen guion limpio.
+ *
+ * 🔴 **Deliberada, no automática — al revés que `identificarFaltantes`.** Identificar es siempre
+ * deseable y barato; limpiar es un acto con una decisión adentro (para qué voz) y un resultado que
+ * alguien tiene que mirar. Por eso lo dispara un botón y no un `useEffect`.
+ *
+ * Corre con presupuesto y devuelve conteos, así que una colección grande se termina en varias
+ * pasadas sin que la función de Vercel la corte por la mitad.
+ */
+export async function limpiarFaltantes(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+  vozId: string | null,
+): Promise<ResultadoAccion & { limpiados: number; quedan: number }> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (!uuid.safeParse(coleccionId).success) {
+    return { ok: false, mensaje: "Esa colección no existe.", limpiados: 0, quedan: 0 };
+  }
+  if (vozId !== null && !uuid.safeParse(vozId).success) {
+    return { ok: false, mensaje: "Esa voz no existe.", limpiados: 0, quedan: 0 };
+  }
+
+  let miembros;
+  let yaLimpios;
+  let perfil: string | null = null;
+  try {
+    [miembros, yaLimpios] = await Promise.all([leerMiembros(ctx, coleccionId), leerLimpios(ctx)]);
+    if (vozId) {
+      perfil = (await leerVoces(ctx)).find((v) => v.id === vozId)?.perfil_limpieza ?? null;
+    }
+  } catch (e) {
+    console.error("[colecciones] falló preparar la limpieza:", e);
+    return { ok: false, mensaje: "No se pudo leer la colección.", limpiados: 0, quedan: 0 };
+  }
+
+  const faltan = miembros.filter((m) => !yaLimpios.has(m.clave));
+  if (faltan.length === 0) {
+    return { ok: true, mensaje: "Ya están todos limpios.", limpiados: 0, quedan: 0 };
+  }
+
+  const huella = huellaDeCriterios(perfil);
+  const hasta = Date.now() + PRESUPUESTO_LIMPIEZA_MS;
+  let limpiados = 0;
+  let sinGuion = 0;
+
+  // Serial y no en pool: cada limpieza es una llamada larga a Haiku sobre un texto de hasta 6000
+  // caracteres, y lo que se quiere acá no es throughput sino **no pasarse del presupuesto**. Una
+  // pasada que hace 3 y devuelve el resto es mejor que una que arranca 8 y la corta Vercel a la
+  // mitad, dejando llamadas pagadas cuyo resultado se tira.
+  for (const m of faltan) {
+    if (Date.now() > hasta) break;
+    try {
+      const crudo = await leerCrudo(ctx, m.plataforma, m.external_id);
+      if (!crudo) {
+        sinGuion++;
+        continue;
+      }
+      const limpio = await limpiar(crudo, perfil);
+      if (!limpio) continue;
+      await guardarLimpio(ctx, m, {
+        texto: limpio,
+        modelo: MODELO,
+        criteriosHash: huella,
+        vozId,
+        usuarioId: usuario.id,
+      });
+      limpiados++;
+    } catch (e) {
+      console.error(`[colecciones] falló limpiar ${m.clave}:`, e);
+    }
+  }
+
+  await registrarEvento(ctx, usuario.id, "colecciones.limpiar", {
+    coleccion: coleccionId,
+    voz: vozId,
+    limpiados,
+    sin_guion: sinGuion,
+    pedidos: faltan.length,
+  });
+  revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
+
+  // Los que no tienen guion NO cuentan como pendientes: volver a intentarlos no los va a hacer
+  // aparecer. Sin esto el bucle del cliente giraría para siempre sobre los links cargados a mano.
+  const quedan = Math.max(0, faltan.length - limpiados - sinGuion);
+
+  if (limpiados === 0) {
+    const motivo =
+      sinGuion > 0
+        ? `${sinGuion} de esos videos no tienen guion en el sistema: se cargaron a mano.`
+        : "No se pudo limpiar ninguno. Probá de nuevo en un rato.";
+    return { ok: false, mensaje: motivo, limpiados: 0, quedan };
+  }
+
+  const partes = [`${limpiados} limpiados`];
+  if (sinGuion > 0) partes.push(`${sinGuion} sin guion`);
+  if (quedan > 0) partes.push(`quedan ${quedan}`);
+  return { ok: true, mensaje: partes.join(" · ") + ".", limpiados, quedan };
+}
+
+/** Tira el limpio de un video para poder rehacerlo. El crudo no se toca. */
+export async function tirarLimpio(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+  plataforma: "instagram" | "tiktok",
+  externalId: string,
+): Promise<ResultadoAccion> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (!z.string().min(1).max(30).safeParse(externalId).success) {
+    return { ok: false, mensaje: "Ese video no se pudo identificar." };
+  }
+  try {
+    await borrarLimpio(ctx, plataforma, externalId);
+  } catch (e) {
+    console.error("[colecciones] falló tirar el limpio:", e);
+    return { ok: false, mensaje: "No se pudo borrar. Probá de nuevo." };
+  }
+  await registrarEvento(ctx, usuario.id, "colecciones.tirar_limpio", {
+    video: `${plataforma}:${externalId}`,
+  });
+  revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
+  return { ok: true, mensaje: "Limpio borrado. El guion original sigue igual." };
 }

@@ -4,6 +4,7 @@ import { comoRuta, rutaDe } from "@/domain/rutas";
 import type { Video } from "@/domain/video";
 import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerColeccion, leerMiembros } from "@/lib/colecciones";
+import { clavesConLimpio } from "@/lib/guiones-limpios";
 import { leerLoQueSeSabe } from "@/lib/videos";
 import { Detalle } from "./detalle";
 
@@ -32,7 +33,11 @@ export default async function ColeccionPage({
   // que acá no hay nada, no mandarlo a otra pantalla como si se hubiera equivocado de camino.
   if (!coleccion) notFound();
 
-  const [miembros, seSabe] = await Promise.all([leerMiembros(ctx, id), leerLoQueSeSabe(ctx)]);
+  const [miembros, seSabe, limpios] = await Promise.all([
+    leerMiembros(ctx, id),
+    leerLoQueSeSabe(ctx),
+    clavesConLimpio(ctx),
+  ]);
 
   // El miembro manda la identidad y la url (es la fila que existe seguro); lo que se sabe llena el
   // resto. Un video del que no se sabe nada sale entero en `null` y la tarjeta lo dibuja igual.
@@ -60,7 +65,9 @@ export default async function ColeccionPage({
         <h1 className="mt-1 text-2xl font-semibold">{coleccion.nombre}</h1>
       </div>
 
-      <Detalle coleccionId={id} videos={videos} />
+      {/* `conLimpio` viaja como array: un Set no es serializable a través del límite
+          server/client. Misma razón por la que `cargarTanda` manda sus marcas así. */}
+      <Detalle coleccionId={id} videos={videos} conLimpio={[...limpios]} />
     </div>
   );
 }
