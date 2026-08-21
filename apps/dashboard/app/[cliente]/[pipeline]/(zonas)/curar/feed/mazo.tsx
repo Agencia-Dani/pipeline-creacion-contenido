@@ -20,7 +20,7 @@ import {
   type CandidatoFeed,
   type Filtro,
 } from "@/domain/feed";
-import { calificarCandidato, leerMazo } from "./actions";
+import { calificarCandidato, calificarSeleccion, leerMazo } from "./actions";
 import { Detalle } from "./detalle";
 import { Tarjeta } from "./tarjeta";
 
@@ -139,6 +139,56 @@ export function Mazo({
     });
   }
 
+  /**
+   * Calificar lo seleccionado.
+   *
+   * 🔒 **La única acción del lote que pregunta**, y no por prudencia genérica: las otras tres se
+   * deshacen (quitar de una colección, desmarcar un grabado) o ya preguntan (archivar). Un 👎 sobre
+   * 40 videos los manda a descartes de un clic, y volver es calificar los 40 de nuevo a mano.
+   */
+  function calificarLote(calificacion: Calificacion) {
+    const ids = seleccion.claves;
+    if (ids.length === 0) return;
+    if (
+      calificacion === "👎" &&
+      !confirm(`Vas a descartar ${ids.length} videos. Deshacerlo es calificarlos de a uno.`)
+    ) {
+      return;
+    }
+
+    // Mismo optimista que el botón por tarjeta, y con el mismo cuidado de `originales`: el delta de
+    // los contadores tiene que valer una sola vez por tarjeta aunque se la re-califique.
+    setOriginales((o) => {
+      const copia = { ...o };
+      for (const id of ids) {
+        if (!(id in copia)) copia[id] = cargados.find((c) => c.id === id)?.calificacion ?? null;
+      }
+      return copia;
+    });
+    setPuestas((p) => {
+      const copia = { ...p };
+      for (const id of ids) copia[id] = calificacion;
+      return copia;
+    });
+    seleccion.limpiar();
+
+    startTransition(async () => {
+      const r = await calificarSeleccion(cockpit, ids, calificacion);
+      setAvisoSeleccion(r.mensaje);
+      // Fail-loud y sin revertir a medias: en lote no se sabe **cuáles** fallaron, así que
+      // inventar un rollback parcial pintaría una mentira distinta. Se le vuelve a pedir el mazo al
+      // server, que es la única fuente que sabe la verdad.
+      if (!r.ok) {
+        setPuestas({});
+        setOriginales({});
+        startCargar(async () => {
+          const mazo = await leerMazo(cockpit, filtro);
+          if (mazo.ok) setCargados(mazo.candidatos);
+        });
+      }
+    });
+  }
+
   const grupos = agrupar(cargados);
   const abierto = cargados.find((c) => c.id === abiertoId) ?? null;
   const pendientes = ajustadas["sin-calificar"];
@@ -218,6 +268,20 @@ export function Mazo({
           urlPorClave={(id) => cargados.find((c) => c.id === id)?.urlReferente ?? null}
           onListo={(mensaje) => setAvisoSeleccion(mensaje)}
         />
+        {/* Los tres emojis y no un menú: es el mismo gesto que la tarjeta, con la misma forma.
+            *Grabado* no está y no es un olvido — un candidato del Feed todavía no se grabó. */}
+        {(["🔥", "👍", "👎"] as const).map((cal) => (
+          <Button
+            key={cal}
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={seleccion.cuantos === 0}
+            onClick={() => calificarLote(cal)}
+          >
+            {cal}
+          </Button>
+        ))}
       </BarraSeleccion>
 
       {errorLista && <p className="text-sm text-destructive">{errorLista}</p>}

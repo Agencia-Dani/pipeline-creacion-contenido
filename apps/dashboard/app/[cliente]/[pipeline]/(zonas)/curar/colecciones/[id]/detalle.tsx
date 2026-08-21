@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { GrillaVideos } from "@/components/video/grupos";
+import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { TarjetaVideo } from "@/components/video/tarjeta";
 import { necesitaEnriquecer } from "@/domain/colecciones";
 import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
@@ -16,6 +17,7 @@ import {
   identificarFaltantes,
   limpiarFaltantes,
   quitar,
+  quitarSeleccionados,
   vocesParaLimpiar,
 } from "../actions";
 import { Guiones } from "./guiones";
@@ -47,6 +49,11 @@ export function Detalle({
   const [abierto, setAbierto] = useState<Video | null>(null);
   const [voces, setVoces] = useState<Voz[]>([]);
   const [vozId, setVozId] = useState("");
+  // 🩸 **El detalle tampoco tenía selección múltiple.** El plan de colecciones prometía una barra con
+  // `Quitar seleccionados` y lo que se construyó fue un `Sacar` por tarjeta — el mismo hueco entre
+  // lo prometido y lo hecho que dejó afuera el modo selección entero, encontrado el 2026-08-21
+  // releyendo el plan en vez de mirar la pantalla.
+  const seleccion = usarSeleccion();
 
   const limpios = new Set(conLimpio);
   const sinIdentificar = videos.filter(necesitaEnriquecer).length;
@@ -142,6 +149,17 @@ export function Detalle({
     });
   }
 
+  /** Lo mismo en lote. Sin confirmación, por lo mismo: la bolsa es descartable (ADR-073). */
+  function sacarSeleccionados() {
+    if (trabajando || seleccion.cuantos === 0) return;
+    const claves = seleccion.claves;
+    startTransition(async () => {
+      const r = await quitarSeleccionados(cockpit, coleccionId, claves);
+      setAviso(r);
+      if (r.ok) seleccion.cancelar();
+    });
+  }
+
   const voz = voces.find((v) => v.id === vozId);
 
   return (
@@ -169,6 +187,11 @@ export function Detalle({
             <Button variant="outline" onClick={identificar} disabled={trabajando}>
               {trabajando ? "Buscando…" : `Reintentar los ${sinIdentificar} que faltan`}
             </Button>
+          )}
+          {videos.length > 0 && (
+            <span className="ml-auto">
+              <BotonSeleccionar seleccion={seleccion} />
+            </span>
           )}
         </div>
         {aviso && (
@@ -250,6 +273,14 @@ export function Detalle({
                 atenuada={quitando === v.clave}
                 badge={limpios.has(v.clave) ? "✨" : undefined}
                 onAbrir={() => setAbierto(v)}
+                seleccion={
+                  seleccion.activo
+                    ? {
+                        marcado: seleccion.marcado(v.clave),
+                        onAlternar: () => seleccion.alternar(v.clave),
+                      }
+                    : undefined
+                }
                 pie={
                   <>
                     <span className="truncate text-xs text-muted-foreground">
@@ -273,6 +304,18 @@ export function Detalle({
               />
             ))}
           </GrillaVideos>
+          <BarraSeleccion seleccion={seleccion}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={seleccion.cuantos === 0 || trabajando}
+              onClick={sacarSeleccionados}
+            >
+              Sacar de la colección
+            </Button>
+          </BarraSeleccion>
+
           <p className="text-center text-sm text-muted-foreground">
             {videos.length} {videos.length === 1 ? "video" : "videos"}.
           </p>

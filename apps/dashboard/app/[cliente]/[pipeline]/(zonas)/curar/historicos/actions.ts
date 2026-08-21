@@ -77,6 +77,13 @@ export async function marcarGrabado(
 export async function marcarMuchosComoGrabados(
   enRuta: CockpitEnRuta,
   texto: string,
+  /**
+   * De dónde vino el lote. **No es telemetría decorativa:** desde el 2026-08-21 `app.eventos` es el
+   * único instrumento que dice si alguien usa esto —fue lo que probó que las 288 marcas del 20/08
+   * las cargó Majo y no un backfill— y `count(*)` sobre `app.grabados` ya no lo distingue. Sin este
+   * campo, marcar desde el modo selección se leería idéntico a pegar 300 links.
+   */
+  origen: "pegote" | "seleccion" = "pegote",
 ): Promise<ResultadoAccion> {
   const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
 
@@ -103,6 +110,7 @@ export async function marcarMuchosComoGrabados(
   }
 
   await registrarEvento(ctx, usuario.id, "historicos.marcar_masivo", {
+    origen,
     detectados: validos.length,
     nuevos: resultado.nuevos,
     ya_estaban: resultado.yaEstaban,

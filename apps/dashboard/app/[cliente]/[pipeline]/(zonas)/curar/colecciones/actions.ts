@@ -18,6 +18,7 @@ import {
   leerColecciones,
   leerMiembros,
   quitarMiembro,
+  quitarMiembros,
 } from "@/lib/colecciones";
 import { registrarEvento } from "@/lib/eventos";
 import { borrarLimpio, guardarLimpio, leerLimpios } from "@/lib/guiones-limpios";
@@ -256,6 +257,52 @@ export async function coleccionesParaElegir(
     console.error("[colecciones] no se pudieron listar para elegir:", e);
     return [];
   }
+}
+
+/**
+ * Saca de la colección lo que está seleccionado.
+ *
+ * 🔓 **Sin confirmación**, y es la decisión de ADR-073 aplicada: la bolsa es descartable. Sacar un
+ * video de una colección no toca su guion, ni su limpio, ni la metadata que se le compró — se
+ * deshace volviéndolo a agregar, y agregarlo no vuelve a pagar (la PK de `videos_meta` es la
+ * guardia). Lo que no vuelve se pregunta; esto vuelve.
+ *
+ * Recibe **claves** (`plataforma:external_id`) y no urls: acá los videos ya están adentro, así que
+ * su identidad ya se derivó al agregarlos. Se re-valida igual, porque viene del browser.
+ */
+export async function quitarSeleccionados(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+  claves: readonly string[],
+): Promise<ResultadoAccion> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (!uuid.safeParse(coleccionId).success) return { ok: false, mensaje: "Esa colección no existe." };
+
+  const enlaces: { plataforma: "instagram" | "tiktok"; external_id: string }[] = [];
+  for (const clave of claves.slice(0, 1_000)) {
+    const [plataforma, externalId] = clave.split(":");
+    if ((plataforma !== "instagram" && plataforma !== "tiktok") || !externalId) continue;
+    if (!z.string().min(1).max(30).safeParse(externalId).success) continue;
+    enlaces.push({ plataforma, external_id: externalId });
+  }
+  if (enlaces.length === 0) return { ok: false, mensaje: "No hay videos seleccionados." };
+
+  let idas: number;
+  try {
+    idas = await quitarMiembros(ctx, coleccionId, enlaces);
+  } catch (e) {
+    console.error("[colecciones] falló quitar seleccionados:", e);
+    return { ok: false, mensaje: "No se pudieron sacar los videos. Probá de nuevo." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "colecciones.quitar", {
+    coleccion: coleccionId,
+    origen: "seleccion",
+    pedidos: enlaces.length,
+    idas,
+  });
+  revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
+  return { ok: true, mensaje: `${idas} ${idas === 1 ? "video sacado" : "videos sacados"} de la colección.` };
 }
 
 export async function quitar(

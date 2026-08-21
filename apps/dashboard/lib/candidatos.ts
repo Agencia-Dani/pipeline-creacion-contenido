@@ -298,6 +298,36 @@ export async function aprobarSiEstanSinCalificar(
 const filaParaAprobar = z.object({ id: z.string(), url_referente: z.string().nullable() });
 
 /**
+ * Calificar en lote: los mismos tres campos, un solo UPDATE.
+ *
+ * Un bucle sobre `calificar()` habría sido más corto de escribir y son N viajes a Postgres: Jero
+ * calificó 80 videos en un día, de a uno, y ese es exactamente el caso que esto acelera.
+ *
+ * Devuelve cuántos tocó. Puede ser **menos** que los ids pedidos sin que sea un error: el barrido
+ * pudo llevarse alguno, o el id puede no ser de este cockpit (el filtro de `scoped` entra en el
+ * `update`, ADR-047). Quien llama decide si esa diferencia le importa.
+ */
+export async function calificarMuchos(
+  ctx: TenantContext,
+  ids: readonly string[],
+  calificacion: Calificacion,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  let tocados = 0;
+  // De a 200, como `marcarMuchos` y `agregarMiembros`: una URL de PostgREST muy larga da 414 en
+  // prod, y seleccionar el feed entero es un caso real.
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await (await scoped(ctx))
+      .update("app.candidatos", camposDeCalificacion(calificacion))
+      .in("id", ids.slice(i, i + 200))
+      .select("id");
+    if (error) throw new Error(`Supabase respondió con error calificando el lote: ${error.message}`);
+    tocados += (data ?? []).length;
+  }
+  return tocados;
+}
+
+/**
  * Las notas son la válvula de escape de ADR-034: "buen video pero no lo quiero" dejó de ser
  * expresable con el emoji. No se pierden — el archivado las lleva a `outputs.metadata`.
  */

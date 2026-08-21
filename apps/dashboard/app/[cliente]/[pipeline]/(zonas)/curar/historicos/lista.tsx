@@ -7,6 +7,7 @@ import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
+import { MarcarGrabados } from "@/components/video/marcar-grabados";
 import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { TarjetaVideo } from "@/components/video/tarjeta";
@@ -183,12 +184,13 @@ export function Lista({
    * las claves marcadas y nada más. Sale de `visibles` —lo que el filtro está mostrando— así que una
    * clave marcada siempre tiene su url mientras la tarjeta esté en pantalla.
    */
-  const urlPorId = useMemo(() => {
-    const m = new Map<string, string>();
+  const datosPorId = useMemo(() => {
+    const m = new Map<string, { clave: string; url: string }>();
     for (const fila of visibles) {
       const id = fila.tipo === "huerfana" ? fila.marca.clave : fila.guion.id;
+      const clave = fila.tipo === "huerfana" ? fila.marca.clave : fila.clave;
       const url = fila.tipo === "huerfana" ? fila.marca.url : fila.guion.urlReferente;
-      if (url) m.set(id, url);
+      if (clave && url) m.set(id, { clave, url });
     }
     return m;
   }, [visibles]);
@@ -348,8 +350,33 @@ export function Lista({
       <BarraSeleccion seleccion={seleccion}>
         <AgregarAColeccion
           seleccion={seleccion}
-          urlPorClave={(id) => urlPorId.get(id) ?? null}
+          urlPorClave={(id) => datosPorId.get(id)?.url ?? null}
           onListo={setAviso}
+        />
+        <MarcarGrabados
+          seleccion={seleccion}
+          urlPorClave={(id) => datosPorId.get(id)?.url ?? null}
+          // 🩸 La marca se pinta acá y NO se espera un refresh del server: `marcas` vive en el
+          // `useState` de este componente, sembrado una sola vez por su inicializador, así que
+          // `router.refresh()` no la tocaría. Es la misma lección que costó el bug del 18/08 en
+          // Transcribir, y por eso `alternar` (el botón por tarjeta) hace exactamente esto mismo.
+          onListo={(mensaje, marcadas) => {
+            setAviso(mensaje);
+            setMarcas((m) => {
+              const copia = new Map(m);
+              for (const id of marcadas) {
+                const d = datosPorId.get(id);
+                if (d && !copia.has(d.clave)) {
+                  copia.set(d.clave, {
+                    clave: d.clave,
+                    url: d.url,
+                    grabadoEn: new Date().toISOString(),
+                  });
+                }
+              }
+              return copia;
+            });
+          }}
         />
       </BarraSeleccion>
 

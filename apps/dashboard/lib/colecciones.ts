@@ -176,6 +176,46 @@ export async function agregarMiembros(
   return { nuevos, yaEstaban: enlaces.length - nuevos };
 }
 
+/**
+ * Saca varios videos de una colección. No los borra de ningún lado más.
+ *
+ * 🔑 **Agrupado por plataforma, un DELETE por grupo**, y no un `in` sobre `external_id` a secas: la
+ * membresía se identifica por `(plataforma, external_id)` y los ids de Instagram y TikTok son los
+ * dos enteros de 19 dígitos, así que un `in` plano podría sacar de la bolsa un video que nadie
+ * marcó. Es el mismo cuidado que documenta `claveDe`, aplicado al borrado.
+ *
+ * Devuelve cuántas filas se fueron.
+ */
+export async function quitarMiembros(
+  ctx: TenantContext,
+  coleccionId: string,
+  enlaces: readonly { plataforma: Plataforma; external_id: string }[],
+): Promise<number> {
+  if (enlaces.length === 0) return 0;
+  const porPlataforma = new Map<Plataforma, string[]>();
+  for (const e of enlaces) {
+    const ids = porPlataforma.get(e.plataforma) ?? [];
+    ids.push(e.external_id);
+    porPlataforma.set(e.plataforma, ids);
+  }
+
+  const s = await scoped(ctx);
+  let idas = 0;
+  for (const [plataforma, ids] of porPlataforma) {
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data, error } = await s
+        .borrar("app.colecciones_videos")
+        .eq("coleccion_id", coleccionId)
+        .eq("plataforma", plataforma)
+        .in("external_id", ids.slice(i, i + 200))
+        .select("external_id");
+      if (error) throw new Error(`Supabase respondió con error quitando el lote: ${error.message}`);
+      idas += (data ?? []).length;
+    }
+  }
+  return idas;
+}
+
 /** Saca un video de una colección. No lo borra de ningún lado más. */
 export async function quitarMiembro(
   ctx: TenantContext,

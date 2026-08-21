@@ -6,6 +6,7 @@ import { Copiar } from "@/components/ui/copiar";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
+import { MarcarGrabados } from "@/components/video/marcar-grabados";
 import { GrillaVideos } from "@/components/video/grupos";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { claveDe } from "@/domain/enlace";
@@ -250,6 +251,26 @@ export function Tanda({
               seleccion={seleccion}
               urlPorClave={(id) => filas?.find((f) => f.id === id)?.url ?? null}
               onListo={setAvisoSeleccion}
+            />
+            <MarcarGrabados
+              seleccion={seleccion}
+              urlPorClave={(id) => filas?.find((f) => f.id === id)?.url ?? null}
+              // 🩸 Misma trampa que el botón por tarjeta, y el mismo arreglo: `grabadas` vive en el
+              // `useState` de acá y ningún `router.refresh()` la repinta, porque `abrir()` tiene un
+              // `if (filas) return` que impide recargar las filas de una tanda ya abierta. Si esto
+              // no se pintara a mano, la marca entraría a la base y la pantalla no cambiaría —
+              // exactamente el bug que Mani encontró el 18/08 apretando el botón en prod.
+              onListo={(mensaje, marcadas) => {
+                setAvisoSeleccion(mensaje);
+                setGrabadas((g) => {
+                  const copia = new Set(g);
+                  for (const id of marcadas) {
+                    const fila = filas?.find((f) => f.id === id);
+                    if (fila) copia.add(claveDe(fila));
+                  }
+                  return copia;
+                });
+              }}
             />
           </BarraSeleccion>
         </div>

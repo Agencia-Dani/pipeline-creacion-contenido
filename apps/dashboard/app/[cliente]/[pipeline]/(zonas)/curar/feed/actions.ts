@@ -2,6 +2,7 @@
 
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import {
   esCalificacion,
   esFiltro,
@@ -10,7 +11,7 @@ import {
   type TextosCandidato,
 } from "@/domain/feed";
 import { exigirTenant } from "@/lib/auth";
-import { calificar, guardarNotas, leerFeed, leerTextos } from "@/lib/candidatos";
+import { calificar, calificarMuchos, guardarNotas, leerFeed, leerTextos } from "@/lib/candidatos";
 import { registrarEvento } from "@/lib/eventos";
 
 export type Resultado = { ok: boolean; mensaje: string };
@@ -60,6 +61,55 @@ export async function calificarCandidato(
   }
 
   return { ok: true, mensaje: "Guardado." };
+}
+
+/**
+ * Calificar en lote, desde el modo selección.
+ *
+ * 🔑 **Un solo evento y no N**, igual que `historicos.marcar_masivo`. Ochenta filas
+ * `candidatos.calificar` idénticas al milisegundo no dicen nada que `{cuantos: 80}` no diga, y
+ * arruinarían la única instrumentación que hoy contesta *¿alguien usa esto?* — que es cómo se supo
+ * que las 288 marcas del 20/08 eran de Majo.
+ *
+ * ⚠️ **Calificar en lote es la acción con más filo de la barra**, y por eso es la única que la
+ * pantalla confirma. Las otras tres se deshacen: quitar de una colección, desmarcar un grabado,
+ * archivar (que ya pregunta). Un 👎 sobre 40 videos los manda a descartes en un clic.
+ */
+export async function calificarSeleccion(
+  enRuta: CockpitEnRuta,
+  ids: readonly string[],
+  calificacion: string,
+): Promise<Resultado> {
+  const { usuario, ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+
+  if (!esCalificacion(calificacion)) return { ok: false, mensaje: "Esa calificación no existe." };
+  const lista = z.array(z.string().uuid()).min(1).max(1_000).safeParse(ids);
+  if (!lista.success) return { ok: false, mensaje: "No hay videos seleccionados." };
+
+  let tocados: number;
+  try {
+    tocados = await calificarMuchos(ctx, lista.data, calificacion);
+    await registrarEvento(ctx, usuario.id, "candidatos.calificar_masivo", {
+      pedidos: lista.data.length,
+      tocados,
+      calificacion,
+      estado: estadoDe(calificacion),
+    });
+  } catch (e) {
+    console.error("[feed] falló calificar en lote:", e);
+    return { ok: false, mensaje: "No se pudo guardar. Probá de nuevo." };
+  }
+
+  // Menos tocados que pedidos no es un error: el barrido pudo llevarse alguno mientras la pantalla
+  // lo seguía mostrando. Se dice, no se esconde.
+  const faltan = lista.data.length - tocados;
+  return {
+    ok: true,
+    mensaje:
+      faltan > 0
+        ? `${tocados} calificados · ${faltan} ya no estaban en el feed.`
+        : `${tocados} calificados.`,
+  };
 }
 
 /**
