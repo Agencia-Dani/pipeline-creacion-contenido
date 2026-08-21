@@ -111,6 +111,109 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🧺 2026-08-21 (cierre 113) · COLECCIONES, LA TARJETA ÚNICA Y EL GUION LIMPIO (Claude, pedido de Mani)
+>
+> **En una línea:** entró el primitivo que faltaba —la **colección**— más la compra de metadata a
+> Apify y la **limpieza de guiones** (ADR-072, 073, 074; migraciones `030`, `031`, `032`, las tres
+> aplicadas y verificadas). Falta la tarjeta única en Transcribir/Históricos (2b, 2c) y la descarga
+> en `.docx` (Fase 5).
+>
+> **El plan completo vive en `~/.claude/plans/bueno-entonces-pues-como-cryptic-cupcake.md`** y sigue
+> siendo la fuente: acá va el estado, no el diseño.
+>
+> ### De dónde salió
+>
+> Pedido de Majo Duarte por WhatsApp el 21/08, con dos cosas adentro: **limpiar el guion** (urgente,
+> para su corrida del día) y **bajar un documento con los guiones que elige** (ella dijo "el
+> martes"). En la reunión del 20/08 se había acordado lo contrario —la adaptación a la voz seguía
+> siendo manual— así que esto **enmienda el norte** y por eso lleva ADR.
+>
+> ### 🔬 Lo medido, que es lo que ordenó todo
+>
+> El plan arrancó asumiendo que *"la metadata que falta ya está en el sistema, es un join"*. **Falso:**
+>
+> | Origen | Videos | Título real | Miniatura |
+> |---|---|---|---|
+> | Feed (`app.candidatos`) | 101 | 101 | **34** |
+> | Históricos · `guion_reel` | 55 | 55 | **0** |
+> | Históricos · `transcripcion_a_pedido` | 129 | **0** | 0 |
+> | Transcribir | 130 | **0** | 0 |
+> | Marcas cargadas a mano | 294 | **3** | 3 |
+>
+> 🩸 **El primer cruce dio 129/130 y era un falso positivo:** las transcripciones matcheaban
+> **consigo mismas**, porque `outputs` guarda **la url en el campo `titulo`** en esas 129 filas. De
+> ahí salió `esTituloDeVerdad()` en `domain/video.ts`. *Se contó el match y se concluyó sobre el
+> contenido* — hermana de la lección de ADR-070.
+>
+> Causas verificadas: Supadata devuelve solo `content`/`lang`/`availableLangs`; Instagram bloquea las
+> `og:` tags sin login; TikTok sí tiene oEmbed gratis pero es **2 videos de 424**. La única fuente que
+> sirve es `apify~instagram-scraper`, que ya está en el motor.
+>
+> ### 🔀 El plan se reordenó por esto (y hay que respetarlo)
+>
+> El orden original ponía las tarjetas (2b, 2c) **antes** del dato que las llena, y eso habría
+> shippeado dos pantallas **más vacías que hoy**. Orden nuevo, acordado con Mani:
+> **2a ✅ → Fase 3 ✅ → Fase 4 ✅ → 2b + 2c ⬜ → Fase 5 ⬜.**
+>
+> ### ✅ Lo que quedó hecho
+>
+> | Fase | Qué | Estado |
+> |---|---|---|
+> | 0 | `docs/prompts/limpieza-guion.md` — el prompt para que Majo limpiara a mano ese día | ✅ entregado |
+> | 1 | ADR-072 · migración `030` (`app.videos_meta`) · `domain/video.ts` · fuga de miniaturas tapada en el archivado | ✅ |
+> | 2a | `components/video/tarjeta.tsx` + `grupos.tsx` extraídos del Feed, sin cambio visible | ✅ |
+> | 3 | ADR-073 · `031` (`colecciones` + `colecciones_videos`) · `lib/apify.ts` · pantalla `curar/colecciones` | ✅ verificado en navegador |
+> | 4 | ADR-074 · `032` (`guiones_limpios` + `voces.perfil_limpieza`) · interruptor Crudo/Limpio | ✅ verificado en navegador |
+>
+> **Las tres migraciones están aplicadas y medidas por su efecto** (detalle en CLAUDE.md). Lo que más
+> importa de la `031`: el **FK compuesto rechaza con `23503`** un video cuyo `instance_id` es de otra
+> empresa, o sea que el aislamiento **ya no depende de que el código lo haga bien**.
+>
+> ### 🩸 Tres bugs que solo aparecieron corriéndolo
+>
+> 1. **`videoViewCount` de Apify vuelve `null`; las reproducciones están en `videoPlayCount`.** El
+>    nombre obvio es el vacío. Se midió con una llamada real antes de escribir el mapeo.
+> 2. **Enriquecer dentro de la acción de agregar era una carrera contra Vercel.** Una llamada al
+>    actor tarda **~45 s con dos links** (arrancar el actor domina, no los items) contra
+>    `maxDuration = 60`. Se movió a `<Identificador>`, el mismo componente en pasadas que vacía la
+>    cola de Transcribir.
+> 3. **El prompt de limpieza contaminaba el guion con su propio voseo.** Crudo: *"lo que **dices**"*.
+>    Limpio: *"lo que **decís**"*. Está escrito en voseo rioplatense porque así escribe el equipo, y
+>    el modelo copiaba el registro. Milena y Rochi son colombianas: empeoraba el guion **justo en el
+>    criterio número uno de Majo**. Arreglado y reverificado.
+>
+> ### ⬜ Lo que falta, en orden
+>
+> 1. **Fase 2b — Transcribir adopta la tarjeta.** Dentro de la tanda, el `<ul>` de `<Fila>`
+>    (`transcribir/tanda.tsx:198`) pasa a `<GrillaVideos>` + `<TarjetaVideo>`; las acciones
+>    (Reintentar · Abandonar · Grabado) entran por el slot `pie`; el guion sale del `<details>` al
+>    modal. **De paso:** matar el `Copiar` duplicado (`transcribir/copiar.tsx:6` es la versión vieja
+>    sin manejo de fallo del clipboard).
+> 2. **Fase 2c — Históricos agrupa por proyecto** con `agrupar()` de `domain/feed.ts:238`, que ya es
+>    genérica. Las huérfanas caen en `(sin proyecto)`, que va último a propósito.
+> 3. **Fase 5 — la descarga.** Majo pidió **Word o PDF**, no Excel. `domain/xlsx.ts` ya tiene escrito
+>    a mano el contenedor ZIP con CRC32, y **un `.docx` es el mismo ZIP con otro XML**: se extrae el
+>    escritor a `domain/zip.ts` y `domain/docx.ts` lo reusa. Cero dependencias, que es el criterio de
+>    ADR-071.
+> 4. **Enmendar ROADMAP §1.1** con la nota de ADR-074, igual que la enmienda del 2026-07-15.
+> 5. **`docs/agents/context.md`**: faltan **colección**, **guion limpio**, **perfil de limpieza**,
+>    **llave de video**, **tarjeta de video**.
+>
+> ### ⚠️ Cosas que el próximo tiene que saber
+>
+> - **`app.videos_meta` tiene 4 filas y las 4 son de la verificación**, no uso. Se dejaron para no
+>   pagarlas dos veces. **El primer dato de adopción es la fila 5** (la lección del canario de
+>   ADR-069: una marca puesta por quien construyó el botón no es evidencia de adopción).
+> - **`APIFY_TOKEN` se agregó a `apps/dashboard/.env.local`** (Next no lee el `.env` de la raíz).
+>   ⬜ **Falta agregarlo en Vercel**, o el enriquecimiento no corre en producción.
+> - **El slug del pipeline en la URL es `reels`**, no `short-form-content`.
+> - **Ningún guion es editable** en ninguna pantalla, y el limpio tampoco. Fuera de alcance a
+>   propósito.
+> - **La `033` (contract de ADR-070, dropear `transcripciones.grabado_en`) sigue pendiente** y se
+>   corrió de número dos veces: *el número se toma cuando el archivo existe*.
+>
+> ---
+>
 > ## 🔀 2026-08-20 (cierre 112) · UN PR "MERGEABLE" NO ES UN PR QUE COMPILA (Claude, pedido de Mani)
 >
 > **En una línea:** merge del [PR #4](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/4)
