@@ -111,6 +111,40 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🔀 2026-08-20 (cierre 112) · UN PR "MERGEABLE" NO ES UN PR QUE COMPILA (Claude, pedido de Mani)
+>
+> **En una línea:** merge del [PR #4](https://github.com/Agencia-Dani/pipeline-creacion-contenido/pull/4)
+> (`d27d063`), el arreglo de Reintentar/Abandonar del cierre 110. Abierto el 18/08, sin tocar desde
+> entonces mientras el cierre 111 (ADR-070) le movía el piso a uno de los archivos que toca.
+>
+> ### 🩸 El hallazgo: GitHub decía "mergeable, clean" y el merge no compilaba
+>
+> El PR arregla que `Fila` no repintaba su badge de "grabado" cuando `tanda.tsx` recargaba filas
+> (la `key` es `t.id` y React no remonta), con la guardia *"gana el prop más nuevo"* mirando
+> `t.grabado_en`. Entre que se abrió y se auditó, ADR-070 (cierre 111) mudó esa marca a
+> `app.grabados` y **sacó `grabado_en` del tipo `Transcripcion` por completo**. El diff del PR
+> tocaba una línea que seguía existiendo, así que el merge de texto era limpio — pero
+> `t.grabado_en` ya no existe, y `tsc --noEmit` sobre el merge real daba 4 `TS2339`.
+>
+> 🔑 **La lección:** "mergeable" en GitHub es solo ausencia de conflicto de texto. Un campo que un
+> commit intermedio saca de un tipo no deja marca en el diff — hay que compilar el merge, no solo
+> mirar si aplica. Se verificó armando el merge en un worktree descartable (`git merge` + `tsc`)
+> antes de tocar nada del PR real.
+>
+> ### ✅ El arreglo, y por qué no cambia la decisión del PR
+>
+> La guardia pasa a mirar `grabadaInicial` (el prop que ADR-070 ya le agregó a `Fila` para el mismo
+> propósito) en vez de `t.grabado_en`. Mismo patrón —ajustar estado durante el render, más barato
+> que un efecto—, apuntado a la fuente que se movió. Nada del diseño original del PR cambió.
+>
+> **Verde sobre el merge real:** `typecheck` limpio · **320 tests** · `build` · `validate`
+> **2317 checks** · Vercel preview OK. Rama remota borrada, worktree local (`.claude/worktrees/
+> fix-reintentar-abandonar`) removido.
+>
+> 🩹 **Nota operativa:** `gh pr merge` intentó hacer checkout local de `main`, que ya estaba en uso
+> por el checkout principal del repo (`fatal: 'main' is already used by worktree`). Se mergeó por
+> la API (`gh api .../pulls/4/merge -X PUT`), que no toca ningún checkout local.
+
 > ## 📕 2026-08-20 (cierre 111) · LA MARCA DE GRABADO SE MUDA AL VIDEO, Y EL HISTÓRICO PASA DE ARCHIVO A TABLERO
 >
 > **En una línea:** `main` = **`ec92ad1`**. Sale **ADR-070** (`app.grabados`, migración `029`
