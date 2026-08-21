@@ -55,8 +55,33 @@ test("la descripción de una voz SÍ sigue siendo opcional: el filtro no la lee"
     nombre: "Rosario",
     descripcion: null,
     criterios_relevancia: "habla de comunicación",
+    // Omitido en la entrada y aun así presente en la salida, en `null`. Es la forma del contrato:
+    // quien escriba la fila siempre recibe la columna, y no tiene que adivinar si viene o no.
+    perfil_limpieza: null,
     activo: false,
   });
+});
+
+test("el perfil de limpieza es opcional y se limpia de bordes, como la descripción", () => {
+  // 🔑 Es OTRA cosa que `criterios_relevancia`, aunque los dos sean texto largo sobre "la voz".
+  // Aquellos deciden qué videos entran (el gate); esto, cómo suena el guion que salió (ADR-074).
+  const r = validarVoz({
+    nombre: "Rosario",
+    descripcion: null,
+    criterios_relevancia: "habla de comunicación",
+    perfil_limpieza: "  Tutea. Frases cortas.  ",
+    activo: true,
+  });
+  assert.equal(r.ok && r.valor.perfil_limpieza, "Tutea. Frases cortas.");
+
+  const enBlanco = validarVoz({
+    nombre: "Rosario",
+    descripcion: null,
+    criterios_relevancia: "habla de comunicación",
+    perfil_limpieza: "   ",
+    activo: true,
+  });
+  assert.equal(enBlanco.ok && enBlanco.valor.perfil_limpieza, null);
 });
 
 // ── validarProyecto ──────────────────────────────────────────────────────────
@@ -105,6 +130,7 @@ const voz = (extra: Partial<VozGuardada> = {}): VozGuardada => ({
   nombre: "Rosario",
   descripcion: null,
   criterios_relevancia: "criterios de la voz",
+  perfil_limpieza: null,
   activo: true,
   ...extra,
 });

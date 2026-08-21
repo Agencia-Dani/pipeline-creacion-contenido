@@ -32,6 +32,7 @@ const filaVoz = z.object({
   nombre: z.string(),
   descripcion: z.string().nullable(),
   criterios_relevancia: z.string(), // not null desde la `014` (ADR-040)
+  perfil_limpieza: z.string().nullable(), // la `032` (ADR-074)
   activo: z.boolean(),
 });
 
@@ -47,7 +48,7 @@ const filaProyecto = z.object({
   n: z.coerce.number().nullable(),
 });
 
-const COLUMNAS_VOZ = "id, nombre, descripcion, criterios_relevancia, activo";
+const COLUMNAS_VOZ = "id, nombre, descripcion, criterios_relevancia, perfil_limpieza, activo";
 const COLUMNAS_PROYECTO =
   "id, nombre, descripcion, criterios_relevancia, criterios_aprendidos, advertencia_criterios, voz_id, activo, n";
 
@@ -100,6 +101,7 @@ export async function actualizarVoz(ctx: TenantContext, id: string, datos: Datos
       nombre: datos.nombre,
       descripcion: datos.descripcion,
       criterios_relevancia: datos.criterios_relevancia,
+      perfil_limpieza: datos.perfil_limpieza,
       activo: datos.activo,
       actualizado_en: new Date().toISOString(),
     })
@@ -146,6 +148,7 @@ export async function crearVoz(ctx: TenantContext, datos: DatosVoz): Promise<str
         nombre: datos.nombre,
         descripcion: datos.descripcion,
         criterios_relevancia: datos.criterios_relevancia,
+        perfil_limpieza: datos.perfil_limpieza,
         activo: datos.activo,
       },
     ])

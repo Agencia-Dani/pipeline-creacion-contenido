@@ -30,6 +30,18 @@ export type DatosVoz = {
    * esa es para el equipo y el filtro no la lee.
    */
   criterios_relevancia: string;
+  /**
+   * Cómo habla esta voz, para la limpieza de guiones (ADR-074, migración `032`).
+   *
+   * 🔑 **No confundirlo con `criterios_relevancia`, que está justo arriba y es otra cosa.** Aquellos
+   * son la **rúbrica del gate**: con qué juzga el motor si un video sirve. Este es el **registro**:
+   * muletillas, tratamiento, largo de frase, lo que la creadora nunca diría. Uno decide qué entra,
+   * el otro cómo suena lo que salió.
+   *
+   * Opcional a propósito: una voz sin perfil se limpia igual, solo con los criterios de la casa.
+   * Exigirlo dejaría la limpieza detrás de un formulario que nadie llenó todavía.
+   */
+  perfil_limpieza: string | null;
   activo: boolean;
 };
 
@@ -37,6 +49,9 @@ export function validarVoz(entrada: {
   nombre: unknown;
   descripcion: unknown;
   criterios_relevancia: unknown;
+  /** Opcional en el borde, no solo en la base: un llamador que todavía no conozca el campo no
+   *  tiene por qué romperse, y `opcional()` trata `undefined` igual que "en blanco". */
+  perfil_limpieza?: unknown;
   activo: unknown;
 }): Validacion<DatosVoz> {
   const nombre = limpio(entrada.nombre);
@@ -56,6 +71,7 @@ export function validarVoz(entrada: {
       nombre,
       descripcion: opcional(entrada.descripcion),
       criterios_relevancia: criterios,
+      perfil_limpieza: opcional(entrada.perfil_limpieza),
       activo: entrada.activo === true,
     },
   };
@@ -147,6 +163,7 @@ export type VozGuardada = {
   nombre: string;
   descripcion: string | null;
   criterios_relevancia: string; // not null desde la migración `014` (ADR-040)
+  perfil_limpieza: string | null; // nullable: sin perfil se limpia con la base (ADR-074)
   activo: boolean;
 };
 

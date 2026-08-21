@@ -175,6 +175,10 @@ export async function crearVozParaLinkedin(ctx: TenantContext, nombre: string): 
     descripcion: null,
     criterios_relevancia:
       "(Creada desde el cockpit de LinkedIn: no tiene criterios de relevancia de reels. Si alguna vez corre en reels, escribilos acá.)",
+    // Sin perfil de limpieza, y no hace falta explicarlo con una frase como arriba: es nullable, la
+    // limpieza de guiones es de reels, y una voz que nace apagada y sin proyectos nunca va a pasar
+    // por ahí. Si algún día lo hace, se llena desde `curar/voces`.
+    perfil_limpieza: null,
     activo: false,
   });
 }

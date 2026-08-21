@@ -26,6 +26,7 @@ export type FormVoz = {
   nombre: string;
   descripcion: string;
   criterios_relevancia: string;
+  perfil_limpieza: string;
   activo: boolean;
 };
 

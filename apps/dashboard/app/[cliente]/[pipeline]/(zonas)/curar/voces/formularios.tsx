@@ -39,6 +39,7 @@ export type VozFila = {
   nombre: string;
   descripcion: string | null;
   criterios_relevancia: string | null;
+  perfil_limpieza: string | null;
   activo: boolean;
 };
 
@@ -60,6 +61,7 @@ export const formDeVoz = (v: VozFila): FormVoz => ({
   nombre: v.nombre,
   descripcion: v.descripcion ?? "",
   criterios_relevancia: v.criterios_relevancia ?? "",
+  perfil_limpieza: v.perfil_limpieza ?? "",
   activo: v.activo,
 });
 
@@ -209,7 +211,8 @@ export function FormularioVoz({ voz, onListo }: { voz: VozFila; onListo: () => v
   const cambiado =
     form.nombre.trim() !== original.nombre ||
     form.descripcion.trim() !== original.descripcion.trim() ||
-    form.criterios_relevancia.trim() !== original.criterios_relevancia.trim();
+    form.criterios_relevancia.trim() !== original.criterios_relevancia.trim() ||
+    form.perfil_limpieza.trim() !== original.perfil_limpieza.trim();
 
   const enviar = () =>
     startTransition(async () => {
@@ -255,6 +258,27 @@ export function FormularioVoz({ voz, onListo }: { voz: VozFila; onListo: () => v
           onChange={(e) => setForm((f) => ({ ...f, criterios_relevancia: e.target.value }))}
           disabled={enviando}
           rows={6}
+        />
+      </div>
+      {/* 🔑 Va DEBAJO de los criterios y con el contraste dicho en la primera línea, porque los dos
+          son textareas largos sobre "la voz" y se confunden. Uno decide QUÉ ENTRA (el gate), el
+          otro CÓMO SUENA lo que salió (la limpieza). Sin esa frase, el primero que llene el de
+          abajo va a copiar el de arriba. */}
+      <div className="space-y-1">
+        <Label htmlFor="voz-perfil">Cómo habla (para limpiar los guiones)</Label>
+        <p className="text-xs text-muted-foreground">
+          Esto NO decide qué videos entran: eso son los criterios de arriba. Esto se usa cuando
+          limpiás un guion, para que suene a ella. Muletillas, si tutea o trata de usted, frases
+          cortas o largas, lo que nunca diría. Si lo dejás vacío, la limpieza igual corre con los
+          criterios de la casa.
+        </p>
+        <Textarea
+          id="voz-perfil"
+          value={form.perfil_limpieza}
+          onChange={(e) => setForm((f) => ({ ...f, perfil_limpieza: e.target.value }))}
+          disabled={enviando}
+          rows={5}
+          placeholder="Tutea siempre. Frases cortas. Nunca dice 'chicas'. Arranca con una pregunta."
         />
       </div>
       <Pie
@@ -425,7 +449,16 @@ export function FormularioProyecto({
 
 export function AltaVoz({ onListo }: { onListo: () => void }) {
   const cockpit = usarCockpit();
-  const vacio: FormVoz = { nombre: "", descripcion: "", criterios_relevancia: "", activo: false };
+  // Sin `perfil_limpieza` en el formulario, igual que `descripcion`: el alta pide **solo lo
+  // obligatorio**, y cómo habla una voz es algo que se aprende corrigiendo guiones, no algo que se
+  // sepa el día que se la crea. Se llena después, editándola.
+  const vacio: FormVoz = {
+    nombre: "",
+    descripcion: "",
+    criterios_relevancia: "",
+    perfil_limpieza: "",
+    activo: false,
+  };
   const [form, setForm] = useState(vacio);
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [enviando, startTransition] = useTransition();
