@@ -51,9 +51,14 @@ en §Agent skills; acá solo se ubican.
   efecto, no por haber corrido: PostgREST devuelve `[]` y no un 404, y un insert de prueba rebota
   con `23503` contra la FK de `instances`. *Falta mirar `pg_policies` en el SQL Editor: PostgREST
   no lo expone, así que esa pata queda sin medir.*
-  ⏳ **La [`031`](core/schema/031_colecciones.sql) (ADR-073) está escrita y NO aplicada** — crea
+  ✅ **La [`031`](core/schema/031_colecciones.sql) (ADR-073) está aplicada** (Mani, 21/08) — crea
   `app.colecciones` + `app.colecciones_videos`, la bolsa de videos que apunta a la llave y por eso
-  **sobrevive al barrido del archivado**. Gate humano: SQL Editor.
+  **sobrevive al barrido del archivado**. Verificada por su efecto contra prod, con una colección de
+  prueba creada y borrada: el unique del nombre da `23505`, el check del nombre en blanco `23514`,
+  el **FK compuesto rechaza con `23503` un video cuyo `instance_id` es de otra empresa** (o sea que
+  el aislamiento no depende del código), la PK dedupea el mismo video, el `on delete cascade` se
+  lleva los miembros, y **`app.videos_meta` sobrevive al borrado de la colección** — la bolsa es
+  descartable, lo que se pagó no.
   ⏳ **Y el *contract* de ADR-070 pasa a ser la `032`, que todavía no existe.** Tiene que dropear
   `app.transcripciones.grabado_en`, que ya **no la lee ni la escribe nadie**. Va **después** de que
   ADR-070 lleve un tiempo en prod: dropearla hoy no rompe nada, pero deja sin red un rollback del
