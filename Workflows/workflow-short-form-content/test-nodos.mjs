@@ -665,6 +665,47 @@ const runPrepCandidatos = (videos) => {
 };
 const cvid = (id, extra = {}) => Object.assign({ external_id: id, titulo: 't' + id, script: 'g', proyecto_id: 'P1', voz_id: 'V1' }, extra);
 
+seccion('Armar candidato — el título se corta sin partir un emoji (ejecución 136)');
+{
+  // 🩸 REGRESIÓN de una corrida real que costó 33 minutos, 814 transcripciones y 814 traducciones.
+  // `.slice(0, 80)` corta por code units UTF-16: si el carácter 80 es la primera mitad de un emoji,
+  // queda un surrogate suelto. Eso NO es UTF-8 válido, así que PostgREST contesta
+  // 400 `Empty or invalid json` y **la corrida entera muere después de haber pagado todo**
+  // (`POST processed_items` ya corrió, así que los videos quedan quemados y no vuelven).
+  //
+  // El caso se construye igual que el que explotó: relleno hasta que el emoji quede justo en el borde.
+  const relleno = 'a'.repeat(79);
+  const conEmoji = relleno + '😀' + ' cola que se descarta';
+  const { out } = runCorte([vid('e1', 'p1', 0.9, { descripcion: conEmoji })], { projects: { p1: { n: 10 } } });
+  const t = out[0].titulo;
+
+  // ⚠️ Se recorre por CODE UNITS y no con `[...t]`: el spread itera puntos de código, así que un
+  // emoji **entero** sale como un solo carácter cuyo `charCodeAt(0)` ya es su surrogate alto — y un
+  // chequeo ingenuo marcaría como roto un emoji sano. Lo que importa es si el par está DESAPAREADO.
+  let sueltos = 0;
+  for (let i = 0; i < t.length; i++) {
+    const c = t.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) { // alto: tiene que venir un bajo detrás
+      const sig = t.charCodeAt(i + 1);
+      if (!(sig >= 0xdc00 && sig <= 0xdfff)) sueltos++; else i++;
+    } else if (c >= 0xdc00 && c <= 0xdfff) sueltos++; // bajo sin alto adelante
+  }
+  check('el título no deja surrogates sueltos', sueltos === 0,
+    'quedó ' + JSON.stringify(t.slice(-6)) + ' — es lo que rompió la ejecución 136');
+
+  // La prueba que de verdad importa: que se pueda serializar y mandar. `Buffer.from` explota con un
+  // surrogate suelto igual que explota PostgREST, así que reproduce el fallo real y no una proxy.
+  let serializa = true;
+  try { Buffer.from(JSON.stringify(out[0]), 'utf8'); } catch { serializa = false; }
+  check('la fila entera serializa a UTF-8', serializa, 'JSON.stringify + Buffer.from falló, que es exactamente el 400 de PostgREST');
+
+  check('sigue cortando (no se pasa del tope)', [...t].length <= 80, 'largo ' + [...t].length);
+
+  // Y que el corte no se haya vuelto tonto: un título sin emoji tiene que seguir midiendo 80.
+  const { out: out2 } = runCorte([vid('e2', 'p1', 0.9, { descripcion: 'b'.repeat(200) })], { projects: { p1: { n: 10 } } });
+  check('un título largo sin emoji sigue cortando en 80', [...out2[0].titulo].length === 80, 'midió ' + [...out2[0].titulo].length);
+}
+
 seccion('Preparar candidatos — la instancia viaja en cada fila (ADR-048)');
 {
   const filas = runPrepCandidatos([cvid('a'), cvid('b')]);
