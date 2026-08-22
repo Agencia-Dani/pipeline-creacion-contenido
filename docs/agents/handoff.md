@@ -164,12 +164,11 @@
 > guion y miniatura, cero tripwires de *SIN GUION*. **No se volvió a pagar nada.** El Feed pasó a 96
 > sin calificar repartidas en los 5 proyectos.
 >
-> 🔴 **PENDIENTE Y BLOQUEADO: n8n está caído.** nginx da **502 en `/`, `/healthz`, `/rest/login` y
-> `/api/v1`** — no es la API, es el contenedor. Mientras siga así el motor no corre y el fix no se
-> puede empujar. Cuando vuelva:
-> ```
-> npm run n8n:push -- motor --nodos "Armar candidato,Preparar descartes" --apply && npm run n8n:diff
-> ```
+> ✅ **EMPUJADO Y VERIFICADO.** n8n estuvo caído un rato (502 de nginx en `/`, `/healthz` y
+> `/api/v1` — el contenedor, no la API) y volvió a las 02:45 UTC del 22/08. El fix se aplicó con
+> `n8n:push` a los dos nodos y **`n8n:diff` da los 5 workflows en verde**. El motor ya no puede
+> morir por un emoji partido.
+> *Rollback, por si aparece algo: `.n8n-snapshots/motor-2026-08-22T02-47-30-975Z.json`.*
 > *¿La caída tiene que ver con la corrida? Es hipótesis y nada más:* la 136 dejó un payload de 37 MB
 > y murió 20:24; el 502 se midió 21:50. **No se midió nada que las conecte** — hace falta el log del pod.
 >
@@ -224,7 +223,7 @@
 >
 > ### ⬜ Lo que queda
 >
-> 1. 🔴 **n8n caído** — destrabarlo, y recién ahí el `n8n:push` de arriba. **Bloquea toda corrida.**
+> 1. ✅ ~~n8n caído + el push del fix~~ — **resuelto el 22/08 02:47**, `n8n:diff` verde en los 5.
 > 2. ⬜ **El paso 7 de §4-quater**: bajar los dos `.xlsx` y abrirlos en el Excel de Mani. `file` y
 >    `openpyxl` son dos señales; ninguna es Excel.
 > 3. ⬜ **El `.docx` de una colección, abierto en Word.** Mismo argumento.
@@ -235,8 +234,9 @@
 > 5. 💰 **Gasto de esta sesión: cero.** `app.videos_meta` valía 5 antes y 5 después; las dos
 >    colecciones de prueba y la huérfana del paso 5 se borraron.
 >
-> **Para la próxima sesión:** `/diagnose` para la caída de n8n (es lo que bloquea todo), y
-> `/grill-with-docs` si aparece funcionalidad nueva antes de construirla.
+> **Para la próxima sesión:** ya no hay bloqueante. Lo que queda es **una corrida real del motor**
+> con el fix adentro (la 136 fue la última y murió), y `/grill-with-docs` si aparece funcionalidad
+> nueva antes de construirla.
 >
 > ---
 
@@ -3136,9 +3136,8 @@ ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-dem
 
 ## Para la próxima sesión — arrancá por acá
 
-> 🔴 **AL 2026-08-21 LO ÚNICO QUE BLOQUEA ES QUE n8n ESTÁ CAÍDO** (502 de nginx en `/`, `/healthz`
-> y `/api/v1`). Sin eso no corre el motor ni se puede empujar el fix del emoji partido. Arrancá por
-> el **cierre 115**, arriba del todo.
+> ✅ **Al 2026-08-22 no hay bloqueantes.** n8n volvió, el fix del emoji partido está empujado y
+> `n8n:diff` da verde en los 5. Arrancá por el **cierre 115**, arriba del todo.
 >
 > ⚠️ **Esta sección viene del 17/07 y quedó MUY atrás** (habla del refactor de Voces→Proyectos, que
 > terminó, y de Airtable, que murió en D7). Para saber qué sigue **hoy**, leé **§Pendiente vivo** y
