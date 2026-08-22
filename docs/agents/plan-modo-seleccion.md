@@ -138,56 +138,32 @@ hoy**. Cero código.
 
 **Verifica:** `npm run validate` en verde, y `grep -c "^| \[ADR-" docs/adr/README.md` da 75.
 
-### Fase 1 — El modo selección, con una sola acción 🔧 EN CURSO
+### Fase 1 — El modo selección, con una sola acción ✅
 
-> **⏸️ Cortada a mitad el 2026-08-21 (Mani tuvo que cerrar el computador). El repo compila, los 368
-> tests pasan y el build sale — es seguro retomar desde acá.**
+> ✅ **Verificado en el navegador el 2026-08-21 21:30–21:45, en las cuatro pantallas.** Todo contra
+> prod, con la base como segunda señal de cada cosa que se vio en pantalla.
 >
-> **Hecho y commiteado:**
-> - `components/video/seleccion.tsx` — `usarSeleccion()` (el estado, con `Set` para que `marcado()`
->   no sea lineal en 400 tarjetas), `BotonSeleccionar`, `CasillaSeleccion`, `BarraSeleccion`.
-> - `components/video/tarjeta.tsx` — prop `seleccion` opcional: con ella la tarjeta **marca en vez
->   de abrir** y el blanco es la tarjeta entera, no una casilla de 20 px. Sin ella se comporta
->   idéntico a antes.
-> - `lib/candidatos.ts` — `aprobarSiEstanSinCalificar()`, o sea ADR-075. Es **sumidero**: si falla,
->   el video igual quedó en la colección.
-> - `curar/colecciones/actions.ts` — `agregarSeleccionados()` (crea la colección en el mismo acto si
->   le pasás `nombreNuevo`) y `coleccionesParaElegir()`.
-> - `components/video/agregar-a-coleccion.tsx` — el diálogo, compartido por las cuatro pantallas.
-> - **El Feed ya está cableado entero** (`curar/feed/mazo.tsx` + `tarjeta.tsx`).
+> | Qué | Cómo se vio | Qué dijo la base |
+> |---|---|---|
+> | El modo prende y apaga | el botón desaparece, 64 tarjetas pasan a *"Seleccionar…"*, aparece la barra | — |
+> | Agregar 3 **ya calificados** | *"Colección creada · 3 agregados."* | 3 miembros con su `(plataforma, external_id, url)`, y el evento con **`aprobados: 0`** |
+> | Agregar 1 **sin calificar** | mismo flujo | evento con **`aprobados: 1`**, y el candidato en `calificacion: 👍`, `estado: aprobado`, con `fecha_calificacion` — **los tres campos juntos** |
+> | Sacar 2 de una colección de 3 | *"2 videos sacados de la colección"*, queda 1 tarjeta | `{pedidos: 2, idas: 2}` y 1 miembro |
+> | Transcribir | `Seleccionar` **solo aparece con la tanda abierta**, que es el diseño: las filas bajan al expandir | — |
+> | Históricos | los 3 chips cierran: **88 + 294 = 382** | — |
 >
-> **Lo que falta, en orden:**
-> 1. **Verificarlo en el navegador.** Nada de esto se probó en pantalla todavía — es lo primero.
->    (Mani tiene que entrar él y dejar la sesión abierta.)
-> 2. **Cablear Transcribir** (`transcribir/tanda.tsx` + `tarjeta-cola.tsx`) y **Históricos**
->    (`curar/historicos/lista.tsx`). Las dos ya dibujan `TarjetaVideo`, así que es pasarle la prop
->    `seleccion` y montar `BarraSeleccion` + `AgregarAColeccion`. **Ojo con la clave**: el Feed usa
->    el `id` del candidato como clave de selección y resuelve la url por `urlPorClave`; esas dos
->    pantallas tienen `Video`, así que su clave natural es `v.clave` y la url sale de `v.url`.
-> 3. **El detalle de la colección**, que hoy tiene su propio mecanismo de marcado para
->    `Quitar seleccionados` — unificarlo es la Fase 3.
+> 🔑 **ADR-075 quedó verificada en sus DOS direcciones**, que es lo que importaba: aprueba lo que
+> estaba en `nuevo` (`aprobados: 1`) y **no toca** lo que ya tenía juicio (`aprobados: 0`).
 >
-> ⚠️ **Antes de dar la fase por cerrada, releer qué promete el plan para las pantallas que no se
-> tocaron.** Es exactamente así como se perdió el modo selección la primera vez.
-
-
-
-El corazón. Se construye **completo pero con una sola acción en la barra** (*Agregar a colección*),
-que es lo que destraba el pedido de Majo. Las otras tres entran en la Fase 3 sobre la misma máquina.
-
-- `components/video/seleccion.tsx`: el hook de estado (qué está marcado, prendido/apagado) + la barra
-  fija. Recibe sus acciones como prop; **no sabe de colecciones ni de nada**.
-- El botón `Seleccionar` en la cabecera de las tres pantallas.
-- La casilla entra por el **slot de la tarjeta que ya existe**, sin tocar `TarjetaVideo`.
-- La acción *Agregar a colección*: selector de las colecciones existentes + *crear una nueva*.
-- **ADR-075**: si el video es un candidato con `estado = nuevo`, el mismo clic lo deja en 👍 por
-  `camposDeCalificacion()`. Si ya tenía calificación, **no se toca**.
-
-**Verifica en pantalla:** marcar 3 videos en el Feed, agregarlos a una colección nueva, y (a) abrir
-la colección y ver las 3 tarjetas con su guion, (b) volver al Feed y ver que los 3 quedaron en 👍,
-(c) marcar uno que ya tenía 👎 y confirmar que **sigue en 👎**.
-**Verifica en la base:** `app.colecciones_videos` con 3 filas y `candidatos.calificacion` movida
-solo en los que estaban en `nuevo`.
+> 💰 **Cero gasto:** `app.videos_meta` valía 5 antes y 5 después. Las dos colecciones de prueba se
+> borraron, así que los canarios quedan en cero y `guiones_limpios` intacto en 4.
+>
+> 🩸 **Dos cosas que solo aparecieron mirando:**
+> 1. **Dos botones con el mismo texto en Históricos.** El de la barra decía *"Marcar como grabados"*,
+>    igual que el del cuadro de pegar links, haciendo cosas distintas. Ahora dice *"Marcar los
+>    seleccionados como grabados"*.
+> 2. **Los números de este doc estaban mal.** Ver la medición 3 y la §4-quater de
+>    [verificaciones-humanas](../verificaciones-humanas.md).
 
 ### Fase 2 — Archivar ahora en el Feed, diciendo la verdad ✅
 

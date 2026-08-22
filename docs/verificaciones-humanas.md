@@ -378,9 +378,15 @@ síntoma, no un detalle:
 
 | Chip | Esperado | Si da otra cosa |
 |---|---|---|
-| **Todos** | **411** | 184 guiones aprobados **+ 227 huérfanas**. Si da 0 o mucho menos, es RLS o el grant de `outputs`, no la pantalla |
+| **Todos** | **382** | Si da 0 o mucho menos, es RLS o el grant de `outputs`, no la pantalla |
 | **Grabados** | **294** | Si da 0, la policy de `app.grabados` no deja leer (falso "nadie marcó"). Si da ~6, la pantalla no está viendo la carga de Majo |
-| **Sin grabar** | **117** | Los tres tienen que cerrar: **117 + 294 = 411** |
+| **Sin grabar** | **88** | Los tres tienen que cerrar: **88 + 294 = 382** |
+
+🩸 **Estos tres salen de la PANTALLA, leídos el 21/08 21:35, y no de un cruce hecho a mano.** Este
+doc llegó a decir **411 · 294 · 117**, calculado cruzando `app.grabados` contra `outputs` con un
+regex de shortcodes: cerraba entre sí y estaba **mal por 29**. *Un cruce aproximado que cierra
+consigo mismo se lee igual de convincente que uno correcto* — para un doc que existe para dar
+números esperados, la fuente es la pantalla que se va a mirar.
 
 🟢 **De las 294, 288 son de Majo y son USO REAL** — el primer uso del sistema por alguien que no lo
 construyó. Las otras 6 son de Mani probando (5 el 20/08 entre 20:14 y 20:15 UTC, 1 del 18/08).

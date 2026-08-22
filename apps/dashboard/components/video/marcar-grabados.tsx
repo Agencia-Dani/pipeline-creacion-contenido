@@ -61,7 +61,10 @@ export function MarcarGrabados({
       disabled={seleccion.cuantos === 0 || enviando}
       onClick={marcar}
     >
-      {enviando ? "Marcando…" : "Marcar como grabados"}
+      {/* 🏷️ "los seleccionados" y no "Marcar como grabados" a secas: en Históricos ese texto exacto
+          ya lo lleva el botón del cuadro de pegar links, y dos botones idénticos en la misma
+          pantalla haciendo cosas distintas es una trampa. Se vio en la verificación del 21/08. */}
+      {enviando ? "Marcando…" : "Marcar los seleccionados como grabados"}
     </Button>
   );
 }
