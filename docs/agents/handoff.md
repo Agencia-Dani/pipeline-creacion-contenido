@@ -111,6 +111,135 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🚑 2026-08-21 (cierre 115) · EL MODO SELECCIÓN ENTERO, Y UNA CORRIDA DE MAJO RESCATADA DE LA BASURA (Claude, pedido de Mani)
+>
+> **En una línea:** se construyó y verificó el **modo selección** en las 4 pantallas —lo que el plan
+> de colecciones prometía y nadie había anotado como faltante— y en el medio apareció una corrida
+> real de Majo que había muerto tirando 33 minutos de gasto: **se encontró la causa, se arregló y se
+> rescataron sus 70 candidatos sin volver a pagar nada.** `main` = **`13a528e`**, pusheado.
+> **Migraciones: ninguna. n8n: el fix está en el repo y NO se pudo empujar (ver abajo).**
+>
+> El plan entero vive en [plan-modo-seleccion.md](./plan-modo-seleccion.md); acá va el estado.
+>
+> ### 🟢 Lo primero, porque cambia prioridades: MAJO ESTÁ USANDO LA HERRAMIENTA
+>
+> El canario de ADR-069/070 **se despertó**, y no por poco:
+>
+> | Cuándo | Qué hizo Majo |
+> |---|---|
+> | 20/08 23:10 | **288 grabados** en dos tandas (166 + 122) |
+> | 21/08 (todo el día) | **37 calificaciones + 6 referentes**, último evento 20:52 |
+>
+> Es **la primera persona fuera de Mani con dos días distintos** en `app.eventos`. Los demás siguen
+> en uno solo (Jero 81 eventos el 07/08, Juan José 23 ese mismo día).
+>
+> 🩸 **Y este cierre midió mal esa conclusión dos veces en tres horas.** A las 18:55 el veredicto fue
+> *"la adopción es una ráfaga, nadie vuelve"*; a las 21:20 era falso porque Majo estaba adentro
+> mientras se escribía. *Un canario se re-mide, no se cita — y el mío duró tres horas.*
+>
+> ### 🚑 La corrida que se cayó, y por qué importa el mecanismo
+>
+> Ejecución **136** (21/08, botón ▶ de Majo): **`400 Bad request` en `POST Candidatos` a los 33
+> minutos**, después de transcribir 814 videos con Supadata y traducirlos con Haiku.
+>
+> **La causa, leída de los datos de la ejecución y no deducida:**
+>
+> ```
+> titulo se corta con .slice(0, 80)  → JS corta por code units UTF-16
+> la fila 26 cayó justo en la mitad de un emoji
+> quedó "\ud83d" suelto → no es UTF-8 válido → PostgREST: "Empty or invalid json"
+> ```
+>
+> 44 de las 70 filas medían **exactamente 80**, así que el borde se toca seguido; que explotara
+> dependía de que ahí hubiera un emoji. **El mismo `slice` estaba en `Preparar descartes`** y nunca
+> explotó por suerte, no por diseño. Los dos usan `_cortar()` ahora, que corta por puntos de código.
+>
+> 💀 **Lo que costó:** 814 transcripciones + 814 traducciones + 33 min, **70 candidatos** y **~250
+> videos quemados** en `processed_items` —que se escribe ANTES— así que el motor no los va a proponer
+> nunca más. Es literalmente el modo de falla que el comentario del nodo advierte: *"el presupuesto
+> no posterga, QUEMA"*.
+>
+> ✅ **Rescatado:** las 70 filas ya armadas estaban en los datos de la ejecución. Se les sacó el
+> surrogate y se insertaron por PostgREST — **`app.candidatos` 101 → 171**, las 70 con proyecto, voz,
+> guion y miniatura, cero tripwires de *SIN GUION*. **No se volvió a pagar nada.** El Feed pasó a 96
+> sin calificar repartidas en los 5 proyectos.
+>
+> 🔴 **PENDIENTE Y BLOQUEADO: n8n está caído.** nginx da **502 en `/`, `/healthz`, `/rest/login` y
+> `/api/v1`** — no es la API, es el contenedor. Mientras siga así el motor no corre y el fix no se
+> puede empujar. Cuando vuelva:
+> ```
+> npm run n8n:push -- motor --nodos "Armar candidato,Preparar descartes" --apply && npm run n8n:diff
+> ```
+> *¿La caída tiene que ver con la corrida? Es hipótesis y nada más:* la 136 dejó un payload de 37 MB
+> y murió 20:24; el 502 se midió 21:50. **No se midió nada que las conecte** — hace falta el log del pod.
+>
+> ### ✅ El modo selección, las 6 fases
+>
+> | Fase | Qué | Verificado |
+> |---|---|---|
+> | 0 | Los 6 docs que mentían (la `033` sí estaba aplicada, el índice de ADRs iba hasta la 069, el CSV del ROADMAP) | `validate` 2407 checks |
+> | 1 | `components/video/seleccion.tsx` + la prop `seleccion` de `TarjetaVideo` + `AgregarAColeccion`, en **las 4 pantallas** | navegador, con la base como segunda señal |
+> | 2 | **`Archivar ahora` en el Feed** + la confirmación con los números contados al apretar | dijo *"manda 44 y borra 34"* |
+> | 3 | Marcar grabados en lote · calificar en lote · sacar de la colección | los 4 botones, uno por pantalla |
+> | 4 | Los canarios redefinidos **por fecha y autor** | — |
+> | 5 | Verificación en navegador + §4-quater pasos 1–6 + **celular** | ver abajo |
+>
+> **[ADR-075](../adr/ADR-075-agrupar-es-aprobar.md) — agrupar es aprobar**, y quedó verificada en sus
+> **dos** direcciones: aprueba lo que estaba en `nuevo` (evento `aprobados: 1`, con los tres campos
+> escritos juntos) y **no toca** lo que ya tenía juicio (`aprobados: 0`). Tapa un hueco que se
+> descubre a los 20 días: un video sin calificar metido a una colección **perdía su guion crudo**
+> cuando el barrido borraba su fila, porque nunca pasó por `outputs`.
+>
+> ### 🩸 Cinco cosas que solo aparecieron mirando, no leyendo
+>
+> 1. **El detalle de la colección tampoco tenía selección múltiple.** El plan prometía *"Quitar
+>    seleccionados"* y lo construido era un `Sacar` por tarjeta. **Mismo hueco que dejó afuera el modo
+>    selección entero** — se encuentra releyendo el plan, no mirando la pantalla.
+> 2. **Dos botones con el mismo texto en Históricos**, haciendo cosas distintas. Renombrado a
+>    *"Marcar los seleccionados como grabados"*.
+> 3. **Un cartel mal conjugado en Transcribir:** *"1 de estos 1 no hace falta transcribirlos. 1 ya se
+>    grabaron."* Los cinco ítems de esa revisión concordaban siempre en plural. *Un cartel mal
+>    conjugado se lee como que la herramienta contó mal, justo cuando le pide a alguien que le crea un
+>    número.*
+> 4. **Los números que este cierre publicó en `verificaciones-humanas` estaban mal.** Se escribió
+>    `411 · 294 · 117` cruzando `grabados` contra `outputs` con un regex de shortcodes; **la pantalla
+>    dice `382 · 294 · 88`**. *El cruce cerraba consigo mismo y estaba errado por 29 — un cálculo
+>    aproximado que cuadra se lee igual de convincente que uno correcto.*
+> 5. **El paso 4 de §4-quater tenía un paso más que el doc no mencionaba:** `Marcar como grabados`
+>    está gateado detrás de `Revisar`, que muestra el estado link por link **antes** de tocar nada. Es
+>    mejor de lo que pedía el doc.
+>
+> ### 📐 Decisiones que vale no re-litigar
+>
+> - **La selección en Transcribir es POR TANDA**, no de la pantalla. Las filas bajan al expandir, así
+>   que una selección global tendría marcadas claves que no están en memoria.
+> - **`agregarSeleccionados` recibe URLS, no llaves.** La identidad se deriva en el server con
+>   `parsearEnlaces`; una segunda derivación en el browser es un bug mudo esperando.
+> - **`queHariaArchivar` duplica a propósito el `days: 20` del nodo `Barrer candidatos sin calificar`.**
+>   Es la única forma de anticipar a n8n desde la app. **Quien cambie uno tiene que cambiar el otro**,
+>   o el botón pasa a mentir con precisión.
+> - **Los eventos del modo selección llevan `origen`** y calificar en lote tiene su propio tipo. Sin
+>   eso, `app.eventos` deja de distinguir uso de backfill — que es lo único que hoy contesta *¿alguien
+>   usa esto?*.
+>
+> ### ⬜ Lo que queda
+>
+> 1. 🔴 **n8n caído** — destrabarlo, y recién ahí el `n8n:push` de arriba. **Bloquea toda corrida.**
+> 2. ⬜ **El paso 7 de §4-quater**: bajar los dos `.xlsx` y abrirlos en el Excel de Mani. `file` y
+>    `openpyxl` son dos señales; ninguna es Excel.
+> 3. ⬜ **El `.docx` de una colección, abierto en Word.** Mismo argumento.
+> 4. 🐤 **Los canarios, al 2026-09-04.** `colecciones` = 0 (el más limpio, nace sin ruido),
+>    `guiones_limpios` = 4 (todas de Mani), `videos_meta` = 5 (las 5 son verificaciones),
+>    `grabados > '2026-08-21'`. Y la pregunta que ninguno contesta se lee de `app.eventos`: **días
+>    distintos por persona**.
+> 5. 💰 **Gasto de esta sesión: cero.** `app.videos_meta` valía 5 antes y 5 después; las dos
+>    colecciones de prueba y la huérfana del paso 5 se borraron.
+>
+> **Para la próxima sesión:** `/diagnose` para la caída de n8n (es lo que bloquea todo), y
+> `/grill-with-docs` si aparece funcionalidad nueva antes de construirla.
+>
+> ---
+
 > ## 🃏 2026-08-21 (cierre 114) · LA TARJETA ÚNICA LLEGA A LAS TRES PANTALLAS, Y LA COLECCIÓN SE BAJA EN WORD (Claude, pedido de Mani)
 >
 > **En una línea:** cerró lo que el cierre 113 dejó abierto — **2b, 2c y la Fase 5** — más la
@@ -3007,9 +3136,13 @@ ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-dem
 
 ## Para la próxima sesión — arrancá por acá
 
+> 🔴 **AL 2026-08-21 LO ÚNICO QUE BLOQUEA ES QUE n8n ESTÁ CAÍDO** (502 de nginx en `/`, `/healthz`
+> y `/api/v1`). Sin eso no corre el motor ni se puede empujar el fix del emoji partido. Arrancá por
+> el **cierre 115**, arriba del todo.
+>
 > ⚠️ **Esta sección viene del 17/07 y quedó MUY atrás** (habla del refactor de Voces→Proyectos, que
 > terminó, y de Airtable, que murió en D7). Para saber qué sigue **hoy**, leé **§Pendiente vivo** y
-> la **última entrada del log (cierre 76)**. Lo de abajo sirve como arqueología del refactor, no
+> la **última entrada del log (cierre 115)**. Lo de abajo sirve como arqueología del refactor, no
 > como lista de tareas — y varias de sus instrucciones (curar el cockpit de Airtable, congelar
 > páginas) ya no aplican a nada.
 
