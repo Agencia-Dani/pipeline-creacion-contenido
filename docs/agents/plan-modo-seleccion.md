@@ -225,6 +225,31 @@ plan. Cada una necesita ojos, no un agente: apretar el botón y mirar.
 
 ---
 
+### Fase 6 — El motor: el emoji partido, y n8n caído 🔧
+
+> Entró el 2026-08-21 sin estar planeado: Majo apretó ▶ y la corrida murió a los 33 minutos.
+
+**✅ Hecho:** la causa está encontrada, arreglada en el repo, con test de regresión, y **las 70 filas
+se rescataron de los datos de la ejecución sin volver a pagar nada** (`app.candidatos` 101 → 171).
+El detalle vive en el commit y en el handoff.
+
+**⬜ Lo que falta, y no depende de nosotros:**
+
+1. 🔴 **n8n está caído.** nginx devuelve **502 en `/`, `/healthz`, `/rest/login` y `/api/v1`** — no
+   es la API, es el contenedor. Mientras siga así el motor no corre y el fix no se puede empujar.
+2. Cuando vuelva, empujar el arreglo **antes de la próxima corrida**:
+   ```
+   npm run n8n:push -- motor --nodos "Armar candidato,Preparar descartes" --apply
+   npm run n8n:diff
+   ```
+3. **Mirar si la caída y la corrida están relacionadas.** Es una hipótesis, no un hallazgo: la
+   ejecución 136 dejó un payload de **37 MB** y murió 20:24; el 502 se midió 21:50. *No se midió
+   nada que las conecte* — hace falta el log del pod.
+4. ⚠️ **Los ~250 videos quemados no vuelven.** Están en `processed_items`, así que el motor no los
+   va a proponer nunca más. Los 70 que importaban ya están en el Feed; el resto se perdió.
+
+---
+
 ## Fuera de alcance (dicho, no hecho)
 
 - **Sacar el barrido del disparo manual.** Se evaluó y se descartó a favor de decir la verdad: toca
