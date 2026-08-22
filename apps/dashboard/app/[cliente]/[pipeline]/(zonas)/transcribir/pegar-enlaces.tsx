@@ -123,11 +123,20 @@ export function PegarEnlaces() {
         <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
           <div>
             <p className="font-medium">
-              {revision.yaEnCola +
-                revision.fallados +
-                revision.yaVistosPorElMotor +
-                revision.yaGrabadas}{" "}
-              de estos {validos.length} no hace falta transcribirlos.
+              {(() => {
+                const n =
+                  revision.yaEnCola +
+                  revision.fallados +
+                  revision.yaVistosPorElMotor +
+                  revision.yaGrabadas;
+                // 🏷️ Concuerda en singular. Con n=1 esto decía "1 de estos 1 no hace falta
+                // transcribirlos" y el ítem de abajo "1 ya se grabaron" — visto el 2026-08-21
+                // haciendo la verificación. Un cartel mal conjugado se lee como que la herramienta
+                // contó mal, justo en el momento en que le está pidiendo a alguien que le crea.
+                return n === 1
+                  ? `1 de estos ${validos.length} no hace falta transcribirlo.`
+                  : `${n} de estos ${validos.length} no hace falta transcribirlos.`;
+              })()}
             </p>
             <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
               {/* Va PRIMERO en la lista, igual que en la precedencia de `repartirEnlaces`: es el
@@ -135,14 +144,17 @@ export function PegarEnlaces() {
                   dónde está el link y todos admiten un "transcribilo igual" razonable. */}
               {revision.yaGrabadas > 0 && (
                 <li>
-                  <strong>{revision.yaGrabadas}</strong> <strong>ya se grabaron</strong>. Alguien del
-                  equipo los marcó desde la lista de abajo, así que el guion ya se usó.
+                  <strong>{revision.yaGrabadas}</strong>{" "}
+                  <strong>{revision.yaGrabadas === 1 ? "ya se grabó" : "ya se grabaron"}</strong>.
+                  Alguien del equipo {revision.yaGrabadas === 1 ? "lo marcó" : "los marcó"} desde la
+                  lista de abajo, así que el guion ya se usó.
                 </li>
               )}
               {revision.yaEnCola > 0 && (
                 <li>
-                  <strong>{revision.yaEnCola}</strong> ya los pediste antes — el guion está o viene
-                  en camino, abajo en la lista.
+                  <strong>{revision.yaEnCola}</strong>{" "}
+                  {revision.yaEnCola === 1 ? "ya lo pediste antes" : "ya los pediste antes"} — el
+                  guion está o viene en camino, abajo en la lista.
                 </li>
               )}
               {/* Separado de `yaEnCola` a propósito: decirle "viene en camino" a un link que falló
@@ -150,16 +162,23 @@ export function PegarEnlaces() {
                   upsert lo descarta), así que el único camino es el botón. */}
               {revision.fallados > 0 && (
                 <li>
-                  <strong>{revision.fallados}</strong> los pediste y <strong>fallaron</strong>. El
-                  guion no viene: reintentalos con su botón <em>Reintentar</em>, en la lista de
-                  abajo. Volver a pegarlos acá no los destraba.
+                  <strong>{revision.fallados}</strong>{" "}
+                  {revision.fallados === 1 ? "lo pediste y" : "los pediste y"}{" "}
+                  <strong>{revision.fallados === 1 ? "falló" : "fallaron"}</strong>. El guion no
+                  viene: {revision.fallados === 1 ? "reintentalo" : "reintentalos"} con su botón{" "}
+                  <em>Reintentar</em>, en la lista de abajo. Volver a{" "}
+                  {revision.fallados === 1 ? "pegarlo" : "pegarlos"} acá no{" "}
+                  {revision.fallados === 1 ? "lo destraba" : "los destraba"}.
                 </li>
               )}
               {revision.yaVistosPorElMotor > 0 && (
                 <li>
-                  <strong>{revision.yaVistosPorElMotor}</strong> ya los vio el motor. Ojo: eso no
-                  garantiza que exista el guion (el filtro pudo haberlos matado antes de
-                  transcribirlos), así que si lo necesitás, transcribilos igual.
+                  <strong>{revision.yaVistosPorElMotor}</strong>{" "}
+                  {revision.yaVistosPorElMotor === 1 ? "ya lo vio" : "ya los vio"} el motor. Ojo: eso
+                  no garantiza que exista el guion (el filtro pudo{" "}
+                  {revision.yaVistosPorElMotor === 1 ? "haberlo matado" : "haberlos matado"} antes de
+                  transcribir), así que si lo necesitás,{" "}
+                  {revision.yaVistosPorElMotor === 1 ? "transcribilo" : "transcribilos"} igual.
                 </li>
               )}
             </ul>
@@ -175,7 +194,9 @@ export function PegarEnlaces() {
                 : `Quitarlos y transcribir ${revision.nuevos.length}`}
             </Button>
             <Button variant="outline" onClick={() => encolar(texto)} disabled={enviando}>
-              Transcribir los {validos.length} igual
+              {validos.length === 1
+                ? "Transcribirlo igual"
+                : `Transcribir los ${validos.length} igual`}
             </Button>
           </div>
         </div>

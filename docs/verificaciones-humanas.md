@@ -402,6 +402,21 @@ curl -s -H "apikey: $SUPABASE_SERVICE_ROLE" -H "Accept-Profile: app" \
   "$SUPABASE_URL/rest/v1/grabados?select=url,grabado_en&order=grabado_en"
 ```
 
+✅ **Los pasos 1 a 6 los corrió Claude en localhost contra prod el 2026-08-21 21:55, y los 6 pasan.**
+Lo que quedó de eso, además del verde:
+
+- **El paso 4 tiene un paso más que este doc no mencionaba.** `Marcar como grabados` está gateado:
+  hay que apretar **`Revisar`** primero (*"Revisá primero para ver qué va a pasar con cada link"*), y
+  la revisión muestra el estado **link por link antes de tocar nada** — *"Está acá, sin grabar"*,
+  *"✓ Ya lo grabaron"*, *"1 ya está marcado como grabado: no se vuelven a marcar"* — con el botón
+  cambiando a `Marcar 2 como grabados`. Es **mejor** de lo que pedía el paso; el doc estaba viejo.
+- 🩸 **El paso 6 pasó, y de paso destapó un cartel mal conjugado.** Decía *"1 de estos 1 no hace falta
+  transcribirlos. 1 ya se grabaron."* Los cinco ítems de esa revisión concordaban siempre en plural.
+  Arreglado el 21/08: ahora dice *"…no hace falta transcribirlo. 1 ya se grabó. Alguien del equipo lo
+  marcó…"*. *Un cartel mal conjugado se lee como que la herramienta contó mal, justo en el momento en
+  que le está pidiendo a alguien que le crea un número.*
+- ⬜ **Sigue faltando el paso 7 con los ojos**: bajar los dos `.xlsx` y abrirlos en el Excel de Mani.
+
 Los pasos:
 
 1. Abrir Históricos. Los tres chips dan los números de arriba.
