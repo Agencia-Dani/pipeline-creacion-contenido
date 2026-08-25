@@ -3,7 +3,11 @@
 // Dos reglas viven acá, y las dos cuestan plata o la ahorran:
 //  1. Qué nombre es válido (espejo del check de la `031`, para contestar sin ir a la base).
 //  2. **Qué videos hay que enriquecer**, que es la que decide cuánto se le paga a Apify.
+//
+// Y desde el 2026-08-24, la tercera: la **tabla** de la colección, o sea la mitad planilla de lo
+// que el `.docx` cuenta en prosa.
 
+import type { GuionParaDocumento } from "./docx.ts";
 import type { Video } from "./video.ts";
 
 export const NOMBRE_MIN = 1;
@@ -61,4 +65,45 @@ export function queFaltaEnriquecer(videos: readonly Video[]): Video[] {
     vistos.add(v.clave);
     return true;
   });
+}
+
+
+// ── La colección como tabla (el `.xlsx`) ─────────────────────────────────────
+//
+// 🔑 **Por qué existe además del Word.** El `.docx` es para *leer* un guion; esto es para *operar*
+// con la lista: filtrar, ordenar, pegar los links en otro lado, repartir quién graba qué. Son dos
+// consumidores distintos del mismo pedido, no dos formatos del mismo archivo — por eso las columnas
+// no son "el documento en celdas" sino lo que identifica cada video.
+//
+// 📋 **El guion viaja igual, en su columna**, aunque el comentario de `docx.ts` diga que en una
+// celda se lee mal. Sigue siendo cierto para leerlo; lo que cambia es el uso. El histórico ya baja
+// `SCRIPT` en una celda desde ADR-071 y nadie lo abre para leerlo: se abre para cruzarlo. Quien
+// quiera leer, tiene el Word al lado.
+//
+// 🔢 **La primera columna es el número de orden**, el mismo que el Word imprime en cada título. Es
+// lo que deja decir *"grabá del 3 al 7"* mirando cualquiera de los dos archivos.
+
+export const COLUMNAS_COLECCION = [
+  "#", "TITULO", "REFERENTE", "LINK", "GUION", "LIMPIEZA",
+] as const;
+
+/**
+ * Los videos de una colección → las filas de su `.xlsx`.
+ *
+ * Recibe exactamente lo que ya arma la descarga del Word: una consulta, dos archivos. Duplicar el
+ * viaje al server para las mismas filas sería pagar dos veces `leerCrudo` por video.
+ *
+ * Un video **sin guion entra igual**, con la celda vacía y `SIN GUION` en la columna de limpieza —
+ * misma regla que el documento. Sacarlo haría que la numeración de los dos archivos no coincida, y
+ * que la planilla mienta sobre cuántos videos tiene la colección.
+ */
+export function tablaDeColeccion(guiones: readonly GuionParaDocumento[]): unknown[][] {
+  return guiones.map((g, i) => [
+    i + 1,
+    g.titulo,
+    g.referente,
+    g.url,
+    g.texto,
+    g.texto === null ? "SIN GUION" : g.limpio ? "LIMPIO" : "ORIGINAL",
+  ]);
 }

@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { necesitaEnriquecer, queFaltaEnriquecer, validarNombre } from "./colecciones.ts";
+import {
+  COLUMNAS_COLECCION,
+  necesitaEnriquecer,
+  queFaltaEnriquecer,
+  tablaDeColeccion,
+  validarNombre,
+} from "./colecciones.ts";
+import type { GuionParaDocumento } from "./docx.ts";
 import type { Video } from "./video.ts";
 
 const video = (p: Partial<Video> = {}): Video => ({
@@ -76,4 +83,55 @@ test("solo se manda lo que falta, y en orden", () => {
 test("sin nada que enriquecer, no se llama a nadie", () => {
   const todos = [video({ titulo: "t", referente: "@r" })];
   assert.deepEqual(queFaltaEnriquecer(todos), []);
+});
+
+// ── La tabla (el `.xlsx` de la colección) ────────────────────────────────────
+
+const guion = (p: Partial<GuionParaDocumento> = {}): GuionParaDocumento => ({
+  titulo: "Un título",
+  referente: "@milena",
+  url: "https://www.instagram.com/p/AAA/",
+  texto: "Hola.",
+  limpio: false,
+  ...p,
+});
+
+test("la tabla numera desde 1, igual que el Word", () => {
+  // Los dos archivos se leen juntos: si la numeración no coincide, "grabá del 3 al 7" deja de
+  // significar lo mismo en cada uno.
+  const filas = tablaDeColeccion([guion(), guion(), guion()]);
+  assert.deepEqual(filas.map((f) => f[0]), [1, 2, 3]);
+});
+
+test("cada fila tiene tantas celdas como columnas", () => {
+  const [fila] = tablaDeColeccion([guion()]);
+  assert.equal(fila.length, COLUMNAS_COLECCION.length);
+});
+
+test("la limpieza dice cuál de los dos guiones es", () => {
+  // ADR-074: el limpio y el crudo conviven, y quien graba tiene que saber cuál está leyendo.
+  const filas = tablaDeColeccion([guion({ limpio: true }), guion({ limpio: false })]);
+  assert.deepEqual(filas.map((f) => f[5]), ["LIMPIO", "ORIGINAL"]);
+});
+
+test("un video sin guion entra igual y no se saltea el número", () => {
+  // Misma regla que el documento. Sacarlo desalinearía la numeración de los dos archivos y haría
+  // que la planilla mienta sobre cuántos videos tiene la colección.
+  const filas = tablaDeColeccion([guion(), guion({ texto: null }), guion()]);
+  assert.equal(filas.length, 3);
+  assert.deepEqual(filas.map((f) => f[0]), [1, 2, 3]);
+  assert.equal(filas[1][4], null);
+  assert.equal(filas[1][5], "SIN GUION");
+});
+
+test("lo que no se sabe va vacío, no inventado", () => {
+  const [fila] = tablaDeColeccion([guion({ titulo: null, referente: null })]);
+  assert.equal(fila[1], null);
+  assert.equal(fila[2], null);
+  // El link siempre está: es lo único que un miembro de la colección sabe de sí mismo con certeza.
+  assert.equal(fila[3], "https://www.instagram.com/p/AAA/");
+});
+
+test("una colección vacía da una tabla vacía, no una fila fantasma", () => {
+  assert.deepEqual(tablaDeColeccion([]), []);
 });

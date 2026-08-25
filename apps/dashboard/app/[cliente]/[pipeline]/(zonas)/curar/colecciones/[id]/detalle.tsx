@@ -7,9 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { GrillaVideos } from "@/components/video/grupos";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { TarjetaVideo } from "@/components/video/tarjeta";
-import { necesitaEnriquecer } from "@/domain/colecciones";
+import { COLUMNAS_COLECCION, necesitaEnriquecer, tablaDeColeccion } from "@/domain/colecciones";
 import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
 import type { Video } from "@/domain/video";
+import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
 import { usarCockpit } from "../../../usar-cockpit";
 import {
   agregarPegados,
@@ -107,13 +108,18 @@ export function Detalle({
   }
 
   /**
-   * Baja los guiones en un `.docx`.
+   * Baja la colección: `word` para leer los guiones, `excel` para operar con la lista.
    *
    * 📦 **El archivo se arma ACÁ**, con los datos que devuelve la acción — mismo patrón que los dos
    * export de Históricos (ADR-071). Nunca un blob cruzando la red ni una route nueva: así la
    * descarga pasa por la misma guardia de tenant que el resto.
+   *
+   * 🔑 **Los dos formatos comparten la MISMA acción y el mismo viaje.** `descargar` ya trae todo lo
+   * que la planilla necesita (título, referente, link, texto y si está limpio), y es la parte cara:
+   * hace un `leerCrudo` por video. Una segunda acción para el Excel pagaría dos veces lo mismo y
+   * abriría la puerta a que los dos archivos digan cosas distintas de la misma colección.
    */
-  function bajar() {
+  function bajar(formato: "word" | "excel") {
     if (trabajando) return;
     startTransition(async () => {
       const r = await descargar(cockpit, coleccionId);
@@ -121,20 +127,29 @@ export function Detalle({
         setAviso(r);
         return;
       }
-      const url = URL.createObjectURL(
-        new Blob([aDocx(documentoDeGuiones(r.nombre, r.guiones))], { type: TIPO_DOCX }),
-      );
+      const [bytes, tipo, extension] =
+        formato === "word"
+          ? ([aDocx(documentoDeGuiones(r.nombre, r.guiones)), TIPO_DOCX, "docx"] as const)
+          : ([
+              aXlsx(COLUMNAS_COLECCION, tablaDeColeccion(r.guiones), r.nombre),
+              TIPO_XLSX,
+              "xlsx",
+            ] as const);
+
+      const url = URL.createObjectURL(new Blob([bytes], { type: tipo }));
       const a = document.createElement("a");
       a.href = url;
       // Sin caracteres que un sistema de archivos pueda rechazar. El nombre de la colección es libre.
-      a.download = `${r.nombre.replace(/[/\\:*?"<>|]/g, " ").trim() || "guiones"}.docx`;
+      a.download = `${r.nombre.replace(/[/\\:*?"<>|]/g, " ").trim() || "guiones"}.${extension}`;
       a.click();
       URL.revokeObjectURL(url);
+
+      const cuantos = `${r.guiones.length} ${r.guiones.length === 1 ? "video" : "videos"}`;
       setAviso({
         ok: true,
         mensaje: r.truncado
-          ? `El documento trae ${r.guiones.length} guiones: la colección es grande y quedó cortada. Bajala en dos colecciones más chicas.`
-          : `${r.guiones.length} ${r.guiones.length === 1 ? "guion" : "guiones"} en el documento.`,
+          ? `El archivo trae ${cuantos}: la colección es grande y quedó cortada. Bajala en dos colecciones más chicas.`
+          : `${cuantos} en el archivo.`,
       });
     });
   }
@@ -234,10 +249,14 @@ export function Detalle({
                   ? "Todos limpios"
                   : `Limpiar ${sinLimpiar}`}
             </Button>
-            {/* Word y no Excel: un guion es prosa de 1000+ caracteres y en una celda se lee mal.
-                Los dos export de Históricos siguen siendo `.xlsx` — ese archivo es una tabla. */}
-            <Button variant="outline" onClick={bajar} disabled={trabajando}>
+            {/* Los dos, porque son dos usos y no dos formatos del mismo archivo: el Word es para
+                LEER un guion (prosa de 1000+ caracteres, que en una celda se lee mal) y el Excel
+                para OPERAR con la lista (filtrar, ordenar, repartir quién graba qué). */}
+            <Button variant="outline" onClick={() => bajar("word")} disabled={trabajando}>
               {trabajando ? "Preparando…" : "Descargar (Word)"}
+            </Button>
+            <Button variant="outline" onClick={() => bajar("excel")} disabled={trabajando}>
+              {trabajando ? "Preparando…" : "Descargar (Excel)"}
             </Button>
           </div>
           {/* Se avisa acá y no después de gastar: una voz sin perfil limpia solo con los criterios

@@ -111,6 +111,95 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🔌 2026-08-24 (cierre 116) · LOS DOS BOTONES QUE NO ANDABAN, Y NINGUNO ERA n8n (Claude, pedido de Mani)
+>
+> **En una línea:** *Buscar cuentas nuevas* daba **404** y *Archivar lo calificado* decía **falta
+> configurar el webhook**; los dos workflows de n8n estaban **activos y sanos**, y la falla entera
+> vivía en las env vars de Vercel. Se arreglaron (Mani las cargó), se **probaron los dos en
+> producción** y andan. De yapa: el botón *Seleccionar* se ve, y la colección se baja en Excel.
+> **Migraciones: ninguna. n8n: cero cambios.**
+>
+> ### 🩸 El diagnóstico, que es lo único que vale de acá
+>
+> **Los dos errores tenían causas distintas, y ninguna era la que el mensaje sugería.**
+>
+> | Botón | Lo que decía | Lo que era |
+> |---|---|---|
+> | Buscar | `El buscador respondió 404` | Vercel tenía la URL **vieja**. La del `.env` funciona |
+> | Archivar | `Falta configurar ARCHIVADO_WEBHOOK_URL` | **La var nunca existió en la app**: faltaba en `.env.example` Y en `.env.local` |
+>
+> 🔑 **La idea portable: una env var que no está en `.env.example` no existe para quien despliega.**
+> El botón *Archivar ahora* se construyó con ADR-062, su variable se escribió **solo en el `.env` de
+> la raíz** —que Next.js no lee— y nadie la cargó nunca en Vercel. El botón estuvo roto desde que
+> nació y el mensaje de error, que estaba bien escrito, apuntaba a un dev que no tenía dónde mirar.
+> `APIFY_TOKEN` tenía el mismo hueco (está en Vercel de casualidad, cargado a mano en el cierre 113).
+> **Los dos ya están en `.env.example` y en el README.**
+>
+> ### 🔬 Cómo se midió que n8n estaba sano, sin disparar nada
+>
+> Un `GET` a un webhook de n8n distingue dos cosas que un 404 pelado confunde:
+>
+> ```
+> path registrado   → "This webhook is not registered for GET requests. Did you mean POST?"
+> path inexistente  → "The requested webhook GET <x> is not registered." + hint de activar
+> ```
+>
+> Los dos webhooks dieron **la primera**, o sea que su ruta POST existe. Segunda señal independiente:
+> la API de n8n dice `active=true` y el `path` de cada nodo **coincide con el `.env`**. Con eso el
+> lado de n8n quedó descartado **sin gastar una corrida**.
+>
+> ### ✅ Probados en producción (24/08 ~03:43 UTC)
+>
+> | | Respuesta | Efecto medido en `public.runs` |
+> |---|---|---|
+> | **Archivar** | *"Archivando…"* | run `archivado` **ok** en 4 s · calificados **1 → 0** · los 116 sin calificar **intactos** |
+> | **Buscar** | *"Buscando…"* | run `descubrimiento` **ok** en 1 m 46 s · **0 propuestas nuevas** |
+>
+> La confirmación del archivado dijo *"manda 1 y borra 0"*, que es **exactamente** lo que se había
+> contado por separado contra la base antes de apretar. Dos mediciones independientes que coinciden.
+>
+> ⚠️ **El buscador cerró `ok` y no propuso nada.** Las 5 propuestas que hay siguen siendo las del
+> **2026-07-20**. El workflow tiene un `IF — hay propuestas`, así que cero es un camino legítimo y
+> no un error — pero **no se midió si miró y no encontró, o si cortó antes**. Queda para mirar:
+> el botón anda, lo que el botón produce no está verificado.
+>
+> ### ✅ Lo otro que se hizo
+>
+> - **`BotonSeleccionar` se ve** (pedido de Mani: el equipo no lo encontraba). Pasa a `secondary`
+>   —relleno sólido— y a **"Seleccionar varios"**. En las 4 pantallas vivía rodeado de `outline`
+>   (filtros, Descargar, Archivar) y se leía como mobiliario. No se le puso `default`: ese lugar es
+>   de la acción principal de cada pantalla.
+> - **La colección se baja en Excel**, al lado del Word. `tablaDeColeccion()` en
+>   `domain/colecciones.ts` + 6 tests. Columnas `# · TITULO · REFERENTE · LINK · GUION · LIMPIEZA`.
+>   🔑 **Reusa la MISMA acción del server que el Word** (`descargar`): ese viaje ya trae todo lo que
+>   la planilla necesita y es la parte cara (un `leerCrudo` por video). Una acción propia pagaría dos
+>   veces lo mismo y dejaría que los dos archivos digan cosas distintas de la misma colección.
+>   **La numeración es la misma en los dos**, y un video sin guion ocupa su número igual, para que
+>   *"grabá del 3 al 7"* signifique lo mismo mirando cualquiera de los dos.
+>
+> Verde: `typecheck` · **374 tests** · `build` · `validate` **2407 checks**.
+>
+> ### 🟢 Y un pendiente que ya estaba cerrado sin que nadie lo anotara
+>
+> **La corrida real del motor con el fix del emoji adentro YA PASÓ:** 24/08 13:00, **29 minutos, 44
+> candidatos, `ok`**. El cierre 115 la dejaba como *"lo que queda"*. Se leyó de `public.runs`, no del
+> recuerdo.
+>
+> ### ⬜ Lo que queda
+>
+> 1. ⬜ **El botón nuevo y el Excel, mirados en pantalla.** Se verificaron con `typecheck`, 374 tests,
+>    `build`, y el `.xlsx` generado con el código nuevo **abierto y leído de vuelta con openpyxl**
+>    (acentos y emoji intactos, el `#` como número, la celda sin guion **ausente** y no vacía). Nadie
+>    los vio todavía en el navegador: la sesión de localhost no se pudo abrir.
+> 2. ⬜ **El `.xlsx` de una colección, abierto en el Excel de Mani.** `file` y openpyxl son dos
+>    señales; ninguna es Excel. Mismo argumento que el paso 7 de §4-quater.
+> 3. ⬜ **Por qué el buscador propuso 0** (ver arriba).
+> 4. 🐤 Los canarios siguen al **2026-09-04**, sin cambios.
+> 5. 💰 **Gasto de esta sesión:** una corrida del descubrimiento (créditos de Apify), autorizada por
+>    Mani. El archivado no gasta.
+>
+> ---
+
 > ## 🚑 2026-08-21 (cierre 115) · EL MODO SELECCIÓN ENTERO, Y UNA CORRIDA DE MAJO RESCATADA DE LA BASURA (Claude, pedido de Mani)
 >
 > **En una línea:** se construyó y verificó el **modo selección** en las 4 pantallas —lo que el plan

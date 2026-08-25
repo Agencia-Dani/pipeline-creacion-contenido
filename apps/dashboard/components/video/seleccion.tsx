@@ -84,17 +84,27 @@ export function usarSeleccion(): Seleccion {
  *
  * Desaparece mientras el modo está prendido: ahí el control de salida es el `Cancelar` de la barra,
  * y dos formas de apagar lo mismo en pantallas distintas es cómo se aprende que una no funciona.
+ *
+ * 👁️ **`secondary` y no `outline`, y la etiqueta dice qué hace** (pedido de Mani el 2026-08-24: el
+ * equipo no lo encontraba). En las cuatro pantallas este botón vive rodeado de `outline` —filtros,
+ * `Descargar`, `Archivar`—, así que siendo uno más se leía como parte del mobiliario. Relleno
+ * sólido lo separa de sus vecinos sin robarle el lugar al `default`, que en esas barras está
+ * reservado para la acción principal de la pantalla.
+ *
+ * 🔤 **"Seleccionar varios" y no "Seleccionar"**: el verbo solo se nombra a sí mismo y deja al
+ * lector adivinando qué se selecciona; "varios" es lo que el modo agrega, que es actuar sobre un
+ * montón de una vez.
  */
 export function BotonSeleccionar({
   seleccion,
-  etiqueta = "Seleccionar",
+  etiqueta = "Seleccionar varios",
 }: {
   seleccion: Seleccion;
   etiqueta?: string;
 }) {
   if (seleccion.activo) return null;
   return (
-    <Button type="button" variant="outline" size="sm" onClick={seleccion.prender}>
+    <Button type="button" variant="secondary" size="sm" onClick={seleccion.prender}>
       {etiqueta}
     </Button>
   );

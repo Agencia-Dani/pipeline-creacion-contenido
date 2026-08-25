@@ -186,8 +186,13 @@ Scripts: `npm run typecheck` · `npm test` (dominio) · `npm run build`.
 5. **Env vars** (del gestor, solo server-side): `SUPABASE_SERVICE_ROLE` · `MOTOR_WEBHOOK_URL` +
    los 2 del header (el par exacto de la credencial `Webhook Motor Header` de n8n — si difiere en
    algo, el botón da 403) · los 2 `RUN_PLAN_HEADER_*` (el par que n8n manda a la fachada) · los 3
-   `DESCUBRIMIENTO_WEBHOOK_*` (el botón «Buscar cuentas nuevas»). **Son tres pares de header
-   distintos a propósito: no se reusan.**
+   `DESCUBRIMIENTO_WEBHOOK_*` (el botón «Buscar cuentas nuevas») · `ARCHIVADO_WEBHOOK_URL` (el
+   botón «Archivar ahora», **sin header propio: usa el del motor**) · `APIFY_TOKEN` (la metadata de
+   las colecciones). **Los tres pares de header son distintos a propósito: no se reusan.**
+   🩸 **`ARCHIVADO_WEBHOOK_URL` y `APIFY_TOKEN` faltaban en `.env.example`**, y el primero por eso
+   nunca llegó a Vercel: el botón devolvía *«Falta configurar el webhook del archivado»* en
+   producción, con el workflow de n8n perfectamente activo. Arreglado el 2026-08-24. **Una var que
+   no está en `.env.example` no existe para quien despliega.**
    ⚠️ `AIRTABLE_PAT` y `AIRTABLE_BASE_ID` **salen en D7**, en cuanto la corrida verde cierre el
    paso 3 del expand/contract. Hasta entonces siguen en Vercel sin que nadie los use.
 
