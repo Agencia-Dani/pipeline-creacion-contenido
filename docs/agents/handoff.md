@@ -22,10 +22,10 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> # 🔴 `git push` PENDIENTE — 9 commits de ADR-076 sin subir (26/08)
-> El sistema de orden y filtro está **hecho, testeado y verificado contra prod**, pero `main` está 9
-> commits adelante de `origin/main` y Vercel no lo desplegó. **Nadie del equipo lo ve todavía.**
-> Un `git push` y queda live. Detalle en el **cierre 116** del log.
+> # ✅ ADR-076 ESTÁ LIVE (26/08) — el orden y el filtro ya se ven en producción
+> Pusheado (`d88c419..5915a14`) y desplegado. Verificado por **dos señales independientes**: la
+> huella del HTML de prod cambió y se mantuvo estable en 3 requests, y **Vercel reporta `success`
+> contra el SHA `5915a14`** (`gh api .../commits/5915a14/status`). Detalle en el **cierre 116**.
 
 
 > # ⛔ DECISIÓN ABIERTA — LEER ANTES DE TOCAR CUALQUIER ETAPA DE LINKEDIN
@@ -3418,10 +3418,12 @@ implementaciones sueltas de "filtrar"** sin conocerse. Nuevo: `domain/orden.ts` 
 Commits `b66d044` · `b8c86ea` · `53d8186` · `b98c8ad` · `e66b287` · `97c62f8` · `9b60877` ·
 `7caa88b` · `c7bc827`.
 
-> # 🔴 LOS 9 COMMITS NO ESTÁN PUSHEADOS — LOS CAMBIOS **NO ESTÁN LIVE**
-> `main` está **9 adelante de `origin/main`**. Todo se verificó en `localhost:3000` **contra la base
-> de producción**, así que los datos eran reales pero el código no está desplegado en Vercel.
-> **Majo todavía no ve nada de esto.** Es lo primero que hay que resolver en la próxima sesión.
+> # ✅ PUSHEADO Y LIVE — `d88c419..5915a14`, el mismo 26/08
+> La verificación funcional se hizo en `localhost:3000` **contra la base de producción** (datos
+> reales, código local). Después se pusheó y se confirmó el deploy con **dos señales
+> independientes**: la huella del HTML de prod cambió y quedó estable en 3 requests seguidos, y
+> **Vercel reporta `success` contra el SHA exacto** (`gh api .../commits/5915a14/status`).
+> *La primera sola no alcanzaba: probaba que había un build nuevo, no que fuera el mío.*
 
 **🩸 El bug que ningún test iba a atrapar, y la regla que dejó (ADR-076 §9).** En Históricos los
 criterios leían `Historico` crudo mientras la tarjeta dibuja `videos.get(clave)` — el mapa de
