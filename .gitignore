@@ -10,4 +10,3 @@ outputs-referentes/
 
 # Snapshots del live de n8n antes de cada push (ADR-053) — contienen las keys resueltas
 .n8n-snapshots/
-launch.json
