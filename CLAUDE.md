@@ -23,12 +23,17 @@ en §Agent skills; acá solo se ubican.
 
 - [docs/agents/plan-cockpit-propio.md](docs/agents/plan-cockpit-propio.md) — el plan del **cockpit propio**
   que reemplazó a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
+- [docs/agents/plan-orden-y-filtro.md](docs/agents/plan-orden-y-filtro.md) — el plan de **orden y
+  filtro** en las 4 pantallas de video (ADR-076): 7 tareas, dominio puro + una barra compartida.
+  **Sin migración, sin n8n, sin `core/`.** Su hallazgo ordenador: *el default de las cuatro es "no
+  reordenes"*, porque las cuatro ya llegan ordenadas por alguien y reproducir esas reglas serían
+  dos implementaciones de cada una.
 - [docs/agents/plan-motor-linkedin.md](docs/agents/plan-motor-linkedin.md) — de **esqueleto a motor**:
   las fases 0–4 para que el pipeline de LinkedIn corra. Su hallazgo ordenador: **los dos carriles no
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–075, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–076, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -163,7 +168,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..075).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..076).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del
