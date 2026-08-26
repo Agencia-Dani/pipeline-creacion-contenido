@@ -164,6 +164,23 @@ Instagram, o sea **un solo valor en cada una**. La regla se ve funcionando justo
 — no hay dos chips que digan *"en 57"* y *"instagram 57"* ocupando lugar para no filtrar nada.
 Es también el aviso para el que la pruebe: *no ver las facetas no es que estén rotas.*
 
+**🩸 9. Se ordena por lo que la tarjeta MUESTRA, no por el campo crudo que hay detrás.**
+
+Esta regla no estaba en el ADR: se pagó construyendo Históricos el 26/08. Los criterios se
+escribieron leyendo `Historico` crudo, pero la tarjeta dibuja `videos.get(clave)` — el mapa que
+arma `fusionar()`. **Son fuentes distintas y difieren justo donde duele:** `outputs.titulo` guarda
+**la url** en las 129 filas de `transcripcion_a_pedido`, y `fusionar` la descarta con
+`esTituloDeVerdad` (ADR-072 §4) mientras que el campo crudo no.
+
+Medido en pantalla: *Título A-Z* ordenaba por un valor **que no se ve**, y dejaba arriba de todo
+una pared de **320 tarjetas que dicen "sin título"**. No fallaba, no tiraba error, y desde afuera
+era indistinguible de estar roto.
+
+Es ADR-072 §4 cobrándose lo que anunció con estas palabras: *un título que en realidad es una url
+miente dos veces, en la tarjeta y **en el próximo cruce que alguien escriba encima***. Estos
+criterios eran ese próximo cruce. Arreglado leyendo del mapa fusionado; con eso el invariante de
+§2 quedó **observado sobre 325 filas reales**, con los 320 nulos abajo en las dos direcciones.
+
 **8. El estado es local (`useState`), no un query param.** Como `filtro` y `plegados` hoy. Un
 `?orden=likes` obligaría al server a releer, que es justo el viaje que esta decisión evita. Si algún
 día hace falta compartir vistas, ahí se gana el lugar.

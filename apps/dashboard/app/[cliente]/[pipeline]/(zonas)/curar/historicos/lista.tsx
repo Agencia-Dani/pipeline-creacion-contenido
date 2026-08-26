@@ -9,9 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
 import { MarcarGrabados } from "@/components/video/marcar-grabados";
 import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
+import { BarraOrden, usarOrden } from "@/components/video/orden";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { TarjetaVideo } from "@/components/video/tarjeta";
 import { agrupar, SIN_PROYECTO } from "@/domain/feed";
+// 🔴 `ordenar` sale del dominio, NO del componente: `orden.tsx` no lo re-exporta.
+import { ordenar, type CriterioOrden, type Faceta } from "@/domain/orden";
 import { fusionar, type ParteVideo, type Video } from "@/domain/video";
 import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
 import { parsearEnlaces } from "@/domain/enlace";
@@ -76,6 +79,20 @@ const ETIQUETA_REVISION: Record<EstadoRevision, string> = {
   "visto-por-el-motor": "Lo vio el motor, sin guion",
   nuevo: "No está en la herramienta",
 };
+
+type Fila = FilaRegistro<Historico>;
+
+/** Lo que `agrupar()` recibe y devuelve acá. Se nombra para no spreadear a ciegas. */
+type ItemGrupo = { id: string; proyecto: string; heat: null; fila: Fila };
+
+/**
+ * Lo que la fila sabe, o `null` si es una **huérfana** — un link que alguien grabó por fuera de la
+ * herramienta, que no tiene guion ni métricas de ningún tipo. Sus nulos caen al final solos.
+ */
+const del =
+  <K extends keyof Historico>(campo: K) =>
+  (f: Fila): Historico[K] | null =>
+    f.tipo === "guion" ? f.guion[campo] : null;
 
 export function Lista({
   guiones,
@@ -162,20 +179,86 @@ export function Lista({
    * las ~291 huérfanas— el heat es `null` en todas y el desempate termina siendo el uuid, que es un
    * orden sin significado. El histórico se lee por lo último que pasó, que es como venía ordenado.
    */
+  /**
+   * Los ejes de orden y filtro del histórico (ADR-076).
+   *
+   * 🩸 **Salen del mapa FUSIONADO, no de `Historico`, y eso se pagó mirando la pantalla el 26/08.**
+   * La tarjeta dibuja `videos.get(clave)` (ver el `<TarjetaHistorico>` de abajo), y la primera
+   * versión de estos criterios leía `Historico` crudo. Son fuentes distintas y difieren justo donde
+   * duele: `outputs.titulo` guarda **la url** en las 129 filas de `transcripcion_a_pedido`, y
+   * `fusionar` la descarta con `esTituloDeVerdad` (ADR-072 §4) mientras que el campo crudo no.
+   * Resultado medido: *Título A-Z* ordenaba por un valor **que no se ve**, y dejaba arriba de todo
+   * una pared de 320 tarjetas que dicen "sin título".
+   *
+   * 🔑 La regla que queda: **se ordena por lo que la tarjeta muestra.** Un orden que no se puede
+   * leer en pantalla es indistinguible de uno roto.
+   *
+   * `relevancia` y `origen` son la excepción y salen de `Historico`: no existen en `Video`.
+   * `useMemo` porque `usarOrden` memoiza contra estas referencias.
+   */
+  const CRITERIOS = useMemo<readonly CriterioOrden<Fila>[]>(() => {
+    const fusionado =
+      <K extends keyof Video>(campo: K) =>
+      (f: Fila) =>
+        (videos.get(claveDeFila(f))?.[campo] ?? null) as number | string | null;
+    return [
+      { clave: "likes", etiqueta: "Likes", valor: fusionado("likes") },
+      { clave: "views", etiqueta: "Vistas", valor: fusionado("views") },
+      { clave: "seguidores", etiqueta: "Seguidores", valor: fusionado("seguidores") },
+      { clave: "heat", etiqueta: "Heat", valor: fusionado("heat") },
+      { clave: "relevancia", etiqueta: "Relevancia", valor: del("relevanciaScore") },
+      { clave: "titulo", etiqueta: "Título A-Z", valor: fusionado("titulo") },
+    ];
+  }, [videos]);
+
+  // `origen` es la faceta que **sólo esta pantalla puede ofrecer**, y contesta la pregunta que las
+  // 129 filas de Transcribir hacen inevitable: *¿esto vino del Feed o de un link que pegamos?*.
+  // Está en `Historico` desde ADR-062 y no la leía nadie.
+  const FACETAS = useMemo<readonly Faceta<Fila>[]>(
+    () => [
+      {
+        clave: "idioma",
+        etiqueta: "Idioma",
+        valor: (f: Fila) => videos.get(claveDeFila(f))?.idioma ?? null,
+      },
+      { clave: "origen", etiqueta: "Origen", valor: del("origen") },
+    ],
+    [videos],
+  );
+
+  // El orden y las facetas van ENCIMA del chip de grabado, no en su lugar: son los dos sistemas
+  // conviviendo (ADR-076 §4). `visibles` es lo que dejó pasar `filtrarRegistro`.
+  const orden = usarOrden(visibles, CRITERIOS, FACETAS);
+
   const grupos = useMemo(() => {
-    const items = visibles.map((fila) => ({
+    const items: ItemGrupo[] = orden.visibles.map((fila) => ({
       id: fila.tipo === "huerfana" ? fila.marca.clave : fila.guion.id,
       proyecto: (fila.tipo === "huerfana" ? null : fila.guion.proyecto) ?? "",
       heat: null,
       fila,
     }));
+
+    // El criterio se declara sobre `Fila` pero acá se ordenan los items envueltos. Se adapta
+    // explícito y no con un spread: el spread compila igual y esconde qué tipo quedó del otro lado.
+    const elegido = CRITERIOS.find((c) => c.clave === orden.claveCriterio) ?? null;
+    const criterio: CriterioOrden<ItemGrupo> | null =
+      elegido === null
+        ? null
+        : { clave: elegido.clave, etiqueta: elegido.etiqueta, valor: (x) => elegido.valor(x.fila) };
+
     return agrupar(items).map((g) => ({
       ...g,
-      candidatos: [...g.candidatos].sort((a, b) =>
-        fechaDeFila(b.fila).localeCompare(fechaDeFila(a.fila)),
-      ),
+      // Sin criterio elegido se restaura el orden por FECHA, que es el default de esta pantalla y
+      // la razón escrita arriba: acá el heat es `null` en 129 de 377 filas, así que el desempate de
+      // `agrupar` terminaría siendo el uuid. Con criterio elegido, manda el criterio.
+      candidatos:
+        criterio === null
+          ? [...g.candidatos].sort((a, b) =>
+              fechaDeFila(b.fila).localeCompare(fechaDeFila(a.fila)),
+            )
+          : ordenar(g.candidatos, criterio, orden.direccion),
     }));
-  }, [visibles]);
+  }, [orden.visibles, orden.claveCriterio, orden.direccion, CRITERIOS]);
 
   /**
    * `id de fila → url del video`, para el modo selección.
@@ -289,6 +372,8 @@ export function Lista({
               {ETIQUETA_FILTRO[f]} ({cuentas[f]})
             </Button>
           ))}
+          {/* Convive con los chips de grabado y NO se unifica con ellos (ADR-076 §4). */}
+          <BarraOrden orden={orden} />
         </div>
         <div className="flex flex-wrap gap-2">
           <BotonSeleccionar seleccion={seleccion} />
