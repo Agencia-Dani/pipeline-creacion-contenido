@@ -22,6 +22,12 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🔴 `git push` PENDIENTE — 9 commits de ADR-076 sin subir (26/08)
+> El sistema de orden y filtro está **hecho, testeado y verificado contra prod**, pero `main` está 9
+> commits adelante de `origin/main` y Vercel no lo desplegó. **Nadie del equipo lo ve todavía.**
+> Un `git push` y queda live. Detalle en el **cierre 116** del log.
+
+
 > # ⛔ DECISIÓN ABIERTA — LEER ANTES DE TOCAR CUALQUIER ETAPA DE LINKEDIN
 > ## ¿Qué es un candidato de LinkedIn: material crudo para curar, o un post ya generado?
 >
@@ -3400,6 +3406,76 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-26 (cierre 116) — Orden y filtro en las 4 pantallas de video, y un orden que no se podía leer (Claude, con Mani).**
+
+**Qué se hizo:** [ADR-076](../adr/ADR-076-ordenar-es-una-vista-no-una-consulta.md) + las 7 tareas de
+[plan-orden-y-filtro](./plan-orden-y-filtro.md), completas y verificadas contra prod pantalla por
+pantalla. Salió del pedido de Majo (*ordenar una colección por likes*) y se generalizó porque el
+mismo hueco estaba en las 4 pantallas que dibujan `TarjetaVideo`, que además ya tenían **tres
+implementaciones sueltas de "filtrar"** sin conocerse. Nuevo: `domain/orden.ts` (18 tests) y
+`components/video/orden.tsx`. **Cero migraciones, cero n8n, cero `core/`.**
+Commits `b66d044` · `b8c86ea` · `53d8186` · `b98c8ad` · `e66b287` · `97c62f8` · `9b60877` ·
+`7caa88b` · `c7bc827`.
+
+> # 🔴 LOS 9 COMMITS NO ESTÁN PUSHEADOS — LOS CAMBIOS **NO ESTÁN LIVE**
+> `main` está **9 adelante de `origin/main`**. Todo se verificó en `localhost:3000` **contra la base
+> de producción**, así que los datos eran reales pero el código no está desplegado en Vercel.
+> **Majo todavía no ve nada de esto.** Es lo primero que hay que resolver en la próxima sesión.
+
+**🩸 El bug que ningún test iba a atrapar, y la regla que dejó (ADR-076 §9).** En Históricos los
+criterios leían `Historico` crudo mientras la tarjeta dibuja `videos.get(clave)` — el mapa de
+`fusionar()`. Difieren justo donde duele: `outputs.titulo` guarda **la url** en las 129 filas de
+`transcripcion_a_pedido`, y `fusionar` la descarta con `esTituloDeVerdad` mientras el campo crudo no.
+Resultado: *Título A-Z* ordenaba por un valor **que no se ve**, dejando arriba una pared de **320
+tarjetas que dicen "sin título"**. No fallaba ni tiraba error: desde afuera era indistinguible de
+estar roto. Es [ADR-072](../adr/ADR-072-el-video-es-la-unidad-una-llave-una-tarjeta.md) §4
+cobrándose lo que anunció — *una url disfrazada de título miente dos veces, en la tarjeta y en el
+próximo cruce que alguien escriba encima*. **Estos criterios eran ese próximo cruce.** La regla que
+queda: **se ordena por lo que la tarjeta muestra**; un orden que no se puede leer en pantalla es
+indistinguible de uno roto.
+
+**🩸 Y una medición mía que era falsa, destapada por la pantalla y no por releer.** Reporté *"título
+0 de 57"* en la colección de Majo y de ahí salió una consecuencia entera del ADR (*"Título A-Z
+ordena todo-nulos"*). **Es 57 de 57.** Mi cruce leía `titulo` sólo de `app.videos_meta` (5 filas)
+cuando `fusionar()` lo toma de las tres fuentes. *La lección de ADR-072 al revés: allá se contó un
+match de más, acá uno de menos, las dos por medir una parte y concluir sobre el todo.*
+
+**🔑 La simplificación que ordenó el diseño: el default de las 4 pantallas es `null` = *no
+reordenes*.** Las cuatro ya llegan ordenadas por alguien (`agrupar`, `armarRegistro`,
+`ordenarDescartes`, el orden de inserción), así que el criterio por defecto no tiene que
+**reproducir** esas reglas sino **no tocarlas** — con un criterio "near-miss" propio habría dos
+implementaciones de ADR-021 desincronizándose. Y el desempate sale gratis: `Array.prototype.sort` es
+estable por spec desde ES2019, así que un empate cae de nuevo al near-miss o a la fecha, nunca a un
+uuid. Clavado en un test, porque es la clase de cosa que alguien "optimiza" sin saber que la usaban.
+
+**🟢 La regla de "una faceta necesita 2+ valores" quedó vista por sus dos lados, en producción.** En
+Colecciones **no se dibuja ninguna** (los 57 son `idioma=en` y los 57 de Instagram); en el Feed sí
+(`en 144` / `otro 2`) y en Históricos también, con `origen` (`transcribir 129` / `feed 95`, que
+coincide exacto con lo medido en la base). *No ver las facetas no es que estén rotas.*
+
+**🔴 Hallazgo nuevo, sin arreglar: `borrar` de colecciones es una action huérfana.** Existe en
+`curar/colecciones/actions.ts:75`, está escrita y documentada, y **no la importa ningún componente**
+⇒ no hay forma de borrar una colección desde la UI. Es la tercera vez que este repo se come el mismo
+patrón (`BotonBuscar` sin renderizar, el modo selección entero del plan de colecciones). Se
+descubrió al ir a limpiar la colección de prueba, que hubo que borrar por PostgREST.
+
+**✅ Verificación humana §12 cerrada el mismo día** ([verificaciones-humanas](../verificaciones-humanas.md)):
+el invariante de los nulos, con una colección propia de 3 videos reales + 1 link sintético. Likes ↓
+y ↑ dan vuelta los tres reales y **el sin métricas no se mueve del último lugar**. La colección se
+borró (cascade limpio, `videos_meta` intacta en 5). Residuo honesto: 3 filas en `app.eventos` con el
+`usuario_id` del dev — verificación, no adopción.
+
+**Qué NO hace:** no monta la barra en Transcribir (0 de 130 con título: sería un adorno) ni en
+LinkedIn (tabla vacía), no agrega filtro por referente (decisión de Mani; es lo primero que se va a
+pedir después), y **no pagina**. El techo está declarado en el ADR: esto funciona porque las 4
+pantallas traen todo a memoria (209 / 82 / 420 / 57 y ningún lector tiene `limit`). Si el Feed vuelve
+a paginar, el orden tiene que mudarse a la query — salvo en Colecciones, donde no se puede sin
+materializar `fusionar()`.
+
+**Qué sigue:** `git push` (lo único que separa esto de estar live) → avisarle a Majo → decidir si se
+tapa el hueco de `borrar`. Skills sugeridas: `/diagnose` si el deploy de Vercel se queja, `/tdd` para
+la action huérfana.
 
 **2026-08-09 (cierre 106) — El cockpit de LinkedIn queda listo para configurar, y el ▶ disparaba la máquina equivocada (Claude, con Alejandro).**
 **Qué se hizo:** las Fases 0, 1 y 3 del plan de integración de LinkedIn. Commits `8737b0e` (ADR-066: las interferencias), `b73086b` (ADR-067: perfil de voz) y `0453739` (feed y descartes), los tres pusheados. El cockpit pasó de **1 pantalla a 4**. Antes, limpieza pedida: se borraron las 2 filas `prueba rls` de `app.referentes_linkedin` (`be8e3a1`) — la voz "Alejo" **no se tocó porque ya no existía**, la había borrado el cierre 102.

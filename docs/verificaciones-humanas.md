@@ -703,7 +703,7 @@ cliente se administre solo, hay que nombrarle un `sponsor`**, y eso es una decis
 
 </details>
 
-## 12. ⬜ **Que los nulos NO suban al ordenar ascendente** *(nuevo del 26/08, ADR-076)*
+## 12. ✅ **Que los nulos NO suban al ordenar ascendente — CERRADA el 2026-08-26** *(ADR-076)*
 
 **Quién:** Mani o cualquiera con acceso a un cockpit. **Cuánto tarda:** 3 minutos.
 **De dónde sale:** Tarea 4 de [plan-orden-y-filtro](./agents/plan-orden-y-filtro.md).
@@ -731,6 +731,31 @@ En Históricos sí hay nulos de sobra (**129 de 377** filas sin métricas, las d
 3. Ordená por **Likes**, flecha en **↓**. El video nuevo tiene que quedar **último**.
 4. Dale a la flecha para pasar a **↑**. El video nuevo **tiene que seguir último**.
 5. 🚮 Después: sacá el video de la colección.
+
+### ✅ Cómo se cerró (2026-08-26)
+
+No se usó la colección de Majo: se creó una aparte (`zz-prueba-orden-nulos`) con **3 videos reales
+que ya tenían métricas + 1 link sintético** (`/p/CLAUDETEST01/`, un shortcode válido de un video que
+no existe). Sintético a propósito: el caso que hace falta es *"un video del que no se sabe nada"*, y
+así no se toca contenido de nadie ni se arriesga pagar un scrape.
+
+**El resultado, sin apretar *Identificar*:**
+
+| | orden de la grilla |
+|---|---|
+| **Likes ↓** | 206.638 → 57.965 → 43.454 → **el sintético** |
+| **Likes ↑** | 43.454 → 57.965 → 206.638 → **el sintético** |
+
+Los tres reales se dan vuelta; **el que no tiene métricas no se mueve del último lugar en ninguna de
+las dos direcciones.** Su tarjeta además dice *"sin miniatura · sin título · sin referente"*, que es
+ADR-072 degradando sin mentir.
+
+🚮 La colección se borró después: los 4 miembros se fueron por el `on delete cascade`, quedó sólo
+*"Test"*, y **`app.videos_meta` siguió en 5 filas** — nunca se compró nada.
+
+⚠️ **Residuo honesto:** quedaron 3 filas en `app.eventos` (`colecciones.crear`, `colecciones.agregar`,
+`colecciones.borrar`) con el `usuario_id` del dev. Son verificación, no adopción — mismo cuidado que
+los canarios de `CLAUDE.md`.
 
 ### Qué significa si falla
 
