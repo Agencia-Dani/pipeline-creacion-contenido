@@ -30,12 +30,13 @@ const filaDescarte = z.object({
   relevancia_score: z.coerce.number().nullable(),
   relevancia_razon: z.string().nullable(),
   veredicto: z.string().nullable(),
+  creado_en: z.string().nullable(),
   proyectos: z.object({ nombre: z.string() }).nullable(),
 });
 
 const COLUMNAS =
   "id, titulo, script, thumbnail_url, referente, url_referente, relevancia_score, " +
-  "relevancia_razon, veredicto, proyectos(nombre)";
+  "relevancia_razon, veredicto, creado_en, proyectos(nombre)";
 
 export async function leerDescartes(ctx: TenantContext): Promise<DescarteFeed[]> {
   const { data, error } = await (await scoped(ctx)).select("app.descartes", COLUMNAS);
@@ -53,6 +54,7 @@ export async function leerDescartes(ctx: TenantContext): Promise<DescarteFeed[]>
       relevanciaScore: r.relevancia_score,
       relevanciaRazon: r.relevancia_razon,
       veredicto: esVeredicto(r.veredicto) ? r.veredicto : null,
+      creadoEn: r.creado_en,
     } satisfies DescarteFeed)),
   );
 }

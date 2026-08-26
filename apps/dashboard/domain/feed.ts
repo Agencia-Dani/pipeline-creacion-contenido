@@ -291,6 +291,8 @@ export type DescarteFeed = {
   relevanciaScore: number | null;
   relevanciaRazon: string | null;
   veredicto: Veredicto | null;
+  /** Cuándo el gate lo mató. Es el único eje temporal que esta tabla tiene (ADR-076). */
+  creadoEn: string | null;
 };
 
 /**

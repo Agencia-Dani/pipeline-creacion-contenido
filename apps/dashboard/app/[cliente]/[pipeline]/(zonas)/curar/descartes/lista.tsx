@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
+import { BarraOrden, usarOrden } from "@/components/video/orden";
 import { VEREDICTOS, type DescarteFeed, type Veredicto } from "@/domain/feed";
+import type { CriterioOrden } from "@/domain/orden";
 import { auditarDescarte } from "./actions";
 import { usarCockpit } from "../../usar-cockpit";
 
@@ -15,6 +17,19 @@ import { usarCockpit } from "../../usar-cockpit";
 // El botón que importa es "era bueno" — es el que produce el `falsos_negativos` de la semana.
 // Por eso los dos dicen qué significan y no "sí/no": marcar mal acá afina los criterios en la
 // dirección equivocada.
+
+// 🔴 **Tres criterios y ninguna faceta, y es lo honesto.** Sondeado contra prod el 26/08:
+// `app.descartes` tiene **12 columnas y ninguna es una métrica** — sin likes, views, seguidores,
+// engagement ni idioma, porque el gate mata el video antes de que se archive nada de eso. Un
+// selector con seis ejes acá serían cuatro que no hacen nada (ADR-076 §5 y §7).
+//
+// Se ordena por lo que la tarjeta muestra (ADR-076 §9): `titulo` es el que dibuja el `<p>` de la
+// tarjeta, y acá no esconde urls — medido, 0 de 82 empiezan con `http`, al revés que `outputs`.
+const CRITERIOS: readonly CriterioOrden<DescarteFeed>[] = [
+  { clave: "relevancia", etiqueta: "Relevancia", valor: (d) => d.relevanciaScore },
+  { clave: "fecha", etiqueta: "Más reciente", valor: (d) => d.creadoEn },
+  { clave: "titulo", etiqueta: "Título A-Z", valor: (d) => d.titulo },
+];
 
 const ETIQUETA: Record<Veredicto, string> = {
   "bien descartado": "Bien descartado",
@@ -28,6 +43,8 @@ export function Lista({ descartes }: { descartes: DescarteFeed[] }) {
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  // Sin facetas: la tabla no tiene con qué. `<BarraOrden>` dibuja sólo el selector.
+  const orden = usarOrden(descartes, CRITERIOS);
 
   const efectivo = (d: DescarteFeed): Veredicto | null => puestos[d.id] ?? d.veredicto;
 
@@ -67,8 +84,13 @@ export function Lista({ descartes }: { descartes: DescarteFeed[] }) {
           : `${pendientes} sin auditar de ${descartes.length}.`}
       </p>
 
+      {/* 🔴 El default (`null`) NO reordena, y acá eso protege una regla: `leerDescartes` aplica
+          `ordenarDescartes` en el server —near-miss primero, sin auditar antes (ADR-021)— y ahí es
+          donde viven los falsos negativos. El control deja salirse un rato; no la reemplaza. */}
+      <BarraOrden orden={orden} />
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {descartes.map((d) => {
+        {orden.visibles.map((d) => {
           const puesto = efectivo(d);
           return (
             <div
