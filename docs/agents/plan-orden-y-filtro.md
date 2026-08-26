@@ -151,7 +151,8 @@ test("🔴 un empate conserva el orden que traía la lista", () => {
 });
 
 test("una lista toda de nulos queda tal cual", () => {
-  // El caso real de Título A-Z en Colecciones: 0 de 57 tienen título.
+  // El caso real es Históricos: 129 de sus 377 filas no tienen métricas (las que entraron por un
+  // link pegado). Ordenarlas por likes no puede reacomodarlas entre sí.
   const lista = [v("a", null), v("b", null), v("c", null)];
   assert.equal(ids(ordenar(lista, porTitulo, "asc")), "a,b,c");
 });
@@ -815,9 +816,9 @@ Abrir la colección *"Test"* (57 videos) y comprobar las cinco cosas:
 2. Elegir **Likes** con la flecha en ↓ pone el de más likes primero.
 3. La flecha en ↑ lo da vuelta, y **los videos sin likes siguen al final** (si en esta colección son
    57/57, forzar el caso agregando un link nuevo sin metadata antes de correr *Identificar*).
-4. Elegir **Título A-Z** no cambia nada (0 de 57 tienen título) y eso es lo esperado, no un bug.
-5. La faceta **Plataforma** aparece sólo si hay videos de IG y de TikTok; con todo de una sola
-   plataforma **no se dibuja**.
+4. Elegir **Título A-Z** ordena alfabético de verdad: el título está en **57 de 57**.
+5. **No aparece ninguna faceta**, y es correcto: los 57 son `idioma = en` y los 57 son de Instagram,
+   o sea un solo valor en cada una (§7). *No verlas no es que estén rotas.*
 
 - [ ] **Paso 5 — Commit**
 

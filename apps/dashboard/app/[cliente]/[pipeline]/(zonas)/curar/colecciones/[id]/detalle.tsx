@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { GrillaVideos } from "@/components/video/grupos";
+import { BarraOrden, usarOrden } from "@/components/video/orden";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { TarjetaVideo } from "@/components/video/tarjeta";
 import { COLUMNAS_COLECCION, necesitaEnriquecer, tablaDeColeccion } from "@/domain/colecciones";
 import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
+import type { CriterioOrden, Faceta } from "@/domain/orden";
 import type { Video } from "@/domain/video";
 import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
 import { usarCockpit } from "../../../usar-cockpit";
@@ -29,6 +31,30 @@ import { Identificador } from "./identificador";
 // **Meter videos es pegar links**, que es el idioma que esta app ya usa para *"hacer algo con
 // muchos ítems"* (el pegote de Transcribir, la carga masiva de Históricos). Es además lo que Majo
 // ya tiene a mano: sus documentos de scripts son listas de links.
+
+// Los ejes de orden y filtro de esta pantalla (ADR-076).
+//
+// 🔑 **A nivel de módulo y NO dentro del componente**: `usarOrden` memoiza contra estas
+// referencias, y armarlas inline daría un array nuevo por render. Es la misma trampa que ya costó
+// un bucle de fetch en este mismo archivo (las deps del `useEffect` de `vocesParaLimpiar`).
+//
+// ⚠️ **No hay `engagement` ni `relevancia`**: `domain/video.ts` no los transporta. El dato existe
+// en las fuentes —medido el 26/08, 57 de 57 en la colección de prueba— pero `fusionar()` no lo
+// trae, y agregarlo sería una columna en `app.videos_meta`, o sea `core/`, o sea otro ADR
+// (ADR-076 §5).
+const CRITERIOS: readonly CriterioOrden<Video>[] = [
+  { clave: "likes", etiqueta: "Likes", valor: (v) => v.likes },
+  { clave: "views", etiqueta: "Vistas", valor: (v) => v.views },
+  { clave: "seguidores", etiqueta: "Seguidores", valor: (v) => v.seguidores },
+  { clave: "heat", etiqueta: "Heat", valor: (v) => v.heat },
+  { clave: "titulo", etiqueta: "Título A-Z", valor: (v) => v.titulo },
+];
+
+// `plataforma` sale del tipo y no de un parseo nuevo: `Video` ya la trae resuelta por `claveDe`.
+const FACETAS: readonly Faceta<Video>[] = [
+  { clave: "idioma", etiqueta: "Idioma", valor: (v) => v.idioma },
+  { clave: "plataforma", etiqueta: "Plataforma", valor: (v) => v.plataforma },
+];
 
 type Voz = { id: string; nombre: string; tienePerfil: boolean };
 
@@ -55,6 +81,7 @@ export function Detalle({
   // lo prometido y lo hecho que dejó afuera el modo selección entero, encontrado el 2026-08-21
   // releyendo el plan en vez de mirar la pantalla.
   const seleccion = usarSeleccion();
+  const orden = usarOrden(videos, CRITERIOS, FACETAS);
 
   const limpios = new Set(conLimpio);
   const sinIdentificar = videos.filter(necesitaEnriquecer).length;
@@ -284,8 +311,9 @@ export function Detalle({
         </p>
       ) : (
         <>
+          <BarraOrden orden={orden} />
           <GrillaVideos>
-            {videos.map((v) => (
+            {orden.visibles.map((v) => (
               <TarjetaVideo
                 key={v.clave}
                 video={v}

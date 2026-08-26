@@ -703,6 +703,45 @@ cliente se administre solo, hay que nombrarle un `sponsor`**, y eso es una decis
 
 </details>
 
+## 12. ⬜ **Que los nulos NO suban al ordenar ascendente** *(nuevo del 26/08, ADR-076)*
+
+**Quién:** Mani o cualquiera con acceso a un cockpit. **Cuánto tarda:** 3 minutos.
+**De dónde sale:** Tarea 4 de [plan-orden-y-filtro](./agents/plan-orden-y-filtro.md).
+
+### Por qué un agente no puede cerrarla
+
+El invariante *"los nulos van al final en ASC y en DESC"* **sí** tiene test unitario
+(`domain/orden.test.ts`, el caso 🔴). Lo que no se puede probar sin ojos es que **la pantalla real
+lo respete con datos reales**, y ahí está el problema: medido contra prod el 26/08, la única
+colección que existe (*"Test"*, 57 videos) tiene **57 de 57** con likes, vistas, seguidores, heat
+**y título** — remedido el 26/08 mirando la pantalla, después de que un primer cruce dijera *0 de 57
+con título* por leer sólo `app.videos_meta` en vez de las tres fuentes que `fusionar()` cruza.
+**No hay un solo nulo que mirar en ninguno de los cinco ejes.** Un "se ve bien" sobre esa colección no distingue *el invariante
+anda* de *no había caso que lo ejercitara* — que es exactamente la trampa del §0 de este doc.
+
+En Históricos sí hay nulos de sobra (**129 de 377** filas sin métricas, las de
+`transcripcion_a_pedido`), pero esa pantalla llega en la Tarea 6.
+
+### Los pasos
+
+1. Entrá a una colección y pegá un link de un video que el sistema **no conozca** (uno que no esté
+   en el Feed ni en el histórico).
+2. 🛑 **NO aprietes *Identificar*.** Ese botón es el que le compra la metadata a Apify; el punto de
+   esta prueba es tener un video sin likes.
+3. Ordená por **Likes**, flecha en **↓**. El video nuevo tiene que quedar **último**.
+4. Dale a la flecha para pasar a **↑**. El video nuevo **tiene que seguir último**.
+5. 🚮 Después: sacá el video de la colección.
+
+### Qué significa si falla
+
+| Lo que ves en el paso 4 | Qué significa |
+|---|---|
+| El video sin likes **último** | ✅ El invariante corre en la pantalla |
+| El video sin likes **primero** | 🩸 Alguien "arregló" el signo en `ordenar()` y movió los chequeos de `null` adentro de la comparación. En Históricos eso pone **129 incógnitas arriba de todo** |
+| El video no aparece | Otra cosa: revisá si hay un chip de faceta prendido (un video sin idioma queda afuera si el filtro está activo — es el comportamiento esperado, ver ADR-076 §4) |
+
+---
+
 ## Registro — lo que ya se cerró, para no repetirlo
 
 | # | Qué | Cuándo |

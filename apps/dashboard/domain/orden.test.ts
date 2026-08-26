@@ -79,7 +79,8 @@ test("🔴 un empate conserva el orden que traía la lista", () => {
 });
 
 test("una lista toda de nulos queda tal cual", () => {
-  // El caso real de Título A-Z en Colecciones: 0 de 57 tienen título.
+  // El caso real es Históricos: 129 de sus 377 filas no tienen métricas (las que entraron por un
+  // link pegado). Ordenarlas por likes no puede reacomodarlas entre sí.
   const lista = [v("a", null), v("b", null), v("c", null)];
   assert.equal(ids(ordenar(lista, porTitulo, "asc")), "a,b,c");
 });

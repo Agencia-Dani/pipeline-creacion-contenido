@@ -29,7 +29,7 @@ videos, creada el 24/08) se dibuja con `leerLoQueSeSabe`, que fusiona `app.candi
 colección "Test" — 57 miembros
    likes 57/57 · views 57/57 · seguidores 57/57
    engagement 57/57 · heat_score 57/57 · idioma 57/57
-   titulo  0/57
+   titulo 57/57
 ```
 
 `app.videos_meta` tiene **5 filas**. O sea que los 57 llegan completos por el Feed y el histórico:
@@ -44,7 +44,7 @@ colección "Test" — 57 miembros
 | relevancia_score | 208 | — | 248 |
 | idioma | 209 | 57 | 377 |
 | fecha (calificación / grabado) | 63 | — | 377 |
-| título | 209 | **0** | 377 |
+| título | 209 | 57 | 377 |
 
 Los 129 huecos del histórico son las filas `tipo = transcripcion_a_pedido`: entraron por un link
 pegado y nunca tuvieron métricas. **Son el caso que obliga a decidir qué hace un `null` al ordenar.**
@@ -158,6 +158,12 @@ de orden no re-litiga eso.
 Instagram, el chip de plataforma no aparece. Es lo que evita el problema que el handoff ya anotó una
 vez: un control que no hace nada *"se leía como mobiliario"*.
 
+**🟢 §7 confirmada en producción el 26/08, y por su lado silencioso.** En la colección *"Test"* la
+barra **no dibuja ninguna faceta**, y es correcto: los 57 videos son `idioma = en` y los 57 son de
+Instagram, o sea **un solo valor en cada una**. La regla se ve funcionando justo donde es invisible
+— no hay dos chips que digan *"en 57"* y *"instagram 57"* ocupando lugar para no filtrar nada.
+Es también el aviso para el que la pruebe: *no ver las facetas no es que estén rotas.*
+
 **8. El estado es local (`useState`), no un query param.** Como `filtro` y `plegados` hoy. Un
 `?orden=likes` obligaría al server a releer, que es justo el viaje que esta decisión evita. Si algún
 día hace falta compartir vistas, ahí se gana el lugar.
@@ -192,8 +198,13 @@ día hace falta compartir vistas, ahí se gana el lugar.
   memoria. Hoy son 209 / 377 / 57 y los descartes. Si el Feed pasa de ~1-2k filas hay que volver a
   paginar, y ahí el orden **tiene que mudarse a la query** — con la salvedad de §1: en Colecciones eso
   no es posible sin materializar la fusión.
-- (−) *Título A-Z* en Colecciones ordena todo-nulos hoy (0 de 57 tienen título), o sea que deja el
-  orden de inserción. Degrada honesto y se llena solo cuando alguien corre *Identificar*.
+- (+) 🩸 **Corregido el 26/08 al verlo en pantalla: el título está en 57 de 57, no en 0.** Este ADR
+  decía lo contrario y sacaba de ahí una consecuencia entera (*"Título A-Z ordena todo-nulos y deja
+  el orden de inserción"*), que era falsa: el criterio funciona. El error estuvo en la medición, no
+  en el diseño — el cruce que la produjo tomaba `titulo` **sólo de `app.videos_meta`** (5 filas),
+  mientras que `fusionar()` lo toma de las tres fuentes con `app.candidatos` primero. *Es la lección
+  de ADR-072 otra vez, en su versión inversa: allá se contó un match de más y acá uno de menos, las
+  dos por medir una parte y concluir sobre el todo.* Lo destapó la pantalla, no una re-lectura.
 - (−) **La barra de Descartes queda flaca**: dos criterios de orden y una faceta. Es lo honesto para
   una tabla sin métricas, pero conviene saberlo antes de montarla y leerlo como que quedó a medias.
 - (−) *Engagement* no se puede ordenar en Colecciones ni en Históricos. Si se pide, el camino barato
