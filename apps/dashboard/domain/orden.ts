@@ -71,3 +71,73 @@ export function ordenar<T>(
     return direccion === "asc" ? cmp : -cmp;
   });
 }
+
+// ── Facetas ───────────────────────────────────────────────────────────────────
+//
+// 🔴 **La línea que no se cruza (ADR-076 §4): el filtro que EDITA no es el filtro que MIRA.**
+//
+// Los chips que ya existen filtran por un atributo **mutable desde la pantalla**:
+//  · `FILTROS` de `domain/feed.ts` filtra por calificación, y **se aplica en la query** (`leerMazo`).
+//    Eso es lo que sostiene *"una tarjeta calificada no se va del mazo"* (ADR-034 /
+//    plan-cockpit §D6.4): si filtrara acá en el cliente, calificar haría desaparecer la tarjeta de
+//    abajo del cursor y un misclick sobre 209 tarjetas sería irrecuperable desde la pantalla.
+//  · `FILTROS_REGISTRO` de `domain/grabados.ts` filtra por grabado, y ya vive en el cliente.
+//
+// Estas facetas son de otra especie: **nadie edita `idioma` ni `plataforma` desde la pantalla**, así
+// que un `.filter()` vivo no puede hacer desaparecer nada y no necesitan congelado.
+//
+// ⚠️ **Los dos sistemas conviven en la misma barra y NO se unifican.** Meter el chip de calificación
+// acá adentro reintroduce el bug que ADR-034 ya resolvió.
+
+/** Un eje categórico por el que se puede filtrar. `null` = esta fila no lo tiene. */
+export type Faceta<T> = {
+  clave: string;
+  etiqueta: string;
+  valor: (item: T) => string | null;
+};
+
+/** Un valor presente en los datos, con cuántas filas lo tienen. */
+export type OpcionFaceta = { valor: string; cuantos: number };
+
+/**
+ * Los valores que esta faceta tiene **en lo que está cargado**, del más poblado al menos.
+ *
+ * 🔑 **Los nulos no se listan.** *"No lo sé"* no es una categoría: es la misma regla que la tarjeta
+ * aplica al dibujar la falta como falta y no como un dato (ADR-072 §4). La consecuencia hay que
+ * saberla: con algo elegido, las filas sin valor quedan afuera y se recuperan apagando la faceta.
+ *
+ * El largo de esto es lo que decide si la faceta se dibuja: con menos de 2 opciones es un control
+ * que no hace nada, y un control que no hace nada se lee como mobiliario (ADR-076 §7).
+ */
+export function opcionesDe<T>(items: readonly T[], faceta: Faceta<T>): OpcionFaceta[] {
+  const cuenta = new Map<string, number>();
+  for (const item of items) {
+    const valor = faceta.valor(item);
+    if (valor === null || valor === "") continue;
+    cuenta.set(valor, (cuenta.get(valor) ?? 0) + 1);
+  }
+
+  return [...cuenta.entries()]
+    .map(([valor, cuantos]) => ({ valor, cuantos }))
+    .sort((a, b) => b.cuantos - a.cuantos || a.valor.localeCompare(b.valor, "es"));
+}
+
+/**
+ * Deja pasar las filas cuyo valor está entre los elegidos.
+ *
+ * **Sin nada elegido pasa todo**, que es el estado de reposo: montar una faceta no cambia lo que la
+ * pantalla venía mostrando. Varios elegidos son un OR. **No reordena** — filtrar y ordenar son dos
+ * actos y el orden de entrada se respeta.
+ */
+export function filtrarPor<T>(
+  items: readonly T[],
+  faceta: Faceta<T>,
+  elegidos: readonly string[],
+): T[] {
+  if (elegidos.length === 0) return [...items];
+  const quiero = new Set(elegidos);
+  return items.filter((item) => {
+    const valor = faceta.valor(item);
+    return valor !== null && quiero.has(valor);
+  });
+}
