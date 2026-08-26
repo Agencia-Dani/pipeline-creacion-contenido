@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { AgregarAColeccion } from "@/components/video/agregar-a-coleccion";
 import { GrillaVideos, GrupoPlegable } from "@/components/video/grupos";
+import { BarraOrden, usarOrden } from "@/components/video/orden";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { BotonArchivar } from "../../operar/boton-archivar";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,8 @@ import {
   type CandidatoFeed,
   type Filtro,
 } from "@/domain/feed";
+// 🔴 `ordenar` sale del dominio, NO del componente: `orden.tsx` no lo re-exporta.
+import { ordenar, type CriterioOrden, type Faceta } from "@/domain/orden";
 import { calificarCandidato, calificarSeleccion, leerMazo } from "./actions";
 import { Detalle } from "./detalle";
 import { Tarjeta } from "./tarjeta";
@@ -42,6 +45,27 @@ import { Tarjeta } from "./tarjeta";
 // Los contadores de los chips salen igual de los cuatro `head` counts del server más los cambios
 // de esta sesión (`ajustarCuentas`), y no de `cargados`: el chip de "🔥" tiene que decir cuántos
 // hay **en la tabla**, no cuántos hay en el filtro que está abierto.
+
+// Los ejes de orden y filtro del mazo (ADR-076).
+//
+// 🔑 **A nivel de módulo**: `usarOrden` memoiza contra estas referencias.
+//
+// El Feed es la única de las cuatro pantallas que tiene `engagement` y `relevanciaScore` en su
+// tipo, así que es la única que puede ofrecerlos. **Sin `heat`**: el mazo ya viene ordenado por
+// heat descendente y ese ES el default ("Lo que muestra la pantalla"); ofrecerlo otra vez sería el
+// mismo orden con otro nombre.
+const CRITERIOS: readonly CriterioOrden<CandidatoFeed>[] = [
+  { clave: "likes", etiqueta: "Likes", valor: (c) => c.likes },
+  { clave: "views", etiqueta: "Vistas", valor: (c) => c.views },
+  { clave: "seguidores", etiqueta: "Seguidores", valor: (c) => c.seguidores },
+  { clave: "engagement", etiqueta: "Interacción", valor: (c) => c.engagement },
+  { clave: "relevancia", etiqueta: "Relevancia", valor: (c) => c.relevanciaScore },
+  { clave: "titulo", etiqueta: "Título A-Z", valor: (c) => c.titulo },
+];
+
+const FACETAS: readonly Faceta<CandidatoFeed>[] = [
+  { clave: "idioma", etiqueta: "Idioma", valor: (c) => c.idioma },
+];
 
 export function Mazo({
   inicial,
@@ -72,6 +96,10 @@ export function Mazo({
   const [errorLista, setErrorLista] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [cargando, startCargar] = useTransition();
+  // Va acá arriba con los demás hooks y no donde se calcula `grupos` (que vive justo antes del
+  // `return`): ahí funcionaría hoy sólo porque no hay ningún early return por encima, y sería una
+  // trampa para el próximo que agregue uno.
+  const orden = usarOrden(cargados, CRITERIOS, FACETAS);
 
   const efectiva = (c: CandidatoFeed): Calificacion | null => puestas[c.id] ?? c.calificacion;
 
@@ -189,7 +217,22 @@ export function Mazo({
     });
   }
 
-  const grupos = agrupar(cargados);
+  // 🔑 Se filtra ANTES de agrupar (`orden.visibles`) y se re-ordena DESPUÉS, dentro de cada grupo.
+  // Son dos pasos y no uno porque `agrupar()` ordena por heat adentro de cada grupo — está en su
+  // contrato y las otras pantallas dependen de eso, así que pisaría el criterio elegido. Con el
+  // criterio en `null` (el default) el segundo `ordenar` no hace nada y el mazo queda como siempre.
+  //
+  // 🔴 Ordenar NO aplana los grupos: `domain/feed.ts` tiene escrito que los criterios de relevancia
+  // son por proyecto y mezclarlos vuelve inconsistente el juicio. Un control de orden no re-litiga
+  // eso (ADR-076 §6).
+  const grupos = agrupar(orden.visibles).map((g) => ({
+    ...g,
+    candidatos: ordenar(
+      g.candidatos,
+      CRITERIOS.find((c) => c.clave === orden.claveCriterio) ?? null,
+      orden.direccion,
+    ),
+  }));
   const abierto = cargados.find((c) => c.id === abiertoId) ?? null;
   const pendientes = ajustadas["sin-calificar"];
 
@@ -210,6 +253,9 @@ export function Mazo({
             {ETIQUETA_FILTRO[f]} <span className="text-muted-foreground">{ajustadas[f]}</span>
           </button>
         ))}
+        {/* La barra convive con los chips de calificación y NO se unifica con ellos: aquéllos
+            filtran un atributo mutable y por eso van a la query (ADR-034 / ADR-076 §4). */}
+        <BarraOrden orden={orden} />
         <span className="ml-auto flex flex-wrap items-center gap-2">
           {/* Archivar vive acá y en Operar, el mismo componente (ver `boton-archivar.tsx`). Acá
               porque es donde alguien termina de calificar: hasta hoy, para que lo calificado
@@ -291,6 +337,11 @@ export function Mazo({
           por un instante mientras una calificación viaja. */}
       {cargados.length > 0 && (
         <p className="text-center text-sm text-muted-foreground">
+          {/* 🩸 Con una faceta prendida esto decía "146 tarjetas." mostrando 2, y eso se lee como un
+              bug aunque el número sea correcto. El total sigue saliendo de `cargados` —nunca de lo
+              visible, que es la regla del tope de este archivo— y lo que se agrega adelante es
+              cuántas de esas está dejando pasar el filtro. Sin filtro, la frase no cambia. */}
+          {orden.visibles.length < cargados.length && `${orden.visibles.length} de `}
           {cargados.length} {cargados.length === 1 ? "tarjeta" : "tarjetas"}.
         </p>
       )}
