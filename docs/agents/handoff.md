@@ -22,23 +22,23 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> # 🛑 n8n ESTÁ CAÍDO (26/08, ~20:00) — 502 en TODO, `/healthz` incluido
-> No es el cambio: el nginx contesta y el proceso de n8n detrás no. **El push murió en el `GET`
-> inicial, que ocurre ANTES de cualquier escritura**, así que no quedó nada a medias y el motor vivo
-> sigue con el código viejo (el del `|| 'es'`).
-> Ya pasó antes y volvió solo (cierre 115: *"n8n volvió"*). Cuando responda, correr el comando de
-> abajo — es lo único que falta.
-
-> # 🔴 UN COMANDO PENDIENTE — el arreglo del idioma está escrito y probado, pero NO en el motor vivo
-> ```bash
-> cd core/scripts && npm run n8n:push -- motor --nodos "Transcribir (Supadata)" --apply
-> ```
-> El dry-run ya corre limpio: toca **sólo** el `jsCode` de ese nodo (5833b → 6749b) y avisa
-> `⚠ 1 placeholder(s) resueltos desde el .env y NO del live: <SUPADATA_API_KEY>`, que es lo esperado
-> (ADR-077). **Antes se verificó que esa key del `.env` es idéntica a la del live**, así que para ese
-> placeholder la escritura es un no-op demostrado.
-> Después: `npm run n8n:diff` tiene que dar **verde en los 5**.
-> *La mitad de la app (el etiquetado `'otro'`) ya está desplegada por Vercel; la del motor no.*
+> # ✅ EL ARREGLO DEL IDIOMA ESTÁ EN EL MOTOR VIVO (27/08 01:10 UTC) — ADR-077
+> `npm run n8n:push -- motor --nodos "Transcribir (Supadata)" --apply` → **aplicado, 1 nodo, el
+> workflow sigue activo** (34 nodos, topología intacta). Verificado por **dos señales
+> independientes**:
+> 1. `n8n:diff` → **✓ Los 5 workflows corren lo que dice el repo.**
+> 2. Lectura directa del nodo en el live: la línea es
+>    `const idioma = c.lang || guessLang(c.txt) || d.idioma_guess || 'otro';`, no queda ningún
+>    `|| 'es';`, el comentario nuevo está, y 🔒 **la `KEY` quedó con su valor real y no con el
+>    placeholder literal** — que es el modo de falla con el que este repo ya se quemó dos veces.
+>
+> 🩸 **n8n estuvo caído ~5 minutos justo al intentarlo** (502 en todo, `/healthz` incluido). El push
+> murió en el `GET` inicial, o sea **antes de cualquier escritura**: no hubo estado a medias. Volvió
+> solo, como en el cierre 115. *Vale como dato operativo: la instancia se cae sola y vuelve sola, y
+> el push es seguro de reintentar porque lee antes de escribir.*
+>
+> Rollback, si hiciera falta:
+> `node n8n-sync.mjs restore motor .n8n-snapshots/motor-2026-08-27T01-10-15-371Z.json --apply`
 
 > # ✅ EL DEFECTO DEL IDIOMA — arreglado en el repo (26/08), ver ADR-077
 > Salió de contestar *"¿el sistema soporta referentes en cualquier idioma?"*. **Sí lo soporta** — la
