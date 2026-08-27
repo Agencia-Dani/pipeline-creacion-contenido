@@ -4,6 +4,19 @@
 > `superpowers:subagent-driven-development` o `superpowers:executing-plans`. Los pasos usan
 > checkbox (`- [ ]`) para llevar la cuenta.
 
+> ## ✅ EJECUTADO Y LIVE — 2026-08-26
+> Las 7 tareas cerradas, verificadas contra producción pantalla por pantalla, y desplegadas
+> (`d88c419..5915a14`, Vercel `success`). El detalle de lo que se encontró construyendo está en el
+> **cierre 116** de [handoff.md](./handoff.md); las dos reglas que el plan **no** tenía y que se
+> pagaron construyendo están en el ADR: **§9 (se ordena por lo que la tarjeta muestra)** y el
+> corolario de **§5 (el default `null` = no reordenar)**.
+>
+> Se sumó fuera de plan, a pedido de Mani: **borrar una colección desde la UI** — la action existía
+> sin llamador (`73dd92a`, `3431353`). Y quedó **una corrección de medición** anotada en el ADR: el
+> título de la colección de prueba era 57/57, no 0/57.
+>
+> *Este doc queda como el registro de cómo se planificó, no como una lista de tareas pendientes.*
+
 **Objetivo:** que las 4 pantallas que dibujan `TarjetaVideo` puedan ordenarse (asc/desc) y
 filtrarse por facetas, sin una query nueva ni una migración.
 

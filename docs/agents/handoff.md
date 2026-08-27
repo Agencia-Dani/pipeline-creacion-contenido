@@ -22,6 +22,32 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🟡 DEFECTO ENCONTRADO Y NO ARREGLADO — el motor no traduce si Supadata no dice el idioma (26/08)
+> Salió de contestar *"¿el sistema soporta referentes en cualquier idioma?"*. **Sí lo soporta** — la
+> cadena entera es agnóstica y `Heat-score` hasta le da `boost_idioma` +0.3 a lo no-español (medido:
+> 207 de 209 del Feed son `en`). Pero hay una grieta, y **no es Supadata**:
+>
+> ```js
+> // nodo Transcribir (Supadata)
+> const idioma = c.lang || guessLang(c.txt) || d.idioma_guess || 'es';
+> ```
+>
+> `guessLang` es un diccionario de stopwords que sólo conoce **es/en/pt/it/fr**. Si Supadata
+> devuelve el transcript **sin `lang`**, un video en japonés/alemán/árabe marca 0 en el diccionario,
+> cae al default `'es'` y **nunca se traduce**: al equipo le llega el guion en el idioma original.
+> No falla, degrada en silencio.
+>
+> 🩸 **Y viola un invariante escrito.** `apps/dashboard/lib/transcribir.ts` abre diciendo *"esto
+> tiene que producir el MISMO script literal que el motor"*, pero el transcriptor de la app hace
+> `idioma === "es" ? texto : traducir(texto)` ⇒ con `lang` vacío **sí traduce**. Mismo video, dos
+> resultados según por dónde entró.
+>
+> **Frecuencia: desconocida** — no guardamos el `lang` crudo. Se mide barato (loguear `resp.lang` en
+> el nodo durante una corrida). El arreglo es **una línea**: borrar el `|| 'es'` y dejar que vacío
+> signifique *traducí igual*, como ya hace la app. Va por `n8n:push` (son `parameters`, no
+> topología). *No se tocó en esta sesión porque estaba fuera del pedido y toca el motor en
+> producción.*
+
 > # ✅ ADR-076 ESTÁ LIVE (26/08) — el orden y el filtro ya se ven en producción
 > Pusheado (`d88c419..5915a14`) y desplegado. Verificado por **dos señales independientes**: la
 > huella del HTML de prod cambió y se mantuvo estable en 3 requests, y **Vercel reporta `success`
@@ -3500,9 +3526,30 @@ pantallas traen todo a memoria (209 / 82 / 420 / 57 y ningún lector tiene `limi
 a paginar, el orden tiene que mudarse a la query — salvo en Colecciones, donde no se puede sin
 materializar `fusionar()`.
 
-**Qué sigue:** `git push` (lo único que separa esto de estar live) → avisarle a Majo → decidir si se
-tapa el hueco de `borrar`. Skills sugeridas: `/diagnose` si el deploy de Vercel se queja, `/tdd` para
-la action huérfana.
+**La sesión arrancó con DOS preguntas, y la primera también dejó cola.** *"¿Soporta referentes en
+cualquier idioma?"* → **sí**, y la cadena tiene 6 eslabones de los que Supadata es uno solo (Apify
+colecta agnóstico · `Heat-score` **premia** lo no-español con `boost_idioma` +0.3 · Supadata
+transcribe con `mode=auto` · Haiku traduce si no es `es` · el gate juzga multilingüe · `normLang`
+sólo etiqueta). Probado en la base: los 2 candidatos con `idioma='otro'` **volvieron traducidos al
+español**, o sea que un idioma fuera del diccionario de 5 pasó la cadena entera. **Pero apareció una
+grieta que quedó sin arreglar y está anotada arriba en §Pendiente vivo**: el `|| 'es'` del nodo
+`Transcribir`, que hace que un idioma no reconocido nunca se traduzca — y que además pone al motor y
+al transcriptor de la app a discrepar, contra un invariante que `lib/transcribir.ts` tiene escrito.
+
+**Docs actualizados esta sesión** (auditados uno por uno, no a ojo): ADR-076 + su fila en el índice ·
+`CLAUDE.md` (rango de ADRs + el plan en el mapa) · `plan-orden-y-filtro.md` (marcado ejecutado) ·
+`verificaciones-humanas.md` (§12 cerrada) · `apps/dashboard/README.md` (el mapa del código) ·
+**`onboarding-equipo-redes.md`**, donde apareció un agujero aparte: **el manual de Majo y Jero no
+mencionaba Colecciones ni una vez** (0 coincidencias; el doc es del 05/08 y ADR-073 es del 21/08). Se
+le agregó la fila en la tabla de pantallas, la sección §4.2 de ordenar/filtrar y, en §9, la deuda
+declarada de que Colecciones y la limpieza de guiones **todavía no tienen su sección propia**.
+*No se tocaron* `PLAN.md` (su §3.1 está capada a las ADR fundacionales por regla escrita),
+`context.md` (los 6 sustantivos del dominio ya estaban y esta feature no agregó ninguno),
+`dev-doc.md` ni `mapa-campos.md` (n8n y Airtable, sin cambios).
+
+**Qué sigue:** medir cuántas veces Supadata devuelve `lang` vacío y decidir el `|| 'es'` · escribirle
+a Colecciones su sección del manual · el filtro por referente, que es lo primero que van a pedir.
+Skills sugeridas: `/diagnose` para la grieta del idioma, `/tdd` si se toca el nodo.
 
 **2026-08-09 (cierre 106) — El cockpit de LinkedIn queda listo para configurar, y el ▶ disparaba la máquina equivocada (Claude, con Alejandro).**
 **Qué se hizo:** las Fases 0, 1 y 3 del plan de integración de LinkedIn. Commits `8737b0e` (ADR-066: las interferencias), `b73086b` (ADR-067: perfil de voz) y `0453739` (feed y descartes), los tres pusheados. El cockpit pasó de **1 pantalla a 4**. Antes, limpieza pedida: se borraron las 2 filas `prueba rls` de `app.referentes_linkedin` (`be8e3a1`) — la voz "Alejo" **no se tocó porque ya no existía**, la había borrado el cierre 102.

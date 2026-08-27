@@ -4,6 +4,10 @@
 > dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
 > falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
 >
+> *Actualizado: 2026-08-26 — se agregó **ordenar y filtrar** en las pantallas de video (§4.2) y
+> **Colecciones** entró a la tabla de pantallas (§4.1). ⚠️ Colecciones y la limpieza de guiones
+> todavía no tienen su sección propia acá: está anotado en §9.*
+>
 > *Actualizado: 2026-08-05 — Airtable y el Google Sheet salieron del sistema; todo vive en el
 > cockpit. Refleja el sistema ya estabilizado: el motor busca **solo por
 > referentes** (cuentas de Instagram y TikTok) — las keywords/hashtags se retiraron porque no
@@ -208,6 +212,7 @@ A la izquierda hay cuatro zonas. Esto es todo lo que hay y qué se toca en cada 
 | **Curar → Referentes** · **Sugeridos** | El banco de cuentas y la bandeja de propuestas (§5.3, §8.1) | agregar, apagar, aprobar/descartar |
 | **Curar → Ajustes** | Las perillas (§5.5) | los valores |
 | **Curar → Históricos** | El archivo de sus guiones + qué ya grabaron | la **marca de grabado** y la carga de links ya grabados (+ los 2 botones de descarga) |
+| **Curar → Colecciones** | Apartar los videos que van a trabajar juntos, vengan de donde vengan | crear la colección, meterle videos pegando links, bajarla en Word o Excel, borrarla |
 | **Entender** | Precisión, salud y costos (§6.2) | **nada — solo lectura** |
 | **Transcribir** | Pegar un link suelto y recibir su texto | el link |
 
@@ -222,6 +227,33 @@ y, si quieren, **notas del equipo**.
 > ⚠️ **Hay dos campos del proyecto que cambian solos** — *criterios aprendidos* y una advertencia
 > sobre los criterios. Eso **no** es alguien editando: lo escribe la máquina cada domingo. Se leen en
 > **Criterios** de cada proyecto y ustedes no tienen que tocarlos.
+
+### 4.2 Ordenar y filtrar lo que están viendo *(nuevo, 26/08)*
+
+En **Feed**, **Descartes**, **Históricos** y adentro de una **Colección** hay arriba un
+**«Ordenar por»** con una flechita al lado.
+
+- El **orden que trae la pantalla al abrirla es el bueno** y por eso es la primera opción, que dice
+  *«Lo que muestra la pantalla»*. En el Feed eso es de más caliente a más frío; en Históricos, lo
+  último que pasó; en Descartes, los que más cerca estuvieron de pasar. **Si se pierden, vuelvan a
+  esa opción y queda como estaba.**
+- La **flecha ↓↑** da vuelta el orden. De más a menos, o de menos a más.
+- **Lo que no tiene el dato queda siempre último**, ordenen para donde ordenen. Un video sin likes
+  no es un video con cero likes: es uno del que no sabemos, y esos van al fondo en vez de ensuciar
+  la punta de la lista.
+
+Cada pantalla ofrece solo lo que puede: en una Colección pueden ordenar por **likes, vistas,
+seguidores, heat y título**; en Descartes solo por **relevancia, fecha y título**, porque de esos
+videos la máquina nunca llegó a guardar las métricas.
+
+**Y a veces aparecen unos chips de filtro** (por idioma, por origen). **Que no aparezcan no es que
+estén rotos:** un filtro solo se dibuja si hay al menos dos valores distintos para elegir. Si en una
+colección todos los videos son en inglés y todos de Instagram, no hay nada que filtrar y por eso no
+se muestra nada.
+
+> 🔎 Filtrar **no** hace desaparecer nada de la base: esconde de la vista. El contador de arriba
+> sigue diciendo cuántos hay en total, y cuando el filtro deja pasar menos, el pie del Feed avisa
+> *«2 de 146 tarjetas»* para que no parezca que se perdieron.
 
 ---
 
@@ -767,6 +799,12 @@ Honestidad por adelantado, para que no se sorprendan:
   portugués: todos los no-español reciben el mismo empujón.
 - **El orden es menos estable con poco volumen.** Con pocas corridas el heat score puede ser ruidoso; se
   afina a medida que entra más data y ustedes califican.
+- **No se puede filtrar por referente** (§4.2). Se puede ordenar por casi cualquier número y filtrar
+  por idioma y origen, pero *"mostrame solo lo de esta cuenta"* todavía no está. Si lo necesitan,
+  pídanlo — es lo primero de la lista.
+- **El manual todavía le debe una sección a Colecciones y a la limpieza de guiones.** Las dos
+  pantallas existen y funcionan; lo que falta es explicarlas acá con el detalle del resto. Mientras
+  tanto está la fila en la tabla de §4.1 y el ⓘ de cada campo.
 
 Ninguna de estas rompe el uso diario. Son cosas en la lista para mejorar más adelante.
 

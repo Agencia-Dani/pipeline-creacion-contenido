@@ -29,6 +29,11 @@ Zod en los bordes · sin ORM (el schema vive en [`core/schema/`](../../core/sche
   arma *la frase*; la FK sigue siendo *la garantía*) y **`tenant.ts`** (**de quién es cada cosa**:
   la visibilidad por el árbol de `clients.parent_id`, con tope de profundidad porque un ciclo
   colgaría el request — [ADR-046](../../docs/adr/ADR-046-el-cockpit-es-multi-tenant.md)).
+  **`orden.ts`** (ADR-076) es el más chico y el que más pantallas toca: ordena y filtra en memoria
+  las listas de video de las 4 pantallas que dibujan `TarjetaVideo`. Dos invariantes viven ahí y no
+  son negociables — **los nulos van al final en las dos direcciones** (un `null` es *no lo sé*, no
+  *cero*) y **un empate no reordena** (se apoya en que `Array.prototype.sort` es estable desde
+  ES2019, así que el desempate es el orden que la pantalla ya traía).
   Se testea con `node:test`.
 - `lib/` — clientes Supabase (server con anon key + `admin.ts` con service_role, solo BFF),
   `ajustes.ts`, `referentes.ts` y `proyectos.ts` (los dominios de config, todos en Postgres desde
