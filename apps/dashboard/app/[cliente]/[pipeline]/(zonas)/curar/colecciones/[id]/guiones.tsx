@@ -38,10 +38,11 @@ export function Guiones({
   const [pestana, setPestana] = useState<Pestana>("crudo");
   const [textos, setTextos] = useState<{ crudo: string | null; limpio: string | null } | null>(null);
   // 🩸 Sin esto, `textos === null` significaba DOS cosas —"todavía no llegó" y "no va a llegar"— y
-  // la pantalla dibujaba la primera para siempre. `verGuiones` atrapa sus propios errores, pero
-  // nada atrapa que falle la llamada misma (la función se cae, se corta la red, vuelve un 500):
-  // ahí la promesa rechaza, nadie la escucha y el skeleton queda pulsando sin fin. Es el mismo
-  // síntoma que el loop de identidad de `usarCockpit` (26/08), por un camino distinto.
+  // la pantalla dibujaba la primera para siempre. Recoge los dos modos de falla, que llegan por
+  // caminos distintos: la acción devuelve `ok: false` (no pudo leer Supabase, o el id no es un
+  // video), o la llamada misma rechaza y ni siquiera hay respuesta (la función se cae, se corta la
+  // red, vuelve un 500). Los dos terminaban en un skeleton eterno o —peor, el de `ok: false`— en
+  // un cartel que afirmaba que el video no tenía guion sin haber podido mirar.
   const [error, setError] = useState<string | null>(null);
   const [borrando, startTransition] = useTransition();
 
@@ -58,7 +59,11 @@ export function Guiones({
     setPestana(tieneLimpio ? "limpio" : "crudo");
     verGuiones(cockpit, video.plataforma, video.external_id)
       .then((r) => {
-        if (!cancelado) setTextos(r);
+        if (cancelado) return;
+        // Los dos brazos son el punto: la acción falló, o trajo lo que hay (que puede ser nada).
+        // Antes las dos cosas llegaban como un par de `null` y acá se dibujaban igual.
+        if (r.ok) setTextos({ crudo: r.crudo, limpio: r.limpio });
+        else setError(r.mensaje);
       })
       .catch((e) => {
         console.error("[colecciones] no se pudo pedir el guion:", e);

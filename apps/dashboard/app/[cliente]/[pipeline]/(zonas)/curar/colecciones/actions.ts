@@ -424,24 +424,39 @@ async function enriquecerLote(
  * 🔑 **Se piden al abrir, no vienen con la grilla.** Es la regla del payload de `domain/feed.ts`,
  * medida en su momento: los textos largos eran 240 KB de los 337 que viajaban en cada carga, para
  * dibujar tarjetas que no los muestran. El limpio entra en el mismo saco.
+ *
+ * 🩸 **Devuelve `ok`, y no un par de `null`, porque los dos `null` MENTÍAN.** Hasta el 27/08 un
+ * fallo leyendo Supabase salía por acá idéntico a un video sin guion, y la pantalla lo anunciaba
+ * como *"El sistema no tiene el guion de este video"* — una afirmación sobre los datos hecha con
+ * un error de lectura como única evidencia. El modo de falla no es que se rompa: es que **no se
+ * rompe**, y alguien decide sobre un video creyendo que no tiene guion.
+ *
+ * La forma es la de `verGuion` de Históricos, que ya lo tenía resuelto: `{ ok }` discriminado, el
+ * mensaje ya redactado para la pantalla, y el detalle técnico al log del servidor. Ausencia y
+ * fallo son cosas distintas y desde acá se dicen distinto.
  */
 export async function verGuiones(
   enRuta: CockpitEnRuta,
   plataforma: "instagram" | "tiktok",
   externalId: string,
-): Promise<{ crudo: string | null; limpio: string | null }> {
+): Promise<
+  { ok: true; crudo: string | null; limpio: string | null } | { ok: false; mensaje: string }
+> {
   const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
-  if (!z.string().min(1).max(30).safeParse(externalId).success) return { crudo: null, limpio: null };
+  // Un id que no pasa el filtro no es un video sin guion: es un video que no existe.
+  if (!z.string().min(1).max(30).safeParse(externalId).success) {
+    return { ok: false, mensaje: "Ese video no existe." };
+  }
 
   try {
     const [crudo, limpios] = await Promise.all([
       leerCrudo(ctx, plataforma, externalId),
       leerLimpios(ctx),
     ]);
-    return { crudo, limpio: limpios.get(`${plataforma}:${externalId}`)?.texto ?? null };
+    return { ok: true, crudo, limpio: limpios.get(`${plataforma}:${externalId}`)?.texto ?? null };
   } catch (e) {
     console.error("[colecciones] falló leer los guiones:", e);
-    return { crudo: null, limpio: null };
+    return { ok: false, mensaje: "No se pudo traer el guion. Probá de nuevo." };
   }
 }
 
