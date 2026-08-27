@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  advertenciaDeBorrado,
   COLUMNAS_COLECCION,
   necesitaEnriquecer,
   queFaltaEnriquecer,
@@ -134,4 +135,25 @@ test("lo que no se sabe va vacío, no inventado", () => {
 
 test("una colección vacía da una tabla vacía, no una fila fantasma", () => {
   assert.deepEqual(tablaDeColeccion([]), []);
+});
+
+// ── advertenciaDeBorrado ─────────────────────────────────────────────────────
+
+test("una colección vacía no advierte nada que perder", () => {
+  assert.equal(advertenciaDeBorrado(0), "Está vacía.");
+});
+
+test("con videos dice cuántos se van Y qué se queda", () => {
+  // Las dos mitades importan: el número es lo que se pierde, la segunda frase es lo que NO —
+  // y sin esa mitad la advertencia asusta de más (ADR-073: la bolsa es descartable, lo pagado no).
+  const a = advertenciaDeBorrado(57);
+  assert.match(a, /57/);
+  assert.match(a, /guiones limpios y la metadata comprada se quedan/);
+});
+
+test("un solo video no rompe la frase", () => {
+  assert.equal(
+    advertenciaDeBorrado(1),
+    "Se va la lista de 1. Los guiones limpios y la metadata comprada se quedan.",
+  );
 });

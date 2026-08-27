@@ -3477,6 +3477,16 @@ Verificado end-to-end en una colección desechable: aviso con 0 videos, `Cancela
 inicial, aviso con 1 video, `Sí, borrar` ⇒ la tarjeta desaparece y la base confirma **0 miembros
 huérfanos, `Test` intacta en 57 y `videos_meta` en 5**.
 
+**Y después también adentro de la colección** (pedido de Mani), que **no es el mismo caso**: en el
+índice la tarjeta desaparece y eso alcanza, pero acá la pantalla que estás mirando dejó de existir
+⇒ `router.push` al índice. Quedarse mostraría una colección borrada hasta que alguien recargue, y
+ahí `notFound`. Va **al final de la pantalla** y no junto al nombre: es la única acción de ahí que
+no se deshace, y al lado del título quedaba a un pixel del gesto de volver.
+🔑 **La advertencia se extrajo a `domain/colecciones.ts` (`advertenciaDeBorrado`, 3 tests)** porque
+ahora la dicen dos pantallas — *dos frases distintas para el mismo acto es cómo alguien aprende que
+una es otra cosa*. Verificado: la advertencia dice lo mismo en los dos lados, y borrando desde
+adentro la URL pasa de `/colecciones/<id>` a `/colecciones` con la lista ya sin ésta.
+
 **✅ Verificación humana §12 cerrada el mismo día** ([verificaciones-humanas](../verificaciones-humanas.md)):
 el invariante de los nulos, con una colección propia de 3 videos reales + 1 link sintético. Likes ↓
 y ↑ dan vuelta los tres reales y **el sin métricas no se mueve del último lugar**. La colección se

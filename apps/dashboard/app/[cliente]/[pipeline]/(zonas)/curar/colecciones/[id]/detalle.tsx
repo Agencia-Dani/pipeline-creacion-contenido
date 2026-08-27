@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { BotonBorrar } from "@/components/borrar";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,14 +10,21 @@ import { GrillaVideos } from "@/components/video/grupos";
 import { BarraOrden, usarOrden } from "@/components/video/orden";
 import { BarraSeleccion, BotonSeleccionar, usarSeleccion } from "@/components/video/seleccion";
 import { TarjetaVideo } from "@/components/video/tarjeta";
-import { COLUMNAS_COLECCION, necesitaEnriquecer, tablaDeColeccion } from "@/domain/colecciones";
+import {
+  advertenciaDeBorrado,
+  COLUMNAS_COLECCION,
+  necesitaEnriquecer,
+  tablaDeColeccion,
+} from "@/domain/colecciones";
 import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
 import type { CriterioOrden, Faceta } from "@/domain/orden";
 import type { Video } from "@/domain/video";
 import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
+import { rutaDe } from "@/domain/rutas";
 import { usarCockpit } from "../../../usar-cockpit";
 import {
   agregarPegados,
+  borrar,
   descargar,
   identificarFaltantes,
   limpiarFaltantes,
@@ -69,6 +78,7 @@ export function Detalle({
   conLimpio: string[];
 }) {
   const cockpit = usarCockpit();
+  const router = useRouter();
   const [texto, setTexto] = useState("");
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null);
   const [trabajando, startTransition] = useTransition();
@@ -368,6 +378,33 @@ export function Detalle({
           </p>
         </>
       )}
+
+      {/* 🔑 Va al FINAL, y no arriba junto al nombre. Es la única acción de esta pantalla que no se
+          deshace, y al lado del título quedaría a un pixel del gesto de volver. Acá hay que bajar a
+          buscarla, que es la fricción correcta para un acto así. */}
+      <div className="rounded-lg border p-4">
+        <p className="font-medium">Borrar esta colección</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Se va la lista, no los videos: podés volver a armarla pegando los mismos links, y lo que
+          ya se pagó no se paga de nuevo.
+        </p>
+        <div className="mt-3">
+          <BotonBorrar
+            etiqueta="Borrar la colección"
+            advertencia={advertenciaDeBorrado(videos.length)}
+            deshabilitado={trabajando}
+            onBorrar={() => borrar(cockpit, coleccionId)}
+            onResultado={(r) => {
+              // 🔴 Al salir bien hay que IRSE. Distinto del índice, donde la tarjeta desaparece y
+              // eso alcanza: acá la pantalla que estás mirando dejó de existir, y quedarse muestra
+              // una colección borrada hasta que alguien recargue (y ahí `notFound`). La action
+              // revalida el índice, así que al llegar la lista ya viene sin ésta.
+              if (r.ok) router.push(rutaDe(cockpit, "curar/colecciones"));
+              else setAviso(r);
+            }}
+          />
+        </div>
+      </div>
 
       <Guiones
         coleccionId={coleccionId}

@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { BotonBorrar } from "@/components/borrar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { NOMBRE_MAX } from "@/domain/colecciones";
+import { advertenciaDeBorrado, NOMBRE_MAX } from "@/domain/colecciones";
 import { rutaDe } from "@/domain/rutas";
 import type { Coleccion } from "@/lib/colecciones";
 import { usarCockpit } from "../../usar-cockpit";
@@ -93,14 +93,8 @@ export function Indice({ colecciones }: { colecciones: Coleccion[] }) {
               <div className="mt-auto flex justify-end border-t px-2 py-1">
                 <BotonBorrar
                   etiqueta="Borrar"
-                  // Dice la verdad completa de ADR-073 y por eso tranquiliza en vez de asustar: la
-                  // bolsa es descartable, **lo que se pagó no**. Con la colección vacía no hay nada
-                  // que advertir.
-                  advertencia={
-                    c.videos === 0
-                      ? "Está vacía."
-                      : `Se va la lista de ${c.videos}. Los guiones limpios y la metadata comprada se quedan.`
-                  }
+                  // La frase vive en el dominio: la dicen las DOS pantallas y no pueden divergir.
+                  advertencia={advertenciaDeBorrado(c.videos)}
                   onBorrar={() => borrar(cockpit, c.id)}
                   onResultado={(r) =>
                     setErroresBorrado((previo) =>

@@ -68,6 +68,25 @@ export function queFaltaEnriquecer(videos: readonly Video[]): Video[] {
 }
 
 
+// ── Borrar la colección ──────────────────────────────────────────────────────
+
+/**
+ * Lo que hay que saber **antes** de decir que sí.
+ *
+ * 🔑 **Vive acá porque lo dicen DOS pantallas** (el índice y el detalle), y dos frases distintas
+ * para el mismo acto es cómo alguien aprende que una es otra cosa. Es el mismo criterio con el que
+ * este repo trata cualquier regla duplicada: *dos implementaciones serían dos verdades*.
+ *
+ * Dice la verdad completa de ADR-073 y por eso **tranquiliza en vez de asustar**: la bolsa es
+ * descartable, lo que se pagó no. El `on delete cascade` llega hasta `colecciones_videos`;
+ * `app.videos_meta` y los guiones limpios se quedan donde están.
+ */
+export function advertenciaDeBorrado(videos: number): string {
+  return videos === 0
+    ? "Está vacía."
+    : `Se va la lista de ${videos}. Los guiones limpios y la metadata comprada se quedan.`;
+}
+
 // ── La colección como tabla (el `.xlsx`) ─────────────────────────────────────
 //
 // 🔑 **Por qué existe además del Word.** El `.docx` es para *leer* un guion; esto es para *operar*
