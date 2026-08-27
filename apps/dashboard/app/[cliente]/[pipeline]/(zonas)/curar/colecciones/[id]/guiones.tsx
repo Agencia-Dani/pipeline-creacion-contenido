@@ -37,6 +37,12 @@ export function Guiones({
   const cockpit = usarCockpit();
   const [pestana, setPestana] = useState<Pestana>("crudo");
   const [textos, setTextos] = useState<{ crudo: string | null; limpio: string | null } | null>(null);
+  // 🩸 Sin esto, `textos === null` significaba DOS cosas —"todavía no llegó" y "no va a llegar"— y
+  // la pantalla dibujaba la primera para siempre. `verGuiones` atrapa sus propios errores, pero
+  // nada atrapa que falle la llamada misma (la función se cae, se corta la red, vuelve un 500):
+  // ahí la promesa rechaza, nadie la escucha y el skeleton queda pulsando sin fin. Es el mismo
+  // síntoma que el loop de identidad de `usarCockpit` (26/08), por un camino distinto.
+  const [error, setError] = useState<string | null>(null);
   const [borrando, startTransition] = useTransition();
 
   // Los textos se piden AL ABRIR, no vienen con la grilla: la regla del payload de `domain/feed.ts`,
@@ -48,10 +54,16 @@ export function Guiones({
     }
     let cancelado = false;
     setTextos(null);
+    setError(null);
     setPestana(tieneLimpio ? "limpio" : "crudo");
-    verGuiones(cockpit, video.plataforma, video.external_id).then((r) => {
-      if (!cancelado) setTextos(r);
-    });
+    verGuiones(cockpit, video.plataforma, video.external_id)
+      .then((r) => {
+        if (!cancelado) setTextos(r);
+      })
+      .catch((e) => {
+        console.error("[colecciones] no se pudo pedir el guion:", e);
+        if (!cancelado) setError("No se pudo traer el guion. Cerrá y volvé a abrir el video.");
+      });
     return () => {
       cancelado = true;
     };
@@ -128,7 +140,11 @@ export function Guiones({
           ))}
         </div>
 
-        {textos === null ? (
+        {error !== null ? (
+          // Va antes del skeleton a propósito: un fallo tiene que sacar la pantalla del estado de
+          // carga, no quedar debajo de él.
+          <p className="text-sm text-muted-foreground">{error}</p>
+        ) : textos === null ? (
           <div className="h-40 animate-pulse rounded-md bg-muted" />
         ) : activo ? (
           <p className="whitespace-pre-wrap text-sm">{activo}</p>
