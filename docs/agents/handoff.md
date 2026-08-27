@@ -22,6 +22,13 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🛑 n8n ESTÁ CAÍDO (26/08, ~20:00) — 502 en TODO, `/healthz` incluido
+> No es el cambio: el nginx contesta y el proceso de n8n detrás no. **El push murió en el `GET`
+> inicial, que ocurre ANTES de cualquier escritura**, así que no quedó nada a medias y el motor vivo
+> sigue con el código viejo (el del `|| 'es'`).
+> Ya pasó antes y volvió solo (cierre 115: *"n8n volvió"*). Cuando responda, correr el comando de
+> abajo — es lo único que falta.
+
 > # 🔴 UN COMANDO PENDIENTE — el arreglo del idioma está escrito y probado, pero NO en el motor vivo
 > ```bash
 > cd core/scripts && npm run n8n:push -- motor --nodos "Transcribir (Supadata)" --apply
