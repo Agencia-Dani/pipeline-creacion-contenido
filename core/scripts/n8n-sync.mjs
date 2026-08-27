@@ -199,6 +199,34 @@ function sustituir(valor, mapa, pendientes) {
   return valor;
 }
 
+/**
+ * Segunda fuente para los placeholders: el `.env` de la raíz.
+ *
+ * 🩸 **Por qué hizo falta** (ADR-077, 2026-08-26). Los placeholders se aprenden alineando el string
+ * del repo con su gemelo del live, y para un `jsCode` ese string es **el nodo entero**. O sea que
+ * editar el código rompe la alineación de ese nodo — y si el placeholder no aparece en ningún otro
+ * (`<SUPADATA_API_KEY>`: **1 sola vez en todo el repo**), no queda de dónde aprenderlo. El nodo se
+ * vuelve **imposible de empujar justo cuando lo querés cambiar**, que es el único momento en que
+ * importa. Lo destapó el arreglo del idioma del nodo `Transcribir`.
+ *
+ * 🔒 **Sigue siendo fail-closed y el live sigue mandando.** Esto sólo mira los que quedaron
+ * pendientes *después* de aprender; nunca pisa un valor del live. Si no está en ninguno de los dos,
+ * el push muere igual.
+ *
+ * 🔑 **Y avisa cuáles, nunca el valor.** Un push que resuelve un secreto desde otra fuente tiene que
+ * decirlo: si el `.env` estuviera desactualizado, esta línea es la que lo delata.
+ */
+function completarConEnv(mapa, pendientes) {
+  const puestos = [];
+  for (const ph of pendientes) {
+    const valor = process.env[ph.replace(/^<+|>+$/g, '')];
+    if (!valor) continue;
+    mapa.set(ph, valor);
+    puestos.push(ph);
+  }
+  return puestos;
+}
+
 // ── diff ─────────────────────────────────────────────────────────────────────────────────
 // El problema del diff crudo es el ruido: n8n reescribe el JSON al guardar, así que un
 // `JSON.stringify` distinto NO significa que live esté corriendo otro código. Cada campo se
@@ -361,7 +389,7 @@ async function cmdPush(alias, opts) {
   // parameters y los campos de comportamiento; jamás id, credentials, webhookId ni position:
   // eso es identidad y layout de la instancia.
   const pendientes = new Set();
-  const nodos = live.nodes.map((ln) => {
+  const armarNodos = () => live.nodes.map((ln) => {
     if (!objetivo.includes(ln.name)) return ln;
     const rn = repo.nodes.find((x) => x.name === ln.name);
     const nuevo = { ...ln, parameters: sustituir(rn.parameters ?? {}, mapa, pendientes) };
@@ -370,6 +398,17 @@ async function cmdPush(alias, opts) {
     }
     return nuevo;
   });
+  let nodos = armarNodos();
+
+  // El live no enseñó todo: probá el `.env` (ADR-077). Segunda pasada, no parche sobre la primera.
+  if (pendientes.size) {
+    const delEnv = completarConEnv(mapa, pendientes);
+    if (delEnv.length) {
+      console.log(`${c.amar}⚠ ${delEnv.length} placeholder(s) resueltos desde el .env y NO del live: ${delEnv.join(' ')}${c.off}`);
+      pendientes.clear();
+      nodos = armarNodos();
+    }
+  }
 
   // FAIL-CLOSED: un <ANTHROPIC_API_KEY> literal empujado a producción es el modo de falla
   // silencioso que este script existe para matar.

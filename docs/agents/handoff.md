@@ -22,7 +22,18 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> # 🟡 DEFECTO ENCONTRADO Y NO ARREGLADO — el motor no traduce si Supadata no dice el idioma (26/08)
+> # 🔴 UN COMANDO PENDIENTE — el arreglo del idioma está escrito y probado, pero NO en el motor vivo
+> ```bash
+> cd core/scripts && npm run n8n:push -- motor --nodos "Transcribir (Supadata)" --apply
+> ```
+> El dry-run ya corre limpio: toca **sólo** el `jsCode` de ese nodo (5833b → 6749b) y avisa
+> `⚠ 1 placeholder(s) resueltos desde el .env y NO del live: <SUPADATA_API_KEY>`, que es lo esperado
+> (ADR-077). **Antes se verificó que esa key del `.env` es idéntica a la del live**, así que para ese
+> placeholder la escritura es un no-op demostrado.
+> Después: `npm run n8n:diff` tiene que dar **verde en los 5**.
+> *La mitad de la app (el etiquetado `'otro'`) ya está desplegada por Vercel; la del motor no.*
+
+> # ✅ EL DEFECTO DEL IDIOMA — arreglado en el repo (26/08), ver ADR-077
 > Salió de contestar *"¿el sistema soporta referentes en cualquier idioma?"*. **Sí lo soporta** — la
 > cadena entera es agnóstica y `Heat-score` hasta le da `boost_idioma` +0.3 a lo no-español (medido:
 > 207 de 209 del Feed son `en`). Pero hay una grieta, y **no es Supadata**:
@@ -42,11 +53,20 @@
 > `idioma === "es" ? texto : traducir(texto)` ⇒ con `lang` vacío **sí traduce**. Mismo video, dos
 > resultados según por dónde entró.
 >
-> **Frecuencia: desconocida** — no guardamos el `lang` crudo. Se mide barato (loguear `resp.lang` en
-> el nodo durante una corrida). El arreglo es **una línea**: borrar el `|| 'es'` y dejar que vacío
-> signifique *traducí igual*, como ya hace la app. Va por `n8n:push` (son `parameters`, no
-> topología). *No se tocó en esta sesión porque estaba fuera del pedido y toca el motor en
-> producción.*
+> **Arreglado**: el default pasa de `'es'` a `'otro'` (el valor que `normLang` ya usa), y la app deja
+> de etiquetar `'es'` un guion que acaba de traducir. 3 tests de regresión en `test-nodos.mjs`,
+> **incluido el contraejemplo**: un transcript español sin `lang` lo sigue cazando `guessLang` antes
+> del default, así que no se paga Haiku para convertir español en español.
+>
+> 🔧 **Y arreglarlo destapó un límite de `n8n-sync.mjs`** (ADR-077, toca `core/`): los placeholders se
+> aprenden alineando el `jsCode` **entero** contra el live, así que editarlo rompe la alineación — y
+> `<SUPADATA_API_KEY>` aparece **1 sola vez en todo el repo**. *El nodo era imposible de empujar
+> exactamente cuando alguien lo quería cambiar.* El `.env` entra como **segunda** fuente (nunca pisa
+> al live, avisa en amarillo, jamás imprime el valor) y **fail-closed quedó intacto, medido**:
+> `n8n:test` da 15 ok · 0 fallidos y su caso de fail-closed sigue abortando.
+>
+> **Frecuencia del fallo: desconocida** — no guardamos el `lang` crudo. Se mide barato (loguear
+> `resp.lang` en el nodo durante una corrida) y sigue valiendo la pena para saber cuánto se perdió.
 
 > # ⚠️ ADR-076 SE PERDIÓ Y SE RESTAURÓ — cuidado con los buffers viejos (26/08)
 > El commit **`79190c1`** (mensaje: `quedó`) sobrescribió `ADR-076` con una versión anterior y

@@ -797,6 +797,11 @@ Honestidad por adelantado, para que no se sorprendan:
   llegar vacía — la máquina avisa en las métricas.)*
 - **El empujón por idioma es parejo para todos los idiomas no-español.** No premia más el inglés que el
   portugués: todos los no-español reciben el mismo empujón.
+- **Un video en un idioma raro ahora sí llega traducido** *(arreglado el 26/08)*. Antes, si el
+  transcriptor no lograba decir en qué idioma estaba (pasa con idiomas fuera de español, inglés,
+  portugués, italiano y francés), el sistema **asumía que era español y no lo traducía**: les llegaba
+  el guion en japonés o alemán sin ningún aviso. Ahora, cuando no lo reconoce, lo traduce igual y lo
+  etiqueta como **«otro»**. Si ven un guion sin traducir, avisen: eso ya no debería pasar.
 - **El orden es menos estable con poco volumen.** Con pocas corridas el heat score puede ser ruidoso; se
   afina a medida que entra más data y ustedes califican.
 - **No se puede filtrar por referente** (§4.2). Se puede ordenar por casi cualquier número y filtrar

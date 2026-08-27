@@ -424,9 +424,18 @@ async function procesarUno(
     }
 
     // Script literal (ADR-009): el transcript tal cual, traducido solo si no venía en español.
+    // Con `idioma` vacío (Supadata no lo dijo) esto traduce, que es lo correcto — y es la mitad que
+    // el motor NO hacía hasta el 26/08: su nodo `Transcribir` caía a 'es' y se saltaba la
+    // traducción. Los dos lados ya coinciden.
     const script = idioma === "es" ? texto : await traducir(texto);
 
-    await marcarResultado(ctx, fila.id, { estado: "listo", script, idioma: idioma || "es" });
+    // 🩸 `"otro"` y no `"es"`. Etiquetarlo 'es' era decir que el video venía en español **después de
+    // haberlo traducido**, o sea afirmar lo contrario de lo que se acababa de hacer. Es el mismo
+    // valor que `normLang` usa en el motor para "fuera de los cinco idiomas conocidos", así que las
+    // dos puertas dejan la misma etiqueta.
+    const etiqueta = idioma || "otro";
+
+    await marcarResultado(ctx, fila.id, { estado: "listo", script, idioma: etiqueta });
 
     // Recién acá, con el script en la mano, el enlace entra a la memoria del dedup.
     await registrarEnDedup(ctx, {
@@ -442,7 +451,7 @@ async function procesarUno(
       await registrarEnHistorico(ctx, runId, {
         url: fila.url,
         script,
-        idioma: idioma || "es",
+        idioma: etiqueta,
         externalId: fila.external_id,
         plataforma: fila.plataforma,
       });

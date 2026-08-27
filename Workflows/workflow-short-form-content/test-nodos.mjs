@@ -386,6 +386,35 @@ await (async () => {
     const { out } = await runTranscribir([tvid('l1')], { respuesta: { content: 'the and you for with this', lang: '' } });
     check('sin lang de Supadata, adivina sobre el transcript (en)', out[0].idioma_detectado === 'en', out[0].idioma_detectado);
   }
+  // 🩸 El fallo mudo del idioma (arreglado el 26/08). Estos tres casos son el arreglo entero:
+  // el default de `idioma_detectado` dejó de ser 'es', porque a esa rama sólo se llega cuando
+  // `guessLang` ya descartó los cinco idiomas que conoce — español incluido.
+  {
+    const { out } = await runTranscribir([tvid('jp', { idioma_guess: '' })], {
+      respuesta: { content: 'これはテストです。日本語の動画です。', lang: '' },
+    });
+    check(
+      '🔴 sin lang y sin coincidencias en el diccionario NO cae a "es" (si no, no se traduce nunca)',
+      out[0].idioma_detectado === 'otro',
+      out[0].idioma_detectado,
+    );
+  }
+  {
+    // La otra mitad: 'otro' tiene que pasar el gate de Traducir, que es `idioma !== 'es'`.
+    const { out } = await runTranscribir([tvid('jp2', { idioma_guess: '' })], {
+      respuesta: { content: 'Guten Tag, das ist ein Test.', lang: '' },
+    });
+    check('y por eso Traducir lo va a agarrar (su gate es idioma !== "es")', out[0].idioma_detectado !== 'es', out[0].idioma_detectado);
+  }
+  {
+    // 🔒 Y el contraejemplo, que es lo que hace que el arreglo no sea un cheque en blanco: un
+    // transcript español SIN lang de Supadata lo sigue cazando `guessLang`, así que NO se traduce
+    // ni se paga Haiku por convertir español en español.
+    const { out } = await runTranscribir([tvid('es1', { idioma_guess: '' })], {
+      respuesta: { content: 'esto es una prueba para que el que lo lea entienda de que se trata', lang: '' },
+    });
+    check('🔒 pero un transcript español sin lang SIGUE siendo "es" (no se paga traducirlo)', out[0].idioma_detectado === 'es', out[0].idioma_detectado);
+  }
   // ADR-030: retry cuando la primera respuesta vuelve vacía
   {
     const { out, llamadas } = await runTranscribir([tvid('r1')], { secuencia: [{ content: '', lang: '' }, { content: 'recuperado al reintentar', lang: 'en' }] });
