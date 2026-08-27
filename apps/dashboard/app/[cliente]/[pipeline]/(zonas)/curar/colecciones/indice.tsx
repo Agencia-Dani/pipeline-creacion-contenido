@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { BotonBorrar } from "@/components/borrar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NOMBRE_MAX } from "@/domain/colecciones";
 import { rutaDe } from "@/domain/rutas";
 import type { Coleccion } from "@/lib/colecciones";
 import { usarCockpit } from "../../usar-cockpit";
-import { crear } from "./actions";
+import { borrar, crear } from "./actions";
 
 // El índice: crear una, y la grilla de las que hay.
 //
@@ -20,6 +21,18 @@ export function Indice({ colecciones }: { colecciones: Coleccion[] }) {
   const [nombre, setNombre] = useState("");
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null);
   const [creando, startTransition] = useTransition();
+  /**
+   * El error de borrar, **por colección**.
+   *
+   * No se reusa el `aviso` de arriba a propósito: está pegado al formulario de crear, y este
+   * archivo ya tiene escrita la razón — *"la lección de la carga masiva de Históricos, donde el
+   * mensaje aparecía lejos de donde se había apretado y nadie lo veía"*.
+   *
+   * 🔑 **Sólo el fallo necesita mensaje.** La página es `force-dynamic` y la action hace
+   * `revalidatePath`, así que un borrado exitoso hace desaparecer la tarjeta — y eso **es** el
+   * acuse de recibo. Un "borrada con éxito" flotando donde ya no hay nada es ruido.
+   */
+  const [erroresBorrado, setErroresBorrado] = useState<Record<string, string>>({});
 
   function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -61,16 +74,50 @@ export function Indice({ colecciones }: { colecciones: Coleccion[] }) {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {colecciones.map((c) => (
-            <Link
+            // 🔴 El `<Link>` envuelve **sólo el contenido**, y el botón vive afuera en el pie. Un
+            // botón adentro de un `<a>` es un nido interactivo inválido y dos tabs para dos actos
+            // distintos — el mismo problema que `tarjeta.tsx` ya documenta con su casilla. La forma
+            // (contenido + pie con `border-t`) es la de `TarjetaVideo`, para que las dos grillas de
+            // la app se lean igual.
+            <div
               key={c.id}
-              href={rutaDe(cockpit, `curar/colecciones/${c.id}`)}
-              className="rounded-lg border bg-card p-4 transition-colors hover:border-primary"
+              className="flex flex-col rounded-lg border bg-card transition-colors hover:border-primary"
             >
-              <p className="font-medium">{c.nombre}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {c.videos} {c.videos === 1 ? "video" : "videos"}
-              </p>
-            </Link>
+              <Link href={rutaDe(cockpit, `curar/colecciones/${c.id}`)} className="block p-4">
+                <p className="font-medium">{c.nombre}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {c.videos} {c.videos === 1 ? "video" : "videos"}
+                </p>
+              </Link>
+
+              <div className="mt-auto flex justify-end border-t px-2 py-1">
+                <BotonBorrar
+                  etiqueta="Borrar"
+                  // Dice la verdad completa de ADR-073 y por eso tranquiliza en vez de asustar: la
+                  // bolsa es descartable, **lo que se pagó no**. Con la colección vacía no hay nada
+                  // que advertir.
+                  advertencia={
+                    c.videos === 0
+                      ? "Está vacía."
+                      : `Se va la lista de ${c.videos}. Los guiones limpios y la metadata comprada se quedan.`
+                  }
+                  onBorrar={() => borrar(cockpit, c.id)}
+                  onResultado={(r) =>
+                    setErroresBorrado((previo) =>
+                      r.ok
+                        ? // Éxito: la tarjeta se va con el revalidate. Se limpia por si esta misma
+                          // colección había fallado antes.
+                          Object.fromEntries(Object.entries(previo).filter(([id]) => id !== c.id))
+                        : { ...previo, [c.id]: r.mensaje },
+                    )
+                  }
+                />
+              </div>
+
+              {erroresBorrado[c.id] && (
+                <p className="px-4 pb-2 text-xs text-destructive">{erroresBorrado[c.id]}</p>
+              )}
+            </div>
           ))}
         </div>
       )}

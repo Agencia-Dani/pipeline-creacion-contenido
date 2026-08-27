@@ -3456,11 +3456,26 @@ Colecciones **no se dibuja ninguna** (los 57 son `idioma=en` y los 57 de Instagr
 (`en 144` / `otro 2`) y en Históricos también, con `origen` (`transcribir 129` / `feed 95`, que
 coincide exacto con lo medido en la base). *No ver las facetas no es que estén rotas.*
 
-**🔴 Hallazgo nuevo, sin arreglar: `borrar` de colecciones es una action huérfana.** Existe en
-`curar/colecciones/actions.ts:75`, está escrita y documentada, y **no la importa ningún componente**
-⇒ no hay forma de borrar una colección desde la UI. Es la tercera vez que este repo se come el mismo
-patrón (`BotonBuscar` sin renderizar, el modo selección entero del plan de colecciones). Se
-descubrió al ir a limpiar la colección de prueba, que hubo que borrar por PostgREST.
+**🟢 Hallazgo nuevo, ENCONTRADO Y TAPADO el mismo día: `borrar` de colecciones era una action
+huérfana.** Existía en `curar/colecciones/actions.ts:75`, escrita y documentada, y **no la importaba
+ningún componente** ⇒ no había forma de borrar una colección desde la UI. Tercera vez que este repo
+se come el mismo patrón (`BotonBuscar` sin renderizar, el modo selección entero del plan de
+colecciones). Se descubrió al ir a limpiar la colección de prueba, que hubo que borrar por PostgREST.
+
+Cableado en `indice.tsx` reusando el `BotonBorrar` que ya existía (el mismo de Voces y Referentes,
+que confirma en el lugar en vez de con un `window.confirm`). **Dos decisiones que valen:**
+· la tarjeta se reestructuró en *contenido + pie con `border-t`*, la forma de `TarjetaVideo`, porque
+un botón adentro del `<a>` que envolvía todo era un nido interactivo inválido y dos tabs para dos
+actos distintos;
+· **sólo el fallo muestra mensaje.** La página es `force-dynamic` y la action hace `revalidatePath`,
+así que un borrado exitoso hace desaparecer la tarjeta — y eso **es** el acuse de recibo. El error va
+por colección y pegado a su tarjeta, no al aviso del formulario de crear (la lección que ese archivo
+ya citaba). La advertencia dice la verdad de ADR-073 y por eso tranquiliza: *"Se va la lista de N.
+Los guiones limpios y la metadata comprada se quedan."*
+
+Verificado end-to-end en una colección desechable: aviso con 0 videos, `Cancelar` vuelve al estado
+inicial, aviso con 1 video, `Sí, borrar` ⇒ la tarjeta desaparece y la base confirma **0 miembros
+huérfanos, `Test` intacta en 57 y `videos_meta` en 5**.
 
 **✅ Verificación humana §12 cerrada el mismo día** ([verificaciones-humanas](../verificaciones-humanas.md)):
 el invariante de los nulos, con una colección propia de 3 videos reales + 1 link sintético. Likes ↓
