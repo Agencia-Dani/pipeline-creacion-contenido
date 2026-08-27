@@ -1,6 +1,8 @@
 # ADR-076 — Ordenar es una vista, no una consulta
 
-- **Estado:** aceptada — 2026-08-26 (con Mani). Extiende
+- **Estado:** aceptada · **construida** — 2026-08-26 (con Mani). Las 7 tareas de
+  [plan-orden-y-filtro](../agents/plan-orden-y-filtro.md), verificadas contra prod pantalla por
+  pantalla. Extiende
   [ADR-072](./ADR-072-el-video-es-la-unidad-una-llave-una-tarjeta.md): si el video es la unidad y la
   tarjeta es una sola, *ordenar y filtrar esas tarjetas* también tiene que ser uno solo. **No toca
   `core/`, no tiene migración y no toca n8n.**
@@ -14,7 +16,7 @@ sí:
 
 | Pantalla | Filtro que ya tiene | Orden que ya tiene |
 |---|---|---|
-| `curar/feed` | `FILTROS` de `dom       ain/feed.ts` (calificación) | heat ↓, dentro del grupo por proyecto |
+| `curar/feed` | `FILTROS` de `domain/feed.ts` (calificación) | heat ↓, dentro del grupo por proyecto |
 | `curar/historicos` | `FILTROS_REGISTRO` de `domain/grabados.ts` (grabado) | fecha ↓ |
 | `curar/descartes` | ninguno | near-miss primero (`ordenarDescartes`, ADR-021) |
 | `curar/colecciones/[id]` | ninguno | orden de inserción |
@@ -29,7 +31,7 @@ videos, creada el 24/08) se dibuja con `leerLoQueSeSabe`, que fusiona `app.candi
 colección "Test" — 57 miembros
    likes 57/57 · views 57/57 · seguidores 57/57
    engagement 57/57 · heat_score 57/57 · idioma 57/57
-   titulo  0/57
+   titulo 57/57
 ```
 
 `app.videos_meta` tiene **5 filas**. O sea que los 57 llegan completos por el Feed y el histórico:
@@ -44,7 +46,7 @@ colección "Test" — 57 miembros
 | relevancia_score | 208 | — | 248 |
 | idioma | 209 | 57 | 377 |
 | fecha (calificación / grabado) | 63 | — | 377 |
-| título | 209 | **0** | 377 |
+| título | 209 | 57 | 377 |
 
 Los 129 huecos del histórico son las filas `tipo = transcripcion_a_pedido`: entraron por un link
 pegado y nunca tuvieron métricas. **Son el caso que obliga a decidir qué hace un `null` al ordenar.**
@@ -134,6 +136,21 @@ olvidar — no hay una lista global de la que alguien pueda copiar de más.
 En Descartes hay algo más en juego: *"near-miss primero, sin auditar antes"* es una regla de ADR-021,
 no un orden por defecto cualquiera. El control deja salirse un rato; no la reemplaza.
 
+**🔑 Y por eso el default de las cuatro es el MISMO valor: `null`, que significa *no reordenes*.**
+Apareció al escribir el plan y simplifica el diseño de golpe. Las cuatro pantallas ya llegan
+ordenadas por alguien —`agrupar()` en el Feed, `armarRegistro()` en Históricos, `ordenarDescartes()`
+en Descartes, el orden de inserción en Colecciones— así que el criterio por defecto no tiene que
+*reproducir* esas reglas: tiene que **no tocarlas**. Con un criterio "near-miss" propio habría **dos
+implementaciones de ADR-021** que se desincronizan el día que una cambie, que es el mismo error que
+ADR-072 §2 ya nombró. Ninguna de las cuatro reglas de orden que hoy existen se toca ni se duplica.
+
+**Corolario, y por eso el desempate sale gratis:** cuando dos videos empatan en el criterio elegido,
+el orden que queda es el que traían. `Array.prototype.sort` es estable por especificación desde
+ES2019, así que devolver `0` en el empate **es** el desempate estable de §3 — y es mejor que el
+`id.localeCompare` de `agrupar()`, porque un empate de likes cae de nuevo al near-miss o a la fecha
+en vez de a un uuid. Que sea garantía del lenguaje y no casualidad del motor es justo lo que hay que
+clavar en un test: es la clase de cosa que alguien "optimiza" sin saber que la estaban usando.
+
 **6. Ordenar NO aplana los grupos.** El orden se aplica **dentro** de cada grupo. `domain/feed.ts`
 tiene escrito por qué se agrupa por proyecto: *"los criterios de relevancia son por proyecto, así que
 mezclarlos obliga a rotar de criterio en cada tarjeta y vuelve inconsistente el juicio"*. Un control
@@ -142,6 +159,29 @@ de orden no re-litiga eso.
 **7. Una faceta se dibuja solo si tiene 2+ valores distintos en lo cargado.** En una colección toda de
 Instagram, el chip de plataforma no aparece. Es lo que evita el problema que el handoff ya anotó una
 vez: un control que no hace nada *"se leía como mobiliario"*.
+
+**🟢 §7 confirmada en producción el 26/08, y por su lado silencioso.** En la colección *"Test"* la
+barra **no dibuja ninguna faceta**, y es correcto: los 57 videos son `idioma = en` y los 57 son de
+Instagram, o sea **un solo valor en cada una**. La regla se ve funcionando justo donde es invisible
+— no hay dos chips que digan *"en 57"* y *"instagram 57"* ocupando lugar para no filtrar nada.
+Es también el aviso para el que la pruebe: *no ver las facetas no es que estén rotas.*
+
+**🩸 9. Se ordena por lo que la tarjeta MUESTRA, no por el campo crudo que hay detrás.**
+
+Esta regla no estaba en el ADR: se pagó construyendo Históricos el 26/08. Los criterios se
+escribieron leyendo `Historico` crudo, pero la tarjeta dibuja `videos.get(clave)` — el mapa que
+arma `fusionar()`. **Son fuentes distintas y difieren justo donde duele:** `outputs.titulo` guarda
+**la url** en las 129 filas de `transcripcion_a_pedido`, y `fusionar` la descarta con
+`esTituloDeVerdad` (ADR-072 §4) mientras que el campo crudo no.
+
+Medido en pantalla: *Título A-Z* ordenaba por un valor **que no se ve**, y dejaba arriba de todo
+una pared de **320 tarjetas que dicen "sin título"**. No fallaba, no tiraba error, y desde afuera
+era indistinguible de estar roto.
+
+Es ADR-072 §4 cobrándose lo que anunció con estas palabras: *un título que en realidad es una url
+miente dos veces, en la tarjeta y **en el próximo cruce que alguien escriba encima***. Estos
+criterios eran ese próximo cruce. Arreglado leyendo del mapa fusionado; con eso el invariante de
+§2 quedó **observado sobre 325 filas reales**, con los 320 nulos abajo en las dos direcciones.
 
 **8. El estado es local (`useState`), no un query param.** Como `filtro` y `plegados` hoy. Un
 `?orden=likes` obligaría al server a releer, que es justo el viaje que esta decisión evita. Si algún
@@ -177,8 +217,13 @@ día hace falta compartir vistas, ahí se gana el lugar.
   memoria. Hoy son 209 / 377 / 57 y los descartes. Si el Feed pasa de ~1-2k filas hay que volver a
   paginar, y ahí el orden **tiene que mudarse a la query** — con la salvedad de §1: en Colecciones eso
   no es posible sin materializar la fusión.
-- (−) *Título A-Z* en Colecciones ordena todo-nulos hoy (0 de 57 tienen título), o sea que deja el
-  orden de inserción. Degrada honesto y se llena solo cuando alguien corre *Identificar*.
+- (+) 🩸 **Corregido el 26/08 al verlo en pantalla: el título está en 57 de 57, no en 0.** Este ADR
+  decía lo contrario y sacaba de ahí una consecuencia entera (*"Título A-Z ordena todo-nulos y deja
+  el orden de inserción"*), que era falsa: el criterio funciona. El error estuvo en la medición, no
+  en el diseño — el cruce que la produjo tomaba `titulo` **sólo de `app.videos_meta`** (5 filas),
+  mientras que `fusionar()` lo toma de las tres fuentes con `app.candidatos` primero. *Es la lección
+  de ADR-072 otra vez, en su versión inversa: allá se contó un match de más y acá uno de menos, las
+  dos por medir una parte y concluir sobre el todo.* Lo destapó la pantalla, no una re-lectura.
 - (−) **La barra de Descartes queda flaca**: dos criterios de orden y una faceta. Es lo honesto para
   una tabla sin métricas, pero conviene saberlo antes de montarla y leerlo como que quedó a medias.
 - (−) *Engagement* no se puede ordenar en Colecciones ni en Históricos. Si se pide, el camino barato

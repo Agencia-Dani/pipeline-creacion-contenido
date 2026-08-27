@@ -48,6 +48,21 @@
 > topología). *No se tocó en esta sesión porque estaba fuera del pedido y toca el motor en
 > producción.*
 
+> # ⚠️ ADR-076 SE PERDIÓ Y SE RESTAURÓ — cuidado con los buffers viejos (26/08)
+> El commit **`79190c1`** (mensaje: `quedó`) sobrescribió `ADR-076` con una versión anterior y
+> **borró 51 líneas**: las dos reglas más caras de la sesión (**§9**, *se ordena por lo que la
+> tarjeta muestra*, y el corolario de **§5**, el default `null`), la confirmación de §7 en
+> producción, el estado `construida` — y **repuso una medición que ya se había probado falsa**
+> (`titulo 0/57`, cuando es 57/57) junto con la consecuencia falsa que salía de ella.
+>
+> 🔎 **No fue una edición deliberada, y se sabe por una sola línea:** dejó
+> `` `dom       ain/feed.ts` `` en la tabla de §Contexto. Nadie tipea eso — es un archivo guardado
+> desde un buffer viejo o corrupto, commiteado con un fragmento de frase como mensaje.
+>
+> Restaurado con `git checkout c7bc827 -- <archivo>` y verificado campo por campo. **La lección para
+> el próximo:** un ADR se puede perder sin que falle nada, y el síntoma es que vuelve a afirmar algo
+> que ya se había corregido. Si un doc contradice una medición del log, sospechá del doc.
+
 > # ✅ ADR-076 ESTÁ LIVE (26/08) — el orden y el filtro ya se ven en producción
 > Pusheado (`d88c419..5915a14`) y desplegado. Verificado por **dos señales independientes**: la
 > huella del HTML de prod cambió y se mantuvo estable en 3 requests, y **Vercel reporta `success`
