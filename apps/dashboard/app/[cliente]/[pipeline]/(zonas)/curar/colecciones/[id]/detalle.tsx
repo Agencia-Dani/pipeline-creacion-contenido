@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { BotonBorrar } from "@/components/borrar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { GrillaVideos } from "@/components/video/grupos";
 import { BarraOrden, usarOrden } from "@/components/video/orden";
@@ -17,6 +16,7 @@ import {
   necesitaEnriquecer,
   tablaDeColeccion,
 } from "@/domain/colecciones";
+import { BASE } from "@/domain/limpieza";
 import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
 import {
   contarPorGrabado,
@@ -107,7 +107,6 @@ export function Detalle({
   const [quitando, setQuitando] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<Video | null>(null);
   const [voces, setVoces] = useState<Voz[]>([]);
-  const [vozId, setVozId] = useState("");
   // 🩸 **El detalle tampoco tenía selección múltiple.** El plan de colecciones prometía una barra con
   // `Quitar seleccionados` y lo que se construyó fue un `Sacar` por tarjeta — el mismo hueco entre
   // lo prometido y lo hecho que dejó afuera el modo selección entero, encontrado el 2026-08-21
@@ -162,8 +161,11 @@ export function Detalle({
   }
 
   /**
-   * Limpia en pasadas hasta que no queden. Lo dispara un botón y no un efecto: limpiar es un acto
-   * con una decisión adentro (para qué voz) y un resultado que alguien tiene que mirar.
+   * Limpia en pasadas hasta que no queden. Lo dispara un botón y no un efecto: limpiar **cuesta
+   * plata** y su resultado alguien lo tiene que mirar.
+   *
+   * Desde ADR-080 ya no lleva una decisión adentro: **cada video se limpia con la voz que le
+   * corresponde**, no con una elegida para toda la tanda.
    */
   function limpiarTodos() {
     if (trabajando) return;
@@ -171,7 +173,7 @@ export function Detalle({
       let quedan = sinLimpiar;
       let total = 0;
       while (quedan > 0) {
-        const pasada = await limpiarFaltantes(cockpit, coleccionId, vozId || null);
+        const pasada = await limpiarFaltantes(cockpit, coleccionId);
         total += pasada.limpiados;
         // Una pasada que no movió la aguja corta: mejor eso que girar pagándole a Haiku por nada.
         if (pasada.limpiados === 0) {
@@ -352,7 +354,9 @@ export function Detalle({
     });
   }
 
-  const voz = voces.find((v) => v.id === vozId);
+  // Ya no se elige la voz, pero sí importa cuántas no tienen cargado cómo hablan: sus videos se
+  // limpian igual y salen correctos, pero neutros. Medido el 29/08: **1 de 3** voces tiene perfil.
+  const sinPerfil = voces.filter((v) => !v.tienePerfil);
 
   return (
     <div className="space-y-6">
@@ -400,25 +404,12 @@ export function Detalle({
           <div className="space-y-1">
             <p className="text-sm font-medium">Limpiar los guiones</p>
             <p className="text-sm text-muted-foreground">
-              El guion original nunca se pisa: el limpio queda al lado, y cada video muestra los dos.
+              Cada video se limpia con <strong>los criterios de la casa</strong> más{" "}
+              <strong>la forma de hablar de su propia voz</strong>: no hay que elegirla. El guion
+              original nunca se pisa — el limpio queda al lado y cada video muestra los dos.
             </p>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Select
-              value={vozId}
-              onChange={(e) => setVozId(e.target.value)}
-              disabled={trabajando}
-              aria-label="Voz con la que limpiar"
-              className="w-56"
-            >
-              <option value="">Sin voz (solo criterios de la casa)</option>
-              {voces.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.nombre}
-                  {v.tienePerfil ? "" : " — sin perfil cargado"}
-                </option>
-              ))}
-            </Select>
             <Button onClick={limpiarTodos} disabled={trabajando || sinLimpiar === 0}>
               {trabajando
                 ? "Limpiando…"
@@ -436,14 +427,18 @@ export function Detalle({
               {trabajando ? "Preparando…" : "Descargar (Excel)"}
             </Button>
           </div>
-          {/* Se avisa acá y no después de gastar: una voz sin perfil limpia solo con los criterios
-              de la casa, que es un resultado útil pero no suena a nadie en particular. */}
-          {voz && !voz.tienePerfil && (
+          {/* Se avisa ANTES de gastar, igual que cuando la voz se elegía a mano: una voz sin perfil
+              limpia solo con los criterios de la casa — correcto, pero no suena a nadie. */}
+          {sinPerfil.length > 0 && (
             <p className="w-full text-sm text-muted-foreground">
-              <strong>{voz.nombre}</strong> no tiene cargado cómo habla, así que la limpieza va a
-              salir correcta pero neutra. Se carga en <em>Curar → Voces y proyectos → Ver detalle</em>.
+              {sinPerfil.length === voces.length ? "Ninguna voz tiene" : `${sinPerfil.length} de ${voces.length} voces no tienen`}{" "}
+              cargado cómo habla ({sinPerfil.map((v) => v.nombre).join(", ")}), así que sus guiones
+              van a salir correctos pero neutros. Se carga en{" "}
+              <em>Curar → Voces y proyectos → Ver detalle</em>.
             </p>
           )}
+
+          <CriteriosDeLaCasa />
         </div>
       )}
 
@@ -608,5 +603,44 @@ export function Detalle({
         onCerrar={() => setAbierto(null)}
       />
     </div>
+  );
+}
+
+/**
+ * Los criterios de la casa, a la vista.
+ *
+ * 🩸 **Por qué existe:** los 7 criterios gobiernan **toda** limpieza —con voz y sin voz— y hasta el
+ * 2026-08-29 no había forma de leerlos sin abrir el código. El equipo apretaba un botón que le
+ * aplicaba a su guion reglas que no podía ver. *Un criterio que no se puede leer no se puede
+ * discutir, y el que no se discute se sufre.*
+ *
+ * 🔒 **Solo lectura, y es deliberado** (la decisión está escrita en `domain/limpieza.ts`): son de la
+ * agencia, valen para toda voz, y el punto 4 tiene una trampa que costó descubrir —el prompt está
+ * escrito en voseo y hay un párrafo entero explicándole al modelo que NO lo copie al guion—. Un
+ * textarea invita a reescribir ese párrafo sin saber para qué estaba. Lo editable es **cómo habla
+ * cada voz** (`Curar → Voces`), que es lo que se suma a esto.
+ *
+ * `<details>` nativo y no un modal: es texto de referencia que se abre una vez, no una decisión.
+ */
+function CriteriosDeLaCasa() {
+  return (
+    <details className="w-full">
+      <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+        Ver los criterios de la casa (se aplican siempre, con voz y sin voz)
+      </summary>
+      <div className="mt-2 space-y-2 rounded-md border bg-muted/30 p-3">
+        <p className="text-xs text-muted-foreground">
+          Esto es lo que la máquina corrige en <strong>todos</strong> los guiones. Cuando el video
+          tiene voz, se le suma cómo habla esa voz — nunca la reemplaza.
+        </p>
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed">
+          {BASE}
+        </pre>
+        <p className="text-xs text-muted-foreground">
+          Se cambian en el repo (<code>docs/prompts/limpieza-guion.md</code>), no desde acá: valen
+          para toda voz y son de la agencia.
+        </p>
+      </div>
+    </details>
   );
 }

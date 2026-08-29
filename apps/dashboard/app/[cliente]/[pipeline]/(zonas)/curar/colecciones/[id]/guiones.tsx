@@ -36,7 +36,12 @@ export function Guiones({
 }) {
   const cockpit = usarCockpit();
   const [pestana, setPestana] = useState<Pestana>("crudo");
-  const [textos, setTextos] = useState<{ crudo: string | null; limpio: string | null } | null>(null);
+  const [textos, setTextos] = useState<{
+    crudo: string | null;
+    limpio: string | null;
+    /** El NOMBRE de la voz con la que se limpió; `null` = solo los criterios de la casa. */
+    voz: string | null;
+  } | null>(null);
   // 🩸 Sin esto, `textos === null` significaba DOS cosas —"todavía no llegó" y "no va a llegar"— y
   // la pantalla dibujaba la primera para siempre. Recoge los dos modos de falla, que llegan por
   // caminos distintos: la acción devuelve `ok: false` (no pudo leer Supabase, o el id no es un
@@ -62,7 +67,7 @@ export function Guiones({
         if (cancelado) return;
         // Los dos brazos son el punto: la acción falló, o trajo lo que hay (que puede ser nada).
         // Antes las dos cosas llegaban como un par de `null` y acá se dibujaban igual.
-        if (r.ok) setTextos({ crudo: r.crudo, limpio: r.limpio });
+        if (r.ok) setTextos({ crudo: r.crudo, limpio: r.limpio, voz: r.voz });
         else setError(r.mensaje);
       })
       .catch((e) => {
@@ -152,11 +157,30 @@ export function Guiones({
         ) : textos === null ? (
           <div className="h-40 animate-pulse rounded-md bg-muted" />
         ) : activo ? (
-          <p className="whitespace-pre-wrap text-sm">{activo}</p>
+          <>
+            {/* 🔑 Con qué criterios salió ESTE guion, arriba del texto y no al pie: es lo que
+                decide si lo que se está leyendo suena a la creadora o es neutro, y hasta el
+                2026-08-29 no se decía en ningún lado (ADR-080). */}
+            {pestana === "limpio" && (
+              <p className="mb-2 text-xs text-muted-foreground">
+                {textos?.voz ? (
+                  <>
+                    Limpiado con los criterios de la casa <strong>+ cómo habla {textos.voz}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Limpiado <strong>solo con los criterios de la casa</strong>: este video no tiene
+                    voz asociada, o su voz no tiene cargado cómo habla.
+                  </>
+                )}
+              </p>
+            )}
+            <p className="whitespace-pre-wrap text-sm">{activo}</p>
+          </>
         ) : pestana === "limpio" ? (
           <p className="text-sm text-muted-foreground">
-            Este guion todavía no se limpió. Elegí la voz arriba y apretá{" "}
-            <strong>Limpiar los guiones</strong>.
+            Este guion todavía no se limpió. Apretá <strong>Limpiar los guiones</strong>: cada video
+            se limpia con los criterios de la casa más los de su propia voz.
           </p>
         ) : (
           // Un link cargado a mano NUNCA tuvo guion: se grabó por fuera de la herramienta. No hay

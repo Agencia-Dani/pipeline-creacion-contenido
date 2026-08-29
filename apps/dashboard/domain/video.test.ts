@@ -149,8 +149,17 @@ test("un video del que no se sabe nada sale entero en null, no a medias", () => 
       plataforma: "instagram", external_id: "abc123",
       titulo: null, referente: null, thumbnail: null,
       views: null, likes: null, seguidores: null, idioma: null, heat: null,
+      // `vozId` null es el link pegado a mano: se limpia con los criterios de la casa (ADR-080).
+      vozId: null,
     },
   );
+});
+
+test("la voz viaja en la fusión y gana la primera fuente que la sepa", () => {
+  // El orden de `lib/videos.ts` es candidatos → meta → histórico, así que el uuid del feed vivo le
+  // gana al que se resolvió por nombre desde `outputs`. Son la misma voz salvo un renombre.
+  const [v] = fusionar([parte({ vozId: null }), parte({ vozId: "voz-1" }), parte({ vozId: "voz-2" })]);
+  assert.equal(v.vozId, "voz-1");
 });
 
 // ── nombreDeArchivo ──────────────────────────────────────────────────────────

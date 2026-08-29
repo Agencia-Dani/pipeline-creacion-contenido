@@ -15,6 +15,8 @@ export type GuionLimpio = {
   modelo: string;
   criteriosHash: string | null;
   actualizadoEn: string;
+  /** Con qué voz se limpió. `null` = solo los criterios de la casa. */
+  vozId: string | null;
 };
 
 const fila = z.object({
@@ -24,9 +26,10 @@ const fila = z.object({
   modelo: z.string(),
   criterios_hash: z.string().nullable(),
   actualizado_en: z.string(),
+  voz_id: z.string().nullable(),
 });
 
-const COLUMNAS = "plataforma, external_id, texto, modelo, criterios_hash, actualizado_en";
+const COLUMNAS = "plataforma, external_id, texto, modelo, criterios_hash, actualizado_en, voz_id";
 
 /** El arbiter de la PK de la `032`, con el tenant adentro como exige PostgREST. */
 const ARBITER = "instance_id,plataforma,external_id";
@@ -52,6 +55,7 @@ export async function leerLimpios(ctx: TenantContext): Promise<Map<string, Guion
       modelo: f.modelo,
       criteriosHash: f.criterios_hash,
       actualizadoEn: f.actualizado_en,
+      vozId: f.voz_id,
     });
   }
   return mapa;

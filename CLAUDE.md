@@ -33,7 +33,7 @@ en §Agent skills; acá solo se ubican.
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–078, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–080, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -108,11 +108,23 @@ en §Agent skills; acá solo se ubican.
   ⚠️ **Y con eso este canario dejó de servir: `count(*)` ya no distingue adopción de carga masiva.**
   Se redefine por fecha — `select count(*) from app.grabados where grabado_en > '2026-08-21'` — y la
   pregunta que ninguno de los canarios contesta se lee de `app.eventos`: *¿alguien volvió un segundo
-  día?* **Sí, una: Majo, el 20/08 y el 21/08.** Los demás no (Jero 81 eventos en un solo día, Juan
-  José 23 en ese mismo día). *Se midió dos veces el 21/08 con tres horas de diferencia y dio
-  distinto: a las 18:55 "nadie", a las 21:20 Majo adentro calificando.*
+  día?*
+  ✅ **Re-medido el 2026-08-29 sobre los 374 eventos de la tabla: volvieron DOS, no una.** **Majo
+  Duarte, 3 días** (20/08 · 21/08 · **26/08**, 123 eventos) y **Manuel 30X, 2** (07/08 · 20/08, 24).
+  Los demás siguen en uno: **Jero 81 eventos el 07/08 y no volvió nunca** —el más productivo en un
+  día del sistema entero—, Juan José 23 ese mismo día, Alejo 2, Alejandro Dávila 1. *La suma por
+  persona da 374 exacto: eso es lo que prueba que no quedó nadie afuera, y no "mirar de nuevo".*
+  🟢 **Y el canario de ADR-074 (guion limpio) también SE DESPERTÓ, el 26/08.** Este archivo y
+  `plan-modo-seleccion` decían *"las 4 que hay son de Mani, adopción = la fila 5"*: hay **65 filas y
+  61 son de Majo**, hechas ese día — **34 con voz y 27 sin voz**, o sea que el camino "solo criterios
+  de la casa" es la mitad del uso real. Redefinido por fecha:
+  `select count(*) from app.guiones_limpios where actualizado_en > '2026-08-29'`.
+  📏 **Ese mismo día Majo hizo 80 calificaciones, 13 referentes y 12 ediciones de voces/proyectos,
+  sola — y con eso se cerró D3 y la última condición del "MVP declarado cuando" (ROADMAP §4).**
   *Este renglón decía **"sigue en CERO"** y era correcto cuando se escribió el 20/08 a las 16:30;
-  Majo entró esa misma noche. Un canario se re-mide, no se cita.*
+  Majo entró esa misma noche. Después dijo **"una: Majo, 20 y 21"** y también envejeció en 8 días.
+  Un canario se re-mide, no se cita — y **uno mal consultado miente igual que uno mal escrito**: el
+  29/08 `videos_meta` se contó en 4 por pedirle una columna que no existe, y son 5.*
   *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)
   vive en sus ADRs, en [handoff.md](docs/agents/handoff.md) y en git — acá no se duplica.*
 
@@ -168,7 +180,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..078).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..080).
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

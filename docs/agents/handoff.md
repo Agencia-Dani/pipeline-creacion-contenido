@@ -185,6 +185,98 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🧼 2026-08-29 (cierre 120) · D3 LA CERRÓ MAJO SIN SABERLO, Y EL SELECTOR DE VOZ ERA UNA TRAMPA (Claude, pedido de Mani)
+>
+> **En una línea:** se cerró **D3** —la verificación más vieja del repo— con la medición en vez de la
+> demo, se re-midieron los **4 canarios** (dos estaban mal) y la limpieza de guiones dejó de pedir
+> que alguien elija la voz (**ADR-080**). **Migraciones: ninguna. `core/`: no se tocó. n8n: cero.**
+>
+> ### 🩸 Lo que hay que aprender de acá: el sistema tenía la respuesta y le preguntaba a una persona
+>
+> Limpiar un guion aplica **los criterios de la casa** + **cómo habla la voz**. Los primeros ya se
+> aplicaban siempre (`armarPrompt` los pone de base y el perfil se **suma**), así que la pregunta de
+> Mani —*"¿los criterios base valen también cuando pongo voz?"*— **ya estaba contestada por el
+> código**. Lo que estaba mal era el **selector**: una sola voz para toda la tanda, elegida a mano.
+>
+> 📏 **Y los dos modos de falla ya estaban en juego, medidos contra prod:**
+> 1. **El que ya ocurrió:** de los 57 videos de la única colección, **26 se limpiaron *sin voz*
+>    cuando su voz sí tenía perfil cargado**. Salieron neutros y **nadie podía notarlo**, porque la
+>    pantalla no decía con qué criterios había salido cada guion.
+> 2. **El que iba a ocurrir:** el feed tiene **209 candidatos de las 3 voces** (96 · 61 · 52). La
+>    primera colección mezclada recibía la voz de una aplicada a los videos de la otra. No pasó
+>    todavía **por casualidad**: la única colección viva resultó ser de una sola voz.
+>
+> 🔑 **El video sabe de quién es** (`candidatos.voz_id`, `outputs.metadata.voz` para lo archivado:
+> **57 de 57** resuelven). *La decisión se le estaba pidiendo a una persona teniendo el dato en la
+> fila.*
+>
+> 🔴 **Y la primera intuición —"atar la colección a una voz"— era la trampa.** Resuelve el fallo #2
+> rompiendo lo que la colección **es** (*"lo que vas a trabajar junto, venga de donde venga"*) y **no
+> resuelve el #1**, que es el que ya ocurrió 26 veces. Está escrito como alternativa descartada en
+> ADR-080 para que no vuelva.
+>
+> ### ✅ D3 se cerró con `app.eventos`, no con una demo
+>
+> Era la verificación más vieja abierta del repo y la última condición del *"MVP declarado cuando"*
+> (ROADMAP §4): *el equipo de redes usa el sistema un día completo sin ayuda de un dev*.
+> **Majo Duarte, 26/08, sola: 80 calificaciones · 61 guiones limpiados · 13 referentes · 12 ediciones
+> de voces y proyectos · 5 altas y 5 limpiezas en Colecciones · 3 descargas.**
+>
+> 🔑 *Una demo de 10 minutos con Mani al lado habría probado que el sistema se puede usar
+> **acompañado**. El criterio pedía otra cosa. **Cuando una verificación pide provocar algo que ya
+> ocurrió solo, se cierra con la evidencia — no se descarta.***
+>
+> ⚠️ **Lo que ese cierre NO cubre: Jero.** 81 eventos el 07/08 —el día más productivo de
+> cualquiera— y **no volvió nunca**. Juan José igual (23, mismo día). La pregunta del producto pasó
+> de *"¿vuelven?"* a **"¿por qué vuelve una y no los otros?"**.
+>
+> ### 📏 Los 4 canarios, re-medidos (dos estaban mal, y uno lo rompí yo)
+>
+> | Canario | Decía | Da |
+> |---|---|---|
+> | `grabados > '2026-08-21'` | 2 | **2** ✅ |
+> | `guiones_limpios` | *"4, todas de Mani"* | 🟢 **65, y 61 son de Majo** — despierto hace 3 días |
+> | `videos_meta` | *"5, adopción = la 6"* | **5** ✅ |
+> | `colecciones` | *"hoy CERO"* | **1**, y ya no mide adopción (Majo las usó) |
+>
+> 🩸 **Tres formas distintas de medir mal en una sola sesión, y las tres se veían como un resultado:**
+> 1. **`videos_meta` dio 4** porque le pedí una columna que no existe. *Un canario mal consultado
+>    miente igual que uno mal escrito.*
+> 2. **Un loop se murió imprimiendo un `usuario_id` nulo** y dejó una lista **parcial** que parecía
+>    completa: Juan José desaparecía del conteo de días.
+> 3. **Después sospeché que PostgREST truncaba a 1000 filas** — también falso, son 374.
+>
+> **Lo que cerró la medición no fue mirar de nuevo: fue que la suma por persona diera el total exacto
+> de la tabla.** Días distintos por persona, al 29/08: Mani 15 · **Majo 3** · **Manuel 30X 2** ·
+> Jero 1 · Juan José 1 · Alejo 1 · Alejandro Dávila 1. **Volvieron DOS, no una.**
+>
+> ### Lo que se construyó
+>
+> | Qué | Dónde | Nota |
+> |---|---|---|
+> | El video sabe su voz | `domain/video.ts` (`vozId` + `CAMPOS`) · `lib/videos.ts` | Sale de la **misma fusión que pinta la grilla**: la voz con la que se limpia es la que la tarjeta muestra |
+> | Limpiar sin elegir voz | `limpiarFaltantes` | Perfil **y huella por video**, no por tanda: si no, `estaAlDia` compararía un guion contra el criterio de otro |
+> | Los criterios de la casa, a la vista | `<CriteriosDeLaCasa>` en el detalle | `<details>` nativo, **solo lectura** — la decisión de que vivan en código sigue en pie |
+> | Cada guion dice con qué salió | `guiones.tsx` | *"criterios de la casa + cómo habla X"* / *"solo criterios de la casa"*. Es lo que vuelve visible el fallo #1 |
+>
+> ⏳ **Aplazado a propósito: hacer editables los criterios de la casa.** Se pidió en la misma
+> conversación. La decisión de que vivan en código está escrita en `domain/limpieza.ts` y el punto 4
+> del prompt tiene una trampa que costó descubrir (está en voseo, con un párrafo explicándole al
+> modelo que **no lo copie**). **Se reabre cuando alguien choque contra un criterio** — y nadie chocó:
+> 27 de las 61 limpiezas de Majo salieron con los criterios de la casa puros, sin queja.
+>
+> ### 🔴 Lo que falta mirar
+>
+> **Nada de esto se vio en pantalla.** typecheck · **435 tests** · build · validador en verde, pero
+> la sesión del cockpit se cayó al recompilar y no se pudo volver a entrar. **Es exactamente el
+> patrón que ya mordió dos veces** (el 500 por el emoji, la fila de botones que se rompía en el
+> primer click): *el trabajo real aparece en el primer click, no en la suite*. Anotado como
+> **§14 de [verificaciones-humanas](../verificaciones-humanas.md)**, junto con el §13 del cierre 119
+> que también sigue abierto.
+>
+> ⚠️ **Y ojo con la primera limpieza que se haga:** los 65 guiones que ya existen **no se re-limpian
+> solos** y 26 quedaron neutros. Lo que cambia es que ahora se ve.
+
 > ## 🧾 2026-08-29 (cierre 119) · LAS DOS QUE ESTABAN "BLOQUEADAS POR UN HUMANO", Y UNA ERA UN MALENTENDIDO (Claude, pedido de Mani)
 >
 > **En una línea:** se cerraron las **2 tasks abiertas** del onboarding a Dani. Ninguna necesitaba lo

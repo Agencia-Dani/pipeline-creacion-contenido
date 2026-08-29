@@ -199,18 +199,54 @@ redefinen **por fecha y por autor**, no por total:
 -- Grabados: marcas nuevas desde que se midió, sin contar la carga masiva de Majo.
 select count(*) from app.grabados where grabado_en > '2026-08-21';
 
--- Guion limpio (ADR-074): las 4 que hay son de Mani. Adopción = la fila 5, de otra persona.
-select count(*) from app.guiones_limpios where creado_por <> '<mani>';
+-- Guion limpio (ADR-074): 🟢 DESPIERTO. Este renglon decia "las 4 que hay son de Mani, adopcion =
+-- la fila 5" y era falso desde el 26/08: hay 65 filas y 61 son de MAJO (34 con voz, 27 sin voz).
+-- Redefinido, como el de grabados, por fecha:
+select count(*) from app.guiones_limpios where actualizado_en > '2026-08-29';
 
 -- Metadata comprada (ADR-072): las 5 que hay son verificaciones. Adopción = la fila 6.
 select count(*) from app.videos_meta;
 
--- Colecciones (ADR-073): hoy CERO. El canario más limpio de los cuatro, porque nace sin ruido.
-select count(*) from app.colecciones;
+-- Colecciones (ADR-073): ya no nace limpio. Al 29/08 queda 1 ("Test", de Mani) y Majo la USO el
+-- 26/08 (5 agregar + 5 limpiar + 3 descargar + 2 quitar), asi que el uso no se lee del count.
+-- La bolsa es descartable por diseno: se lee de app.eventos, no de la tabla.
+select count(*) from app.colecciones;   -- <- ya no distingue adopcion de "hoy hay una".
 ```
 
-**A revisar el 2026-09-04.** Y la pregunta que ninguno de los cuatro contesta: *¿alguien volvió un
-segundo día?* Eso se lee de `app.eventos`, contando **días distintos por persona**, no eventos.
+**A revisar el 2026-09-04.**
+
+### 📏 Re-medidos el 2026-08-29 (y dos de los cuatro estaban mal)
+
+| Canario | Lo que decía | Lo que da |
+|---|---|---|
+| `grabados > '2026-08-21'` | 2 | **2** ✅ |
+| `guiones_limpios` | *"4, todas de Mani"* | 🟢 **65, y 61 son de Majo** — despierto hace 3 días |
+| `videos_meta` | *"5 verificaciones, adopción = la 6"* | **5** ✅ (se contó 4 una vez por pedir una columna que no existe: **un canario mal consultado miente igual que uno mal escrito**) |
+| `colecciones` | *"hoy CERO"* | **1** — pero Majo ya las usó, así que el `count(*)` dejó de medir adopción |
+
+**Y la pregunta que ninguno de los cuatro contesta —*¿alguien volvió un segundo día?*— se lee de
+`app.eventos` contando DÍAS DISTINTOS por persona.** Medido el 29/08 sobre los **374** eventos de la
+tabla (la suma por persona da 374, que es lo que prueba que no quedó nadie afuera):
+
+| Persona | Días | Eventos | Cuáles |
+|---|---|---|---|
+| Manuel Mejia | 15 | 118 | 29/07 → 29/08 |
+| **Majo Duarte** | **3** | **123** | 20/08 · 21/08 · **26/08** |
+| **Manuel 30X** | **2** | 24 | 07/08 · 20/08 |
+| Jero | 1 | 81 | 07/08 |
+| Juan José Gaitán | 1 | 23 | 07/08 |
+| Alejo Carvajal | 1 | 2 | 01/08 |
+| Alejandro Dávila | 1 | 1 | 05/08 |
+
+🔑 **Son DOS los que volvieron, no una.** Majo (3 días) y Manuel 30X (2). Y el más productivo en un
+solo día sigue siendo **Jero, con 81 eventos el 07/08 — y no volvió nunca.** *Ésa es la pregunta
+viva del producto, y no la contesta ningún `count(*)`.*
+
+⚠️ **Cómo se rompió esta medición dos veces el 29/08, para que no se repita:** primero un loop que
+se murió imprimiendo un `usuario_id` nulo y dejó una lista **parcial** que parecía completa (Juan
+José desaparecía); después la sospecha de que PostgREST había truncado a 1000 filas, que también era
+falsa (son 374). **La verificación que la cerró no fue mirar de nuevo: fue que la suma por persona
+diera el total exacto de la tabla.**
 
 ### Fase 5 — Las verificaciones humanas ⬜
 

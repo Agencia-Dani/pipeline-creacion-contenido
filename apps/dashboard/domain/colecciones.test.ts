@@ -17,7 +17,7 @@ const video = (p: Partial<Video> = {}): Video => ({
   plataforma: "instagram",
   external_id: "abc",
   url: "https://www.instagram.com/p/AAA/",
-  titulo: null, referente: null, thumbnail: null,
+  titulo: null, referente: null, thumbnail: null, vozId: null,
   views: null, likes: null, seguidores: null, idioma: null, heat: null,
   ...p,
 });

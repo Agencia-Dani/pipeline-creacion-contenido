@@ -135,8 +135,9 @@ M0 ─► A1–A10 (datos listos) ──┬─► B1–B5 (motor v1) ──┬�
 >
 > Lo de abajo se midió, no se dedujo: conteos por PostgREST y `pg_policies` contra la base de prod,
 > y los 5 `workflow.json` traídos por la API de n8n. **Cada `✅ medido` dice qué número lo prueba.**
-> Lo que sigue sin marcar es lo que sigue sin hacerse — y es **D3**, la demo de 10 minutos con
-> Majo y Jero, que es de las cosas más viejas abiertas del repo y la única que no depende de código.
+> Lo que sigue sin marcar es lo que sigue sin hacerse — y era **D3**, la demo de 10 minutos con
+> Majo y Jero, la más vieja abierta del repo y la única que no dependía de código. **Cerrada el
+> 29/08 por la medición, no por la demo** (ver D3 abajo).
 > *(El 07/08 cayeron **cinco**: V6, V5 y D2 por sesión de agente, y V2 y V4 por el ojo de Mani. **V6** no corriéndola: su simulacro era immontable —los 31 nodos HTTP
 > comparten `Config.supabase_url`— y el invariante resultó ser una propiedad estructural que ahora
 > verifica el check #6 del auditor. **V5** sí con una corrida real (~$0.24): 69 videos vueltos a
@@ -339,10 +340,17 @@ y murió en la [`022`](./core/schema/022_poda_balde_2.sql); hoy el conteo lo da 
       **`linkedin` se queda en `draft` a propósito**: su workflow no existe en n8n (ADR-055).
       ✅ **APLICADO el 07/08 y verificado leyendo la tabla de vuelta:** `short-form-content: active` ·
       `linkedin: draft` · `substack: inactive`. **D2 cerrada entera.**)*
-- [ ] **D3.** Demo de 10 min con Majo y Jero: calificar, ver el re-rank, bajar el histórico.
+- [x] **D3.** Demo de 10 min con Majo y Jero: calificar, ver el re-rank, bajar el histórico.
       El sistema solo sirve si lo usan.
-      *(Sigue abierto y es de las cosas más viejas sin cerrar. Está en el checklist de ojo humano de
-      B5, [plan-multi-tenant §15.B](./docs/agents/plan-multi-tenant.md).)*
+      ✅ **CERRADA el 2026-08-29, y NO por una demo: la realidad la contestó mejor.** Lo que D3 iba a
+      provocar —*el equipo usando el sistema sin un dev al lado*— ya pasó y quedó registrado.
+      📏 **Medido en `app.eventos`:** Majo Duarte, **26/08**, sola, en un solo día: **80
+      calificaciones · 61 guiones limpiados · 13 referentes creados · 12 ediciones de voces y
+      proyectos · 5 altas y 5 limpiezas en Colecciones · 3 descargas**. Son **40 eventos** ese día
+      más las 61 limpiezas, y es su **tercer** día distinto de uso (20/08, 21/08, 26/08).
+      🔑 *Una demo con Mani al lado habría probado que el sistema se puede usar acompañado. Esto
+      prueba lo que el criterio pedía de verdad: que se usa **sin** acompañamiento.* Se cierra con la
+      medición, no se descarta: descartarla habría dejado el criterio del §4 sin evidencia.
 
 ## 4. MVP declarado cuando
 
@@ -350,7 +358,10 @@ Backfill real deja candidatos (script literal en español + links) que Majo/Jero
 histórico aparece en `/curar/historicos` y dice cuántos y para qué voz *(era el Sheet +
 `v_selecciones_por_dia`; ADR-057 y ADR-059)* · una corrida
 incremental no reprocesa · una falla simulada no tumba la entrega · los crons corren en
-`America/Bogota` · **el equipo de redes usa el sistema un día completo sin ayuda de un dev**.
+`America/Bogota` · ~~**el equipo de redes usa el sistema un día completo sin ayuda de un dev**~~
+✅ **CUMPLIDO — Majo Duarte, 2026-08-26** (80 calificaciones, 61 guiones limpiados, 13 referentes,
+sola; su tercer día de uso). La condición se declara por lo que dice `app.eventos`, no por una demo
+agendada: ver **D3** arriba.
 
 ## 5. Horizonte post-MVP (no arrancar antes de declarar el MVP)
 

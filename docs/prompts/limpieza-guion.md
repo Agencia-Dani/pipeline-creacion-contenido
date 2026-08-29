@@ -5,7 +5,15 @@
 > el guion. Mañana es el `system` de la acción *Limpiar* del cockpit (Fase 4 del plan de colecciones).
 >
 > **Vive acá y no dentro del código** por la razón de siempre en este repo: se valida a mano antes de
-> hardcodearlo. Si el prompt cambia, cambia acá primero.
+> hardcodearlo. Si el prompt cambia, cambia acá primero — y **después en
+> [`domain/limpieza.ts`](../../apps/dashboard/domain/limpieza.ts), que es su copia**. Si los dos se
+> separan, el equipo recibe dos limpiezas distintas del mismo guion según por dónde haya entrado.
+>
+> ✅ **Ya no se usa a mano: la acción *Limpiar* del cockpit existe desde ADR-074**, y desde
+> [ADR-080](../adr/ADR-080-la-limpieza-la-decide-el-video-no-quien-aprieta.md) (29/08) **no hay que
+> elegir la voz**: cada video se limpia con estos criterios **más** el `perfil_limpieza` de su propia
+> voz, resuelta del video. Estos 7 criterios se aplican **siempre**, con voz y sin voz, y ahora se
+> pueden leer desde la pantalla de la colección (solo lectura).
 
 ## Cómo lo usa Majo hoy (sin código)
 

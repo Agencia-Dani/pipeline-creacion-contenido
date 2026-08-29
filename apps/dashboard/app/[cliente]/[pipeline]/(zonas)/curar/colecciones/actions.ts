@@ -442,6 +442,7 @@ async function enriquecerLote(
           url: e.url,
           titulo: null, referente: null, thumbnail: null,
           views: null, likes: null, seguidores: null, idioma: null, heat: null,
+          vozId: null,
         },
     );
 
@@ -482,7 +483,8 @@ export async function verGuiones(
   plataforma: "instagram" | "tiktok",
   externalId: string,
 ): Promise<
-  { ok: true; crudo: string | null; limpio: string | null } | { ok: false; mensaje: string }
+  | { ok: true; crudo: string | null; limpio: string | null; voz: string | null }
+  | { ok: false; mensaje: string }
 > {
   const { ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
   // Un id que no pasa el filtro no es un video sin guion: es un video que no existe.
@@ -491,11 +493,17 @@ export async function verGuiones(
   }
 
   try {
-    const [crudo, limpios] = await Promise.all([
+    const [crudo, limpios, voces] = await Promise.all([
       leerCrudo(ctx, plataforma, externalId),
       leerLimpios(ctx),
+      leerVoces(ctx),
     ]);
-    return { ok: true, crudo, limpio: limpios.get(`${plataforma}:${externalId}`)?.texto ?? null };
+    const guion = limpios.get(`${plataforma}:${externalId}`) ?? null;
+    // El NOMBRE y no el uuid: lo lee una persona. `null` cubre los dos casos que para ella son el
+    // mismo —se limpió sin voz, o la voz ya no existe— y el panel los dice igual: solo los
+    // criterios de la casa.
+    const voz = guion?.vozId ? (voces.find((v) => v.id === guion.vozId)?.nombre ?? null) : null;
+    return { ok: true, crudo, limpio: guion?.texto ?? null, voz };
   } catch (e) {
     console.error("[colecciones] falló leer los guiones:", e);
     return { ok: false, mensaje: "No se pudo traer el guion. Probá de nuevo." };
@@ -535,24 +543,30 @@ export async function vocesParaLimpiar(
 export async function limpiarFaltantes(
   enRuta: CockpitEnRuta,
   coleccionId: string,
-  vozId: string | null,
 ): Promise<ResultadoAccion & { limpiados: number; quedan: number }> {
   const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
   if (!uuid.safeParse(coleccionId).success) {
     return { ok: false, mensaje: "Esa colección no existe.", limpiados: 0, quedan: 0 };
   }
-  if (vozId !== null && !uuid.safeParse(vozId).success) {
-    return { ok: false, mensaje: "Esa voz no existe.", limpiados: 0, quedan: 0 };
-  }
 
   let miembros;
   let yaLimpios;
-  let perfil: string | null = null;
+  let seSabe;
+  let perfilPorVoz: Map<string, string | null>;
   try {
-    [miembros, yaLimpios] = await Promise.all([leerMiembros(ctx, coleccionId), leerLimpios(ctx)]);
-    if (vozId) {
-      perfil = (await leerVoces(ctx)).find((v) => v.id === vozId)?.perfil_limpieza ?? null;
-    }
+    const [ms, yl, ss, voces] = await Promise.all([
+      leerMiembros(ctx, coleccionId),
+      leerLimpios(ctx),
+      // 🔑 **De acá sale la voz de cada video** (ADR-080). Es la misma fusión que ya pinta la
+      // grilla, así que la voz con la que se limpia es **la que la tarjeta muestra**: no hay una
+      // segunda derivación que pueda discrepar de lo que el equipo ve.
+      leerLoQueSeSabe(ctx),
+      leerVoces(ctx),
+    ]);
+    miembros = ms;
+    yaLimpios = yl;
+    seSabe = ss;
+    perfilPorVoz = new Map(voces.map((v) => [v.id, v.perfil_limpieza ?? null]));
   } catch (e) {
     console.error("[colecciones] falló preparar la limpieza:", e);
     return { ok: false, mensaje: "No se pudo leer la colección.", limpiados: 0, quedan: 0 };
@@ -563,8 +577,8 @@ export async function limpiarFaltantes(
     return { ok: true, mensaje: "Ya están todos limpios.", limpiados: 0, quedan: 0 };
   }
 
-  const huella = huellaDeCriterios(perfil);
   const hasta = Date.now() + PRESUPUESTO_LIMPIEZA_MS;
+  let sinVoz = 0;
   let limpiados = 0;
   let sinGuion = 0;
 
@@ -580,13 +594,23 @@ export async function limpiarFaltantes(
         sinGuion++;
         continue;
       }
+      // La voz sale del video, no de un selector. Un video sin voz —un link pegado a mano, que no
+      // salió de ningún proyecto— se limpia igual, solo con los criterios de la casa: es un
+      // resultado útil y no un caso degradado.
+      const vozDelVideo = seSabe.get(m.clave)?.vozId ?? null;
+      const perfil = vozDelVideo ? (perfilPorVoz.get(vozDelVideo) ?? null) : null;
+      if (!vozDelVideo) sinVoz++;
+
       const limpio = await limpiar(crudo, perfil);
       if (!limpio) continue;
       await guardarLimpio(ctx, m, {
         texto: limpio,
         modelo: MODELO,
-        criteriosHash: huella,
-        vozId,
+        // La huella es **por video**, porque el prompt es por video: dos guiones de la misma
+        // colección limpiados con voces distintas tienen que quedar con huellas distintas, o
+        // `estaAlDia` diría que uno está al día contra el criterio del otro.
+        criteriosHash: huellaDeCriterios(perfil),
+        vozId: vozDelVideo,
         usuarioId: usuario.id,
       });
       limpiados++;
@@ -597,7 +621,9 @@ export async function limpiarFaltantes(
 
   await registrarEvento(ctx, usuario.id, "colecciones.limpiar", {
     coleccion: coleccionId,
-    voz: vozId,
+    // `voz` era la del selector, una sola para toda la pasada. Ahora es por video, así que lo que
+    // se registra es **cuántos no tenían ninguna**: es el número que dice si la derivación anda.
+    sin_voz: sinVoz,
     limpiados,
     sin_guion: sinGuion,
     pedidos: faltan.length,

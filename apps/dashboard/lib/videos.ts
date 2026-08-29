@@ -107,6 +107,7 @@ export async function guardarMeta(ctx: TenantContext, metas: readonly MetaDeVide
 import { parsearEnlaces } from "@/domain/enlace";
 import { fusionar, type Video } from "@/domain/video";
 import { leerTodosLosAprobados } from "@/lib/historicos";
+import { leerVoces } from "@/lib/proyectos";
 
 const filaCandidato = z.object({
   external_id: z.string(),
@@ -119,6 +120,7 @@ const filaCandidato = z.object({
   seguidores: z.number().nullable(),
   idioma: z.string().nullable(),
   heat_score: z.number().nullable(),
+  voz_id: z.string().nullable(),
 });
 
 /**
@@ -147,14 +149,23 @@ function identidad(url: string | null): { plataforma: Plataforma; external_id: s
  */
 export async function leerLoQueSeSabe(ctx: TenantContext): Promise<Map<string, Video>> {
   const s = await scoped(ctx);
-  const [candidatos, meta, aprobados] = await Promise.all([
+  const [candidatos, meta, aprobados, voces] = await Promise.all([
     s.select(
       "app.candidatos",
-      "external_id, url_referente, titulo, referente, thumbnail_url, views, likes, seguidores, idioma, heat_score",
+      "external_id, url_referente, titulo, referente, thumbnail_url, views, likes, seguidores, idioma, heat_score, voz_id",
     ),
     leerMeta(ctx),
     leerTodosLosAprobados(ctx),
+    // Para traducir la voz del histórico, que viaja por NOMBRE y no por uuid (`outputs.metadata.voz`
+    // guarda "Juan Pablo Vieira"). Es la misma asimetría que el join del embudo en `armarVistaOperar`
+    // y por la misma causa: `outputs` archiva texto, no llaves.
+    leerVoces(ctx),
   ]);
+
+  // Renombrar una voz deja huérfanas las filas viejas de `outputs`, que siguen con el nombre
+  // anterior. Degrada a `vozId: null` —el video se limpia con los criterios de la casa— y nunca a
+  // la voz equivocada, que es el único error que costaría plata y saldría mal escrito.
+  const vozPorNombre = new Map(voces.map((v) => [v.nombre, v.id]));
 
   const partes: ParteVideo[] = [];
 
@@ -177,6 +188,7 @@ export async function leerLoQueSeSabe(ctx: TenantContext): Promise<Map<string, V
         seguidores: c.seguidores,
         idioma: c.idioma,
         heat: c.heat_score,
+        vozId: c.voz_id,
       });
     }
   }
@@ -199,6 +211,7 @@ export async function leerLoQueSeSabe(ctx: TenantContext): Promise<Map<string, V
       seguidores: h.seguidores,
       idioma: h.idioma,
       heat: h.heat,
+      vozId: h.voz ? (vozPorNombre.get(h.voz) ?? null) : null,
     });
   }
 

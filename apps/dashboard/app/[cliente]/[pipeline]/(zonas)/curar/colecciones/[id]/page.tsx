@@ -54,6 +54,7 @@ export default async function ColeccionPage({
         url: m.url,
         titulo: null, referente: null, thumbnail: null,
         views: null, likes: null, seguidores: null, idioma: null, heat: null,
+        vozId: null,
       },
   );
 

@@ -865,7 +865,24 @@ Honestidad por adelantado, para que no se sorprendan:
   pídanlo — es lo primero de la lista.
 - **El manual todavía le debe una sección a Colecciones y a la limpieza de guiones.** Las dos
   pantallas existen y funcionan; lo que falta es explicarlas acá con el detalle del resto. Mientras
-  tanto está la fila en la tabla de §4.1 y el ⓘ de cada campo.
+  tanto está la fila en la tabla de §4.1, el ⓘ de cada campo, y lo de acá abajo.
+
+  > **Limpiar guiones, lo mínimo que hay que saber** *(actualizado 29/08)*. En una colección,
+  > **Limpiar los guiones** deja al lado del guion original una versión pulida — el original nunca
+  > se pisa, y cada video muestra los dos.
+  >
+  > **Ya no hay que elegir la voz.** Cada video se limpia con **los criterios de la casa** (7 reglas
+  > que valen para todos: sacar el nombre del referente, borrar su cierre, pasarlo a español
+  > colombiano, arreglar la puntuación…) **más cómo habla la voz de ese video**, que el sistema saca
+  > solo. Antes había un selector y elegía una sola voz para toda la tanda: por eso 26 guiones
+  > salieron neutros sin que nadie se diera cuenta.
+  >
+  > 👀 **Los criterios de la casa se pueden LEER** desde la misma pantalla («Ver los criterios de la
+  > casa»). Son solo lectura: si alguno les molesta o falta, **pídanlo** — se cambia en el repo.
+  >
+  > 🟠 **Para que un guion suene a la creadora, su voz necesita tener cargado cómo habla**
+  > (`Curar → Voces → Ver detalle`). Al 29/08 **solo Juan Pablo Vieira lo tiene**: los guiones de
+  > Milena y Rosario salen correctos pero neutros. Cada guion limpio dice arriba con qué salió.
 
 Ninguna de estas rompe el uso diario. Son cosas en la lista para mejorar más adelante.
 

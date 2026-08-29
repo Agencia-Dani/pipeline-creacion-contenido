@@ -35,6 +35,15 @@ export type Video = {
   seguidores: number | null;
   idioma: string | null;
   heat: number | null;
+  /**
+   * La voz para la que este video es material, o `null` si el sistema no lo sabe.
+   *
+   * 🔑 **Es lo que vuelve innecesario elegir la voz a mano al limpiar** (ADR-080): un video sabe de
+   * quién es, así que la limpieza aplica los criterios de la casa **más** el perfil de SU voz, video
+   * por video. `null` no es un caso degradado: es un link pegado a mano que no salió de ningún
+   * proyecto, y se limpia igual, solo con los criterios de la casa.
+   */
+  vozId: string | null;
 };
 
 /**
@@ -54,7 +63,7 @@ export type ParteVideo = {
 
 const CAMPOS = [
   "url", "titulo", "referente", "thumbnail",
-  "views", "likes", "seguidores", "idioma", "heat",
+  "views", "likes", "seguidores", "idioma", "heat", "vozId",
 ] as const;
 
 /**
@@ -105,6 +114,7 @@ export function fusionar(partes: readonly ParteVideo[]): Video[] {
         url: "",
         titulo: null, referente: null, thumbnail: null,
         views: null, likes: null, seguidores: null, idioma: null, heat: null,
+        vozId: null,
       };
       porClave.set(clave, video);
     }

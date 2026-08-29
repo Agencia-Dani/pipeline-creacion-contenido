@@ -449,10 +449,15 @@ a Haiku, aunque peguen 300 links.
 que *"el cockpit de Retia lleva 11 días sin un solo evento humano"*, y **el botón nuevo movió el
 número solo**: Majo entró el 20/08 y cargó 288 links.
 
-🔴 **Pero la forma de la adopción sigue siendo el problema, y ahora se puede medir.** Nadie volvió un
-segundo día — Jero 81 eventos todos el 07/08, Juan José 23 ese mismo día, Majo 2 el 20/08. *La
-pregunta ya no es "¿entran?" sino "¿vuelven?"*, y se lee contando **días distintos por persona** en
-`app.eventos`, no eventos.
+🟢 **La forma de la adopción se midió de nuevo el 2026-08-29, y este párrafo estaba viejo.** Decía
+*"nadie volvió un segundo día"*. **Volvieron dos:** Majo Duarte **3 días** (20/08 · 21/08 · 26/08,
+123 eventos) y Manuel 30X **2** (07/08 · 20/08). Sobre los **374** eventos de la tabla, con la suma
+por persona dando 374 exacto.
+
+🔴 **Lo que sigue siendo el problema es Jero: 81 eventos el 07/08 —el día más productivo de
+cualquiera— y no volvió nunca.** Juan José igual: 23 ese mismo día, nunca más. *La pregunta ya no es
+"¿entran?" ni "¿vuelven?" —alguien vuelve— sino **por qué vuelve una y no los otros**.* Se lee
+contando **días distintos por persona** en `app.eventos`, no eventos.
 
 ## 4-quinquies. ✅ **La descarga de mp4 en Vercel: CERRADO por Mani el 2026-08-29**
 
@@ -689,13 +694,38 @@ repo tenga que verificar. **Se deja sin hacer a propósito.**
 **→ Decidir qué se rompe antes de correr V6.** Escrito acá para que no se ejecute la versión vieja y
 se declare verde algo que no probó nada.
 
-## 9. ⬜ **D3 — la demo de 10 minutos con Majo y Jero** *(ROADMAP §3)*
+## 9. ✅ **D3 — CERRADA el 2026-08-29, y no por una demo**
 
-**Quién:** Mani + Majo + Jero · **10 minutos.**
+**Quién iba a ser:** Mani + Majo + Jero · 10 minutos. **Nunca se agendó, y ya no hace falta.**
 
-Calificar · ver el re-rank · bajar el histórico. **El sistema solo sirve si lo usan**, y este es el
-único item de la lista que mide eso. Es también la última condición del *"MVP declarado cuando"* del
+Calificar · ver el re-rank · bajar el histórico. **El sistema solo sirve si lo usan**, y éste era el
+único item de la lista que medía eso. Es también la última condición del *"MVP declarado cuando"* del
 ROADMAP §4: *el equipo de redes usa el sistema un día completo sin ayuda de un dev.*
+
+### 📏 Por qué se cierra: la realidad contestó el criterio, medida en `app.eventos`
+
+**Majo Duarte, el 2026-08-26, sola y en un solo día:**
+
+| Qué | Cuánto |
+|---|---|
+| `candidatos.calificar` | **80** |
+| Guiones limpiados (`app.guiones_limpios`) | **61** — 34 con voz, 27 sin voz |
+| `referentes.crear` | 13 |
+| `voces.editar` + `proyectos.editar` | 6 + 6 |
+| Colecciones: agregar · limpiar · descargar · quitar | 5 · 5 · 3 · 2 |
+
+Y es su **tercer día distinto** de uso: 20/08, 21/08 y 26/08.
+
+🔑 **La razón por la que esto vale MÁS que la demo, y no menos:** una demo de 10 minutos con Mani al
+lado habría probado que el sistema se puede usar **acompañado**. El criterio del ROADMAP §4 pide otra
+cosa —*sin ayuda de un dev*— y eso es exactamente lo que dice el registro. *Cuando una verificación
+pide provocar algo que ya ocurrió solo, el enunciado envejeció: se cierra con la evidencia, no se
+descarta.*
+
+⚠️ **Lo que este cierre NO cubre:** Jero. Los 40 eventos son de Majo. Jero tiene **un solo día** de
+uso (07/08, 81 eventos) y no volvió. Eso no es un hueco de verificación —el criterio dice *"el
+equipo"* y quedó cumplido— pero **sí es la pregunta viva del producto**, y se lee del mismo lugar:
+días distintos por persona en `app.eventos`, no `count(*)`.
 
 ## 10. 🔬 **La prueba de §14.6 — RLS de LinkedIn con filas** *(la mitad de query ya está cerrada)*
 
@@ -870,6 +900,41 @@ dominio real.**
 | *«No se pudo cambiar el nombre»* genérico | 🔴 No es el choque de nombre (ése tiene su mensaje). Mirá los logs de la función: el `NO_ESTA` sale cuando el update toca 0 filas, y eso en prod significaría que el filtro de tenant no encontró la fila |
 | El aviso dice **otro número** que 13 de 28 | 🟡 Normal si alguien prendió o apagó una voz desde el 29/08 — el número sale de la config viva. Se re-mide con la query, no se asume. **Si dice 0 de 28**, sospechá: el alcance llegó vacío y estaría marcando todo como que trabaja |
 | No aparece ningún badge y tampoco el aviso | 🩸 `proyectosEnAlcance` llegó vacío o completo por error. La card *«Qué va a correr»* de Operar tiene que decir lo mismo: si las dos discrepan, una de las dos miente (que es justo lo que ADR-079 §3 quiso hacer imposible) |
+
+---
+
+## 14. ⬜ **Limpiar un guion sin elegir voz** *(nuevo del 29/08, ADR-080)*
+
+**Quién:** Mani o Majo · **3 minutos** · *No se pudo ver en pantalla: la sesión del cockpit se cayó
+al recompilar y no se pudo volver a entrar. `typecheck` · 435 tests · `build` · validador en verde,
+que es exactamente lo que **no** alcanzó las dos veces anteriores.*
+
+### Los pasos
+
+1. Abrir una colección. **El selector de voz ya no está**, y arriba del botón tiene que decir que
+   cada video se limpia con los criterios de la casa **más la voz de ese video**.
+2. Abrir **«Ver los criterios de la casa»**: se despliega el prompt entero, solo lectura.
+3. Abrir un video que **ya tenga** guion limpio → pestaña **Limpio**. Arriba del texto tiene que
+   decir con qué salió: *"criterios de la casa + cómo habla Juan Pablo Vieira"* o *"solo con los
+   criterios de la casa"*.
+   📏 En la colección *Test*, al 29/08: **31 con voz y 26 sin voz**, sobre 57.
+4. Agregar un video nuevo (de cualquier proyecto) y apretar **Limpiar los guiones**. Tiene que
+   limpiarlo sin preguntar nada.
+5. Comprobar en la base que se guardó la voz **del video**, no una elegida:
+   `select voz_id from app.guiones_limpios order by actualizado_en desc limit 1`.
+
+### Qué significa si falla
+
+| Lo que ves | Qué significa |
+|---|---|
+| Todos los guiones dicen *"solo con los criterios de la casa"* | 🩸 La derivación llegó vacía. Se mide contra `app.candidatos.voz_id`: al 29/08 resolvían **57 de 57** |
+| Un guion dice una voz que **no es** la del video | 🔴 Lo peor de todo, porque el guion se lee bien igual. La voz sale de `leerLoQueSeSabe`, la misma fusión que pinta la grilla: si la tarjeta y el guion discrepan, la fusión está mal |
+| El botón limpia pero el guion sale idéntico al crudo | 🟡 No es de este cambio: `limpiar()` es fail-**closed** y devuelve `null` si Haiku falla, así que un limpio idéntico al crudo no debería poder existir |
+| «Ver los criterios» abre vacío | El import de `BASE` no llegó al cliente. Es un módulo puro, no debería pasar |
+
+⚠️ **Lo que este cambio NO hace:** re-limpiar los 65 guiones que ya existen. **26 de ellos salieron
+neutros** cuando su voz sí tenía perfil. Re-limpiar cuesta plata y la decisión es de una persona
+(ADR-074). Lo que cambió es que **ahora se ve cuáles son**.
 
 ---
 
