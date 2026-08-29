@@ -328,6 +328,40 @@
 > `public.v_senal_seleccion` (vive en `public`, no en `app`) tiene **21 referentes con tasa medida**
 > y hoy el `0.7` de `heat = 0.7 × score_Haiku + 0.3 × percentil(métrico)` **se eligió sin datos**.
 >
+> ### 📊 Primera medición del heat-score (§5.2), y sale contraintuitiva
+>
+> Es el único punto del §5 con dato acumulado, así que se midió — **sin cambiar nada**: mover el peso
+> toca el motor y es decisión de Mani. **237 videos con etiqueta humana** (100 👍/🔥 · 137 👎).
+> AUC = probabilidad de que un aprobado puntúe más alto que un descartado (0.50 = no distingue):
+>
+> | Señal | AUC | Peso hoy |
+> |---|---|---|
+> | `heat_score` (el combinado) | **0.692** | es el resultado |
+> | **`views` sola** | **0.690** | ninguno |
+> | `engagement` | 0.645 | insumo |
+> | `relevancia_score` (Haiku) | **0.639** | **0.7** |
+> | `seguidores` | 0.582 | insumo |
+>
+> 🔑 **Entre los videos que llegan al equipo, las vistas solas ordenan tan bien como la fórmula
+> entera y mejor que el score de Haiku que se lleva el 70 %.**
+>
+> 🩸 **Pero el matiz es lo que lo vuelve usable, y casi lo reporto sin él.** `relevancia_score` está
+> **truncado**: los descartados por el gate van de **0.00 a 0.45** y los que pasan de **0.50 a
+> 0.96**, sin solaparse. Su AUC se mide sobre la mitad de arriba nada más. *Y el AUC de **1.000** que
+> da separar esas dos poblaciones **no es evidencia de nada**: el gate ES un umbral sobre esa
+> variable, así que separarlas es su definición. Un número perfecto es la señal de que se está
+> midiendo una tautología.*
+>
+> **Hipótesis que queda:** `relevancia_score` se gana el sueldo **como filtro, no como ordenador**, y
+> la fórmula lo usa de ordenador al 70 %. Bajar ese peso a favor de las vistas es la prueba barata.
+> **Límites:** las etiquetas son casi todas de **una persona** (Majo), son 237, y `heat_score`
+> **contiene** a `relevancia_score` (las dos filas no son independientes).
+>
+> 🔴 **Y el hueco que impide calibrar el GATE: nadie audita los descartes.** De los **82**
+> descartados por la máquina, **80 sin `veredicto` humano** — y de los 2 revisados, **uno dice *"era
+> bueno"***. Sin eso no hay forma de medir cuánto se tira de más. La pantalla existe; falta que
+> alguien la use.
+>
 > ### 🔴 Lo que sigue faltando
 >
 > **§13 (cierre 119) sigue abierta:** el renombrado de colecciones y el aviso *sin trabajo* se

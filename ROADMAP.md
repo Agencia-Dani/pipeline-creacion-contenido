@@ -377,12 +377,44 @@ agendada: ver **D3** arriba.
    zona **Entender** del cockpit, sobre `app.v_metricas_calidad`, `v_embudo_semana` y
    `v_costos_semana`. Si algún día se queda corta, la discusión es *qué falta ver*, no *qué
    herramienta*.
-2. 🎯 **Calibrar el heat-score** con curación real — **es el primero que de verdad se puede hacer
-   hoy, y el único con el dato ya acumulado.** `public.v_senal_seleccion` (ojo: vive en `public`,
-   no en `app`) tiene **21 referentes con tasa de selección medida** — `howtoconvince` 0.62,
-   `quinlanwalther` 0.80, `jefferson_fisher` 0.49 — sobre semanas de curación de Majo. La pregunta
-   concreta: hoy `heat = 0.7 × score_Haiku + 0.3 × percentil(heat_métrico)` y el peso 0.7 **se
-   eligió sin datos**. Opcional: scoring semántico de temas si el substring-matching se queda corto.
+2. 🎯 **Calibrar el heat-score** con curación real — **el único punto con el dato ya acumulado, y
+   el 2026-08-29 se hizo la primera medición.** No cambió nada todavía: cambiar el peso toca el
+   motor y es decisión de Mani. Lo que sigue es la evidencia con la que arrancar.
+
+   **El dataset:** **237 videos con etiqueta humana** (100 aprobados 👍/🔥 · 137 descartados 👎),
+   de `outputs`. Se midió, para cada señal, la probabilidad de que un aprobado puntúe más alto que
+   un descartado (**AUC**; 0.50 = no distingue nada):
+
+   | Señal | AUC | Peso que tiene hoy |
+   |---|---|---|
+   | `heat_score` (el combinado) | **0.692** | — es el resultado |
+   | **`views` sola** | **0.690** | ninguno, es un insumo |
+   | `engagement` | 0.645 | insumo |
+   | `relevancia_score` (Haiku) | **0.639** | **0.7 — el 70 % de la fórmula** |
+   | `seguidores` | 0.582 | insumo |
+
+   🔑 **La lectura, con su matiz —que es lo que la vuelve utilizable:** entre los videos que llegan
+   al equipo, **las vistas solas ordenan tan bien como la fórmula entera y mejor que el score de
+   Haiku que se lleva el 70 % del peso.** Pero `relevancia_score` **está truncado**: los descartados
+   por el gate van de **0.00 a 0.45** y los que pasan de **0.50 a 0.96**, sin solaparse, así que su
+   AUC de 0.639 se mide sobre la mitad de arriba nada más. *(El AUC de 1.000 que da separar las dos
+   poblaciones **no es evidencia**: el gate ES un umbral sobre esa variable, así que separarlas es su
+   definición.)*
+
+   **La hipótesis concreta que queda para probar:** `relevancia_score` **se gana el sueldo como
+   filtro, no como ordenador** — y la fórmula lo usa de ordenador al 70 %. Bajar ese peso a favor de
+   las vistas es la primera prueba barata.
+
+   ⚠️ **Dos límites honestos antes de tocar nada:** las etiquetas vienen casi todas de **una sola
+   persona** (Majo) y son 237; y `heat_score` **contiene** a `relevancia_score`, así que las dos
+   filas de la tabla no son independientes.
+
+   🔴 **Y el hueco que impide calibrar el GATE (distinto de calibrar el orden): nadie audita los
+   descartes.** De los **82** descartados por la máquina, **80 no tienen `veredicto` humano** — y de
+   los 2 revisados, **uno dice *"era bueno"***. Sin ese dato no hay forma de medir cuánto se está
+   tirando de más. La pantalla existe (`/curar/descartes`); lo que falta es que alguien la use.
+
+   Opcional, aparte: scoring semántico de temas si el substring-matching se queda corto.
 3. **Costo por corrida medido** + revisión mensual. ⚠️ **Este punto nombraba `runs.costo_estimado`,
    una columna que NO EXISTE** (medido: PostgREST responde `42703`). El costo se calcula por otro
    lado y ya funciona: `app.tarifas` (supadata $0.009/video, haiku_traduccion $0.005,
