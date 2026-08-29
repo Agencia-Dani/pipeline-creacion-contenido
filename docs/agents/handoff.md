@@ -265,17 +265,39 @@
 > modelo que **no lo copie**). **Se reabre cuando alguien choque contra un criterio** — y nadie chocó:
 > 27 de las 61 limpiezas de Majo salieron con los criterios de la casa puros, sin queja.
 >
-> ### 🔴 Lo que falta mirar
+> ### ✅ VERIFICADO EN PANTALLA, con la prueba que importaba (§14 cerrada)
 >
-> **Nada de esto se vio en pantalla.** typecheck · **435 tests** · build · validador en verde, pero
-> la sesión del cockpit se cayó al recompilar y no se pudo volver a entrar. **Es exactamente el
-> patrón que ya mordió dos veces** (el 500 por el emoji, la fila de botones que se rompía en el
-> primer click): *el trabajo real aparece en el primer click, no en la suite*. Anotado como
-> **§14 de [verificaciones-humanas](../verificaciones-humanas.md)**, junto con el §13 del cierre 119
-> que también sigue abierto.
+> Cuatro de los cinco pasos sólo miran texto. **El que prueba el mecanismo fue montar el modo de
+> falla #2 a propósito:** se agregó a la colección *Test* —**57 videos, los 57 de Juan Pablo
+> Vieira**— un video de `@susieinthiran` que pertenece a un proyecto de **Rosario Gomez**, y se
+> apretó *Limpiar 1*.
 >
-> ⚠️ **Y ojo con la primera limpieza que se haga:** los 65 guiones que ya existen **no se re-limpian
-> solos** y 26 quedaron neutros. Lo que cambia es que ahora se ve.
+> **`guiones_limpios.voz_id` quedó en Rosario Gomez.** No en Juan Pablo, no en `null`. El evento lo
+> confirma por otro lado: `colecciones.limpiar` con **`sin_voz: 0`**. *Con el código de ayer ese
+> guion se habría limpiado con lo que dijera el selector — que es el error entero de la ADR, ahora
+> medido en vez de argumentado.*
+>
+> **Segunda señal:** la huella guardada (`97ff9195`) es idéntica a `huellaDeCriterios(null)`
+> calculado aparte — correcto, porque Rosario **no tiene perfil**, así que su prompt *es* el BASE.
+> La voz quedó registrada igual: **`voz_id` dice de quién es el video, la huella dice con qué
+> criterios salió, y son dos cosas distintas.**
+>
+> Los otros cuatro: el selector no está · «Ver los criterios» despliega los 3.492 caracteres del
+> prompt · un guion con voz dice *"+ cómo habla Juan Pablo Vieira"* · uno de los 26 sin voz dice
+> *"solo con los criterios de la casa"*.
+>
+> 🧹 **Prod quedó como estaba:** el video salió de la colección (57) y su limpio se borró (65).
+> *Una verificación que deja su propia fila contamina el canario.*
+>
+> ⚠️ **Dato operativo que costó tiempo:** `npm run build` con el dev server levantado **mata el dev
+> server** (le pisa `.next`); la pantalla queda en blanco con el HMR reintentando y parece un bug de
+> la app. No lo es.
+>
+> ### 🔴 Lo que sigue faltando
+>
+> **§13 (cierre 119) sigue abierta:** el renombrado y el aviso *sin trabajo* se vieron en
+> `localhost`, **no en producción**. Y ojo con la primera limpieza que se haga: los 65 guiones que
+> ya existen **no se re-limpian solos** y 26 quedaron neutros — lo que cambia es que ahora se ve.
 
 > ## 🧾 2026-08-29 (cierre 119) · LAS DOS QUE ESTABAN "BLOQUEADAS POR UN HUMANO", Y UNA ERA UN MALENTENDIDO (Claude, pedido de Mani)
 >

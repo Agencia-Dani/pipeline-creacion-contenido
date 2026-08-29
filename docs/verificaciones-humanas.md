@@ -903,13 +903,48 @@ dominio real.**
 
 ---
 
-## 14. ⬜ **Limpiar un guion sin elegir voz** *(nuevo del 29/08, ADR-080)*
+## 14. ✅ **Limpiar un guion sin elegir voz — CERRADA el 2026-08-29, en pantalla**
 
-**Quién:** Mani o Majo · **3 minutos** · *No se pudo ver en pantalla: la sesión del cockpit se cayó
-al recompilar y no se pudo volver a entrar. `typecheck` · 435 tests · `build` · validador en verde,
-que es exactamente lo que **no** alcanzó las dos veces anteriores.*
+**Verificada por Claude con Mani logueado**, contra la base de **producción**, los 5 pasos. Se deja
+escrita porque el paso 4 es el que hay que repetir si alguien toca la derivación.
 
-### Los pasos
+### 🔬 La prueba que la cierra: un video de OTRA voz en una colección de una sola
+
+Los 5 pasos pasaron, pero cuatro de ellos sólo miran texto. El que prueba el mecanismo fue el
+cuarto, montado a propósito para reproducir el modo de falla #2 de ADR-080:
+
+> Se agregó a la colección *Test* —**57 videos, los 57 de Juan Pablo Vieira**— un video de
+> `@susieinthiran` que pertenece a un proyecto de **Rosario Gomez**. Se apretó *Limpiar 1*.
+> **`guiones_limpios.voz_id` quedó en Rosario Gomez**, no en Juan Pablo y no en `null`.
+> El evento lo confirma por otro lado: `colecciones.limpiar` con **`sin_voz: 0`**.
+>
+> 🔑 **Con el código anterior ese guion se habría limpiado con lo que dijera el selector.** Es
+> exactamente el error que la ADR existe para evitar, y acá está medido en vez de argumentado.
+
+**Segunda señal, independiente:** la huella guardada es `97ff9195`, idéntica a
+`huellaDeCriterios(null)` calculado aparte — correcto, porque Rosario **no tiene perfil cargado**,
+así que su prompt *es* el BASE. La voz quedó registrada igual: `voz_id` dice de quién es el video,
+la huella dice con qué criterios salió, y **son dos cosas distintas**.
+
+🧹 **Prod quedó como estaba:** el video se sacó de la colección (57 miembros) y su guion limpio se
+borró (65, los mismos de antes). *Una verificación que deja su propia fila contamina el canario —
+la lección de las 5 filas de `videos_meta`.*
+
+### Lo que se vio, paso por paso
+
+| Paso | Resultado |
+|---|---|
+| El selector de voz ya no está | ✅ y el texto explica que cada video usa la suya |
+| «Ver los criterios de la casa» | ✅ despliega el prompt entero (3.492 caracteres), solo lectura |
+| Un guion **con** voz | ✅ *"Limpiado con los criterios de la casa **+ cómo habla Juan Pablo Vieira**"* |
+| Un guion **sin** voz (26 de 57) | ✅ *"Limpiado **solo con los criterios de la casa**: este video no tiene voz asociada…"* |
+| El aviso de perfiles faltantes | ✅ *"2 de 3 voces no tienen cargado cómo habla (Milena Morales, Rosario Gomez)"* |
+
+⚠️ **Y un dato operativo que costó tiempo:** correr `npm run build` con el dev server levantado
+**mata el dev server** (le pisa `.next`) y la pantalla queda en blanco con el HMR reintentando.
+No es un bug de la app. Se levanta de nuevo con el preview y listo.
+
+### Los pasos (para repetirla si alguien toca la derivación)
 
 1. Abrir una colección. **El selector de voz ya no está**, y arriba del botón tiene que decir que
    cada video se limpia con los criterios de la casa **más la voz de ese video**.
