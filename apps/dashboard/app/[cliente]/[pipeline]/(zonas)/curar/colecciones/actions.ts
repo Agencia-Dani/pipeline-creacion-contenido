@@ -21,6 +21,7 @@ import {
   quitarMiembros,
 } from "@/lib/colecciones";
 import { registrarEvento } from "@/lib/eventos";
+import { desmarcar, marcar, marcarMuchos } from "@/lib/grabados";
 import { borrarLimpio, guardarLimpio, leerLimpios } from "@/lib/guiones-limpios";
 import { leerCrudo } from "@/lib/guiones";
 import { limpiar, MODELO } from "@/lib/limpiar";
@@ -747,5 +748,82 @@ export async function linksDeVideo(
   } catch (e) {
     console.error("[colecciones] falló pedir los videos:", e);
     return { ok: false, mensaje: "No se pudieron pedir los videos. Probá de nuevo." };
+  }
+}
+
+
+// ──────────────── La marca de "ya se grabó", desde la colección (ADR-070) ────────────────
+//
+// 🔑 **`lib/grabados` sigue siendo el único dueño del acto; esto es el envoltorio de ESTA zona.**
+// Es el mismo reparto que ya existe en Históricos y en Transcribir: los tres llaman a `marcar` /
+// `desmarcar`, y cada uno revalida SU pantalla. Reusar la acción de Históricos desde acá revalidaría
+// la ruta equivocada y esta colección se quedaría mostrando la marca vieja.
+
+/** Prende o apaga la marca de un video de la colección. Sin confirmación: se deshace apagándola. */
+export async function marcarGrabadoEnColeccion(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+  enlace: EnlaceVideo,
+  grabado: boolean,
+): Promise<ResultadoAccion> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+
+  try {
+    if (grabado) await marcar(ctx, enlace);
+    else await desmarcar(ctx, enlace.plataforma, enlace.external_id);
+  } catch (e) {
+    console.error("[colecciones] falló marcar grabado:", e);
+    return { ok: false, mensaje: "No se pudo guardar la marca. Probá de nuevo." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "colecciones.grabado", {
+    coleccion: coleccionId,
+    video: `${enlace.plataforma}:${enlace.external_id}`,
+    grabado,
+  });
+  revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
+  return { ok: true, mensaje: grabado ? "Marcado como grabado." : "Marca sacada." };
+}
+
+/**
+ * Lo mismo en lote, desde el modo selección.
+ *
+ * Solo **prende**: apagar en lote no lo pidió nadie y sería el único gesto masivo de esta pantalla
+ * que resta trabajo hecho. El upsert cuenta cuántos ya estaban, así que se puede decir.
+ */
+export async function marcarGrabadosEnColeccion(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+  claves: readonly string[],
+): Promise<ResultadoAccion> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (claves.length === 0) return { ok: false, mensaje: "No hay videos elegidos." };
+
+  try {
+    const miembros = await leerMiembros(ctx, coleccionId);
+    const elegidos = enElOrdenPedido(miembros, claves);
+    const { nuevos, yaEstaban } = await marcarMuchos(
+      ctx,
+      elegidos.map((m) => ({ plataforma: m.plataforma, external_id: m.external_id, url: m.url })),
+    );
+
+    await registrarEvento(ctx, usuario.id, "colecciones.marcar_masivo", {
+      coleccion: coleccionId,
+      nuevos,
+      yaEstaban,
+    });
+    revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
+
+    return {
+      ok: true,
+      mensaje:
+        nuevos === 0
+          ? "Ya estaban todos marcados."
+          : `${nuevos} ${nuevos === 1 ? "marcado" : "marcados"}` +
+            (yaEstaban > 0 ? ` · ${yaEstaban} ya estaban.` : "."),
+    };
+  } catch (e) {
+    console.error("[colecciones] falló marcar grabados en lote:", e);
+    return { ok: false, mensaje: "No se pudieron guardar las marcas. Probá de nuevo." };
   }
 }

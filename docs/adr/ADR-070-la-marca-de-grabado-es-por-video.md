@@ -114,6 +114,35 @@ con dependencia nueva, adivinanza de qué columna trae los links y sus encodings
 resultado. `ponytail:` si algún día piden `.xlsx` de verdad, el upgrade es un input que lee el
 archivo en el browser y vuelca texto en el mismo cuadro — el dominio no cambia.
 
+### ✏️ Extensión 2026-08-29 — la marca llega a Colecciones, que era la tercera pantalla
+
+Pedido del onboarding de Dani (28/08): *"que desde colecciones se pueda marcar como grabado, que se
+vea esa marca"*. **No hay decisión nueva de datos**: la marca sigue siendo por video, en
+`app.grabados`, y por eso esta pantalla no necesitó ni una migración ni una columna. Es exactamente
+lo que esta ADR compró — el mismo acto funciona en la tercera pantalla porque la llave es del video y
+no del carril.
+
+Lo que sí se decidió, y queda escrito:
+
+- **Se reusa `FiltroRegistro` (`sin-grabar` · `grabados` · `todos`), no un vocabulario propio.** El
+  acto es el mismo en las dos pantallas y dos vocabularios para un solo hecho es cómo el equipo
+  termina creyendo que son dos cosas distintas. Lo único que cambia es la forma de la fila, y por eso
+  `domain/grabados.ts` suma `filtrarPorGrabado()` / `contarPorGrabado()` para listas de `Video`.
+- **El default del chip es `todos`, igual que en Históricos, y por la misma razón:** el filtro
+  actúa sobre un atributo **que la pantalla edita**, así que con *"Falta grabar"* prendido marcar
+  hace desaparecer la tarjeta de abajo del cursor. Es la línea de ADR-076 §4; se convive con ella
+  como allá, no se disimula.
+- **El lote solo PRENDE.** Desmarcar en masa sería el único gesto masivo de esa pantalla que resta
+  trabajo hecho, y nadie lo pidió. Por tarjeta el toggle va en las dos direcciones.
+- **La acción vive en `colecciones/actions.ts` y no se reusa la de Históricos**, aunque las dos
+  llamen a `lib/grabados`. Cada zona revalida SU ruta: reusar la de allá dejaría esta colección
+  mostrando la marca vieja. Es el reparto que Transcribir ya tenía.
+
+📏 **El canario, re-medido el 29/08:** `select count(*) from app.grabados where grabado_en >
+'2026-08-21'` da **2**, las dos del **22/08** y con el mismo timestamp (o sea un lote de 2). La marca
+y el desmarcado de la verificación de hoy **no quedaron**: se probó y se revirtió a propósito, justo
+para no contaminar esta cuenta.
+
 ## Alternativas descartadas
 
 - **Dejar la columna de la `028` y agregar otra a `outputs`.** Dos escritores del mismo hecho que

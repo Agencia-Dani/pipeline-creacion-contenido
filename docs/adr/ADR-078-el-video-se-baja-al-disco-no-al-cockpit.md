@@ -126,11 +126,19 @@ que bajar 50 no es instantáneo, aunque el browser los encole solo.
 
 ## Consecuencias
 
-- **Un canario nuevo, y esta vez nace limpio:** `app.eventos` con `accion = 'colecciones.bajar_videos'`
-  cuenta quién bajó, cuántos pidió y cuántos volvieron. La pregunta que contesta no es *"¿funciona?"*
-  sino *"¿alguien que no lo construyó lo usó?"* — que es la que ADR-069/070 aprendió a hacer por las
-  malas. **Cero es cero: acá no hay verificaciones propias contaminando la cuenta, porque probar esto
-  no escribe eventos desde el server local.**
+- **Un canario nuevo:** `app.eventos` con `tipo = 'colecciones.bajar_videos'` cuenta quién bajó,
+  cuántos pidió y cuántos volvieron. La pregunta que contesta no es *"¿funciona?"* sino *"¿alguien
+  que no lo construyó lo usó?"* — la que ADR-069/070 aprendió a hacer por las malas.
+
+  ⚠️ **Y NO nace en cero.** Este renglón decía *"acá no hay verificaciones propias contaminando la
+  cuenta, porque probar esto no escribe eventos desde el server local"*, **y es falso**: el dev
+  server local lee y escribe contra la **base de producción**. Verificarlo el 29/08 dejó **2
+  `colecciones.bajar_videos`** (18:16 y 18:19, las dos de Mani, la primera fallida por el 500 del
+  emoji) y **1 `colecciones.descargar`** de 57 videos (18:14). *El primer dato de adopción es el
+  tercer `bajar_videos`.* Es exactamente el mismo error que ya se pagó con las 5 filas de
+  `app.videos_meta`, cometido de nuevo doce líneas más arriba en este mismo archivo.
+  **La regla, otra vez: un canario se cuenta DESPUÉS de restar las propias pruebas, y quien lo
+  escribe tiene que saber contra qué base corre su localhost.**
 - **Cada descarga le paga a Apify** una corrida por lote, incluso de videos cuya metadata ya se
   compró. Es el precio de la medida 2 y no hay forma de evitarlo sin persistir un link que vence.
 - **Si el post ya no está, la descarga falla — que es exactamente el caso que el pedido teme.** No es

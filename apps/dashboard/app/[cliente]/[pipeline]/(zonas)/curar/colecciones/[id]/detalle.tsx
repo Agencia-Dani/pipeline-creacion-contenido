@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { BotonBorrar } from "@/components/borrar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,10 +18,17 @@ import {
   tablaDeColeccion,
 } from "@/domain/colecciones";
 import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
+import {
+  contarPorGrabado,
+  FILTROS_REGISTRO,
+  filtrarPorGrabado,
+  type FiltroRegistro,
+} from "@/domain/grabados";
 import type { CriterioOrden, Faceta } from "@/domain/orden";
 import { nombreDeArchivo, type Video } from "@/domain/video";
 import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
 import { rutaDe } from "@/domain/rutas";
+import { cn } from "@/lib/utils";
 import { usarCockpit } from "../../../usar-cockpit";
 import {
   agregarPegados,
@@ -29,6 +37,8 @@ import {
   identificarFaltantes,
   limpiarFaltantes,
   linksDeVideo,
+  marcarGrabadoEnColeccion,
+  marcarGrabadosEnColeccion,
   quitar,
   quitarSeleccionados,
   vocesParaLimpiar,
@@ -66,17 +76,28 @@ const FACETAS: readonly Faceta<Video>[] = [
   { clave: "plataforma", etiqueta: "Plataforma", valor: (v) => v.plataforma },
 ];
 
+// Las mismas palabras que en Históricos: el acto es el mismo (ADR-070, la marca es por video) y
+// dos vocabularios para un solo hecho es cómo el equipo termina creyendo que son dos cosas.
+const ETIQUETA_FILTRO: Record<FiltroRegistro, string> = {
+  "sin-grabar": "Falta grabar",
+  grabados: "Grabados",
+  todos: "Todos",
+};
+
 type Voz = { id: string; nombre: string; tienePerfil: boolean };
 
 export function Detalle({
   coleccionId,
   videos,
   conLimpio,
+  grabados,
 }: {
   coleccionId: string;
   videos: Video[];
   /** Las claves que ya tienen guion limpio. Viaja como array: un Set no cruza el límite server/client. */
   conLimpio: string[];
+  /** Las claves ya marcadas como grabadas, del cockpit entero (ADR-070). Array por lo mismo. */
+  grabados: string[];
 }) {
   const cockpit = usarCockpit();
   const router = useRouter();
@@ -92,12 +113,25 @@ export function Detalle({
   // lo prometido y lo hecho que dejó afuera el modo selección entero, encontrado el 2026-08-21
   // releyendo el plan en vez de mirar la pantalla.
   const seleccion = usarSeleccion();
+  const [filtroGrabado, setFiltroGrabado] = useState<FiltroRegistro>("todos");
   // 🔽 **Abre en Vistas ↓**, y es lo único de esta pantalla que no es un default de diseño sino un
   // pedido textual: *"Poner de mayor a menor vistas en el documento que se descarga de colecciones"*
   // (Majo, 28/08). Vive acá y no en la descarga porque así hay **una sola** regla de orden: el
   // documento es lo que se ve. Un default propio del archivo daría dos listas distintas y la barra
   // dejaría de explicar lo que baja. Enmienda ADR-076 §5 para esta pantalla, no para las otras tres.
-  const orden = usarOrden(videos, CRITERIOS, FACETAS, "views");
+  const marcados = useMemo(() => new Set(grabados), [grabados]);
+  // 🔑 **El filtro de grabado va ANTES del orden, no adentro.** Son los dos sistemas conviviendo de
+  // ADR-076 §4, igual que en Históricos: éste filtra por un atributo **que la pantalla edita**, así
+  // que vive aparte de las facetas (idioma, plataforma) que son inmutables.
+  //
+  // ⚠️ La consecuencia conocida: con "Falta grabar" prendido, marcar hace desaparecer la tarjeta de
+  // abajo del cursor. Por eso el default es "Todos", igual que allá.
+  const sinFiltrar = useMemo(
+    () => filtrarPorGrabado(videos, marcados, filtroGrabado),
+    [videos, marcados, filtroGrabado],
+  );
+  const cuentasGrabado = useMemo(() => contarPorGrabado(videos, marcados), [videos, marcados]);
+  const orden = usarOrden(sinFiltrar, CRITERIOS, FACETAS, "views");
 
   const limpios = new Set(conLimpio);
   const sinIdentificar = videos.filter(necesitaEnriquecer).length;
@@ -272,6 +306,31 @@ export function Detalle({
     });
   }
 
+  /** Prende o apaga la marca de un video. Sin confirmación: se deshace apagándola (ADR-069 §5). */
+  function alternarGrabado(v: Video) {
+    if (trabajando) return;
+    startTransition(async () => {
+      const r = await marcarGrabadoEnColeccion(
+        cockpit,
+        coleccionId,
+        { plataforma: v.plataforma, external_id: v.external_id, url: v.url },
+        !marcados.has(v.clave),
+      );
+      if (!r.ok) setAviso(r);
+    });
+  }
+
+  /** Lo mismo en lote. Solo prende: apagar en masa restaría trabajo hecho y no lo pidió nadie. */
+  function marcarSeleccionados() {
+    if (trabajando || seleccion.cuantos === 0) return;
+    const claves = seleccion.claves;
+    startTransition(async () => {
+      const r = await marcarGrabadosEnColeccion(cockpit, coleccionId, claves);
+      setAviso(r);
+      if (r.ok) seleccion.cancelar();
+    });
+  }
+
   function sacar(v: Video) {
     if (trabajando) return;
     setQuitando(v.clave);
@@ -402,6 +461,28 @@ export function Detalle({
         </p>
       ) : (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 🎨 Los chips del grabado van en su PROPIA línea, arriba de la barra de orden. Son
+                los dos sistemas de ADR-076 §4 y se leen como dos preguntas distintas: *qué me falta*
+                primero, *cómo lo ordeno* después. */}
+            <span className="text-sm text-muted-foreground">Grabación</span>
+            {FILTROS_REGISTRO.map((f) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={filtroGrabado === f}
+                onClick={() => setFiltroGrabado(f)}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                  filtroGrabado === f
+                    ? "border-primary bg-primary/10 font-medium"
+                    : "hover:bg-accent",
+                )}
+              >
+                {ETIQUETA_FILTRO[f]} <span className="text-muted-foreground">{cuentasGrabado[f]}</span>
+              </button>
+            ))}
+          </div>
           <BarraOrden orden={orden} />
           <GrillaVideos>
             {orden.visibles.map((v) => (
@@ -420,7 +501,12 @@ export function Detalle({
                     : undefined
                 }
                 pie={
-                  <>
+                  <div className="flex w-full flex-wrap items-center gap-1.5">
+                    {/* 🎨 El badge en `default` y no en `secondary`: es la lección del 18/08 en
+                        Transcribir, donde la marca quedó como una pastilla gris al lado de otra
+                        gris, presente en el DOM e invisible al ojo. **El estado se muestra fuerte,
+                        la acción se ofrece callada.** Mismo criterio que Históricos. */}
+                    {marcados.has(v.clave) && <Badge>✓ Grabado</Badge>}
                     <span className="truncate text-xs text-muted-foreground">
                       {limpios.has(v.clave)
                         ? "limpio"
@@ -429,15 +515,23 @@ export function Detalle({
                           : "—"}
                     </span>
                     <Button
+                      variant={marcados.has(v.clave) ? "ghost" : "outline"}
+                      size="sm"
+                      onClick={() => alternarGrabado(v)}
+                      disabled={trabajando}
+                    >
+                      {marcados.has(v.clave) ? "Sacar la marca" : "Marcar grabado"}
+                    </Button>
+                    <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => sacar(v)}
                       disabled={trabajando}
-                      className="text-muted-foreground"
+                      className="ml-auto text-muted-foreground"
                     >
                       Sacar
                     </Button>
-                  </>
+                  </div>
                 }
               />
             ))}
@@ -453,6 +547,15 @@ export function Detalle({
               onClick={bajarVideos}
             >
               {trabajando ? "Pidiendo…" : "Descargar videos"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={seleccion.cuantos === 0 || trabajando}
+              onClick={marcarSeleccionados}
+            >
+              Marcar como grabados
             </Button>
             <Button
               type="button"

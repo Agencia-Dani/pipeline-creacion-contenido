@@ -3,8 +3,10 @@ import { test } from "node:test";
 import {
   armarRegistro,
   claveDeUrl,
+  contarPorGrabado,
   contarRegistro,
   estaGrabada,
+  filtrarPorGrabado,
   contarRevision,
   esFiltroRegistro,
   fechaDeFila,
@@ -254,4 +256,54 @@ test("loQueFaltaMarcar deja afuera lo ya grabado y nada más", () => {
   const faltan = loQueFaltaMarcar(r);
   assert.equal(faltan.length, 1);
   assert.equal(faltan[0].enlace.external_id, IG2);
+});
+
+// ── filtrarPorGrabado / contarPorGrabado ─────────────────────────────────────
+//
+// La versión para pantallas que dibujan `Video` (Colecciones). Mismo vocabulario que el histórico.
+
+const item = (clave: string) => ({ clave });
+const marcas = (...claves: string[]) => new Set(claves);
+
+test("con 'todos' no se filtra nada: es el default de la pantalla", () => {
+  const items = [item("a"), item("b")];
+  assert.deepEqual(filtrarPorGrabado(items, marcas("a"), "todos"), items);
+});
+
+test("'sin-grabar' deja los que NO tienen marca", () => {
+  const items = [item("a"), item("b"), item("c")];
+  assert.deepEqual(
+    filtrarPorGrabado(items, marcas("b"), "sin-grabar").map((x) => x.clave),
+    ["a", "c"],
+  );
+});
+
+test("'grabados' deja solo los marcados", () => {
+  const items = [item("a"), item("b"), item("c")];
+  assert.deepEqual(
+    filtrarPorGrabado(items, marcas("b", "c"), "grabados").map((x) => x.clave),
+    ["b", "c"],
+  );
+});
+
+test("una marca de un video que no está en la lista no inventa filas", () => {
+  // Las marcas se leen del cockpit entero, no de la colección: la mayoría no está acá.
+  assert.equal(filtrarPorGrabado([item("a")], marcas("z"), "grabados").length, 0);
+});
+
+test("las cuentas se toman sobre la lista entera, no sobre lo ya filtrado", () => {
+  // Si se contaran sobre lo filtrado, prender un chip dejaría los otros en cero y no habría vuelta.
+  assert.deepEqual(contarPorGrabado([item("a"), item("b"), item("c")], marcas("a")), {
+    "sin-grabar": 2,
+    grabados: 1,
+    todos: 3,
+  });
+});
+
+test("sin marcas, todo está sin grabar", () => {
+  assert.deepEqual(contarPorGrabado([item("a")], new Set()), {
+    "sin-grabar": 1,
+    grabados: 0,
+    todos: 1,
+  });
 });

@@ -227,3 +227,31 @@ export function loQueFaltaMarcar<G extends GuionDelRegistro>(
 ): LinkRevisado<G>[] {
   return revisados.filter((r) => r.estado !== "grabado");
 }
+
+// ── El mismo filtro, para las pantallas que dibujan `Video` ──────────────────
+//
+// 🔑 **Reusa `FiltroRegistro` en vez de inventar un vocabulario paralelo.** El acto es el mismo
+// (ADR-070: la marca es por video, no por carril) y las etiquetas que la persona lee tienen que ser
+// las mismas en Históricos y en Colecciones. Lo único que cambia es la forma de la fila: allá es
+// `FilaRegistro`, que sabe si está grabada; acá es un `Video` suelto y la marca vive aparte, en el
+// conjunto de claves que la pantalla ya carga.
+
+/** Deja pasar los que el filtro pide. Con `todos`, pasa todo (y ése es el default). */
+export function filtrarPorGrabado<T extends { clave: string }>(
+  items: readonly T[],
+  grabados: ReadonlySet<string>,
+  filtro: FiltroRegistro,
+): T[] {
+  if (filtro === "todos") return [...items];
+  const quiero = filtro === "grabados";
+  return items.filter((item) => grabados.has(item.clave) === quiero);
+}
+
+/** Cuántos hay de cada lado, para escribirlo en los chips. Se cuenta sobre la lista ENTERA. */
+export function contarPorGrabado<T extends { clave: string }>(
+  items: readonly T[],
+  grabados: ReadonlySet<string>,
+): CuentasRegistro {
+  const cuantos = items.filter((item) => grabados.has(item.clave)).length;
+  return { "sin-grabar": items.length - cuantos, grabados: cuantos, todos: items.length };
+}

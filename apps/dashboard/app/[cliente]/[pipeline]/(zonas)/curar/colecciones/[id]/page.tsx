@@ -4,6 +4,7 @@ import { comoRuta, rutaDe } from "@/domain/rutas";
 import type { Video } from "@/domain/video";
 import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerColeccion, leerMiembros } from "@/lib/colecciones";
+import { leerMarcas } from "@/lib/grabados";
 import { clavesConLimpio } from "@/lib/guiones-limpios";
 import { leerLoQueSeSabe } from "@/lib/videos";
 import { Detalle } from "./detalle";
@@ -33,10 +34,13 @@ export default async function ColeccionPage({
   // que acá no hay nada, no mandarlo a otra pantalla como si se hubiera equivocado de camino.
   if (!coleccion) notFound();
 
-  const [miembros, seSabe, limpios] = await Promise.all([
+  const [miembros, seSabe, limpios, marcas] = await Promise.all([
     leerMiembros(ctx, id),
     leerLoQueSeSabe(ctx),
     clavesConLimpio(ctx),
+    // Las marcas de "ya se grabó" son del cockpit entero (ADR-070: la marca es por video, no por
+    // colección), así que la mayoría no está en esta lista. La pantalla cruza por clave.
+    leerMarcas(ctx),
   ]);
 
   // El miembro manda la identidad y la url (es la fila que existe seguro); lo que se sabe llena el
@@ -67,7 +71,12 @@ export default async function ColeccionPage({
 
       {/* `conLimpio` viaja como array: un Set no es serializable a través del límite
           server/client. Misma razón por la que `cargarTanda` manda sus marcas así. */}
-      <Detalle coleccionId={id} videos={videos} conLimpio={[...limpios]} />
+      <Detalle
+        coleccionId={id}
+        videos={videos}
+        conLimpio={[...limpios]}
+        grabados={[...marcas.keys()]}
+      />
     </div>
   );
 }
