@@ -454,6 +454,41 @@ segundo día — Jero 81 eventos todos el 07/08, Juan José 23 ese mismo día, M
 pregunta ya no es "¿entran?" sino "¿vuelven?"*, y se lee contando **días distintos por persona** en
 `app.eventos`, no eventos.
 
+## 4-quinquies. 🔴 **La descarga de mp4, PERO EN VERCEL** *(nuevo del 29/08, ADR-078)*
+
+> **Quién:** Mani · **Cuánto:** 3 minutos, después del primer deploy que incluya el cierre 117.
+
+**Esto es lo único de esa entrega que localhost NO puede contestar, y puede fallar entero.**
+
+Las tres cosas del cierre 117 se verificaron en vivo **contra la base de producción**, pero
+**corriendo el server en `localhost`**. La descarga de video pasa **33 MB por una función**
+(`/api/video`), y ése es justo el tamaño donde Vercel se comporta distinto que `next dev`: el límite
+de tamaño de respuesta de una Serverless Function aplica al body **materializado**. La route
+devuelve `origen.body` en streaming justamente para no materializarlo, **y eso no está probado en
+Vercel**.
+
+**Qué hacer:**
+
+1. Entrar a *Curar → Colecciones →* una colección con videos de Instagram.
+2. *Seleccionar varios* → marcar **uno** → **Descargar videos**.
+3. Mirar dos cosas:
+
+| Lo que pasa | Qué significa |
+|---|---|
+| Baja un `.mp4` que **se abre y se ve**, y el aviso dice *"1 video bajado."* | ✅ El streaming sobrevive a Vercel. Cerrar este item |
+| El aviso dice *"1 no se pudieron"* | 🔴 La función rechazó el tamaño. **No es el CDN**: mirá los logs de la función en Vercel antes de tocar código. El plan B ya está escrito en ADR-078 (copiar a Storage), y **es otro ADR**, no un parche |
+| Baja un archivo de **0 bytes** o que no abre | 🔴 El body se cortó a mitad. Peor que el anterior porque **se ve como éxito**: el aviso va a decir *"1 video bajado"* igual |
+
+🩸 **El tercer caso es el que hay que buscar a propósito.** El aviso cuenta descargas que
+**arrancaron bien**, no archivos completos: un `res.ok` con el stream cortado después se ve idéntico
+a un éxito desde la pantalla. **Abrí el archivo.** Un `.mp4` que no reproduce es la única señal.
+
+**Y de paso, gratis:** que el nombre del archivo tenga el título del video. Si baja como `video.mp4`
+teniendo título, el `Content-Disposition` no está llegando (el caption con emoji ya rompió esto una
+vez, ver cierre 117).
+
+---
+
 ## 5. ✅ **V4 — el re-rank: CERRADO por Mani el 2026-08-07**
 
 *"Filtrar por aprobados en curar/feed sirve de maravilla."*

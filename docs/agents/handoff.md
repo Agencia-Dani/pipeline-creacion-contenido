@@ -185,6 +185,71 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🎞️ 2026-08-29 (cierre 117) · LAS TRES DEL ONBOARDING DE DANI, Y UN 500 QUE SOLO APARECIÓ AL CLICKEAR (Claude, pedido de Mani)
+>
+> **En una línea:** salieron **8 pedidos** del onboarding a Dani (28/08, con Majo). Se cerraron
+> **3**, las tres verificadas **en vivo contra producción** desde `localhost` con Mani logueado:
+> el documento baja lo que se ve, el mp4 se baja desde la colección, y la marca de grabado llegó a
+> Colecciones. **Migraciones: ninguna. `core/`: no se tocó. n8n: cero cambios.** ADRs: **078 nuevo**,
+> **076 enmendado**, **070 extendido**.
+>
+> ### 🩸 Lo único que hay que aprender de acá: el verde no alcanzaba
+>
+> `typecheck` + **422 tests** + `build` + `validate` estaban en verde **y las dos fallas aparecieron
+> en el primer click real**:
+>
+> 1. **500 por un emoji.** El nombre del archivo sale del caption del video, y el caption traía 📈.
+>    Las cabeceras HTTP son **ByteStrings latin-1**: `new Headers()` tira
+>    `character at index 94 has a value of 55357`. Los tests usaban títulos ASCII y pasaban. Vive
+>    arreglado en `cabeceraDeDescarga()` (`domain/cdn.ts`) con las dos formas de la RFC 6266 y cinco
+>    tests de regresión.
+> 2. **El `<a>` navegaba y se llevaba la pantalla.** Un `<a href="/api/video?…">` sin `download`
+>    **navega**, así que el 500 reemplazó la colección entera por el texto del error y se perdió la
+>    selección de 57 tarjetas. Se pasó a `fetch` → blob, que es **el patrón que ese mismo componente
+>    ya usaba para el Word**.
+>
+> *Ninguna de las dos es de lógica y ninguna la iba a encontrar un test. La verificación en el
+> browser no fue una formalidad: fue donde apareció el trabajo.*
+>
+> ### 🔴 Y una afirmación falsa que se escribió y se corrigió el mismo día
+>
+> ADR-078 decía que su canario *"nace limpio, porque probar esto no escribe eventos desde el server
+> local"*. **Es falso: el dev server local escribe contra la base de PRODUCCIÓN.** Verificar dejó en
+> `app.eventos` **2 `colecciones.bajar_videos` + 1 `colecciones.descargar` + 2 `colecciones.grabado`,
+> todos de Mani el 29/08**. Es el mismo error que ya se había pagado con las 5 filas de
+> `app.videos_meta`, cometido de nuevo doce líneas más abajo en el mismo archivo. Corregido en el ADR.
+> **El primer dato de adopción de la descarga de video es el tercer `bajar_videos`.**
+>
+> ### Lo que se construyó, con lo que decidió cada cosa
+>
+> | Pedido (textual de Majo) | Qué se hizo | Qué lo decidió |
+> |---|---|---|
+> | *"Poner de mayor a menor vistas en el documento que se descarga de colecciones"* | Colecciones **abre en Vistas ↓** y la descarga viaja con las claves de `orden.visibles`: el criterio **y** los chips de filtro llegan al Word y al Excel | El orden se aplica **en el server, antes del corte por presupuesto**. Reordenando al volver, un doc truncado traería *los primeros agregados ordenados por vistas* y diría en silencio que son los más vistos |
+> | *"Revisar como poner la opción de descargar videos de gráficas en colección para editores"* | Botón **Descargar videos** en la barra de selección: compra el `videoUrl` a Apify y baja el mp4 por `/api/video` | **3 medidas** (ADR-078): `videoUrl` ya vuelve del actor que ya se paga · la firma **vence en ~38 h** ⇒ no se persiste ⇒ **sin migración** · **33 MB por video** ⇒ no hay ZIP posible |
+> | *"que desde colecciones se pueda marcar como grabado, que se vea esa marca"* | Toggle por tarjeta, badge **✓ Grabado** en el pie, chips *falta grabar / grabados / todos* y marcar en lote | **Nada de datos cambió**: la marca ya era por video (ADR-070). Es lo que esa decisión compró |
+>
+> ### 📏 Medido contra prod el 29/08 (números para no volver a adivinar)
+>
+> - **`videoUrl` existe** en `apify~instagram-scraper`, al lado de los 9 campos que ADR-072
+>   documentó. Devuelve `200`, `video/mp4`, **32.981.910 bytes** para un reel de 93 s.
+> - **La firma vence en ~38 h** (`oe=6A94F4CF` → 31/08 03:28 UTC). La miniatura dura ~5 días.
+> - **El CDN de los mp4 manda `cross-origin-resource-policy: cross-origin`**, al revés que las
+>   imágenes (`same-origin`). El proxy de video **no existe por la razón del de miniaturas**.
+> - **33 MB tardan 13,8 s** por el dev server local. Bajar 50 no es instantáneo.
+> - La colección *"Test"* tiene **57/57 con vistas**; el orden por vistas va de **629.497 a 2.456**.
+> - **`app.grabados` con `grabado_en > '2026-08-21'` = 2**, las dos del **22/08** y con el mismo
+>   timestamp. La marca de la verificación de hoy **se revirtió a propósito** para no ensuciarlo.
+>
+> ### ⏳ Lo que queda de esos 8 pedidos
+>
+> **5 abiertas**, todas en Notion con `owner: retia`: *insights en Buscar Referentes* · *investigar
+> cómo el 🔥 y el 👎 influyen en el heat* · *cambiar el nombre de "Colecciones"* (necesita que Mani
+> elija el nombre) · *revisar el registro de cuentas* (**alcance sin confirmar en su propio cuerpo**:
+> hay que preguntarle a Majo qué está mal antes de tocar nada) · *Three.js* (`someday`).
+>
+> 🔴 **Y lo único que falta de las 3 cerradas: nada de esto está desplegado.** Los 4 commits están en
+> `main` local **sin push**. Se verificaron contra prod pero corriendo desde `localhost`.
+
 > ## 🔌 2026-08-24 (cierre 116) · LOS DOS BOTONES QUE NO ANDABAN, Y NINGUNO ERA n8n (Claude, pedido de Mani)
 >
 > **En una línea:** *Buscar cuentas nuevas* daba **404** y *Archivar lo calificado* decía **falta
