@@ -328,6 +328,42 @@
 > `public.v_senal_seleccion` (vive en `public`, no en `app`) tiene **21 referentes con tasa medida**
 > y hoy el `0.7` de `heat = 0.7 × score_Haiku + 0.3 × percentil(métrico)` **se eligió sin datos**.
 >
+> ### 🔬 LA HIPÓTESIS DEL PESO SE PROBÓ Y QUEDÓ REFUTADA — el 0.7 se queda
+>
+> **Conclusión: no se toca el motor.** El barrido sobre 217 videos etiquetados (87 aprobados · 130
+> descartados) da el AUC máximo **en el peso que ya está puesto**:
+>
+> | peso rel | 0.0 | 0.3 | 0.5 | **0.7 (hoy)** | 0.8 | 1.0 |
+> |---|---|---|---|---|---|---|
+> | AUC | 0.671 | 0.681 | 0.692 | **0.706** | 0.709 | 0.639 |
+>
+> **Bootstrap (300 remuestreos):** el óptimo cae en 0.7–0.8 el **84 %** de las veces y
+> `AUC(0.8) − AUC(0.7)` da **IC95 % [−0.013, +0.019]**, que incluye el 0. Subirlo a 0.8 sería
+> cambiar el motor por ruido.
+>
+> 🩸 **Y lo que hay que aprender es POR QUÉ la hipótesis parecía buena.** Salió de comparar señales
+> **sueltas** —`views` 0.690 vs `relevancia_score` 0.639— y concluir que el 70 % estaba mal gastado.
+> **Contrafáctico equivocado:** la pregunta no era *qué señal sola gana* sino *qué mezcla gana*, y la
+> mezcla al 0.7 (**0.706**) le gana **a las dos por separado**. *Dos señales mediocres y poco
+> correlacionadas combinan mejor que la buena sola; comparar los ingredientes entre sí no dice nada
+> sobre la receta.* La hipótesis vivió tres commits antes de morir.
+>
+> 🔑 **Dos cosas del método, para reusar:**
+> 1. **La fórmula estaba en otro nodo del que yo decía.** `Heat-score v1` calcula el prescore
+>    **métrico** y `Gate de relevancia` lo **pisa** con el compuesto. Leer el nodo antes de barrer
+>    fue lo que evitó medir una fórmula inventada.
+> 2. **El percentil métrico no se persiste, pero se despeja:** `pctM = (heat − 0.7·rel)/0.3`. **Y el
+>    despeje se validó antes de usarlo:** las 228 filas caen dentro de [0,1] y su mediana da
+>    **exactamente 0.500**, que es lo que debe dar una distribución de percentiles. Con otro `PESO`
+>    en alguna corrida habrían salido valores imposibles.
+>
+> 📉 **Lo que deja:** con estas señales el techo es **AUC ≈ 0.71**. Las mejoras no van a venir de
+> re-pesar lo que hay sino de **señales nuevas**. Y sigue el hueco que no es de código: **de 82
+> descartes, 80 sin `veredicto` humano** — sin eso no se puede calibrar el **gate**, que es distinto
+> del orden.
+>
+> <details><summary>La medición previa que originó la hipótesis (queda como registro)</summary>
+>
 > ### 📊 Primera medición del heat-score (§5.2), y sale contraintuitiva
 >
 > Es el único punto del §5 con dato acumulado, así que se midió — **sin cambiar nada**: mover el peso
@@ -361,6 +397,8 @@
 > descartados por la máquina, **80 sin `veredicto` humano** — y de los 2 revisados, **uno dice *"era
 > bueno"***. Sin eso no hay forma de medir cuánto se tira de más. La pantalla existe; falta que
 > alguien la use.
+>
+> </details>
 >
 > ### 🔴 Lo que sigue faltando
 >
