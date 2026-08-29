@@ -460,6 +460,11 @@ pregunta ya no es "¿entran?" sino "¿vuelven?"*, y se lee contando **días dist
 
 **Esto es lo único de esa entrega que localhost NO puede contestar, y puede fallar entero.**
 
+✅ **Lo que YA está probado (Mani, 29/08): en `localhost` el archivo baja completo y reproduce.** O
+sea que el proxy arma un `.mp4` válido y el nombre llega bien. **Eso NO cierra este item**: lo que
+queda abierto no es si el código funciona, es si **Vercel** deja pasar 33 MB por una función. Un
+`next dev` no prueba eso.
+
 Las tres cosas del cierre 117 se verificaron en vivo **contra la base de producción**, pero
 **corriendo el server en `localhost`**. La descarga de video pasa **33 MB por una función**
 (`/api/video`), y ése es justo el tamaño donde Vercel se comporta distinto que `next dev`: el límite
@@ -475,7 +480,7 @@ Vercel**.
 
 | Lo que pasa | Qué significa |
 |---|---|
-| Baja un `.mp4` que **se abre y se ve**, y el aviso dice *"1 video bajado."* | ✅ El streaming sobrevive a Vercel. Cerrar este item |
+| Baja un `.mp4` que **se abre y se ve**, y el aviso dice *"1 video bajado."* | ✅ El streaming sobrevive a Vercel. Cerrar este item (en localhost ya da esto: el cambio es el entorno, no el resultado esperado) |
 | El aviso dice *"1 no se pudieron"* | 🔴 La función rechazó el tamaño. **No es el CDN**: mirá los logs de la función en Vercel antes de tocar código. El plan B ya está escrito en ADR-078 (copiar a Storage), y **es otro ADR**, no un parche |
 | Baja un archivo de **0 bytes** o que no abre | 🔴 El body se cortó a mitad. Peor que el anterior porque **se ve como éxito**: el aviso va a decir *"1 video bajado"* igual |
 

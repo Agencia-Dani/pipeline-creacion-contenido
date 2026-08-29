@@ -247,8 +247,13 @@
 > elija el nombre) · *revisar el registro de cuentas* (**alcance sin confirmar en su propio cuerpo**:
 > hay que preguntarle a Majo qué está mal antes de tocar nada) · *Three.js* (`someday`).
 >
-> 🔴 **Y lo único que falta de las 3 cerradas: nada de esto está desplegado.** Los 4 commits están en
-> `main` local **sin push**. Se verificaron contra prod pero corriendo desde `localhost`.
+> ✅ **El mp4 se abrió y reproduce** (Mani, 29/08), o sea que el proxy arma un archivo completo y
+> válido, no un stream cortado. La task de Notion quedó en `done`.
+>
+> 🔴 **Y lo único que falta de las 3 cerradas: nada de esto está desplegado.** Los commits están en
+> `main` local **sin push**. Se verificó contra la base de prod pero **corriendo desde `localhost`**,
+> y ésa es justo la diferencia que importa para la descarga de video: 33 MB por una función de Vercel
+> es otro entorno. Sigue abierto el §4-quinquies de `verificaciones-humanas.md`.
 
 > ## 🔌 2026-08-24 (cierre 116) · LOS DOS BOTONES QUE NO ANDABAN, Y NINGUNO ERA n8n (Claude, pedido de Mani)
 >
