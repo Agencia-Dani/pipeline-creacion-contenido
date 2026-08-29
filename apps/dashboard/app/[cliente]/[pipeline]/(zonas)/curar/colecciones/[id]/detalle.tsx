@@ -91,7 +91,12 @@ export function Detalle({
   // lo prometido y lo hecho que dejó afuera el modo selección entero, encontrado el 2026-08-21
   // releyendo el plan en vez de mirar la pantalla.
   const seleccion = usarSeleccion();
-  const orden = usarOrden(videos, CRITERIOS, FACETAS);
+  // 🔽 **Abre en Vistas ↓**, y es lo único de esta pantalla que no es un default de diseño sino un
+  // pedido textual: *"Poner de mayor a menor vistas en el documento que se descarga de colecciones"*
+  // (Majo, 28/08). Vive acá y no en la descarga porque así hay **una sola** regla de orden: el
+  // documento es lo que se ve. Un default propio del archivo daría dos listas distintas y la barra
+  // dejaría de explicar lo que baja. Enmienda ADR-076 §5 para esta pantalla, no para las otras tres.
+  const orden = usarOrden(videos, CRITERIOS, FACETAS, "views");
 
   const limpios = new Set(conLimpio);
   const sinIdentificar = videos.filter(necesitaEnriquecer).length;
@@ -151,6 +156,11 @@ export function Detalle({
    * export de Históricos (ADR-071). Nunca un blob cruzando la red ni una route nueva: así la
    * descarga pasa por la misma guardia de tenant que el resto.
    *
+   * 📄 **El archivo es la vista: se baja lo que se ve, en el orden en que se ve.** Por eso viajan
+   * las claves de `orden.visibles` y no un `coleccionId` pelado — el criterio de la barra Y sus
+   * chips de filtro llegan al documento. La consecuencia hay que saberla: con un chip prendido, el
+   * archivo trae menos videos que la colección, y el aviso del final dice cuántos son.
+   *
    * 🔑 **Los dos formatos comparten la MISMA acción y el mismo viaje.** `descargar` ya trae todo lo
    * que la planilla necesita (título, referente, link, texto y si está limpio), y es la parte cara:
    * hace un `leerCrudo` por video. Una segunda acción para el Excel pagaría dos veces lo mismo y
@@ -158,8 +168,9 @@ export function Detalle({
    */
   function bajar(formato: "word" | "excel") {
     if (trabajando) return;
+    const claves = orden.visibles.map((v) => v.clave);
     startTransition(async () => {
-      const r = await descargar(cockpit, coleccionId);
+      const r = await descargar(cockpit, coleccionId, claves);
       if (!r.ok) {
         setAviso(r);
         return;

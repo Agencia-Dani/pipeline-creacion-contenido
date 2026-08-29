@@ -126,3 +126,49 @@ export function tablaDeColeccion(guiones: readonly GuionParaDocumento[]): unknow
     g.texto === null ? "SIN GUION" : g.limpio ? "LIMPIO" : "ORIGINAL",
   ]);
 }
+
+/**
+ * Deja `items` en el orden exacto de `claves`, y **solo los que están ahí**.
+ *
+ * Existe por el pedido de Majo del 28/08: *"Poner de mayor a menor vistas en el documento que se
+ * descarga de colecciones"*. El documento tenía su propio orden —el de inserción que devuelve
+ * `leerMiembros`— y la barra de ADR-076 ordenaba únicamente la pantalla, así que lo que se veía y
+ * lo que se bajaba eran dos listas distintas.
+ *
+ * 🔑 **El orden lo decide el cliente y lo aplica el SERVER, y eso no es un rodeo.** La descarga
+ * corta por presupuesto de tiempo (`PRESUPUESTO_DESCARGA_MS`) y avisa que quedó cortada. Si el
+ * cliente reordenara el resultado, lo que se corta seguiría siendo la cola del orden de inserción:
+ * un documento truncado traería *los primeros agregados, ordenados por vistas* y diría, en silencio,
+ * que esos son los más vistos. Aplicando el orden antes del corte, lo que se pierde es la cola de lo
+ * que la persona eligió ver.
+ *
+ * `claves === null` = nadie pidió nada: la lista pasa tal cual. Es lo que hace que un llamador viejo
+ * siga comportándose igual.
+ *
+ * Tres cosas que pasan de verdad y por eso están contempladas:
+ *  · una clave que ya no existe (alguien sacó el video en otra pestaña) **se ignora**, no rompe;
+ *  · una clave repetida entrega el video **una sola vez** — un guion duplicado en el documento
+ *    desalinearía la numeración contra la pantalla;
+ *  · un miembro que no está en `claves` **queda afuera**, que es cómo el filtro de facetas llega al
+ *    archivo: se baja lo que se ve.
+ */
+export function enElOrdenPedido<T extends { clave: string }>(
+  items: readonly T[],
+  claves: readonly string[] | null,
+): T[] {
+  if (claves === null) return [...items];
+
+  const porClave = new Map(items.map((item) => [item.clave, item]));
+  const salida: T[] = [];
+  const puestos = new Set<string>();
+
+  for (const clave of claves) {
+    if (puestos.has(clave)) continue;
+    const item = porClave.get(clave);
+    if (item === undefined) continue;
+    puestos.add(clave);
+    salida.push(item);
+  }
+
+  return salida;
+}

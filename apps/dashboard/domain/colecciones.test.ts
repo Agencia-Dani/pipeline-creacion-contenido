@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   advertenciaDeBorrado,
   COLUMNAS_COLECCION,
+  enElOrdenPedido,
   necesitaEnriquecer,
   queFaltaEnriquecer,
   tablaDeColeccion,
@@ -156,4 +157,54 @@ test("un solo video no rompe la frase", () => {
     advertenciaDeBorrado(1),
     "Se va la lista de 1. Los guiones limpios y la metadata comprada se quedan.",
   );
+});
+
+// ── enElOrdenPedido ──────────────────────────────────────────────────────────
+//
+// Lo que se protege acá es que el archivo diga lo mismo que la pantalla (pedido de Majo, 28/08).
+
+const miembro = (clave: string) => ({ clave });
+
+test("sin claves pedidas la lista pasa tal cual", () => {
+  const items = [miembro("a"), miembro("b"), miembro("c")];
+  assert.deepEqual(enElOrdenPedido(items, null), items);
+});
+
+test("los deja en el orden pedido, no en el suyo", () => {
+  const items = [miembro("a"), miembro("b"), miembro("c")];
+  assert.deepEqual(
+    enElOrdenPedido(items, ["c", "a", "b"]).map((x) => x.clave),
+    ["c", "a", "b"],
+  );
+});
+
+test("lo que no está en las claves queda afuera: así el filtro de la pantalla llega al archivo", () => {
+  const items = [miembro("a"), miembro("b"), miembro("c")];
+  assert.deepEqual(
+    enElOrdenPedido(items, ["c", "a"]).map((x) => x.clave),
+    ["c", "a"],
+  );
+});
+
+test("una clave que ya no existe se ignora en vez de romper", () => {
+  // Pasa de verdad: alguien saca un video en otra pestaña entre que la pantalla se dibujó y el
+  // click en Descargar. El documento sale con lo que quedó.
+  const items = [miembro("a"), miembro("b")];
+  assert.deepEqual(
+    enElOrdenPedido(items, ["a", "fantasma", "b"]).map((x) => x.clave),
+    ["a", "b"],
+  );
+});
+
+test("una clave repetida entrega el video una sola vez", () => {
+  // Un guion duplicado desalinearía la numeración del Word y del Excel contra la pantalla.
+  const items = [miembro("a"), miembro("b")];
+  assert.deepEqual(
+    enElOrdenPedido(items, ["a", "a", "b"]).map((x) => x.clave),
+    ["a", "b"],
+  );
+});
+
+test("pedir una lista vacía baja un archivo vacío, no la colección entera", () => {
+  assert.deepEqual(enElOrdenPedido([miembro("a")], []), []);
 });

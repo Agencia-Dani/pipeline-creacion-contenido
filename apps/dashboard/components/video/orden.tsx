@@ -49,6 +49,11 @@ export const SIN_CRITERIO = "";
 /**
  * El estado del control, más el cálculo de lo visible.
  *
+ * `criterioInicial` es con qué eje abre la pantalla. **El default sigue siendo `SIN_CRITERIO`**: las
+ * cuatro pantallas ya llegan ordenadas por alguien y el control no tiene que tocar eso. La única que
+ * lo pasa hoy es Colecciones, y no por gusto de diseño sino porque el orden de esa pantalla es lo
+ * que baja en el documento, y el documento tiene un default pedido (ADR-076 §5, enmendado).
+ *
  * ⚠️ **`criterios` y `facetas` tienen que ser estables entre renders** (declarados como constantes
  * a nivel de módulo, o memoizados). Si se arman inline en el cuerpo del componente, los `useMemo`
  * de acá se invalidan en cada render. Es la misma trampa que ya costó un bucle de fetch en
@@ -58,8 +63,9 @@ export function usarOrden<T>(
   items: readonly T[],
   criterios: readonly CriterioOrden<T>[],
   facetas: readonly Faceta<T>[] = [],
+  criterioInicial: string = SIN_CRITERIO,
 ): Orden<T> {
-  const [claveCriterio, setClaveCriterio] = useState<string>(SIN_CRITERIO);
+  const [claveCriterio, setClaveCriterio] = useState<string>(criterioInicial);
   const [direccion, setDireccion] = useState<Direccion>("desc");
   const [elegidos, setElegidos] = useState<Record<string, string[]>>({});
 
@@ -134,8 +140,10 @@ export function BarraOrden<T>({ orden }: { orden: Orden<T> }) {
             value={orden.claveCriterio}
             onChange={(e) => orden.elegirCriterio(e.target.value)}
           >
-            {/* La primera opción es el default de la pantalla: no reordenar. */}
-            <option value={SIN_CRITERIO}>Lo que muestra la pantalla</option>
+            {/* No reordenar: el orden que la pantalla ya traía. Decía "Lo que muestra la
+                pantalla" y dejó de ser cierto el día que Colecciones abrió en Vistas ↓ — ahí lo
+                que la pantalla muestra ES un criterio, y esta opción es la otra cosa. */}
+            <option value={SIN_CRITERIO}>Como llega la lista</option>
             {orden.criterios.map((c) => (
               <option key={c.clave} value={c.clave}>
                 {c.etiqueta}

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { queFaltaEnriquecer, validarNombre } from "@/domain/colecciones";
+import { enElOrdenPedido, queFaltaEnriquecer, validarNombre } from "@/domain/colecciones";
 import type { GuionParaDocumento } from "@/domain/docx";
 import { huellaDeCriterios } from "@/domain/limpieza";
 import { parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
@@ -623,10 +623,17 @@ const PRESUPUESTO_DESCARGA_MS = 45_000;
  * ⏳ **Con presupuesto, como la limpieza.** `leerCrudo` puede terminar barriendo `outputs` por cada
  * video sin transcripción propia, así que una colección grande podría pasarse del techo de Vercel.
  * Se corta y **se avisa** con `truncado`, en vez de tumbar el request en silencio.
+ *
+ * 📄 **`claves` es lo que la pantalla está mostrando, en su orden** (pedido de Majo, 28/08: el
+ * documento salía en orden de inserción mientras la barra de ADR-076 ordenaba solo la pantalla).
+ * Se aplica **antes** del presupuesto y no después, a propósito: si el cliente reordenara el
+ * resultado, lo que el corte tira seguiría siendo la cola del orden de inserción y un documento
+ * truncado diría en silencio que esos son los más vistos. `null` = el orden de siempre.
  */
 export async function descargar(
   enRuta: CockpitEnRuta,
   coleccionId: string,
+  claves: readonly string[] | null = null,
 ): Promise<
   | { ok: true; nombre: string; guiones: GuionParaDocumento[]; truncado: boolean }
   | { ok: false; mensaje: string }
@@ -648,7 +655,7 @@ export async function descargar(
     const guiones: GuionParaDocumento[] = [];
     let truncado = false;
 
-    for (const m of miembros) {
+    for (const m of enElOrdenPedido(miembros, claves)) {
       const video = seSabe.get(m.clave);
       const limpio = limpios.get(m.clave)?.texto ?? null;
       if (limpio === null && Date.now() > hasta) {

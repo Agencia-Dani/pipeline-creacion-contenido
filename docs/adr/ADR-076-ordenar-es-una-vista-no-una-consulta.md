@@ -114,8 +114,37 @@ default es la primera entrada de su lista**, o sea lo que ya mostraba:
 |---|---|---|---|
 | `curar/feed` | `CandidatoFeed` | heat ↓ dentro del grupo | likes, views, seguidores, engagement, relevancia, A-Z |
 | `curar/historicos` | `Historico` | fecha ↓ | likes, views, seguidores, heat, relevancia, A-Z |
-| `curar/colecciones/[id]` | `Video` | orden de inserción | likes, views, seguidores, heat, A-Z |
+| `curar/colecciones/[id]` | `Video` | ~~orden de inserción~~ → **vistas ↓** (ver enmienda) | likes, views, seguidores, heat, A-Z |
 | `curar/descartes` | `DescarteFeed` | near-miss (ADR-021) | **relevancia, A-Z y nada más** |
+
+> ### ✏️ Enmienda 2026-08-29 — Colecciones abre en **vistas ↓**, y solo Colecciones
+>
+> **Lo que cambia:** el default de `curar/colecciones/[id]` deja de ser el orden de inserción. Las
+> otras tres pantallas **no se tocan**: su default sigue siendo `null` = *no reordenes*.
+>
+> **Por qué se rompe la regla acá.** Esta pantalla es la única cuyo orden **sale del cockpit en un
+> archivo**. Majo lo pidió textual el 28/08: *"Poner de mayor a menor vistas en el documento que se
+> descarga de colecciones"*. El documento bajaba en orden de inserción mientras la barra ordenaba la
+> pantalla, así que lo que se veía y lo que se bajaba eran **dos listas distintas** — que es el bug,
+> no el default.
+>
+> **Se podía arreglar sin tocar el default**, dándole al documento su propio orden por vistas. Se
+> descartó: serían **dos reglas de orden** para la misma colección, y la barra dejaría de explicar lo
+> que baja. Una sola regla —*el archivo es la vista*— es lo que hace el pedido verificable.
+>
+> **Y el orden viaja al SERVER, no se aplica al volver.** `descargar` corta por presupuesto de tiempo
+> (`PRESUPUESTO_DESCARGA_MS`) y avisa con `truncado`. Reordenando el resultado, lo que el corte tira
+> seguiría siendo la cola del orden de inserción: un documento truncado traería *los primeros
+> agregados, ordenados por vistas* y diría en silencio que esos son los más vistos. Aplicando el
+> orden antes del corte, lo que se pierde es la cola de lo que la persona eligió. Vive en
+> `enElOrdenPedido()` de `domain/colecciones.ts`, con sus tests.
+>
+> **Las facetas van también**, por la misma regla: con un chip prendido el archivo trae lo filtrado y
+> el aviso dice cuántos son.
+>
+> **Consecuencia que hay que saber:** el sentinel `SIN_CRITERIO` dejó de leerse *"Lo que muestra la
+> pantalla"* —en Colecciones lo que la pantalla muestra ES un criterio— y ahora dice **"Como llega la
+> lista"** en las cuatro.
 
 🩸 **Las tres listas son distintas y no por gusto — el primer borrador de esta tabla decía
 `engagement` en las cuatro filas y `likes` en Descartes, y las dos cosas son falsas.** Se corrigió
