@@ -78,9 +78,20 @@
     perfil dejan de limpiarse en neutro por olvido.
   - (+) `criterios_hash` empieza a significar algo por fin: con la huella por video, `estaAlDia`
     puede señalar de verdad los limpios viejos.
-  - (−) 🔴 **Los 65 guiones que ya existen no se re-limpian solos, y 26 quedaron neutros.**
-    Re-limpiar cuesta plata y esa decisión es de una persona (ADR-074 ya lo estableció). Lo que sí
-    cambia es que **ahora se ve**: cada guion dice con qué criterios salió.
+  - (−) 🔴 **Los 65 guiones que ya existen no se re-limpian solos, y 28 quedaron viejos.**
+    📏 **Medido el 29/08 cruzando `criterios_hash` contra la huella que hoy le tocaría a cada
+    video:** **37 al día · 28 desactualizados**, y el desglose dice qué pasó — **27** se limpiaron
+    *sin voz* aunque su video **es de Juan Pablo Vieira**, que sí tiene perfil (salieron neutros
+    pudiendo sonar a él), y **1** se limpió *con* Juan Pablo pero su video ya no tiene voz derivable
+    porque su candidato se archivó.
+    ⚠️ **Y este renglón decía *"lo que sí cambia es que ahora se ve"*, que era falso.** Cada guion
+    dice **con qué voz** salió, pero **ninguno dice que quedó viejo**: `estaAlDia()` existe, está
+    testeada y **no la llama nadie**. *La consecuencia de una decisión no se declara resuelta por el
+    mecanismo que la haría resoluble.*
+    🅿️ **Deuda conocida, aplazada por Mani el 29/08.** Re-limpiar cuesta plata y esa decisión es de
+    una persona (ADR-074 ya lo estableció). Cuando se retome, lo que falta es conectar `estaAlDia` a
+    la pantalla y darle un botón propio que confirme antes de gastar — nunca meterlo en *Limpiar*,
+    que gastaría de nuevo en cada click.
   - (−) **La voz depende de que el video esté en `candidatos` u `outputs`.** El barrido del domingo
     vacía `candidatos`, pero lo calificado pasa a `outputs`, así que la cadena aguanta. Lo que no
     tiene voz es lo pegado a mano — y ése es el caso #4, que ya está resuelto.

@@ -293,11 +293,46 @@
 > server** (le pisa `.next`); la pantalla queda en blanco con el HMR reintentando y parece un bug de
 > la app. No lo es.
 >
+> ### 🅿️ La deuda que ADR-080 deja, medida y aplazada por Mani
+>
+> 📏 **28 de los 65 guiones quedaron viejos** (37 al día), cruzando `criterios_hash` contra la huella
+> que hoy le tocaría a cada video: **27** se limpiaron *sin voz* aunque su video es de Juan Pablo
+> Vieira —que sí tiene perfil, o sea salieron neutros pudiendo sonar a él— y **1** se limpió *con*
+> Juan Pablo pero su video ya no tiene voz derivable (su candidato se archivó).
+>
+> 🩸 **Y ADR-080 se atribuyó de más:** su consecuencia decía *"lo que sí cambia es que ahora se
+> ve"*. **Falso.** Cada guion dice **con qué voz** salió; **ninguno dice que quedó viejo**.
+> `estaAlDia()` existe, está testeada y **no la llama nadie**. *La consecuencia de una decisión no se
+> declara resuelta por el mecanismo que la haría resoluble.* Corregido en el ADR.
+>
+> **Mani decidió aplazarlo** (29/08). Cuando se retome: conectar `estaAlDia` a la pantalla y darle
+> **botón propio con confirmación** — nunca meterlo dentro de *Limpiar*, que gastaría de nuevo en
+> cada click.
+>
+> ### 🟢 Cerrar D3 habilitó el §5 del ROADMAP — y tres de sus cinco puntos eran ficción
+>
+> El §5 se titulaba *"no arrancar antes de declarar el MVP"*. **El MVP quedó declarado hoy**, así que
+> se leyó por primera vez como una lista accionable, y contra prod:
+>
+> | Punto | Decía | Es |
+> |---|---|---|
+> | 1. Dashboard de métricas | *"interfaces de Airtable + el Sheet Histórico"* | 🪦 **las dos cosas están muertas** (Airtable purgado el 03/08, el Sheet con ADR-057). Lo que pedía **ya existe y es propio**: la zona *Entender* |
+> | 3. Costo por corrida | *"`runs.costo_estimado` real"* | ⚠️ **esa columna NO EXISTE** (`42703`). El costo ya se calcula por `app.tarifas` × `runs.metricas` → `v_costos_semana`. Lo que falta es **la revisión mensual**, que nadie hace |
+> | 5. Descubrimiento | *"falta importar en n8n y la 1ª corrida"* | ✅ **corriendo hace semanas** (24/08 `ok` en 1 m 46 s) y con gate por voz desde ayer |
+>
+> Y en §6 murieron 3 riesgos: la cuota de Airtable, **el OAuth de Google** (ADR-057 se llevó la
+> última dependencia de Google) y *"D3: demo obligatoria"*. 🔴 **El de adopción mutó y sigue vivo,
+> con otra forma:** ya no es *"¿la adoptan?"* sino **Jero, 81 eventos el 07/08 y nunca más**.
+>
+> 🎯 **El único punto del §5 con el dato ya acumulado es el 2, calibrar el heat-score:**
+> `public.v_senal_seleccion` (vive en `public`, no en `app`) tiene **21 referentes con tasa medida**
+> y hoy el `0.7` de `heat = 0.7 × score_Haiku + 0.3 × percentil(métrico)` **se eligió sin datos**.
+>
 > ### 🔴 Lo que sigue faltando
 >
-> **§13 (cierre 119) sigue abierta:** el renombrado y el aviso *sin trabajo* se vieron en
-> `localhost`, **no en producción**. Y ojo con la primera limpieza que se haga: los 65 guiones que
-> ya existen **no se re-limpian solos** y 26 quedaron neutros — lo que cambia es que ahora se ve.
+> **§13 (cierre 119) sigue abierta:** el renombrado de colecciones y el aviso *sin trabajo* se
+> vieron en `localhost`, **no en producción**. *(Mani confirmó en prod los criterios de limpieza y el
+> botón de limpiar — eso es ADR-080/§14, no el §13.)*
 
 > ## 🧾 2026-08-29 (cierre 119) · LAS DOS QUE ESTABAN "BLOQUEADAS POR UN HUMANO", Y UNA ERA UN MALENTENDIDO (Claude, pedido de Mani)
 >

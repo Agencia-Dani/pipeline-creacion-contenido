@@ -363,19 +363,40 @@ incremental no reprocesa · una falla simulada no tumba la entrega · los crons 
 sola; su tercer día de uso). La condición se declara por lo que dice `app.eventos`, no por una demo
 agendada: ver **D3** arriba.
 
-## 5. Horizonte post-MVP (no arrancar antes de declarar el MVP)
+## 5. Horizonte post-MVP — 🟢 **HABILITADO el 2026-08-29**, cuando cerró D3
 
-1. **Dashboard de métricas con filtros** (lo acordado con Alejo): primero vistas/interfaces de
-   Airtable + el Sheet Histórico (cero infra); Looker Studio sobre Supabase solo si se queda corto.
-2. **Calibrar el heat-score** con 2+ semanas de curación real (`v_senal_seleccion`): pesos de
-   idioma vs selección vs métricas. Opcional: scoring semántico de temas con Claude (1 llamada
-   batch) si el substring-matching se queda corto.
-3. **Costo por corrida medido** (`runs.costo_estimado` real) + revisión mensual.
+> **Este título decía *"no arrancar antes de declarar el MVP"*, y el MVP quedó declarado el 29/08**
+> con el cierre de D3 (§3). O sea que esta lista dejó de ser hipotética — y al releerla ese mismo
+> día, **tres de sus cinco puntos nombraban cosas que ya no existen**. Se puso al día contra prod,
+> no de memoria; cada corrección dice qué la mide.
+
+1. ~~**Dashboard de métricas con filtros**: vistas/interfaces de Airtable + el Sheet Histórico~~
+   🪦 **Obsoleto por partida doble:** **Airtable se purgó el 2026-08-03** y **el Sheet murió con
+   [ADR-057](./docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md)** (con él se fue la
+   última dependencia de Google del pipeline). Lo que el punto pedía **ya existe y es propio**: la
+   zona **Entender** del cockpit, sobre `app.v_metricas_calidad`, `v_embudo_semana` y
+   `v_costos_semana`. Si algún día se queda corta, la discusión es *qué falta ver*, no *qué
+   herramienta*.
+2. 🎯 **Calibrar el heat-score** con curación real — **es el primero que de verdad se puede hacer
+   hoy, y el único con el dato ya acumulado.** `public.v_senal_seleccion` (ojo: vive en `public`,
+   no en `app`) tiene **21 referentes con tasa de selección medida** — `howtoconvince` 0.62,
+   `quinlanwalther` 0.80, `jefferson_fisher` 0.49 — sobre semanas de curación de Majo. La pregunta
+   concreta: hoy `heat = 0.7 × score_Haiku + 0.3 × percentil(heat_métrico)` y el peso 0.7 **se
+   eligió sin datos**. Opcional: scoring semántico de temas si el substring-matching se queda corto.
+3. **Costo por corrida medido** + revisión mensual. ⚠️ **Este punto nombraba `runs.costo_estimado`,
+   una columna que NO EXISTE** (medido: PostgREST responde `42703`). El costo se calcula por otro
+   lado y ya funciona: `app.tarifas` (supadata $0.009/video, haiku_traduccion $0.005,
+   haiku_lote $0.004) × las unidades de `runs.metricas`, agregado en `app.v_costos_semana`. Lo que
+   falta no es la columna: es **la revisión mensual**, que nadie hace.
 4. **Pipeline general** ([PLAN.md §5](./PLAN.md)): Substack + sync Notion (F3), capa del jefe
    completa (F4), templatización cliente N+1 (F5), operación sostenible (F6).
-5. **Motor de descubrimiento de referentes** (cierra el loop de aprendizaje) — **✅ CONSTRUIDO
-   ([ADR-020](./docs/adr/ADR-020-motor-descubrimiento-referentes.md), 2026-07-10; falta importar en
-   n8n y la 1ª corrida)**: `Workflows/workflow-descubrimiento-referentes/` propone **referentes
+5. **Motor de descubrimiento de referentes** (cierra el loop de aprendizaje) — **✅ CONSTRUIDO Y
+   CORRIENDO.** *Este punto decía "falta importar en n8n y la 1ª corrida" y llevaba semanas
+   desactualizado:* está activo, corrió en producción el **24/08** (`ok` en 1 m 46 s) y el **29/08**
+   ganó su gate por voz ([ADR-079](./docs/adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md)). Lo
+   único abierto es la task del 25/08 —*cerró ok con CERO propuestas*—, que ADR-079 explica como un
+   camino legítimo: con `cap_semillas = 8` y dedup contra todo lo conocido, cero es posible.
+   ([ADR-020](./docs/adr/ADR-020-motor-descubrimiento-referentes.md), 2026-07-10): `Workflows/workflow-descubrimiento-referentes/` propone **referentes
    nuevos** parecidos a los que mejor convierten (semillas rankeadas por `v_senal_seleccion` →
    sugeridos del propio Instagram vía Apify **+ lookalikes de TikTok** vía dataovercoffee, rama
    paralela — ADR-020 §8, enmienda 2026-07-13 → vetting Haiku contra criterios), a la tabla
@@ -388,7 +409,8 @@ agendada: ver **D3** arriba.
 | Riesgo | Mitigación |
 |---|---|
 | La traducción "literal" deriva en reescritura (el LLM embellece) | Prompt con instrucción explícita + V2 compara contra la transcripción original |
-| Cuota free de Airtable (1.000 records / 1.000 calls/mes) con backfill grande | Solo el top_n por proyecto entra a Airtable; el archivado diario limpia calificados |
-| OAuth de Google (Docs/Sheets) en n8n self-host: el consent screen **External + Testing** caduca el refresh token a los **7 días** → el archivado moría cada domingo | **Resuelto (2026-07-12):** publicar la app a **Producción** (Audience → Publish app). El dueño del Sheet es un Gmail personal → "Internal" no aplica y Service Account está bloqueado (política de org `iam.disableServiceAccountKeyCreation`). Producción para uso personal (<100 usuarios) no pide verificación (solo warning de "app no verificada" al autorizar) y quita la expiración de 7 días. Tokens solo caducan tras 6 meses de inactividad; el cron semanal nunca lo está |
-| El equipo no adopta la vista de re-rank | D3: demo obligatoria al activar |
+| ~~Cuota free de Airtable con backfill grande~~ | 🪦 **Riesgo extinto: Airtable se purgó el 2026-08-03.** El store es Supabase (D7) |
+| ~~OAuth de Google (Docs/Sheets) en n8n self-host~~ | 🪦 **Riesgo extinto desde [ADR-057](./docs/adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md) (2026-08-05):** los 3 nodos del Sheet se borraron y con ellos **la última dependencia de Google del pipeline**. No hay OAuth que caduque. *(La mitigación de abajo se conserva como registro de cómo se resolvió mientras existió.)* |
+| *(registro)* El consent screen **External + Testing** caducaba el refresh token a los **7 días** → el archivado moría cada domingo | **Resuelto (2026-07-12):** publicar la app a **Producción** (Audience → Publish app). El dueño del Sheet es un Gmail personal → "Internal" no aplica y Service Account está bloqueado (política de org `iam.disableServiceAccountKeyCreation`). Producción para uso personal (<100 usuarios) no pide verificación (solo warning de "app no verificada" al autorizar) y quita la expiración de 7 días. Tokens solo caducan tras 6 meses de inactividad; el cron semanal nunca lo está |
+| El equipo no adopta la vista de re-rank | ~~D3: demo obligatoria al activar~~ → **la demo no hizo falta: Majo usó el sistema sola el 26/08** (80 calificaciones, 61 guiones limpiados). 🔴 **Pero el riesgo mutó y sigue vivo:** Jero hizo 81 eventos el 07/08 —el día más productivo de cualquiera— y **no volvió nunca**. Se mide con días distintos por persona en `app.eventos`, no con un `count(*)` |
 | `fecha_calificacion` por API falla al crear la base | El script ya lo maneja: warning + creación manual documentada |
