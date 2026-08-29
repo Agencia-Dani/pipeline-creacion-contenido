@@ -241,30 +241,24 @@ export default async function OperarPage({
             </p>
           )}
           <Separator />
-          <BotonCorrer deshabilitado={corridaViva} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Buscar cuentas nuevas</CardTitle>
-          <CardDescription>
-            La otra máquina: en vez de traer videos, propone cuentas de referente nuevas a partir
-            de las que ya funcionan. Ya no corre sola los lunes — se aprieta acá.
-            {pendientes > 0 && (
-              <>
-                {" "}
-                Hay{" "}
-                <Link href={rutaDe(base, "curar/sugeridos")} className="underline">
-                  {pendientes} propuesta{pendientes === 1 ? "" : "s"} esperando
-                </Link>
-                : conviene resolverlas antes de pedir más.
-              </>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BotonBuscar pendientes={pendientes} />
+          {/* 🔑 **Las dos máquinas comparten alcance desde ADR-079, así que comparten card.**
+              Antes «Buscar cuentas nuevas» tenía la suya, abajo, y eso mentía por omisión: hacía
+              parecer que el botón no dependía de esta lista cuando depende de la misma. Juntos y
+              con el mismo formato, la lista de arriba se lee como lo que es — el alcance de los
+              dos. Archivar SÍ sigue aparte: no lee esta configuración, barre lo ya calificado. */}
+          <div className="flex flex-wrap items-start gap-3">
+            <BotonCorrer deshabilitado={corridaViva} />
+            <BotonBuscar pendientes={pendientes} />
+          </div>
+          {pendientes > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Hay{" "}
+              <Link href={rutaDe(base, "curar/sugeridos")} className="underline">
+                {pendientes} propuesta{pendientes === 1 ? "" : "s"} de cuenta esperando
+              </Link>
+              : conviene resolverlas antes de pedir más.
+            </p>
+          )}
         </CardContent>
       </Card>
 

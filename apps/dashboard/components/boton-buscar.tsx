@@ -33,25 +33,31 @@ export function BotonBuscar({ pendientes }: { pendientes: number }) {
   return (
     <div className="space-y-3">
       {confirmando ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+        // El aviso va en su PROPIA línea y no al lado de los botones. Con el botón solo en su card
+        // daba igual; desde ADR-079 comparte fila con el ▶ del motor, y ahí una sola línea larga
+        // empujaba «Sí, buscar» al extremo derecho y tiraba «Cancelar» al renglón de abajo, con las
+        // dos acciones separadas por media pantalla. Se vio en el browser, no en los tests.
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
             Buscar gasta créditos. {pendientes > 0
               ? `Todavía hay ${pendientes} propuesta${pendientes === 1 ? "" : "s"} sin decidir — conviene resolverlas primero.`
               : "¿Seguro?"}
-          </span>
-          <Button onClick={disparar} disabled={enviando}>
-            Sí, buscar
-          </Button>
-          <Button variant="ghost" onClick={() => setConfirmando(false)} disabled={enviando}>
-            Cancelar
-          </Button>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={disparar} disabled={enviando}>
+              Sí, buscar
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmando(false)} disabled={enviando}>
+              Cancelar
+            </Button>
+          </div>
         </div>
       ) : (
-        <Button
-          variant={pendientes > 0 ? "outline" : "default"}
-          onClick={() => setConfirmando(true)}
-          disabled={enviando}
-        >
+        // Mismo `variant` que el ▶ del motor, a propósito: desde ADR-079 los dos botones viven
+        // juntos en la misma card y comparten alcance, así que dos formatos distintos leerían
+        // como dos jerarquías. El empujón a resolver las propuestas pendientes no se perdió —
+        // vive en el paso de confirmación de abajo y en la línea que la card pone al pie.
+        <Button onClick={() => setConfirmando(true)} disabled={enviando}>
           {enviando ? "Enviando señal…" : "Buscar cuentas nuevas"}
         </Button>
       )}

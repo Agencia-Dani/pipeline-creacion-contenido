@@ -118,6 +118,16 @@ export function armarVistaOperar(
   return { porVoz: porVoz.filter((grupo) => grupo.proyectos.length > 0), noCorren };
 }
 
+/**
+ * Los proyectos que de verdad entran: activos **y de voz activa**. Sale de la vista ya armada y no
+ * de un segundo cruce, justamente para que no exista un segundo cruce — desde ADR-079 este mismo
+ * conjunto es el alcance de las DOS máquinas, así que si acá y la card discreparan, una de las dos
+ * estaría mintiendo. Lo consume el plan del buscador (`armarVistaBuscador`).
+ */
+export function proyectosDelPlan(vista: VistaOperar): Set<string> {
+  return new Set(vista.porVoz.flatMap((grupo) => grupo.proyectos.map((p) => p.id)));
+}
+
 // ── Corridas (filas de `runs` del motor) ──────────────────────────────────────
 
 export type EstadoCorrida = "en_curso" | "ok" | "fallo" | "parcial";

@@ -454,7 +454,34 @@ segundo día — Jero 81 eventos todos el 07/08, Juan José 23 ese mismo día, M
 pregunta ya no es "¿entran?" sino "¿vuelven?"*, y se lee contando **días distintos por persona** en
 `app.eventos`, no eventos.
 
-## 4-quinquies. 🔴 **La descarga de mp4, PERO EN VERCEL** *(nuevo del 29/08, ADR-078)*
+## 4-quinquies. ✅ **La descarga de mp4 en Vercel: CERRADO por Mani el 2026-08-29**
+
+**El streaming sobrevive a Vercel.** Mani bajó un mp4 desde la app desplegada y **el archivo abre y
+reproduce completo** — que era el único caso que había que buscar a propósito, porque un stream
+cortado se ve idéntico a un éxito desde la pantalla.
+
+📏 **Medido, no solo mirado.** La confirmación a ojo se cruzó contra `app.eventos`:
+
+| | |
+|---|---|
+| Deploy a producción (sha `40d6663`) | 29/08 **18:32:12Z** |
+| `colecciones.bajar_videos` de la verificación | 29/08 **18:44:05Z** · `{pedidos: 1, encontrados: 1}` |
+| Colección usada | `6450e22e…` — **distinta** a la de las pruebas de localhost |
+
+Las dos cosas que hacen que esto pruebe lo que dice: el evento es **posterior al deploy**, y es sobre
+**otra colección** que las corridas de `localhost`, o sea una acción nueva y no un replay.
+
+🩸 **Y hubo un intento anterior que NO contaba, con la firma exacta de esta trampa.** El primer
+“bajó bien, se ve completo” fue el archivo que ya estaba en disco desde la bajada de las 18:19 por
+`localhost`. Se detectó porque **no había ningún evento posterior al deploy**, y la ausencia es
+concluyente por diseño: ADR-078 compra la URL firmada **cada vez** y no la persiste, así que no hay
+camino con link cacheado — sin evento no hubo compra, y sin compra no hubo descarga. *Un `.mp4` que
+reproduce no dice de dónde vino: la pestaña tenía que decir `vercel.app`, no `localhost:3000`.*
+
+⚠️ **Esta verificación corrió el canario de ADR-078 un número:** el primer dato de adopción pasa a
+ser el **cuarto** `bajar_videos`, no el tercero. Corregido en el ADR.
+
+<details><summary>El enunciado original, que sigue valiendo si esto hay que re-probar</summary>
 
 > **Quién:** Mani · **Cuánto:** 3 minutos, después del primer deploy que incluya el cierre 117.
 
@@ -491,6 +518,8 @@ a un éxito desde la pantalla. **Abrí el archivo.** Un `.mp4` que no reproduce 
 **Y de paso, gratis:** que el nombre del archivo tenga el título del video. Si baja como `video.mp4`
 teniendo título, el `Content-Disposition` no está llegando (el caption con emoji ya rompió esto una
 vez, ver cierre 117).
+
+</details>
 
 ---
 

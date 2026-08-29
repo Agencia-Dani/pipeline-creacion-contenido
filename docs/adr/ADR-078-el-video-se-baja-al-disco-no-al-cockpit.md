@@ -134,11 +134,18 @@ que bajar 50 no es instantáneo, aunque el browser los encole solo.
   cuenta, porque probar esto no escribe eventos desde el server local"*, **y es falso**: el dev
   server local lee y escribe contra la **base de producción**. Verificarlo el 29/08 dejó **2
   `colecciones.bajar_videos`** (18:16 y 18:19, las dos de Mani, la primera fallida por el 500 del
-  emoji) y **1 `colecciones.descargar`** de 57 videos (18:14). *El primer dato de adopción es el
-  tercer `bajar_videos`.* Es exactamente el mismo error que ya se pagó con las 5 filas de
+  emoji) y **1 `colecciones.descargar`** de 57 videos (18:14). Es exactamente el mismo error que ya se pagó con las 5 filas de
   `app.videos_meta`, cometido de nuevo doce líneas más arriba en este mismo archivo.
   **La regla, otra vez: un canario se cuenta DESPUÉS de restar las propias pruebas, y quien lo
   escribe tiene que saber contra qué base corre su localhost.**
+
+  🔴 **Y se corrió otra vez el mismo día: el primer dato de adopción NO es el tercer `bajar_videos`,
+  es el CUARTO.** Este renglón decía *"el tercero"* y quedó viejo a las tres horas: cerrar el
+  §4-quinquies de `verificaciones-humanas.md` exigía bajar un mp4 **desde Vercel**, y esa
+  verificación es el tercero (29/08 18:44, Mani, colección `6450e22e…`). *Un canario que se cita en
+  vez de re-medirse ya cuenta mal: cada verificación que lo toca lo corre un número, y es la tercera
+  vez que este repo lo aprende (5 filas de `videos_meta`, "el tercero", ahora "el cuarto").*
+  **El número del canario no se escribe: se consulta antes de afirmarlo.**
 - **Cada descarga le paga a Apify** una corrida por lote, incluso de videos cuya metadata ya se
   compró. Es el precio de la medida 2 y no hay forma de evitarlo sin persistir un link que vence.
 - **Si el post ya no está, la descarga falla — que es exactamente el caso que el pedido teme.** No es
