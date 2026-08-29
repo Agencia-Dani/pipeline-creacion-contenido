@@ -836,6 +836,43 @@ los canarios de `CLAUDE.md`.
 
 ---
 
+## 13. ⬜ **Renombrar una colección y el aviso «sin trabajo», EN PRODUCCIÓN** *(nuevo del 29/08, cierre 119)*
+
+**Quién:** Mani (o cualquiera del equipo) · **2 minutos** · *Está desplegado y sin tocar por nadie.*
+
+### Por qué un agente no puede cerrarla
+
+Las dos se verificaron **desde `localhost` contra la base de prod**, que es exactamente la
+distinción que este repo ya se cobró dos veces: en el cierre 117 con el mp4 (*"un `.mp4` que
+reproduce no dice de dónde vino"*) y en el 118 con el §4-quinquies, que se dio por cerrado una vez
+de más. El código está en `8507cd3` y Vercel dice `success`, **pero nadie apretó el botón en el
+dominio real.**
+
+### Los pasos
+
+1. Abrir **`Curar → Colecciones`** en producción. Tocar **Renombrar** en cualquier tarjeta.
+2. Escribir el nombre de **otra colección que ya exista** → *Guardar*. **Tiene que rebotar** con
+   *«Ya tenés una colección que se llama "X"»*, mostrado **adentro de la tarjeta** y no al pie de la
+   página.
+3. Corregirlo a un nombre nuevo → *Guardar*. El campo se cierra, la tarjeta muestra el nombre nuevo
+   y **la cuenta de videos no cambia**.
+4. Entrar a esa colección: el título de adentro **también** tiene que decir el nombre nuevo (son dos
+   `revalidatePath`, y el de adentro es el que se olvida).
+5. Abrir **`Curar → Referentes`**. Arriba tiene que estar el aviso *«hay 13 de 28 cuentas prendidas
+   que no están haciendo nada»* y el badge naranja **sin trabajo** en `@jefferson_fisher`,
+   `@markmanson` y `@susieinthiran`.
+
+### Qué significa si falla
+
+| Lo que ves | Qué significa |
+|---|---|
+| El nombre nuevo en la grilla pero **el viejo adentro** de la colección | 🩸 Falta el `revalidatePath` del detalle. El `.docx` que se baja va a llevar el nombre viejo |
+| *«No se pudo cambiar el nombre»* genérico | 🔴 No es el choque de nombre (ése tiene su mensaje). Mirá los logs de la función: el `NO_ESTA` sale cuando el update toca 0 filas, y eso en prod significaría que el filtro de tenant no encontró la fila |
+| El aviso dice **otro número** que 13 de 28 | 🟡 Normal si alguien prendió o apagó una voz desde el 29/08 — el número sale de la config viva. Se re-mide con la query, no se asume. **Si dice 0 de 28**, sospechá: el alcance llegó vacío y estaría marcando todo como que trabaja |
+| No aparece ningún badge y tampoco el aviso | 🩸 `proyectosEnAlcance` llegó vacío o completo por error. La card *«Qué va a correr»* de Operar tiene que decir lo mismo: si las dos discrepan, una de las dos miente (que es justo lo que ADR-079 §3 quiso hacer imposible) |
+
+---
+
 ## Registro — lo que ya se cerró, para no repetirlo
 
 | # | Qué | Cuándo |

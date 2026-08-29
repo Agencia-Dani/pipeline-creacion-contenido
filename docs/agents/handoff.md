@@ -251,10 +251,30 @@
 > `app.eventos`. Es el mismo costo que ya se pagó con `videos_meta` y con `bajar_videos`: **el dev
 > server local escribe contra prod.** El primer dato de adopción del renombrado es el **tercero**.
 >
+> ### 🚀 Pusheado y desplegado (29/08 19:32 UTC)
+>
+> Dos commits: **`23f629a`** (el cierre 118, que llevaba desde ayer sin commitear) y **`8507cd3`**
+> (éste). Verificado por **dos señales independientes**, y consultado en vez de heredado —que es la
+> corrección que este mismo handoff se hizo ayer—: el commit status de Vercel para `8507cd3` dice
+> **`success`**, y hay un **deployment `Production` del mismo sha** a las **19:32:49Z**. Prod
+> responde 200.
+>
+> 🔴 **Lo que eso NO prueba: nadie hizo clic en producción.** Las dos features se verificaron desde
+> `localhost` **contra la base de prod**, que es otra cosa. Anotado como
+> [§13 de verificaciones-humanas](../verificaciones-humanas.md).
+>
 > ### ⏳ Qué queda
 >
-> De los 8 pedidos del onboarding, **cero abiertas**. Sigue en `someday` Three.js, y sigue la
-> `waiting` de recibir el audio de Majo. **Nada de esto está desplegado:** vive en el working tree.
+> De los 8 pedidos del onboarding, **cero abiertas** — las dos últimas quedaron en `done` en Notion,
+> y la de Colecciones **se renombró** (*"Renombrar una colección desde el cockpit"*) para que el
+> título no vuelva a hacer creer que faltaba elegir un nombre. Sigue en `someday` Three.js y sigue la
+> `waiting` del audio de Majo.
+>
+> **Lo abierto del repo no cambió y ninguno es de esta sesión:** la decisión de producto de LinkedIn
+> (espera a Alejandro), el ritual manual de topología en n8n
+> ([plan-multi-tenant §14.2](./plan-multi-tenant.md)), la demo D3 con Majo y Jero (§9), V6
+> (§8, hay que rediseñarla), los items ⬜ de `verificaciones-humanas` (§3, §4-bis, §4-ter,
+> §4-quater, §10) y **los cuatro canarios a re-mirar el 2026-09-04**.
 
 > ## 🎛️ 2026-08-29 (cierre 118) · EL SELECTOR YA EXISTÍA Y UNA DE LAS DOS MÁQUINAS LO IGNORABA (Claude, pedido de Mani)
 >
