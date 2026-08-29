@@ -1,4 +1,4 @@
-import { urlDeCdnPermitida } from "@/domain/cdn";
+import { cabeceraDeDescarga, urlDeCdnPermitida } from "@/domain/cdn";
 
 // El proxy de videos. Sirve el mp4 de un reel desde nuestro origen para que el browser lo BAJE.
 //
@@ -30,12 +30,6 @@ import { urlDeCdnPermitida } from "@/domain/cdn";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Un nombre de archivo que ningún sistema de archivos rechace. */
-function nombreSeguro(crudo: string | null): string {
-  const limpio = (crudo ?? "").replace(/[/\\:*?"<>|]/g, " ").trim().slice(0, 80);
-  return `${limpio || "video"}.mp4`;
-}
-
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const cruda = params.get("u");
@@ -56,7 +50,7 @@ export async function GET(request: Request) {
 
   const cabeceras = new Headers({
     "Content-Type": origen.headers.get("content-type") ?? "video/mp4",
-    "Content-Disposition": `attachment; filename="${nombreSeguro(params.get("nombre"))}"`,
+    "Content-Disposition": cabeceraDeDescarga(params.get("nombre")),
     // Sin cache: la URL firmada cambia en cada compra, así que cachear guardaría una copia por
     // firma de un archivo que ya está en el disco de quien lo bajó.
     "Cache-Control": "no-store",

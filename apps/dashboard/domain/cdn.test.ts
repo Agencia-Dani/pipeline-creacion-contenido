@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { urlDeCdnPermitida } from "./cdn.ts";
+import { cabeceraDeDescarga, urlDeCdnPermitida } from "./cdn.ts";
 
 // Los tests del guard de SSRF. Cada uno de estos es una request que alguien con sesión podría
 // mandar a mano: lo que se prueba no es el happy path, es lo que tiene que rebotar.
@@ -33,4 +33,39 @@ test("http pelado rebota aunque el host esté permitido", () => {
 test("basura que no es una URL devuelve null en vez de tirar", () => {
   assert.equal(urlDeCdnPermitida("no soy una url"), null);
   assert.equal(urlDeCdnPermitida(""), null);
+});
+
+// ── cabeceraDeDescarga ───────────────────────────────────────────────────────
+//
+// 🩸 Todos estos son el mismo 500 del 29/08 visto desde ángulos distintos: una cabecera HTTP no
+// puede llevar nada fuera de latin-1, y el nombre viene de un caption de Instagram.
+
+test("un emoji en el nombre no rompe la cabecera (el 500 medido)", () => {
+  const c = cabeceraDeDescarga("julias.algos - the stock market?\u{1F4C8}");
+  // Lo que tiraba `new Headers()`: cualquier code unit por encima de 255 en la parte `filename=`.
+  const plano = c.match(/filename="([^"]+)"/)![1];
+  assert.ok([...plano].every((ch) => ch.charCodeAt(0) <= 255), `no representable: ${plano}`);
+  // El `?` también se va: es de los que un sistema de archivos rechaza.
+  assert.equal(plano, "julias.algos - the stock market.mp4");
+});
+
+test("el nombre completo viaja igual, en filename*", () => {
+  const c = cabeceraDeDescarga("cuánto vale \u{1F4C8}");
+  assert.match(c, /filename\*=UTF-8''/);
+  assert.equal(decodeURIComponent(c.split("filename*=UTF-8''")[1]), "cuánto vale \u{1F4C8}.mp4");
+});
+
+test("un nombre entero no-ASCII no deja un archivo llamado solo .mp4", () => {
+  assert.match(cabeceraDeDescarga("\u{1F4C8}\u{1F4C9}\u{1F525}"), /filename="video\.mp4"/);
+});
+
+test("sin nombre cae a video.mp4", () => {
+  assert.match(cabeceraDeDescarga(null), /filename="video\.mp4"/);
+  assert.match(cabeceraDeDescarga("   "), /filename="video\.mp4"/);
+});
+
+test("las comillas y las barras se van: cerrarían la cabecera o el path", () => {
+  const c = cabeceraDeDescarga('un "titulo" con /barras/');
+  // La barra del final se vuelve espacio y el `trim` se lo come: sin espacio antes del punto.
+  assert.equal(c.match(/filename="([^"]+)"/)![1], "un titulo con barras.mp4");
 });

@@ -2,10 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dashboard",
+      "name": "cockpit",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "cwd": "apps/dashboard",
+      "runtimeArgs": ["--prefix", "apps/dashboard", "run", "dev"],
       "port": 3000
     }
   ]

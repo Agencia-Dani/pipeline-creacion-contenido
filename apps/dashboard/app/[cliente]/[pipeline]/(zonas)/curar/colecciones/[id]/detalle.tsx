@@ -227,25 +227,45 @@ export function Detalle({
         return;
       }
 
+      let bajados = 0;
+      let fallados = 0;
       for (const v of elegidos) {
         const origen = r.porClave[v.clave];
         if (!origen) continue;
-        const a = document.createElement("a");
-        a.href = `/api/video?u=${encodeURIComponent(origen)}&nombre=${encodeURIComponent(nombreDeArchivo(v))}`;
-        // Sin `download`: el nombre lo pone el `Content-Disposition` de la route, que es quien
-        // sabe sanitizarlo. El atributo acá sería una segunda fuente para el mismo hecho.
-        a.click();
+        const nombre = nombreDeArchivo(v);
+        // 🩸 **Se baja con `fetch` y no con un `<a>` apuntando al proxy** (encontrado el 29/08
+        // probándolo en vivo): un `<a>` sin `download` NAVEGA, así que un 500 o una firma vencida
+        // reemplazaban la pantalla entera con el texto del error y se perdía la selección de 57
+        // tarjetas. Es el mismo patrón que `bajar()` acá arriba, y sale gratis porque `/api/video`
+        // es del mismo origen — contra el CDN no se podría: no manda `Access-Control-Allow-Origin`.
+        try {
+          const res = await fetch(
+            `/api/video?u=${encodeURIComponent(origen)}&nombre=${encodeURIComponent(nombre)}`,
+          );
+          if (!res.ok) throw new Error(String(res.status));
+          const url = URL.createObjectURL(await res.blob());
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${nombre}.mp4`;
+          a.click();
+          URL.revokeObjectURL(url);
+          bajados += 1;
+        } catch {
+          fallados += 1;
+        }
+        // Un respiro entre descargas: N clicks en el mismo tick los descarta el browser.
         await new Promise((listo) => setTimeout(listo, 400));
       }
-
-      const bajados = elegidos.length - r.sinVideo;
+      fallados += r.sinVideo;
       setAviso({
         ok: bajados > 0,
         mensaje:
           bajados === 0
-            ? "Ninguno de esos videos se pudo traer. Solo funciona con Instagram por ahora."
-            : `Bajando ${bajados} ${bajados === 1 ? "video" : "videos"}.` +
-              (r.sinVideo > 0 ? ` ${r.sinVideo} no se pudieron traer (¿TikTok, o el post ya no está?).` : "") +
+            ? "Ninguno de esos videos se pudo bajar. ¿Son de TikTok, o el creador ya los bajó?"
+            : `${bajados} ${bajados === 1 ? "video bajado" : "videos bajados"}.` +
+              (fallados > 0
+                ? ` ${fallados} no se pudieron (¿TikTok, o el post ya no está?).`
+                : "") +
               (r.recortado ? " La selección era muy grande: se tomaron los primeros 50." : ""),
       });
       seleccion.cancelar();

@@ -87,6 +87,25 @@ sale del mismo `.cdninstagram.com` que ya estaba permitido.
 (medido en ADR-072), y lo que no se pudo traer se cuenta y se avisa, en vez de dejar tarjetas que no
 responden.
 
+### 🩸 Los dos arreglos que costó verificarlo en vivo (mismo día)
+
+Los tests, el typecheck y el build estaban en verde y **las dos fallas aparecieron en el primer
+click real**. Quedan acá porque las dos son de forma, no de lógica, y las dos son reincidentes:
+
+1. **500 por un emoji.** El nombre del archivo sale del caption, y el caption traía 📈. Las cabeceras
+   HTTP son **ByteStrings latin-1**, así que `new Headers()` tira
+   `character at index 94 has a value of 55357`. Los tests usaban títulos ASCII y pasaban. Ahora el
+   `Content-Disposition` lo arma `cabeceraDeDescarga()` en `domain/cdn.ts`, con las dos formas de la
+   RFC 6266 (`filename=` en ASCII + `filename*=UTF-8''…`) y sus cinco tests de regresión.
+2. **El `<a>` navegaba y se llevaba la pantalla.** Sin `download`, un `<a href="/api/video?…">`
+   **navega**: el 500 reemplazó la colección entera por el texto del error y se perdió la selección
+   de 57 tarjetas. Se pasó a `fetch` → blob → `<a download>`, que es **el patrón que este mismo
+   componente ya usaba para el Word**, y sale gratis porque `/api/video` es del mismo origen. Ahora
+   un fallo se cuenta y se dice en el aviso, en vez de tragarse la página.
+
+📏 **Y una medida de operación:** 33 MB tardan **13,8 s** por el dev server local. Sirve para saber
+que bajar 50 no es instantáneo, aunque el browser los encole solo.
+
 ## Alternativas descartadas
 
 - **Copiar los mp4 a Storage (respaldo real).** Es el único diseño que cumple el motivo *"por si lo
