@@ -67,6 +67,15 @@
   - (+) Deja de gastarse Apify y Haiku proponiendo cuentas para voces apagadas.
   - (+) Le da una hipótesis medible a la task del 25/08 (*«Buscar cuentas nuevas» cerró ok con CERO
     propuestas*): con `cap_semillas = 8` y dedup contra todo lo conocido, cero es un camino legítimo.
+  - (−) 🩸 **Volvió invisible un estado que antes era sólo "a medias": la cuenta prendida que no
+    hace nada.** Antes de esta ADR, una cuenta de voz apagada al menos seguía sembrando propuestas;
+    desde acá no hace nada, y la pantalla de Referentes la seguía mostrando *Activa* con sus tasas
+    al lado. 📏 **Medido el 2026-08-29, apenas aplicada: 13 de las 28 cuentas activas (46%)**
+    quedaron así — incluidas `@jefferson_fisher` (49%) y `@howtoconvince` (62%), **las dos de mejor
+    tasa del sistema**. Se tapó el mismo día: `noAlimentaNada` (`domain/referentes.ts`) + el aviso
+    y el badge *sin trabajo* en `curar/referentes`, con el alcance pedido prestado a
+    `proyectosDelPlan(armarVistaOperar(…))` para que no exista un tercer cruce. *Una decisión que
+    apaga algo tiene que dejar visible lo que apagó, o el ahorro se cobra en confusión.*
   - (−) **Cambia comportamiento en producción:** el buscador pasa de atender 6 proyectos a atender
     2. Es el objetivo del cambio, pero si alguien dependía de sembrar el banco de una voz pausada,
     se entera acá. Se preguntó antes de aplicarlo.
@@ -76,4 +85,4 @@
 - **Toca `core/`:** no. Sin migración y sin cambio de contrato — `run-plan` sigue igual, y el ámbito
   `completo` sigue significando lo mismo. Cambia `Workflows/workflow-descubrimiento-referentes/`
   (`Armar plan de descubrimiento`, que entra por `n8n:push` porque es `parameters.jsCode` y no
-  topología) y la zona `operar` + `curar/sugeridos` del cockpit.
+  topología) y las zonas `operar`, `curar/sugeridos` y `curar/referentes` del cockpit.

@@ -19,6 +19,7 @@ import {
   leerMiembros,
   quitarMiembro,
   quitarMiembros,
+  renombrarColeccion,
 } from "@/lib/colecciones";
 import { registrarEvento } from "@/lib/eventos";
 import { desmarcar, marcar, marcarMuchos } from "@/lib/grabados";
@@ -65,6 +66,46 @@ export async function crear(enRuta: CockpitEnRuta, nombre: string): Promise<Resu
 
   revalidatePath(rutaDe(comoRuta(cockpit), "curar/colecciones"));
   return { ok: true, mensaje: `Colección "${validado.nombre}" creada.` };
+}
+
+/**
+ * Le cambia el nombre a una colección ya creada.
+ *
+ * 🔑 **Reusa `validarNombre`, no una copia:** el nombre nuevo tiene que pasar exactamente el mismo
+ * filtro que el de `crear` (trim, 1..80, espejo del check de la `031`). Una segunda validación acá
+ * sería la forma de que crear y renombrar acepten cosas distintas.
+ *
+ * Revalida las **dos** rutas: la grilla, donde se renombra, y el detalle, que pinta el nombre en su
+ * título y en el `.docx` que se baja.
+ */
+export async function renombrar(
+  enRuta: CockpitEnRuta,
+  id: string,
+  nombre: string,
+): Promise<ResultadoAccion> {
+  const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (!uuid.safeParse(id).success) return { ok: false, mensaje: "Esa colección no existe." };
+
+  const validado = validarNombre(nombre);
+  if (!validado.ok) return { ok: false, mensaje: validado.motivo };
+
+  try {
+    await renombrarColeccion(ctx, id, validado.nombre);
+  } catch (e) {
+    if (e instanceof Error && e.message === "YA_EXISTE") {
+      return { ok: false, mensaje: `Ya tenés una colección que se llama "${validado.nombre}".` };
+    }
+    if (e instanceof Error && e.message === "NO_ESTA") {
+      return { ok: false, mensaje: "Esa colección ya no está." };
+    }
+    console.error(`[colecciones] falló renombrar ${id}:`, e);
+    return { ok: false, mensaje: "No se pudo cambiar el nombre. Probá de nuevo." };
+  }
+
+  await registrarEvento(ctx, usuario.id, "colecciones.renombrar", { id, nombre: validado.nombre });
+  revalidatePath(rutaDe(comoRuta(cockpit), "curar/colecciones"));
+  revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${id}`));
+  return { ok: true, mensaje: `Ahora se llama "${validado.nombre}".` };
 }
 
 /**

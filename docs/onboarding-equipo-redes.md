@@ -4,6 +4,11 @@
 > dentro**. Está armada para que casi cualquier duda se resuelva acá. Si algo igual no se entiende o
 > falta, anotalo al final (sección "Lo que necesitamos") y lo resolvemos.
 >
+> *Actualizado: 2026-08-29 — nuevo **§7.1**: qué le hace exactamente el 🔥 y el 👎 al heat (los dos
+> caminos, y por qué el 👎 pesa más de lo que parece). Además: apagar una voz ahora apaga **las dos**
+> máquinas (§5.2), Referentes avisa cuáles cuentas quedaron **sin trabajo** (§5.3), y una colección
+> se puede **renombrar** (§4.1).*
+>
 > *Actualizado: 2026-08-26 — se agregó **ordenar y filtrar** en las pantallas de video (§4.2) y
 > **Colecciones** entró a la tabla de pantallas (§4.1). ⚠️ Colecciones y la limpieza de guiones
 > todavía no tienen su sección propia acá: está anotado en §9.*
@@ -212,7 +217,7 @@ A la izquierda hay cuatro zonas. Esto es todo lo que hay y qué se toca en cada 
 | **Curar → Referentes** · **Sugeridos** | El banco de cuentas y la bandeja de propuestas (§5.3, §8.1) | agregar, apagar, aprobar/descartar |
 | **Curar → Ajustes** | Las perillas (§5.5) | los valores |
 | **Curar → Históricos** | El archivo de sus guiones + qué ya grabaron | la **marca de grabado** y la carga de links ya grabados (+ los 2 botones de descarga) |
-| **Curar → Colecciones** | Apartar los videos que van a trabajar juntos, vengan de donde vengan | crear la colección, meterle videos pegando links, bajarla en Word o Excel, borrarla |
+| **Curar → Colecciones** | Apartar los videos que van a trabajar juntos, vengan de donde vengan | crear la colección, **renombrarla**, meterle videos pegando links, bajarla en Word o Excel, borrarla |
 | **Entender** | Precisión, salud y costos (§6.2) | **nada — solo lectura** |
 | **Transcribir** | Pegar un link suelto y recibir su texto | el link |
 
@@ -286,9 +291,11 @@ Una Voz = un personaje o marca para la que curan contenido (ej: "Cora", "30X ins
 | `criterios_relevancia` | **obligatorio.** Qué le sirve a este cliente puntual. El filtro los **suma** a los criterios de cada proyecto de esta voz, así que sin ellos juzga con la mitad del contexto y deja pasar de más. Ya no se puede crear ni guardar una voz sin esto |
 | `activo` | ✅ para que la voz corra. **Es el interruptor maestro:** destildarlo pausa **todos** los proyectos de esa voz de una (aunque los proyectos sigan en `activo`). Ideal para pausar un cliente entero sin tocar proyecto por proyecto |
 
-> **La voz apagada sigue recibiendo propuestas de cuentas.** El buscador de cuentas nuevas (§8.1) le
-> sigue proponiendo referentes aunque la voz esté apagada — es a propósito: cuando la prendan, ya
-> tiene la despensa llena. Apagar una voz solo frena los **videos**, no las propuestas.
+> **Apagar una voz apaga las dos máquinas** *(cambió el 29/08)*. Antes el buscador de cuentas nuevas
+> (§8.1) seguía proponiendo referentes para una voz apagada; ahora **no**. `Activo` significa lo mismo
+> en los dos lados: la voz apagada no trae videos **y tampoco recibe propuestas de cuentas**. Si
+> quieren que una voz pausada siga juntando cuentas para más adelante, préndanla el rato que corre el
+> buscador (lunes 9:00) y vuélvanla a apagar.
 
 > **Cuidado con la coherencia Voz ↔ Proyecto.** La Voz tiene que tener sentido con el tema del Proyecto al
 > que la asignan. Ejemplo real que salió mal: una voz de *bienestar y maternidad* asignada a un proyecto de
@@ -378,6 +385,18 @@ calidad** (cuentas que ustedes eligieron a mano).
 > («Buscar cuentas nuevas», en `Operar` y en la misma página de Sugeridos) y conviene apretarlo
 > recién cuando resolvieron lo que ya está esperando.
 >
+> **🟡 «Sin trabajo»: la cuenta prendida que igual no produce nada** *(nuevo, 29/08)*. Arriba de la
+> lista puede aparecer un aviso como *«hay 13 de 28 cuentas prendidas que no están haciendo nada»*, y
+> las cuentas así llevan una etiqueta naranja **sin trabajo**. Quiere decir que la cuenta está
+> tildada en Rastrear, **pero todos los proyectos que alimenta cuelgan de una voz apagada**: no trae
+> videos y desde el 29/08 tampoco le sirve de semilla al buscador (§5.4).
+> **Se arregla en `Curar → Voces`, prendiendo la voz — no acá.** Apagar la cuenta sería tapar el
+> síntoma.
+>
+> ⚠️ **Ojo con esto porque es contraintuitivo:** una cuenta puede tener buenísimos números y estar
+> sin trabajo igual. Medido el 29/08: `@jefferson_fisher` (49% de aprobación) y `@howtoconvince`
+> (62%), **las dos mejores del sistema**, estaban las dos dormidas.
+
 > **🟠 Falta sembrar TikTok.** Hoy casi todos los Referentes cargados son de Instagram. Para que la máquina
 > traiga videos de TikTok hacen falta **dos cosas**: cargar cuentas de TikTok acá **y** que el toggle
 > **"Buscar por referentes en TikTok"** esté prendido (§5.5). Sin cuentas de TikTok cargadas, ese eje corre
@@ -609,6 +628,43 @@ Tres cosas que conviene saber:
 
 El sistema le da un **empujón extra** al contenido en otros idiomas (inglés, portugués, etc.), porque la
 prioridad del negocio es traer lo que **no** circula en español.
+
+### 7.1 Qué le hace exactamente el 🔥 y el 👎 al heat *(nuevo, 29/08 — la pregunta de Dani)*
+
+Lo primero, porque suele sorprender: **calificar no cambia el video que están calificando.** Ese ya
+tiene su número y ya está en la lista. Lo que cambia son **los próximos** que traiga la máquina.
+
+La calificación viaja por **dos caminos distintos**, y no pesan lo mismo.
+
+**Camino 1 — el número (pesa poco: 30%).**
+El 🔥 y el 👍 se guardan los dos como **aprobado**; el 👎 como **descartado**. Con eso la máquina saca,
+**por cuenta**, cuántos le aprobaron de todos los que le calificaron. Esa proporción le sube el heat a
+los próximos videos de esa cuenta.
+
+Tres cosas que conviene tener claras acá:
+
+- **Para este número, el 🔥 y el 👍 valen igual.** La diferencia entre los dos no se usa en esta cuenta.
+- **El 👎 no resta puntos.** Lo peor que le puede pasar a una cuenta es quedar en cero y no recibir
+  empujón. Nunca queda por debajo de una cuenta que nadie calificó.
+- **Es por cuenta, no por video.** Aprobar tres videos de una cuenta le levanta el heat a *todo* lo que
+  esa cuenta publique después.
+
+**Camino 2 — los criterios (pesa mucho: 70%, y es el que manda).**
+Cada domingo la máquina le muestra a la IA ejemplos de lo que aprobaron **y de lo que descartaron**, y
+con eso reescribe los `criterios_aprendidos` del Proyecto. Después, cuando llegan videos nuevos, los
+juzga contra esos criterios y ese juicio es la mayor parte del heat.
+
+Acá pasan las dos cosas importantes:
+
+- **Acá sí el 🔥 se distingue del 👍.** La máquina elige los 🔥 como "esto es exactamente lo que quiero";
+  solo si no hay ningún 🔥 se conforma con los aprobados comunes. Marcar 🔥 en lo mejor cambia lo que
+  aprende.
+- **El 👎 es la señal más fuerte de las dos, y no por el puntaje.** Un video que cae en lo que los
+  criterios aprendieron a rechazar **no baja en la lista: no aparece**. Se descarta antes de rankear.
+  Por eso califiquen lo que no sirve: es la única forma de enseñarle a no traerlo más.
+
+> ⚠️ **Necesita al menos 4 calificados por proyecto por semana.** Con menos de eso la máquina no
+> aprende nada ese domingo: se salta el proyecto. Una semana sin calificar es una semana sin mejorar.
 
 ---
 

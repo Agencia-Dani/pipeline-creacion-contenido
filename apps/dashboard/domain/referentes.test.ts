@@ -6,6 +6,7 @@ import {
   cruzaVoces,
   esFlojo,
   esPlataforma,
+  noAlimentaNada,
   normalizarHandle,
   validarReferente,
   type DatosReferente,
@@ -198,5 +199,24 @@ describe("cruzaVoces", () => {
 
   it("un proyecto sin voz conocida no inventa un cruce", () => {
     assert.equal(cruzaVoces(["recA", "recHUERFANO"], vozPorProyecto), false);
+  });
+});
+
+describe("noAlimentaNada", () => {
+  it("una cuenta cuyos proyectos están TODOS fuera de alcance no alimenta nada", () => {
+    assert.equal(noAlimentaNada(["p1", "p2"], new Set(["p3"])), true);
+  });
+
+  it("alcanza con UN proyecto en alcance para que la cuenta trabaje", () => {
+    assert.equal(noAlimentaNada(["p1", "p2"], new Set(["p2"])), false);
+  });
+
+  it("la cuenta sin proyectos NO se marca acá: ya la avisa `sinProyecto`", () => {
+    assert.equal(noAlimentaNada([], new Set()), false);
+    assert.equal(noAlimentaNada([], new Set(["p1"])), false);
+  });
+
+  it("con el alcance vacío (ninguna voz prendida) toda cuenta con proyectos queda sin trabajo", () => {
+    assert.equal(noAlimentaNada(["p1"], new Set()), true);
   });
 });

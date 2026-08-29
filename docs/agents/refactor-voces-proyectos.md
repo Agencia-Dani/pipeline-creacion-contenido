@@ -309,8 +309,9 @@ proyecto seleccionado con su N**. Es el cambio intrusivo grande. El resto del pi
       node porque Airtable omite los checkbox destildados** del payload → ahí "destildado" y "el campo no
       existe" son indistinguibles. El gate corta **antes del scrape** (un proyecto salteado no se paga en
       Apify — probado). Probado con [test-nodos.mjs](../../Workflows/workflow-short-form-content/test-nodos.mjs).
-      **Abre una decisión:** el **descubrimiento** no respeta `Voces.activo` → hoy propondría referentes
-      para proyectos de una voz apagada. Barato pero incoherente. Ver §Descubrimiento.
+      **Abrió una decisión, ya cerrada:** el **descubrimiento** no respetaba `Voces.activo`. Se
+      decidió dejarlo así (2026-07-16) y se **revirtió** en
+      [ADR-079](../adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md) (2026-08-29). Ver §Descubrimiento.
 - [x] **C.5** ✅ **Podados los 2 knobs muertos del `Config` del motor** (2026-07-16): `banda_descarte_min`
       (0.35) y `banda_descarte_max` (0.6), muertos desde la enmienda del 2026-07-13 (banda fija → top-K
       `cap_descartes`). Config: 21 → **19 knobs**. Verificado que ningún nodo los lee. Cero cambio de
@@ -403,12 +404,22 @@ El workflow de descubrimiento (ADR-020) no cambia por este refactor: propone ref
 que ya viven bajo una voz. Solo se **audita** (parte de A) para confirmar que no queda huérfano y que
 respeta la jerarquía.
 
-✅ **Decidido por Mani (2026-07-16): el descubrimiento NO respeta `Voces.activo`, a propósito.**
-Una voz apagada no corre en el motor pero **sigue recibiendo propuestas de referentes** cada semana:
-es barato (el descubrimiento no paga Supadata/gate) y llena la despensa para cuando la voz se prenda.
-**Es deliberado — no lo "arregles"** copiando el filtro de C.2 a su `Leer Voces`; si algún día
-molesta (ruido en *Referentes propuestos* de voces muertas), el fix sigue siendo 1 línea con el
-patrón de C.2, pero se decide de nuevo, no se asume.
+🔄 **REVERTIDO el 2026-08-29 por [ADR-079](../adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md):
+el descubrimiento SÍ respeta `Voces.activo`.** *Lo que decía este párrafo — "es deliberado, no lo
+arregles" — ya no vale.*
+
+La decisión original (Mani, 2026-07-16) era que una voz apagada siguiera recibiendo propuestas: es
+barato y llena la despensa para cuando se prenda. Lo que la volteó no fue el costo sino **el
+significado del interruptor**: en el onboarding del 28/08 el equipo pidió "poder delimitar para
+quién quiero que traiga" sin saber que el control ya existía, porque gobernaba una máquina y no la
+otra. Medido el 29/08: **3 voces con 1 activa y 6 proyectos activos** ⇒ el motor atendía 2 y el
+buscador 6. *Un interruptor que gobierna un workflow y no el otro no se lee como un bug: se lee como
+que el interruptor no sirve.*
+
+⚠️ **Y el fix NO fue "1 línea con el patrón de C.2"**, como este párrafo prometía. Copiar el filtro
+del motor significa pedir `?ambito=motor`, y ese ámbito **también** filtra los referentes por
+`activo` ⇒ rompe el dedup, que necesita los inactivos. El gate quedó explícito en el nodo. *La
+estimación de una decisión aplazada envejece peor que la decisión.*
 
 ## 5. Cómo se reparte entre 2 devs
 

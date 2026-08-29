@@ -199,3 +199,31 @@ export function cruzaVoces(proyectoIds: string[], vozPorProyecto: Map<string, st
   }
   return voces.size > 1;
 }
+
+/**
+ * Una cuenta **prendida que igual no trabaja**: tiene proyectos, pero ninguno está en el alcance
+ * de las máquinas (proyecto activo de voz activa).
+ *
+ * 🩸 **Por qué hace falta un aviso propio, y por qué recién ahora.** Hasta
+ * [ADR-079](../../../docs/adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md) una cuenta así por lo
+ * menos seguía alimentando al buscador de cuentas nuevas; desde el 2026-08-29 no hace **nada**: ni
+ * trae videos ni siembra propuestas. Medido contra prod ese mismo día: **13 de las 28 cuentas
+ * activas** (46%) están en este estado, porque sus proyectos cuelgan de las dos voces apagadas —
+ * y entre ellas están `@jefferson_fisher` (49%) y `@howtoconvince` (62%), las de mejor tasa del
+ * sistema. La pantalla las mostraba como *Activa* con buen número y no producían nada.
+ *
+ * 🔑 **`proyectoIdsEnAlcance` llega ya resuelto, no se recalcula acá.** Es la misma decisión que
+ * `armarVistaBuscador`: el conjunto sale de `proyectosDelPlan(armarVistaOperar(…))`, así que
+ * Operar, Sugeridos y esta pantalla no pueden discrepar sobre quién corre. Un tercer cruce escrito
+ * a mano sería una tercera versión de la regla.
+ *
+ * No cubre el caso "sin ningún proyecto": ése ya tiene su propio aviso (`sinProyecto`), y avisar
+ * dos veces de la misma cuenta reparte la atención en vez de dirigirla.
+ */
+export function noAlimentaNada(
+  proyectoIds: readonly string[],
+  proyectoIdsEnAlcance: ReadonlySet<string>,
+): boolean {
+  if (proyectoIds.length === 0) return false;
+  return !proyectoIds.some((id) => proyectoIdsEnAlcance.has(id));
+}

@@ -13,9 +13,14 @@ funcionan* y el equipo decide cuáles entran. El porqué de cada decisión está
    copia a mano.
 2. **Semillas** — referentes IG activos de proyectos activos, rankeados por `v_senal_seleccion`
    (tasa de selección del equipo); sin señal entran todos. Tope `cap_semillas` (8).
-   ⚠️ **Deliberado (decisión Mani 2026-07-16): este workflow NO filtra por `Voces.activo`** (el motor
-   sí, C.2). Una voz apagada sigue recibiendo propuestas — es barato y llena la despensa para cuando
-   se prenda. No lo "arregles" copiando el filtro del motor.
+   ✅ **Desde [ADR-079](../../docs/adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md) (2026-08-29)
+   este workflow SÍ gatea por `Voces.activo`**, con la misma semántica que el motor: un proyecto
+   activo cuya voz está apagada no entra al plan; un proyecto **sin** voz sí entra. *Revierte la
+   decisión del 2026-07-16 (que decía "no lo arregles"): el equipo entendía `Activo` como un solo
+   interruptor y tenerlo a medias se leía como que no servía.*
+   🔑 **El gate vive acá, en el nodo, y NO en el ámbito del run-plan.** Este workflow sigue pidiendo
+   `?ambito=completo` a propósito: `?ambito=motor` también filtra los **referentes** por `activo`, y
+   el dedup del paso 4 necesita los inactivos para no re-proponer una cuenta ya conocida.
 3. **Sugeridos** — Apify `instagram-profile-scraper` trae el perfil de cada semilla con sus
    `relatedProfiles` (las cuentas "sugeridas" del propio algoritmo de IG, ~20 por semilla).
 4. **Dedup + ranking** — fuera privados, fuera handles ya en `Referentes` (activos o no) o en

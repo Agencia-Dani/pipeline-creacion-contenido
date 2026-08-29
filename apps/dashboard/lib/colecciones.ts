@@ -96,6 +96,34 @@ export async function crearColeccion(
 }
 
 /**
+ * Le cambia el nombre a una colección. El nombre ya viene validado y trimmeado por
+ * `domain/colecciones.ts`, igual que en `crearColeccion`.
+ *
+ * 🔒 **Fail-loud si toca 0 filas**, mismo patrón que `actualizar` en `lib/candidatos.ts`: el filtro
+ * de `scoped` entra en el `update`, así que renombrar el id de otra empresa simplemente no lo toca
+ * y devuelve vacío. El mensaje no distingue *"no existe"* de *"no es tuya"* — a propósito, igual
+ * que `leerColeccion`.
+ */
+export async function renombrarColeccion(
+  ctx: TenantContext,
+  coleccionId: string,
+  nombre: string,
+): Promise<void> {
+  const { data, error } = await (await scoped(ctx))
+    .update("app.colecciones", { nombre })
+    .eq("id", coleccionId)
+    .select("id");
+
+  // 23505 = el mismo unique `(instance_id, nombre)` que ya distingue `crearColeccion`. Renombrar
+  // choca exactamente igual que crear, así que habla el mismo idioma y lo traduce la action.
+  if (error) {
+    if (error.code === "23505") throw new Error("YA_EXISTE");
+    throw new Error(`Supabase respondió con error renombrando la colección: ${error.message}`);
+  }
+  if (!data || data.length === 0) throw new Error("NO_ESTA");
+}
+
+/**
  * Una colección por id, o `null` si no existe **o no es de este cockpit**.
  *
  * 🔒 El `null` cubre los dos casos con la misma respuesta a propósito: `scoped` filtra por

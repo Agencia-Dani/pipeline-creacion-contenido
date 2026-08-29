@@ -21,6 +21,7 @@ import {
   UMBRAL_TASA_GATE_FLOJO,
   cruzaVoces,
   esFlojo,
+  noAlimentaNada,
   type Salud,
 } from "@/domain/referentes";
 import { borrar, crear, guardar, type FormReferente, type Resultado } from "./actions";
@@ -61,16 +62,20 @@ export function Pantalla({
   banco,
   proyectos,
   vozPorProyecto,
+  proyectosEnAlcance,
 }: {
   banco: ReferenteFila[];
   proyectos: ProyectoOpcion[];
   vozPorProyecto: Record<string, string>;
+  /** Los proyectos que las máquinas van a atender. Plano y no un Set: cruza servidor→cliente. */
+  proyectosEnAlcance: string[];
 }) {
   const cockpit = usarCockpit();
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [altaAbierta, setAltaAbierta] = useState(false);
 
   const nombrePorId = new Map(proyectos.map((p) => [p.id, p.nombre]));
+  const enAlcance = new Set(proyectosEnAlcance);
   const mapaVoces = new Map(Object.entries(vozPorProyecto));
   const abierto = banco.find((r) => r.id === abiertoId) ?? null;
 
@@ -80,6 +85,9 @@ export function Pantalla({
   // Una cuenta prendida que no alimenta a nadie es trabajo que no se hace: el motor recorre sus
   // proyectos y no encuentra ninguno. Pasa si se borra un proyecto (la puente cascadea).
   const sinProyecto = banco.filter((r) => r.activo && r.proyectoIds.length === 0);
+  // Prendidas, con proyecto, y aun así sin trabajo: todos sus proyectos están fuera de alcance.
+  // Desde ADR-079 eso ya no significa "no trae videos pero junta propuestas": significa nada.
+  const dormidas = banco.filter((r) => r.activo && noAlimentaNada(r.proyectoIds, enAlcance));
 
   const fila = (r: ReferenteFila) => (
     <Fila
@@ -87,6 +95,7 @@ export function Pantalla({
       referente={r}
       nombrePorId={nombrePorId}
       avisoCruzaVoces={cruzaVoces(r.proyectoIds, mapaVoces)}
+      dormida={r.activo && noAlimentaNada(r.proyectoIds, enAlcance)}
       onAbrir={() => setAbiertoId(r.id)}
     />
   );
@@ -110,6 +119,21 @@ export function Pantalla({
           <AlertDescription>
             Hay {sinProyecto.length} cuenta(s) prendidas que no alimentan ningún proyecto: el motor
             no les pide nada. Elegiles un proyecto o apagalas.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {dormidas.length > 0 && (
+        <Alert>
+          <AlertDescription>
+            Hay {dormidas.length} de {banco.filter((r) => r.activo).length} cuentas prendidas que{" "}
+            <strong>no están haciendo nada</strong>: todos sus proyectos cuelgan de una voz apagada
+            (o están apagados). No traen videos <em>y tampoco</em> le sirven de semilla al buscador
+            de cuentas nuevas. Se arregla prendiendo la voz en{" "}
+            <Link href={rutaDe(cockpit, "curar/voces")} className="underline">
+              Voces
+            </Link>
+            , no acá.
           </AlertDescription>
         </Alert>
       )}
@@ -184,11 +208,13 @@ function Fila({
   referente,
   nombrePorId,
   avisoCruzaVoces,
+  dormida,
   onAbrir,
 }: {
   referente: ReferenteFila;
   nombrePorId: Map<string, string>;
   avisoCruzaVoces: boolean;
+  dormida: boolean;
   onAbrir: () => void;
 }) {
   const { salud } = referente;
@@ -212,6 +238,20 @@ function Fila({
           >
             {miles(salud.seguidores)} seguidores
           </span>
+        )}
+        {/* 🔑 El badge va acá arriba y no junto a las tasas a propósito: el caso que duele es
+            justamente la cuenta con BUENAS tasas que no produce nada (medido: @jefferson_fisher
+            49% y @howtoconvince 62%, las mejores del sistema, las dos dormidas). Al lado del
+            número se leería como una nota sobre el número; al lado del handle se lee como lo que
+            es, un estado de la cuenta. */}
+        {dormida && (
+          <Badge
+            variant="outline"
+            className="border-amber-500/50 text-amber-600 dark:text-amber-500"
+            title="Está prendida, pero ninguno de sus proyectos corre: su voz está apagada. No trae videos ni siembra propuestas."
+          >
+            sin trabajo
+          </Badge>
         )}
         {avisoCruzaVoces && (
           <Badge variant="outline" title="Alimenta proyectos de más de una voz. El motor lo permite: cada video llega una sola vez, al proyecto que mejor pega.">

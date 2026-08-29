@@ -1,6 +1,8 @@
+import { armarVistaOperar, proyectosDelPlan } from "@/domain/corrida";
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import Link from "next/link";
 import { exigirPantallaDeCurar } from "@/lib/auth";
+import { leerConfigOperar } from "@/lib/config";
 import { leerBanco, leerProyectos } from "@/lib/referentes";
 import { leerBancoLinkedin } from "@/lib/referentes-linkedin";
 import { Pantalla } from "./pantalla";
@@ -56,7 +58,22 @@ export default async function ReferentesPage({
     );
   }
 
-  const [banco, proyectos] = await Promise.all([leerBanco(ctx), leerProyectos(ctx)]);
+  const [banco, proyectos, config] = await Promise.all([
+    leerBanco(ctx),
+    leerProyectos(ctx),
+    // 🔑 **El alcance se pide prestado, no se recalcula.** `leerConfigOperar` + `armarVistaOperar`
+    // + `proyectosDelPlan` son exactamente las tres que ya usan Operar y Sugeridos, así que las
+    // cuentas «sin trabajo» de esta pantalla no pueden discrepar con la card de «Qué va a correr».
+    // Escribir acá el cruce "proyecto activo de voz activa" sería la tercera copia de la regla, y
+    // la que nadie actualizaría. Vale un viaje más a la base: la página ya es `force-dynamic`.
+    leerConfigOperar(ctx),
+  ]);
+
+  const enAlcance = proyectosDelPlan(
+    // El techo de crudos no se muestra acá, así que el knob de supply entra en 0: `armarVistaOperar`
+    // solo se usa por su gate, y `proyectosDelPlan` lee nada más que los ids.
+    armarVistaOperar(config.voces, config.proyectos, 0),
+  );
 
   return (
     <div className="space-y-6">
@@ -66,6 +83,7 @@ export default async function ReferentesPage({
         proyectos={proyectos.map((p) => ({ id: p.id, nombre: p.nombre, activo: p.activo }))}
         // Plano y no un Map: cruza el borde servidor→cliente, y un Map no es serializable.
         vozPorProyecto={Object.fromEntries(proyectos.map((p) => [p.id, p.vozId]))}
+        proyectosEnAlcance={[...enAlcance]}
       />
     </div>
   );

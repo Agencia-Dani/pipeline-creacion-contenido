@@ -65,9 +65,12 @@
 > fail-open sin ambigüedad. `Armar plan de corrida` saltea todo proyecto cuyo `voz_default[0]` no esté
 > entre las voces que llegaron (= voz apagada), y lo **loguea**. Un proyecto **sin** voz no está gateado.
 > El gate corta **antes del scrape**: los referentes de un proyecto salteado no se pagan en Apify.
-> **El archivado y el descubrimiento NO lo respetan** — el archivado necesita todas las voces para
-> resolver nombres al archivar (correcto); el descubrimiento es una **decisión abierta** (hoy propondría
-> referentes para proyectos de una voz apagada; ver plan §Descubrimiento). *(E.1 creó el campo.)*
+> **El archivado NO lo respeta** — necesita todas las voces para resolver nombres al archivar
+> (correcto). **El descubrimiento SÍ lo respeta desde
+> [ADR-079](../adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md) (2026-08-29)**: su nodo
+> `Armar plan de descubrimiento` aplica el mismo gate, aunque siga pidiendo el plan con
+> `?ambito=completo` (lo necesita para deduplicar contra los referentes inactivos). *Esto cierra la
+> "decisión abierta" que este párrafo declaraba.* *(E.1 creó el campo.)*
 >
 > ⚠️ **Enmienda 2026-07-16 (C.5) — podados 2 knobs muertos del `Config` del motor:**
 > `banda_descarte_min` (0.35) y `banda_descarte_max` (0.6). Nadie los leía desde la enmienda

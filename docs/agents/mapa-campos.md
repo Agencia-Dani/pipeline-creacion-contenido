@@ -182,7 +182,7 @@ vista del cockpit, ningún workflow).
 | `descripcion` | equipo | **nadie** | 🟡 Mismo caso que `Proyectos.descripcion`: contexto humano, no influye. Y la **descripción de la tabla** sigue pre-ADR-009 (§2.3) → **B.3**. |
 | `criterios_relevancia` | equipo | MOTOR (`Gate`, como *ajuste de voz* que complementa al tema) · DESC (ambos `Vetting`) · ARCH (`Destilar`) | ✅ ADR-010: Proyecto ⊕ Voz. |
 | `Proyectos` · `Candidatos` (links inversos) | Airtable | nadie | 🟡 → **B.3**. |
-| `activo` | equipo | **MOTOR** (`Leer Voces` filtra `{activo}` server-side → `Armar plan` saltea los proyectos de una voz apagada) | ✅ **Nuevo 2026-07-16** (E.1 + C.2). En el repo **y** en la base viva (`fldqekbuBxhzgOSG1`), las 3 voces prendidas. **ARCH no lo filtra** (necesita todas las voces para resolver nombres al archivar) y **DESC tampoco** — decisión abierta. Vivo tras el re-import de C. Falta **B.5**: que el equipo lo vea en la página *Voces*. |
+| `activo` | equipo | **MOTOR** (`Leer Voces` filtra `{activo}` server-side → `Armar plan` saltea los proyectos de una voz apagada) | ✅ **Nuevo 2026-07-16** (E.1 + C.2). En el repo **y** en la base viva (`fldqekbuBxhzgOSG1`), las 3 voces prendidas. **ARCH no lo filtra** (necesita todas las voces para resolver nombres al archivar); **DESC sí lo filtra desde [ADR-079](../adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md)** (29/08, en su nodo y no por el ámbito del run-plan) — la "decisión abierta" quedó cerrada. Vivo tras el re-import de C. Falta **B.5**: que el equipo lo vea en la página *Voces*. |
 
 ### 4.3 `Candidatos`
 
@@ -401,7 +401,7 @@ campos donde el texto cambia una decisión; el resto no necesita ayuda.
 
 | Tabla.campo | Texto de ayuda |
 |---|---|
-| `Voces.activo` | Interruptor maestro: destildarlo pausa TODOS los proyectos de esta voz de una. La voz apagada igual sigue recibiendo propuestas de cuentas nuevas. |
+| `Voces.activo` | Interruptor maestro: destildarlo pausa TODOS los proyectos de esta voz de una. Desde [ADR-079](../adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md) (29/08) **también** frena las propuestas de cuentas nuevas: apaga las dos máquinas. |
 | `Proyectos.N` | Cuántos videos quieren de este tema por corrida (ej: 20). Vacío = usa la perilla global "Candidatos por corrida". Es un máximo: si el filtro encuentra menos videos buenos, llegan menos. |
 | `Proyectos.criterios_relevancia` | El campo más importante: qué hace relevante a un video para este tema y qué NO. Concreto = menos basura. La máquina nunca lo pisa. |
 | `Proyectos.criterios_aprendidos` | Lo que la máquina destiló de sus calificaciones (se actualiza cada domingo). Pueden corregirlo o borrarlo si dice algo raro. |

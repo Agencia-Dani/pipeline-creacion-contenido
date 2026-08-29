@@ -185,6 +185,174 @@
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
 
+> ## 🧾 2026-08-29 (cierre 119) · LAS DOS QUE ESTABAN "BLOQUEADAS POR UN HUMANO", Y UNA ERA UN MALENTENDIDO (Claude, pedido de Mani)
+>
+> **En una línea:** se cerraron las **2 tasks abiertas** del onboarding a Dani. Ninguna necesitaba lo
+> que el handoff decía que necesitaba. **Migraciones: ninguna. `core/`: no se tocó. n8n: cero
+> cambios.** ADRs: **079 ampliada** (una consecuencia medida), **5 docs corregidas**.
+>
+> ### 🩸 Lo que hay que aprender de acá: el cierre 118 dejó 5 docs afirmando lo contrario del sistema
+>
+> ADR-079 cambió conducta en producción y **cinco documentos siguieron diciendo la conducta vieja**,
+> uno de ellos con un ***"no lo arregles"*** explícito dirigido al próximo agente
+> (`refactor-voces-proyectos.md` §Descubrimiento). El más caro era
+> [`onboarding-equipo-redes.md`](../onboarding-equipo-redes.md) §5.2: es **el doc que lee Majo**, y
+> le estaba prometiendo que apagar una voz no frenaba las propuestas.
+>
+> ⚠️ **Y ese párrafo prometía además que el fix era "1 línea con el patrón de C.2". No lo era:**
+> copiar el filtro del motor significa pedir `?ambito=motor`, que también filtra los referentes y
+> **rompe el dedup**. *La estimación de una decisión aplazada envejece peor que la decisión.*
+>
+> ### 🔴 La task de "Colecciones" no era la que el handoff decía
+>
+> Dos cierres seguidos escribieron *"cambiar el nombre de «Colecciones» — falta que Mani elija el
+> nombre"*, y la sesión llegó a ofrecerle tres nombres. **El pedido de Majo era poder renombrar
+> **cada colección**, no la sección.** El bloqueo humano no existía: era un resumen mal hecho que se
+> copió de un cierre al siguiente sin volver a la fuente.
+>
+> *Lo mismo casi pasa con la otra: «alcance sin confirmar, hay que preguntarle a Majo». La task de
+> Notion **ya listaba las tres lecturas posibles** (duplicadas / permisos / cuáles siguen activas), y
+> las tres se miden contra prod en un minuto. **Preguntar era más caro que medir.***
+>
+> ### 📏 Lo que apareció al medir el registro de cuentas (29/08, contra prod)
+>
+> - **29 cuentas, 0 duplicadas, 0 huérfanas, todas de Instagram.** Estructuralmente sano: las dos
+>   primeras lecturas de la task no tenían nada.
+> - 🔴 **13 de las 28 activas (46%) no alimentan nada que corra.** Sus proyectos cuelgan de Milena y
+>   Rosario, las dos voces apagadas. **Entre ellas `@jefferson_fisher` (49%) y `@howtoconvince`
+>   (62%), las dos de mejor tasa del sistema entero.** La pantalla las mostraba *Activa*, con el
+>   número bueno al lado, produciendo cero.
+> - **0 cuentas de TikTok** ⇒ los dos toggles de TikTok corren vacíos (ya estaba escrito en §5.3).
+> - 5 propuestas esperando en Sugeridos.
+>
+> 🔑 **Y el 46% es consecuencia de ADR-079, de ayer.** Antes esas cuentas al menos sembraban el
+> buscador; desde el gate no hacen nada. *Una decisión que apaga algo tiene que dejar visible lo que
+> apagó, o el ahorro se cobra en confusión.* Quedó escrito como el (−) medido de esa ADR.
+>
+> ### Lo que se construyó
+>
+> | Qué | Dónde | Nota |
+> |---|---|---|
+> | Renombrar una colección | `curar/colecciones/indice.tsx` + `renombrar` + `renombrarColeccion` | Reusa `validarNombre` (no una copia) y el `23505` que `crearColeccion` ya traducía |
+> | El aviso «sin trabajo» | `domain/referentes.ts` `noAlimentaNada` + 4 tests | El alcance **se pide prestado** a `proyectosDelPlan(armarVistaOperar(…))`: un tercer cruce escrito a mano sería la versión que nadie actualiza |
+> | Las 5 docs al día | onboarding · README descubrimiento · dev-doc · refactor · mapa-campos ×2 | La de onboarding es la que lee el equipo |
+>
+> ### ✅ Verificado en vivo (localhost + login de Mani, base de PRODUCCIÓN)
+>
+> - **Referentes dice «13 de 28»**, el mismo número que dio la query independiente, y el badge *sin
+>   trabajo* sale en `@jefferson_fisher`, `@markmanson` y `@susieinthiran`.
+> - **Renombrar, los dos caminos:** el choque de nombre (*«Ya tenés una colección que se llama
+>   "Test"»*, mostrado adentro de la tarjeta y **sin escribir evento**) y el camino feliz
+>   (`Test2 → "Grabar semana del 1"`, tarjeta actualizada, 6 videos intactos, `colecciones.renombrar`
+>   en `app.eventos` a las 19:27:38Z). **Se restauró a `Test2`.**
+> - typecheck · **434 tests** (+4) · build · validador, los cuatro en verde. Consola sin errores.
+>
+> ⚠️ **Ojo con el canario:** esas pruebas dejaron **2 eventos `colecciones.renombrar` de Mani** en
+> `app.eventos`. Es el mismo costo que ya se pagó con `videos_meta` y con `bajar_videos`: **el dev
+> server local escribe contra prod.** El primer dato de adopción del renombrado es el **tercero**.
+>
+> ### ⏳ Qué queda
+>
+> De los 8 pedidos del onboarding, **cero abiertas**. Sigue en `someday` Three.js, y sigue la
+> `waiting` de recibir el audio de Majo. **Nada de esto está desplegado:** vive en el working tree.
+
+> ## 🎛️ 2026-08-29 (cierre 118) · EL SELECTOR YA EXISTÍA Y UNA DE LAS DOS MÁQUINAS LO IGNORABA (Claude, pedido de Mani)
+>
+> **En una línea:** se retomó la herramienta tras el onboarding a Dani. Se cerró el **§4-quinquies**
+> (el mp4 en Vercel), se documentó **cómo el 🔥 y el 👎 mueven el heat** (§7.1 del onboarding), y el
+> pedido *"agregar insights a Buscar Referentes"* resultó ser **un interruptor roto, no una métrica
+> faltante**: `Voces.activo` gobernaba el motor y **no** el buscador. **Migraciones: ninguna.
+> `core/`: no se tocó. n8n: 1 nodo por `push`.** ADRs: **079 nuevo**, **078 corregido**.
+>
+> ### 🩸 Lo que hay que aprender de acá: el reclamo no era el problema
+>
+> Majo pidió *"poder delimitar para quién quiero que traiga"* y se leía como *falta un selector*.
+> **El selector ya existía y el buscador lo obedecía a medias.** El motor pide el plan con
+> `?ambito=motor` —que filtra las voces por `activo`— y saltea los proyectos de voz apagada; el
+> descubrimiento pide `?ambito=completo`, que **no filtra nada**, y su nodo solo miraba
+> `proyecto.activo`. Las voces las leía nada más que para sacarles los criterios.
+>
+> 📏 **Medido contra prod, y mordía:** 3 voces con **1 sola activa**, 6 proyectos todos activos ⇒ el
+> motor atendía **2** y el buscador **6**, cuatro de ellos de voces apagadas. Apagar una voz no
+> frenaba el descubrimiento, y se pagaban Apify y Haiku proponiendo cuentas para proyectos que no
+> corren. *Un interruptor que gobierna un workflow y no el otro no se lee como un bug: se lee como
+> que el interruptor no sirve.*
+>
+> 🔑 **Y el reflejo obvio estaba mal, por eso hay ADR:** cambiar el descubrimiento a `?ambito=motor`
+> arreglaría el alcance **rompiendo el dedup** — ese ámbito también filtra los referentes por
+> `activo`, y el buscador necesita los **inactivos** para no re-proponer una cuenta ya existente
+> pero apagada. La regla se queda en el nodo, explícita.
+>
+> ### ✅ La verificación en vivo, otra vez, encontró lo que el verde no
+>
+> Con `typecheck` + **430 tests** + `build` en verde, **la fila de dos botones se rompía en el primer
+> click**: al abrir la confirmación, «▶ Correr ahora» saltaba de línea, «Sí, buscar» se iba al
+> extremo derecho y «Cancelar» caía suelto. Arreglado (el aviso va en su propia línea) y
+> re-verificado en pantalla. **Es la segunda sesión seguida en que el trabajo real aparece en el
+> primer click y no en la suite.**
+>
+> 🟢 **Y una verificación que salió gratis:** en Sugeridos las 8 semillas son todas de trading, y
+> **`jefferson_fisher` (49%) y `howtoconvince` (62%) no aparecen** aunque son las de mejor tasa del
+> sistema entero — porque sus voces están apagadas. ADR-079 funcionando, visible sin leer código.
+>
+> ### 🔴 Dos afirmaciones falsas que se corrigieron
+>
+> 1. **El cierre 117 decía "los commits están en `main` local sin push".** Falso al retomar: estaban
+>    pusheados y **desplegados** (commit status de Vercel `success` para `40d6663`, 29/08 18:32:12Z,
+>    y un deployment `Production` del mismo sha). *El estado del deploy se consulta, no se hereda.*
+> 2. **El §4-quinquies se dio por cerrado una vez de más.** El primer *"bajó bien, se ve completo"*
+>    era el archivo que ya estaba en disco desde la bajada por `localhost` de las 18:19. Se detectó
+>    porque **no había ningún evento posterior al deploy**, y la ausencia es concluyente por diseño:
+>    ADR-078 compra la URL firmada cada vez y no la persiste ⇒ sin evento no hubo compra. El cierre
+>    real tiene su prueba: `bajar_videos` a las **18:44:05Z** (12 min post-deploy) y sobre **otra
+>    colección** que las pruebas locales. *Un `.mp4` que reproduce no dice de dónde vino.*
+>
+> ⚠️ **Y eso corrió el canario de ADR-078 un número:** el primer dato de adopción de la descarga de
+> video pasa a ser el **CUARTO** `bajar_videos`, no el tercero. Es la tercera vez que este repo paga
+> lo mismo (las 5 filas de `videos_meta`, "el tercero", ahora "el cuarto"). **El número del canario
+> no se escribe: se consulta antes de afirmarlo.**
+>
+> ### Lo que se construyó
+>
+> | Qué | Dónde | Nota |
+> |---|---|---|
+> | El gate por voz del buscador | `Armar plan de descubrimiento` | Aplicado al live por `n8n:push` (1 nodo, sigue activo), verificado con `n8n:diff` |
+> | El plan del buscador, calculable en el cockpit | `domain/buscador.ts` + 8 tests | Función pura, **espejo del nodo**: es una 2ª implementación asumida, con el mismo precedente que `techoDeCrudos` |
+> | La card «Qué va a buscar» | `curar/sugeridos/` | Las 8 semillas por nombre con su tasa, el tope, la afinidad y las que quedan afuera |
+> | Operar con una sola card de alcance | `operar/page.tsx` | Los dos botones juntos y con el mismo formato; Archivar sigue aparte porque **no lee esta configuración** |
+> | El heat en cristiano | `onboarding-equipo-redes.md` §7.1 | Los dos caminos: el número (30%) y los criterios (70%) |
+>
+> 🔑 **`proyectosDelPlan()` es lo que vuelve honesta la card compartida:** el alcance sale de la
+> vista que Operar ya pinta, así que la lista de Operar y las semillas de Sugeridos **no pueden
+> discrepar**. Sin eso, "una sola card para las dos máquinas" habría sido una promesa de diseño sin
+> nada que la sostenga.
+>
+> ### 📏 El heat, medido (para no volver a investigarlo)
+>
+> - **🔥 y 👍 pesan IGUAL en el número:** `estadoDe()` los colapsa en `aprobado` y la diferencia se
+>   pierde. Se distinguen **solo** en `Destilar criterios`, que prioriza los 🔥 como ejemplos ideales.
+> - **El 👎 no resta nunca.** El piso es `tasa = 0` ⇒ `×1`. Solo diluye el ratio de esa cuenta.
+> - **El camino fuerte es el texto, no el número:** `heat = 0.7 × score_Haiku + 0.3 × percentil(heat_métrico)`
+>   (`Peso de relevancia = 0.7`, leído de prod). Y el efecto más fuerte del 👎 es la **eliminación**:
+>   un `relevante:false` cae del embudo antes de rankear.
+> - **`min_muestra_destilar = 4`:** un proyecto con menos de 4 calificados esa semana no aprende nada.
+> - **El eje "tema" de ADR-012 NO es un hueco:** ADR-019 lo borró a propósito (2/60 aprobables, 58%
+>   del gasto). Ni el nodo `Leer señal tema` ni la vista `v_senal_tema` existen. *Se verificó antes
+>   de reportarlo como trabajo faltante.*
+>
+> ### ⏳ Lo que queda de los 8 pedidos del onboarding
+>
+> **2 abiertas**, las dos bloqueadas por una respuesta humana, no por código:
+> - *Cambiar el nombre de "Colecciones"* — falta que Mani elija el nombre.
+> - *Revisar el registro de cuentas* — **alcance sin confirmar**: hay que preguntarle a Majo qué está
+>   mal antes de tocar nada.
+>
+> *(Three.js sigue en `someday`. Y hay una `waiting`: recibir de Majo el audio con lo último que pidió.)*
+>
+> ✅ **Decisión de Mani sobre la consecuencia de ADR-079:** que el buscador deje de proponer para
+> voces apagadas es lo deseado — *"los de redes activan/desactivan cuando necesiten"*. El (−) del ADR
+> queda contestado.
+
 > ## 🎞️ 2026-08-29 (cierre 117) · LAS TRES DEL ONBOARDING DE DANI, Y UN 500 QUE SOLO APARECIÓ AL CLICKEAR (Claude, pedido de Mani)
 >
 > **En una línea:** salieron **8 pedidos** del onboarding a Dani (28/08, con Majo). Se cerraron
