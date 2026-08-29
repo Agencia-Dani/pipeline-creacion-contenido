@@ -22,79 +22,32 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
-> # ✅ EL ARREGLO DEL IDIOMA ESTÁ EN EL MOTOR VIVO (27/08 01:10 UTC) — ADR-077
-> `npm run n8n:push -- motor --nodos "Transcribir (Supadata)" --apply` → **aplicado, 1 nodo, el
-> workflow sigue activo** (34 nodos, topología intacta). Verificado por **dos señales
-> independientes**:
-> 1. `n8n:diff` → **✓ Los 5 workflows corren lo que dice el repo.**
-> 2. Lectura directa del nodo en el live: la línea es
->    `const idioma = c.lang || guessLang(c.txt) || d.idioma_guess || 'otro';`, no queda ningún
->    `|| 'es';`, el comentario nuevo está, y 🔒 **la `KEY` quedó con su valor real y no con el
->    placeholder literal** — que es el modo de falla con el que este repo ya se quemó dos veces.
+> # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
-> 🩸 **n8n estuvo caído ~5 minutos justo al intentarlo** (502 en todo, `/healthz` incluido). El push
-> murió en el `GET` inicial, o sea **antes de cualquier escritura**: no hubo estado a medias. Volvió
-> solo, como en el cierre 115. *Vale como dato operativo: la instancia se cae sola y vuelve sola, y
-> el push es seguro de reintentar porque lee antes de escribir.*
+> **Nada espera a Mani para la próxima corrida.** El único bloqueo del repo es el ⛔ de abajo, y es
+> de producto, no de código.
 >
-> Rollback, si hiciera falta:
-> `node n8n-sync.mjs restore motor .n8n-snapshots/motor-2026-08-27T01-10-15-371Z.json --apply`
-
-> # ✅ EL DEFECTO DEL IDIOMA — arreglado en el repo (26/08), ver ADR-077
-> Salió de contestar *"¿el sistema soporta referentes en cualquier idioma?"*. **Sí lo soporta** — la
-> cadena entera es agnóstica y `Heat-score` hasta le da `boost_idioma` +0.3 a lo no-español (medido:
-> 207 de 209 del Feed son `en`). Pero hay una grieta, y **no es Supadata**:
+> - **El MVP está declarado** (ROADMAP §4): la última condición —*el equipo usa el sistema un día
+>   completo sin un dev*— la cumplió **Majo el 26/08**, sola. Con eso **D3 se cerró por medición y
+>   no por demo**, y el **§5 (horizonte post-MVP) quedó habilitado**.
+> - **El live corre lo que dice el repo** (`n8n:diff` verde, 5 workflows) y **prod corre el `main`**
+>   (Vercel `success` para cada push del 29/08). Último commit desplegado: **`339d0c3`**.
+> - **Cerrados el 26–27/08, ya no son pendientes** *(están en sus ADRs y en git; se podaron de acá
+>   porque este bloque es lo que **falta**, no lo que se hizo)*: el defecto del idioma y su push al
+>   motor vivo (**ADR-077**, cierre 117), el orden y filtro en producción (**ADR-076**), y el susto
+>   de que ADR-076 se perdió y se restauró — *si un doc contradice una medición del log, sospechá
+>   del doc*.
 >
-> ```js
-> // nodo Transcribir (Supadata)
-> const idioma = c.lang || guessLang(c.txt) || d.idioma_guess || 'es';
-> ```
+> ### Lo que sí falta, y quién lo puede hacer
 >
-> `guessLang` es un diccionario de stopwords que sólo conoce **es/en/pt/it/fr**. Si Supadata
-> devuelve el transcript **sin `lang`**, un video en japonés/alemán/árabe marca 0 en el diccionario,
-> cae al default `'es'` y **nunca se traduce**: al equipo le llega el guion en el idioma original.
-> No falla, degrada en silencio.
->
-> 🩸 **Y viola un invariante escrito.** `apps/dashboard/lib/transcribir.ts` abre diciendo *"esto
-> tiene que producir el MISMO script literal que el motor"*, pero el transcriptor de la app hace
-> `idioma === "es" ? texto : traducir(texto)` ⇒ con `lang` vacío **sí traduce**. Mismo video, dos
-> resultados según por dónde entró.
->
-> **Arreglado**: el default pasa de `'es'` a `'otro'` (el valor que `normLang` ya usa), y la app deja
-> de etiquetar `'es'` un guion que acaba de traducir. 3 tests de regresión en `test-nodos.mjs`,
-> **incluido el contraejemplo**: un transcript español sin `lang` lo sigue cazando `guessLang` antes
-> del default, así que no se paga Haiku para convertir español en español.
->
-> 🔧 **Y arreglarlo destapó un límite de `n8n-sync.mjs`** (ADR-077, toca `core/`): los placeholders se
-> aprenden alineando el `jsCode` **entero** contra el live, así que editarlo rompe la alineación — y
-> `<SUPADATA_API_KEY>` aparece **1 sola vez en todo el repo**. *El nodo era imposible de empujar
-> exactamente cuando alguien lo quería cambiar.* El `.env` entra como **segunda** fuente (nunca pisa
-> al live, avisa en amarillo, jamás imprime el valor) y **fail-closed quedó intacto, medido**:
-> `n8n:test` da 15 ok · 0 fallidos y su caso de fail-closed sigue abortando.
->
-> **Frecuencia del fallo: desconocida** — no guardamos el `lang` crudo. Se mide barato (loguear
-> `resp.lang` en el nodo durante una corrida) y sigue valiendo la pena para saber cuánto se perdió.
-
-> # ⚠️ ADR-076 SE PERDIÓ Y SE RESTAURÓ — cuidado con los buffers viejos (26/08)
-> El commit **`79190c1`** (mensaje: `quedó`) sobrescribió `ADR-076` con una versión anterior y
-> **borró 51 líneas**: las dos reglas más caras de la sesión (**§9**, *se ordena por lo que la
-> tarjeta muestra*, y el corolario de **§5**, el default `null`), la confirmación de §7 en
-> producción, el estado `construida` — y **repuso una medición que ya se había probado falsa**
-> (`titulo 0/57`, cuando es 57/57) junto con la consecuencia falsa que salía de ella.
->
-> 🔎 **No fue una edición deliberada, y se sabe por una sola línea:** dejó
-> `` `dom       ain/feed.ts` `` en la tabla de §Contexto. Nadie tipea eso — es un archivo guardado
-> desde un buffer viejo o corrupto, commiteado con un fragmento de frase como mensaje.
->
-> Restaurado con `git checkout c7bc827 -- <archivo>` y verificado campo por campo. **La lección para
-> el próximo:** un ADR se puede perder sin que falle nada, y el síntoma es que vuelve a afirmar algo
-> que ya se había corregido. Si un doc contradice una medición del log, sospechá del doc.
-
-> # ✅ ADR-076 ESTÁ LIVE (26/08) — el orden y el filtro ya se ven en producción
-> Pusheado (`d88c419..5915a14`) y desplegado. Verificado por **dos señales independientes**: la
-> huella del HTML de prod cambió y se mantuvo estable en 3 requests, y **Vercel reporta `success`
-> contra el SHA `5915a14`** (`gh api .../commits/5915a14/status`). Detalle en el **cierre 116**.
-
+> | Qué | Quién | Nota |
+> |---|---|---|
+> | **§13** — el renombrado de colecciones y el badge *sin trabajo*, **en producción** | Mani, 2 min | Se vieron en `localhost`. Es la única verificación de esta tanda sin cerrar |
+> | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
+> | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
+> | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
+> | La topología de n8n sigue siendo ritual manual | dev | Enmienda de ADR-053, no ADR nuevo ([plan-multi-tenant §14.2](./plan-multi-tenant.md)) |
+> | Los **28 guiones limpios viejos** | Mani | Deuda conocida de ADR-080, **aplazada por él el 29/08** |
 
 > # ⛔ DECISIÓN ABIERTA — LEER ANTES DE TOCAR CUALQUIER ETAPA DE LINKEDIN
 > ## ¿Qué es un candidato de LinkedIn: material crudo para curar, o un post ya generado?
@@ -400,11 +353,41 @@
 >
 > </details>
 >
+> ### 📨 Y lo único que salió del repo: un WhatsApp a Majo
+>
+> El hueco de los descartes no se arregla con código, así que se le pidió a ella directamente
+> (29/08, aprobado por Mani antes de mandarlo): *"en Curar → Descartes hay 80 videos que la máquina
+> botó sola y nadie los ha revisado…"*. 🔑 **El número a mirar si ella audita es
+> `falsos_negativos`**: hoy da **0 siempre**, y no porque el gate sea perfecto sino porque nadie
+> marcó nunca. La pantalla los ordena **sin veredicto primero y por score descendente**, así que los
+> de arriba son los que casi pasan — por eso el pedido fue *"los primeros"* y no *"los 80"*.
+>
 > ### 🔴 Lo que sigue faltando
 >
 > **§13 (cierre 119) sigue abierta:** el renombrado de colecciones y el aviso *sin trabajo* se
 > vieron en `localhost`, **no en producción**. *(Mani confirmó en prod los criterios de limpieza y el
 > botón de limpiar — eso es ADR-080/§14, no el §13.)*
+>
+> ### 🧭 Para la próxima sesión
+>
+> **Leer primero:** el §Pendiente vivo de arriba, y **ADR-080** + **§5.2 del ROADMAP** si se va a
+> tocar limpieza o heat.
+>
+> **Lo que está listo para tomar, en orden de barato a caro:**
+> 1. **Conectar `estaAlDia` a la pantalla** (los 28 guiones viejos) — la deuda de ADR-080, con su
+>    diseño ya escrito. `/tdd`: el dominio ya existe y está testeado, falta la UI y su botón propio.
+> 2. **La revisión mensual de costos** — §5.3: la maquinaria existe (`app.tarifas` × `runs.metricas`
+>    → `v_costos_semana`) y lo que falta es el hábito, no el código.
+> 3. **La topología por `n8n:push`** — §14.2, enmienda de ADR-053. `/grill-with-docs` primero: la
+>    pregunta abierta no es técnica sino la red de seguridad (`nodes` **reemplaza**, así que un push
+>    que crea nodos también puede borrarlos).
+> 4. **La capa de producto (Three.js)** — iniciativa de Mani, todavía sin plan escrito: animaciones,
+>    transiciones, *ver cómo piensa el workflow mientras corre*. Es de cara a **vender esto**, no
+>    cosmética suelta; hoy está en `someday` como "Three.js" a secas, que se lee como un capricho
+>    técnico. Pide `/grill-me` antes que código.
+>
+> ⛔ **Lo que NO hay que tocar:** el peso del heat (probado el 29/08, el 0.7 es el óptimo) y ninguna
+> etapa de contenido de LinkedIn mientras el ⛔ de arriba siga abierto.
 
 > ## 🧾 2026-08-29 (cierre 119) · LAS DOS QUE ESTABAN "BLOQUEADAS POR UN HUMANO", Y UNA ERA UN MALENTENDIDO (Claude, pedido de Mani)
 >
