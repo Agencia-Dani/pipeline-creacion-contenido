@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { urlDeCdnPermitida } from "@/domain/cdn";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // El proxy de miniaturas. Existe por una razón concreta y medida: **Instagram sirve sus imágenes
@@ -20,26 +21,6 @@ export const dynamic = "force-dynamic";
 
 const BUCKET = "miniaturas";
 
-// Allowlist por sufijo de host. **No es cosmética: es lo que impide que esto sea un SSRF.** Sin
-// ella, cualquiera con sesión pediría `?u=http://169.254.169.254/…` y el server lo buscaría.
-const HOSTS_PERMITIDOS = [
-  ".cdninstagram.com",
-  ".fbcdn.net",
-  ".tiktokcdn.com",
-  ".tiktokcdn-us.com",
-];
-
-function urlPermitida(cruda: string): URL | null {
-  let url: URL;
-  try {
-    url = new URL(cruda);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:") return null;
-  return HOSTS_PERMITIDOS.some((sufijo) => url.hostname.endsWith(sufijo)) ? url : null;
-}
-
 /**
  * La clave en Storage sale del **pathname**, no de la URL entera.
  *
@@ -53,7 +34,7 @@ export async function GET(request: Request) {
   const cruda = new URL(request.url).searchParams.get("u");
   if (!cruda) return new Response("falta ?u", { status: 400 });
 
-  const url = urlPermitida(cruda);
+  const url = urlDeCdnPermitida(cruda);
   if (!url) return new Response("origen no permitido", { status: 400 });
 
   const supabase = createAdminClient();

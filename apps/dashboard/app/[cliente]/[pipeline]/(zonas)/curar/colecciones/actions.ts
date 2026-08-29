@@ -7,7 +7,7 @@ import type { GuionParaDocumento } from "@/domain/docx";
 import { huellaDeCriterios } from "@/domain/limpieza";
 import { parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
-import { traerMetadata, TOPE_POR_LOTE } from "@/lib/apify";
+import { traerMetadata, traerVideoUrls, TOPE_POR_LOTE } from "@/lib/apify";
 import { exigirTenant } from "@/lib/auth";
 import { aprobarSiEstanSinCalificar } from "@/lib/candidatos";
 import {
@@ -682,5 +682,70 @@ export async function descargar(
   } catch (e) {
     console.error("[colecciones] falló preparar la descarga:", e);
     return { ok: false, mensaje: "No se pudo preparar el documento. Probá de nuevo." };
+  }
+}
+
+
+// ──────────────────── Bajar los videos (pedido de Majo / JP Vieira, 28/08) ────────────────────
+
+/**
+ * Las URLs de mp4 de los videos elegidos, listas para que el browser los baje.
+ *
+ * 🔑 **Por qué existe.** Un guion de referencia con explicaciones visuales (los de trading son el
+ * caso que dio Majo) **no se sostiene solo con el texto**: si el creador baja el post, el editor
+ * queda con un script sin fundamento. Hoy ella lo resuelve a mano con `savefrom.net` y
+ * `sssinstagram.com`, un video por vez y fuera de la herramienta.
+ *
+ * ⚠️ **Esto NO es un respaldo del sistema.** La decisión del 29/08 fue *bajar al disco, sin
+ * guardar*: el archivo queda en la máquina de quien lo baja, no en el cockpit. Un video que nadie
+ * bajó antes del takedown se pierde igual. La alternativa —copiarlos a Storage, ~1,9 GB por
+ * colección de 57— es otro producto y necesita su propia decisión de costo.
+ *
+ * 🔴 **Se compra cada vez, y no hay dónde guardarlo.** La URL firmada vence en ~38 h (medido), o
+ * sea menos que la cadencia semanal: una columna en `app.videos_meta` guardaría links muertos.
+ *
+ * 📸 **Solo Instagram.** El actor es `apify~instagram-scraper`. TikTok se devuelve contado en
+ * `sinVideo` para poder decirlo, en vez de dejar tarjetas que no responden.
+ */
+export async function linksDeVideo(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+  claves: readonly string[],
+): Promise<
+  | { ok: true; porClave: Record<string, string>; sinVideo: number; recortado: boolean }
+  | { ok: false; mensaje: string }
+> {
+  const { usuario, ctx } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
+  if (!uuid.safeParse(coleccionId).success) return { ok: false, mensaje: "Esa colección no existe." };
+  if (claves.length === 0) return { ok: false, mensaje: "No hay videos elegidos." };
+
+  try {
+    const miembros = await leerMiembros(ctx, coleccionId);
+    const pedidos = enElOrdenPedido(miembros, claves).filter((m) => m.plataforma === "instagram");
+
+    // El costo dominante del actor es arrancar, así que va una sola corrida. Lo que pase del tope
+    // se recorta y **se dice**: un lote silenciosamente incompleto es peor que uno chico.
+    const recortado = pedidos.length > TOPE_POR_LOTE;
+    const lote = pedidos.slice(0, TOPE_POR_LOTE);
+
+    const videoUrls = await traerVideoUrls(lote.map((m) => m.url));
+
+    const porClave: Record<string, string> = {};
+    for (const m of lote) {
+      const video = videoUrls.get(m.url);
+      if (video) porClave[m.clave] = video;
+    }
+
+    const encontrados = Object.keys(porClave).length;
+    await registrarEvento(ctx, usuario.id, "colecciones.bajar_videos", {
+      coleccion: coleccionId,
+      pedidos: claves.length,
+      encontrados,
+    });
+
+    return { ok: true, porClave, sinVideo: claves.length - encontrados, recortado };
+  } catch (e) {
+    console.error("[colecciones] falló pedir los videos:", e);
+    return { ok: false, mensaje: "No se pudieron pedir los videos. Probá de nuevo." };
   }
 }

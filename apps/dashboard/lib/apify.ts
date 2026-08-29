@@ -78,6 +78,38 @@ function tituloDeCaption(caption: unknown): string | null {
  * colección porque un proveedor de terceros tuvo un mal día.
  */
 export async function traerMetadata(urls: readonly string[]): Promise<MetaDeVideo[]> {
+  return (await correrActor(urls)).map(normalizar).filter((m): m is MetaDeVideo => m !== null);
+}
+
+/**
+ * Las URLs de mp4 de estos videos, **recién compradas**, indexadas por la url del post.
+ *
+ * 🔴 **No se guardan en `app.videos_meta`, y eso no es pereza: es que no se puede.** La URL viene
+ * firmada y **vence en ~38 horas** (medido el 2026-08-29: `oe=6A94F4CF` → 31/08 03:28 UTC). La
+ * miniatura dura ~5 días y por eso allá se cachea el archivo; acá una columna guardaría un link
+ * muerto antes de la próxima corrida semanal. Se compra en el momento de bajar, cada vez.
+ *
+ * 📏 **El campo existe y sirve** (medido el mismo día contra el actor que ya se paga): `videoUrl`
+ * responde `206` con `content-type: video/mp4`, 32,9 MB para un reel de 93 s, desde
+ * `scontent-*.cdninstagram.com` — el mismo sufijo que ya estaba permitido para las miniaturas.
+ *
+ * Fail-open igual que su hermana: sin token, o si Apify se cae, devuelve un mapa vacío y quien
+ * llame avisa que no se pudo. Bajar un video es una comodidad, no puede tumbar la pantalla.
+ */
+export async function traerVideoUrls(urls: readonly string[]): Promise<Map<string, string>> {
+  const salida = new Map<string, string>();
+  for (const item of await correrActor(urls)) {
+    // `inputUrl` es la que mandamos nosotros, así que es la que el llamador puede volver a cruzar
+    // contra sus propias filas; `url` es la que devuelve Instagram y puede venir canonicalizada.
+    const pedida = texto(item.inputUrl) ?? texto(item.url);
+    const video = texto(item.videoUrl);
+    if (pedida && video) salida.set(pedida, video);
+  }
+  return salida;
+}
+
+/** Una corrida del actor. Los items crudos, sin interpretar. Nunca tira: devuelve `[]`. */
+async function correrActor(urls: readonly string[]): Promise<Record<string, unknown>[]> {
   if (urls.length === 0) return [];
   const token = process.env.APIFY_TOKEN;
   if (!token) {
@@ -109,8 +141,7 @@ export async function traerMetadata(urls: readonly string[]): Promise<MetaDeVide
       return [];
     }
     const items = await res.json();
-    if (!Array.isArray(items)) return [];
-    return items.map(normalizar).filter((m): m is MetaDeVideo => m !== null);
+    return Array.isArray(items) ? items : [];
   } catch (e) {
     console.error("[apify] no se pudo traer la metadata:", e);
     return [];

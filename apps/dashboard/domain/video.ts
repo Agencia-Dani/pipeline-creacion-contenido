@@ -129,3 +129,26 @@ export function fusionar(partes: readonly ParteVideo[]): Video[] {
   // disimula.
   return [...porClave.values()].filter((v) => v.url !== "");
 }
+
+/** Tope del nombre de archivo. El `titulo` es el caption recortado a 200 y eso es un nombre absurdo. */
+const TOPE_NOMBRE = 60;
+
+/**
+ * Cómo se llama el archivo cuando alguien baja este video.
+ *
+ * 🔑 **`esTituloDeVerdad` decide, no `!== null`.** El título de un video puede ser su propia url
+ * (el disfraz que ya costó un falso positivo de medición): bajar 20 archivos llamados
+ * `https---www.instagram.com-p-...` sería peor que no ponerles nombre.
+ *
+ * El fallback es la identidad del video, que siempre existe y siempre es distinta — sin eso, veinte
+ * videos sin título bajarían todos como `video.mp4` y el browser los numeraría `video (3).mp4`.
+ * La sanitización del nombre la hace `/api/video`, que es quien escribe el `Content-Disposition`.
+ */
+export function nombreDeArchivo(video: Video): string {
+  const partes = [
+    video.referente?.trim() || null,
+    esTituloDeVerdad(video.titulo) ? video.titulo.trim().slice(0, TOPE_NOMBRE) : null,
+  ].filter((p): p is string => p !== null);
+
+  return partes.length > 0 ? partes.join(" - ") : `${video.plataforma}-${video.external_id}`;
+}

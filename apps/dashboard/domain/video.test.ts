@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { esTituloDeVerdad, fusionar, type ParteVideo } from "./video.ts";
+import { esTituloDeVerdad, fusionar, nombreDeArchivo, type ParteVideo } from "./video.ts";
 
 // Cada test nombra la PROPIEDAD que se sostiene, no la función que llama, y lleva el porqué del
 // caso: casi todos son un bug real medido contra prod el 2026-08-21.
@@ -151,4 +151,29 @@ test("un video del que no se sabe nada sale entero en null, no a medias", () => 
       views: null, likes: null, seguidores: null, idioma: null, heat: null,
     },
   );
+});
+
+// ── nombreDeArchivo ──────────────────────────────────────────────────────────
+
+test("junta referente y título", () => {
+  const [v] = fusionar([parte({ referente: "@nicholascrown", titulo: "Qué es el VIX" })]);
+  assert.equal(nombreDeArchivo(v), "@nicholascrown - Qué es el VIX");
+});
+
+test("un título que en realidad es una url no se usa: quedaría un nombre ilegible", () => {
+  const [v] = fusionar([
+    parte({ referente: "@alguien", titulo: "https://www.instagram.com/p/DcRC0RQkb03/" }),
+  ]);
+  assert.equal(nombreDeArchivo(v), "@alguien");
+});
+
+test("sin nada que decir cae a la identidad, no a un nombre repetido", () => {
+  // 20 videos sin título bajando todos como `video.mp4` es el modo de falla que esto evita.
+  const [v] = fusionar([parte({ referente: null, titulo: null })]);
+  assert.equal(nombreDeArchivo(v), "instagram-abc123");
+});
+
+test("un caption largo se recorta: el título ya viene cortado a 200 y eso no es un nombre", () => {
+  const [v] = fusionar([parte({ referente: null, titulo: "x".repeat(200) })]);
+  assert.equal(nombreDeArchivo(v).length, 60);
 });

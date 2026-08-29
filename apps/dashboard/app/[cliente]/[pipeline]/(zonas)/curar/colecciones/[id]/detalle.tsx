@@ -18,7 +18,7 @@ import {
 } from "@/domain/colecciones";
 import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
 import type { CriterioOrden, Faceta } from "@/domain/orden";
-import type { Video } from "@/domain/video";
+import { nombreDeArchivo, type Video } from "@/domain/video";
 import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
 import { rutaDe } from "@/domain/rutas";
 import { usarCockpit } from "../../../usar-cockpit";
@@ -28,6 +28,7 @@ import {
   descargar,
   identificarFaltantes,
   limpiarFaltantes,
+  linksDeVideo,
   quitar,
   quitarSeleccionados,
   vocesParaLimpiar,
@@ -202,6 +203,55 @@ export function Detalle({
     });
   }
 
+  /**
+   * Baja los mp4 de los videos elegidos (pedido de Majo / JP Vieira, 28/08).
+   *
+   * 🔑 **Uno por uno y sin ZIP.** Son ~33 MB por video (medido): una colección de 57 son ~1,9 GB,
+   * que no entra ni en la memoria ni en los 60 s de una función de Vercel. El browser encola las
+   * descargas solo; la primera vez puede pedir permiso para "descargas múltiples".
+   *
+   * ⏱️ **El respiro entre clicks no es cosmético**: disparar N clicks en el mismo tick hace que
+   * Chrome descarte todos menos el primero.
+   *
+   * 🔴 **Esto NO deja el video guardado en el cockpit.** El archivo queda en el disco de quien lo
+   * baja, igual que hoy con savefrom.net. Un video que nadie bajó antes de que lo desmonten se
+   * pierde igual — cambiarlo es copiarlos a Storage, que es otro producto y otra decisión de costo.
+   */
+  function bajarVideos() {
+    if (trabajando || seleccion.cuantos === 0) return;
+    const elegidos = orden.visibles.filter((v) => seleccion.marcado(v.clave));
+    startTransition(async () => {
+      const r = await linksDeVideo(cockpit, coleccionId, elegidos.map((v) => v.clave));
+      if (!r.ok) {
+        setAviso(r);
+        return;
+      }
+
+      for (const v of elegidos) {
+        const origen = r.porClave[v.clave];
+        if (!origen) continue;
+        const a = document.createElement("a");
+        a.href = `/api/video?u=${encodeURIComponent(origen)}&nombre=${encodeURIComponent(nombreDeArchivo(v))}`;
+        // Sin `download`: el nombre lo pone el `Content-Disposition` de la route, que es quien
+        // sabe sanitizarlo. El atributo acá sería una segunda fuente para el mismo hecho.
+        a.click();
+        await new Promise((listo) => setTimeout(listo, 400));
+      }
+
+      const bajados = elegidos.length - r.sinVideo;
+      setAviso({
+        ok: bajados > 0,
+        mensaje:
+          bajados === 0
+            ? "Ninguno de esos videos se pudo traer. Solo funciona con Instagram por ahora."
+            : `Bajando ${bajados} ${bajados === 1 ? "video" : "videos"}.` +
+              (r.sinVideo > 0 ? ` ${r.sinVideo} no se pudieron traer (¿TikTok, o el post ya no está?).` : "") +
+              (r.recortado ? " La selección era muy grande: se tomaron los primeros 50." : ""),
+      });
+      seleccion.cancelar();
+    });
+  }
+
   function sacar(v: Video) {
     if (trabajando) return;
     setQuitando(v.clave);
@@ -373,6 +423,17 @@ export function Detalle({
             ))}
           </GrillaVideos>
           <BarraSeleccion seleccion={seleccion}>
+            {/* Primero el que NO destruye nada: bajar es la acción que el editor viene a hacer,
+                sacar es la de limpieza. */}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={seleccion.cuantos === 0 || trabajando}
+              onClick={bajarVideos}
+            >
+              {trabajando ? "Pidiendo…" : "Descargar videos"}
+            </Button>
             <Button
               type="button"
               size="sm"
