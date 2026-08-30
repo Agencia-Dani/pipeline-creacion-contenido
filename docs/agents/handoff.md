@@ -46,7 +46,7 @@
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
 > | La topología de n8n sigue siendo ritual manual | dev | Enmienda de ADR-053, no ADR nuevo ([plan-multi-tenant §14.2](./plan-multi-tenant.md)) |
-> | Los **28 guiones limpios viejos** | Mani | Deuda conocida de ADR-080, **aplazada por él el 29/08** |
+> | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ El mecanismo existe desde el 30/08 (ADR-080 §Enmienda, cierre 121). 🔴 **NO apretar *Rehacer 25* todavía**: `guardarLimpio` pisa `creado_por` y convertiría 25 guiones de Majo en guiones de Mani |
 
 > # ⛔ DECISIÓN ABIERTA — LEER ANTES DE TOCAR CUALQUIER ETAPA DE LINKEDIN
 > ## ¿Qué es un candidato de LinkedIn: material crudo para curar, o un post ya generado?
@@ -136,6 +136,99 @@
 >    stub deja de emitir posts terminados para emitir material crudo.
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
+
+> ## 🧹 2026-08-30 (cierre 121) · LOS GUIONES VIEJOS YA SE VEN — Y REHACERLOS LE ROBA LA AUTORÍA A MAJO (Claude, pedido de Mani)
+>
+> **En una línea:** se saldó la deuda que ADR-080 dejó aplazada —`estaAlDia` dejó de estar huérfana,
+> cada guion viejo lo dice en su tarjeta y hay botón propio con confirmación— y al verificarlo
+> apareció que **re-limpiar pisa `creado_por`**. **Migraciones: ninguna. `core/`: no se tocó. n8n:
+> cero.** Commit `337647f`.
+>
+> ### 🩸 Lo que hay que aprender de acá: la verificación tocó dos canarios, y uno era el mío
+>
+> El cierre 120 escribió *"una verificación que deja su propia fila contamina el canario"* y **lo
+> repetí al día siguiente**. El canario de ADR-074 está redefinido como `guiones_limpios where
+> actualizado_en > '2026-08-29'`: daba **0** y hoy da **1**, que es la prueba viva de esta sesión.
+> *Redefinir un canario por fecha no lo protege de quien lo mide: lo expone más, porque cualquier
+> escritura de verificación cae del lado nuevo.*
+>
+> 🔴 **Y el de abajo es peor, porque no es ruido sino pérdida.** `guardarLimpio` escribe
+> `creado_por: usuarioId` en **cada upsert**, así que **rehacer un guion le roba la autoría a quien
+> lo limpió primero**. Medido el 30/08: `creado_por` da **Majo 58 · Mani 7**; ADR-074 registró
+> **61 · 4** el 29/08. Mi re-limpiado explica **1** de esos 3 — **los otros 2 no se pudieron
+> reconstruir**, así que o el 61 estaba mal medido o hubo otro cambio en el medio. Queda como
+> incógnita escrita y no como conclusión.
+>
+> ⛔ **Consecuencia operativa: NO apretar *Rehacer 25* hasta decidir esto.** Convertiría 25 guiones
+> de Majo en guiones de Mani y **borraría la evidencia de adopción que cerró D3**. La decisión —si
+> `guardarLimpio` debe preservar `creado_por` en un re-limpiado, o si hace falta una columna de
+> *quién lo rehizo*— **no se tomó**, es de Mani.
+>
+> ### El hallazgo que ordenó el diseño: un guion viejo tiene DOS estados
+>
+> `estaAlDia` contestaba sí/no, y con eso el guion 28 —limpiado *con* Juan Pablo, cuyo video ya no
+> deriva voz— caía del mismo lado que los otros 27. **Rehacerlo lo dejaría neutro: peor de lo que
+> está, pagando por empeorarlo.** `estadoDelLimpio` devuelve `al-dia · viejo · degradaria`, y lo
+> tercero **se despeja de las huellas solas**: si la de hoy es la del prompt BASE y la guardada no lo
+> es, la pasada perdería el perfil. *No hace falta consultar voces ni saber de qué voz era.*
+>
+> ### 📏 La predicción falló, y por eso la medición sirvió
+>
+> Se escribió antes de mirar: *la pantalla debe decir 27 viejos y 1 degradaría*. **Dijo 26 y 0.**
+> Rehaciendo la fusión de `leerLoQueSeSabe` por fuera de la pantalla —desde `candidatos` y `outputs`,
+> con las mismas funciones de la app— la diferencia quedó explicada y medida:
+>
+> | | viejos | degradarían | al día |
+> |---|---|---|---|
+> | **Los 65 del cockpit** | **27** | **1** | **37** |
+> | En la colección *Test* (57) | **26** | 0 | 31 |
+> | Fuera de toda colección (8) | **1** | **1** | 6 |
+>
+> **Reproduce el 28 y el 37 de ADR-080 por un camino distinto al de la pantalla.** La pantalla dice
+> 26 porque solo clasifica lo que muestra: **2 de los 28 son inalcanzables con el alcance elegido**
+> (solo la colección, decisión de Mani), y eso quedó escrito en el ADR como decisión y no como bug.
+>
+> ### ✅ Verificado montando el caso, con una colección de UN video
+>
+> Cuatro chequeos solo miran texto. El que prueba el mecanismo fue armar una colección con **un solo
+> video viejo**, apretar *Rehacer* y borrarla. La huella pasó de `97ff9195` a `72210da7`, `voz_id`
+> quedó en **Juan Pablo derivado del video**, el evento registró `motivo: "viejos"` con `sin_voz: 0`,
+> y el conteo global cruzó **exactamente uno** (33/32 → 32/33). *Test* bajó de 26 a 25, con 25 + 32 = 57.
+>
+> 🩸 **Los dos defectos que salieron ahí no los podía ver ningún test:** *"1 guion quedó viejo: se
+> limpi**aron**"* y *"1 rehech**os**"*, con los **442 en verde**. *Un plural roto no tiene assert que
+> lo cace; tiene una pantalla con n=1.*
+>
+> ⚠️ **Y el tooling de click del browser falló dos veces**, abriendo el modal de un guion en vez de
+> apretar el botón: el ref cachea coordenadas de un layout anterior al scroll. Se resolvió midiendo
+> con `elementFromPoint` (que devolvía el `<p>` del guion encima) antes de acusar a la app. *Un botón
+> que no responde puede estar tapado, no roto.*
+>
+> ### Lo que se construyó
+>
+> | Qué | Dónde | Nota |
+> |---|---|---|
+> | Los dos estados del limpio | `domain/limpieza.ts` (`estadoDelLimpio`, `clasificarLimpios`) | 8 tests nuevos; `estaAlDia` dejó de estar huérfana |
+> | La huella sin el texto | `lib/guiones-limpios.ts` (`huellasDeLimpios`) | Reemplaza a `clavesConLimpio`, respetando la regla del payload |
+> | Una sola pasada para los dos actos | `colecciones/actions.ts` | `limpiarFaltantes` y `relimpiarViejos` comparten presupuesto, orden serial y evento |
+> | El registro no se partió | `colecciones.limpiar` + `motivo` | Precedente de `origen: pegote \| seleccion` |
+> | El badge y el botón | `[id]/detalle.tsx` | `destructive` y no `default`: al lado de «✓ Grabado» dos badges fuertes compiten |
+>
+> ⬜ **Lo que NO se probó, y no se declara probado:** el badge de `degradaria` **nunca se pintó** — su
+> único caso vive fuera de toda colección. La rama existe y está testeada en dominio; en pantalla no
+> la vio nadie.
+>
+> ### 🧭 Para la próxima sesión
+>
+> **Leer primero:** el §Pendiente vivo y **ADR-080 §Enmienda**.
+>
+> 1. **Decidir lo de `creado_por`** (arriba). Bloquea apretar *Rehacer 25*, que es el arreglo real.
+> 2. **La revisión mensual de costos** — §5.3, sigue igual: falta el hábito, no el código.
+> 3. **La topología por `n8n:push`** — §14.2, `/grill-with-docs` primero.
+> 4. **La capa de producto (Three.js)** — `/grill-me` antes que código.
+>
+> ⛔ **Lo que NO hay que tocar:** el peso del heat (0.7, probado el 29/08) y ninguna etapa de
+> contenido de LinkedIn mientras la decisión de producto siga abierta.
 
 > ## 🧼 2026-08-29 (cierre 120) · D3 LA CERRÓ MAJO SIN SABERLO, Y EL SELECTOR DE VOZ ERA UNA TRAMPA (Claude, pedido de Mani)
 >

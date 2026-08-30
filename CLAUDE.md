@@ -119,6 +119,16 @@ en §Agent skills; acá solo se ubican.
   61 son de Majo**, hechas ese día — **34 con voz y 27 sin voz**, o sea que el camino "solo criterios
   de la casa" es la mitad del uso real. Redefinido por fecha:
   `select count(*) from app.guiones_limpios where actualizado_en > '2026-08-29'`.
+  ⚠️ **Ese canario redefinido ya está contaminado, y por la sesión que lo redefinió.** Daba 0 y al
+  2026-08-30 da **1**: es la prueba viva del cierre 121, no adopción. *Redefinir un canario por fecha
+  no lo protege de quien lo mide — lo expone más, porque toda escritura de verificación cae del lado
+  nuevo.* **El primer dato de adopción es la fila 2.**
+  🔴 **Y `creado_por` dejó de ser confiable como medida de adopción: `guardarLimpio` lo pisa en cada
+  upsert, así que re-limpiar le roba la autoría a quien limpió primero.** Al 30/08 da **Majo 58 ·
+  Mani 7** donde ADR-074 registró **61 · 4**; el re-limpiado del cierre 121 explica **1** de esos 3 y
+  **los otros 2 no se pudieron reconstruir**. Decisión pendiente de Mani (¿preservar `creado_por`, o
+  columna aparte de *quién lo rehizo*?), y **hasta que se tome no se aprieta *Rehacer 25***: serían
+  25 guiones de Majo pasando a nombre de Mani, o sea borrar la evidencia que cerró D3.
   📏 **Ese mismo día Majo hizo 80 calificaciones, 13 referentes y 12 ediciones de voces/proyectos,
   sola — y con eso se cerró D3 y la última condición del "MVP declarado cuando" (ROADMAP §4).**
   *Este renglón decía **"sigue en CERO"** y era correcto cuando se escribió el 20/08 a las 16:30;
