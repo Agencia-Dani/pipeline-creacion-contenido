@@ -42,7 +42,6 @@
 >
 > | Qué | Quién | Nota |
 > |---|---|---|
-> | **§13** — el renombrado de colecciones y el badge *sin trabajo*, **en producción** | Mani, 2 min | Se vieron en `localhost`. Es la única verificación de esta tanda sin cerrar |
 > | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
@@ -364,9 +363,16 @@
 >
 > ### 🔴 Lo que sigue faltando
 >
-> **§13 (cierre 119) sigue abierta:** el renombrado de colecciones y el aviso *sin trabajo* se
-> vieron en `localhost`, **no en producción**. *(Mani confirmó en prod los criterios de limpieza y el
-> botón de limpiar — eso es ADR-080/§14, no el §13.)*
+> ✅ **§13 CERRADA el 2026-08-30, en producción** (era lo único que quedaba de esta tanda). El
+> renombrado lo prueba `colecciones.renombrar` a las **03:41:13Z**, posterior al deploy de `8507cd3`
+> (29/08 19:32:49Z); el aviso *sin trabajo* lo miró Mani, y sus números se re-midieron contra prod
+> (**13 de 28**, con `@jefferson_fisher`, `@markmanson` y `@susieinthiran` adentro).
+>
+> 🩸 **Y el primer intento no contaba:** los dos `renombrar` del 29/08 (19:27 y 19:28) son de
+> **cuatro minutos antes** de que su propio código estuviera desplegado ⇒ `localhost`. Tercera vez
+> con el mismo patrón. **Un evento anterior al deploy de su código es de localhost, sin excepción.**
+> *(Lo que Mani confirmó en prod el 29/08 eran los criterios de limpieza y el botón de limpiar —
+> eso es ADR-080/§14, no el §13.)*
 >
 > ### 🧭 Para la próxima sesión
 >

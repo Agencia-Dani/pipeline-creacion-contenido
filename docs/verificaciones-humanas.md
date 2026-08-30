@@ -866,7 +866,30 @@ los canarios de `CLAUDE.md`.
 
 ---
 
-## 13. ⬜ **Renombrar una colección y el aviso «sin trabajo», EN PRODUCCIÓN** *(nuevo del 29/08, cierre 119)*
+## 13. ✅ **Renombrar una colección y el aviso «sin trabajo»: CERRADA por Mani el 2026-08-30, en producción**
+
+**Las dos mitades pasaron**, y cada una se cerró con la evidencia que le corresponde — que no es la
+misma para las dos.
+
+**Mitad A — el renombrado (escritura).** La cierra `app.eventos`:
+`colecciones.renombrar` el **2026-08-30 03:41:13Z**, sobre `53f0fa23…`, muy posterior al deploy de
+`8507cd3` (29/08 **19:32:49Z**).
+
+🩸 **Y hubo un intento anterior que NO contaba, cazado antes de escribirlo acá.** Los dos
+`colecciones.renombrar` del 29/08 son de las **19:27:38** y **19:28:01** — *cuatro minutos antes* de
+que el código estuviera desplegado — con un `colecciones.borrar` a las 19:29:40 sobre la misma
+colección: un ciclo de prueba en `localhost`, no un uso en el dominio real. **Tercera vez que este
+repo se topa con lo mismo** (el mp4 del cierre 117, el §4-quinquies del 118, esto). *La regla ya no
+se discute: un evento anterior al deploy de su propio código es de localhost, sin excepción.*
+
+**Mitad B — el aviso «sin trabajo» (lectura).** 🔑 **`app.eventos` no puede cerrarla nunca, ni hoy
+ni después: mirar una pantalla no escribe ningún evento.** La cerró Mani con el ojo. Lo que sí se
+midió contra prod, que es lo que el enunciado pedía, es que **los números que la pantalla debe
+mostrar siguen siendo ciertos**: `13 de 28` cuentas prendidas sin trabajo, con
+`@jefferson_fisher`, `@markmanson` y `@susieinthiran` entre ellas. *El dato de atrás se verifica con
+una query; que el build lo pinte, sólo con los ojos.*
+
+<details><summary>El enunciado original, que sigue valiendo si esto hay que re-probar</summary>
 
 **Quién:** Mani (o cualquiera del equipo) · **2 minutos** · *Está desplegado y sin tocar por nadie.*
 
@@ -900,6 +923,8 @@ dominio real.**
 | *«No se pudo cambiar el nombre»* genérico | 🔴 No es el choque de nombre (ése tiene su mensaje). Mirá los logs de la función: el `NO_ESTA` sale cuando el update toca 0 filas, y eso en prod significaría que el filtro de tenant no encontró la fila |
 | El aviso dice **otro número** que 13 de 28 | 🟡 Normal si alguien prendió o apagó una voz desde el 29/08 — el número sale de la config viva. Se re-mide con la query, no se asume. **Si dice 0 de 28**, sospechá: el alcance llegó vacío y estaría marcando todo como que trabaja |
 | No aparece ningún badge y tampoco el aviso | 🩸 `proyectosEnAlcance` llegó vacío o completo por error. La card *«Qué va a correr»* de Operar tiene que decir lo mismo: si las dos discrepan, una de las dos miente (que es justo lo que ADR-079 §3 quiso hacer imposible) |
+
+</details>
 
 ---
 
