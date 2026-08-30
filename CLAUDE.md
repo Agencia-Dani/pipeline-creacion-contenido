@@ -219,9 +219,12 @@ módulos), `/handoff` (compactar una sesión).
   `npm test` (dominio con `node:test`, corre los `.ts` directo en Node 26). Si tocaste rutas o
   auth, además `npm run build`. Cómo correrlo y sus pasos manuales:
   [apps/dashboard/README.md](apps/dashboard/README.md).
-- **¿el live corre lo que dice el repo?** `cd core/scripts && npm run n8n:diff` — compara los **6**
-  workflows (los 4 del pipeline + el error handler + el esqueleto de LinkedIn) contra n8n por la API
-  (ADR-053). Clasifica cada campo, así que solo grita lo accionable:
+- **¿el live corre lo que dice el repo?** `cd core/scripts && npm run n8n:diff` — compara **5**
+  workflows (los 4 del pipeline + el error handler) contra n8n por la API (ADR-053).
+  ⚠️ *Este renglón decía **6**, contando el esqueleto de LinkedIn, y es falso: **`N8N_WF_LINKEDIN`
+  no está en el `.env`**, así que el barrido lo **saltea con aviso** (ADR-068) y **nunca lo mira**.
+  Medido el 30/08 leyendo la salida, no el doc. O sea que el "`n8n:diff` grita por los 5 nodos que
+  faltan en LinkedIn" tampoco pasa: avisa que **no puede** mirarlo, que es otra cosa.* Clasifica cada campo, así que solo grita lo accionable:
   **drift** (los dos lados tienen valor y difieren), **topología**, **orden de ramas** y placeholders
   que no pudo aprender. Lo benigno (defaults que n8n borra, campos que agrega, resourceLocators de
   Apify) va a un contador; `-- --todo` los lista. Solo lee. **Corrélo antes de tocar un workflow.json
