@@ -186,7 +186,7 @@ export async function agregarPegados(
 
   revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
 
-  const partes = [`${resultado.nuevos} agregados`];
+  const partes = [`${resultado.nuevos} ${resultado.nuevos === 1 ? "agregado" : "agregados"}`];
   if (resultado.yaEstaban > 0) partes.push(`${resultado.yaEstaban} ya estaban`);
   if (invalidos.length > 0) partes.push(`${invalidos.length} no reconocidos`);
   return { ok: true, mensaje: partes.join(" · ") + "." };
@@ -279,7 +279,7 @@ export async function agregarSeleccionados(
   // El Feed cambia si se aprobó algo: esas tarjetas salen del filtro "sin calificar".
   if (aprobados > 0) revalidatePath(rutaDe(ruta, "curar/feed"));
 
-  const partes = [`${resultado.nuevos} agregados`];
+  const partes = [`${resultado.nuevos} ${resultado.nuevos === 1 ? "agregado" : "agregados"}`];
   if (resultado.yaEstaban > 0) partes.push(`${resultado.yaEstaban} ya estaban`);
   if (aprobados > 0) partes.push(`${aprobados} quedaron en 👍`);
   return {
@@ -604,8 +604,12 @@ async function pasadaDeLimpieza(
 
   const hasta = Date.now() + PRESUPUESTO_LIMPIEZA_MS;
   let sinVoz = 0;
-  let limpiados = 0;
   let sinGuion = 0;
+  // 🔑 **Qué videos se escribieron, no solo cuántos** (ADR-074 §Enmienda). El evento es la única
+  // superficie que no se pisa: la fila sí. Sin esto, "quién rehizo este guion" es irreconstruible
+  // —ya pasó: los eventos del 26/08 guardan `limpiados` y por eso una fila perdió su autor sin
+  // rastro—. `limpiados` sale de acá para que el conteo y las claves no puedan discrepar.
+  const claves: string[] = [];
 
   // Serial y no en pool: cada limpieza es una llamada larga a Haiku sobre un texto de hasta 6000
   // caracteres, y lo que se quiere acá no es throughput sino **no pasarse del presupuesto**. Una
@@ -636,13 +640,19 @@ async function pasadaDeLimpieza(
         // `estaAlDia` diría que uno está al día contra el criterio del otro.
         criteriosHash: huellaDeCriterios(perfil),
         vozId: vozDelVideo,
-        usuarioId: usuario.id,
+        // 🔑 **El autor solo va cuando la fila es nueva** (ADR-074 §Enmienda), y el corte ya
+        // existía: `faltantes` apunta por definición a videos SIN limpio y `viejos` solo a los que
+        // YA lo tienen. El `motivo` de ADR-080 particiona exacto por INSERT vs UPDATE, así que no
+        // hace falta leer antes de escribir.
+        usuarioId: motivo === "faltantes" ? usuario.id : null,
       });
-      limpiados++;
+      claves.push(m.clave);
     } catch (e) {
       console.error(`[colecciones] falló limpiar ${m.clave}:`, e);
     }
   }
+
+  const limpiados = claves.length;
 
   await registrarEvento(ctx, usuario.id, "colecciones.limpiar", {
     coleccion: coleccionId,
@@ -654,6 +664,9 @@ async function pasadaDeLimpieza(
     // se registra es **cuántos no tenían ninguna**: es el número que dice si la derivación anda.
     sin_voz: sinVoz,
     limpiados,
+    // **Cuáles**, no solo cuántos. Es lo que hace reconstruible "quién rehizo qué" desde una tabla
+    // append-only, ahora que `creado_por` dejó de moverse al rehacer.
+    claves,
     sin_guion: sinGuion,
     pedidos: objetivos.length,
   });
@@ -671,7 +684,9 @@ async function pasadaDeLimpieza(
     return { ok: false, mensaje: porQue, limpiados: 0, quedan };
   }
 
-  const partes = [`${limpiados} limpiados`];
+  // «1 limpiado», no «1 limpiados» — el mismo plural roto que la pantalla de un solo video destapó
+  // en el cierre 121, en su otra mitad.
+  const partes = [`${limpiados} ${limpiados === 1 ? "limpiado" : "limpiados"}`];
   if (sinGuion > 0) partes.push(`${sinGuion} sin guion`);
   if (quedan > 0) partes.push(`quedan ${quedan}`);
   return { ok: true, mensaje: partes.join(" · ") + ".", limpiados, quedan };

@@ -192,17 +192,19 @@ export function Detalle({
         total += pasada.limpiados;
         // Una pasada que no movió la aguja corta: mejor eso que girar pagándole a Haiku por nada.
         if (pasada.limpiados === 0) {
-          setAviso(total > 0 ? { ok: true, mensaje: `${total} limpiados.` } : pasada);
+          setAviso(total > 0 ? { ok: true, mensaje: limpiadosTxt(total) } : pasada);
           return;
         }
         quedan = pasada.quedan;
       }
-      setAviso({ ok: true, mensaje: `${total} limpiados.` });
+      setAviso({ ok: true, mensaje: limpiadosTxt(total) });
     });
   }
 
   /** «1 rehecho», no «1 rehechos»: el aviso lo lee una persona y el plural roto se nota. */
   const rehechos = (n: number) => `${n} ${n === 1 ? "rehecho" : "rehechos"}.`;
+  /** El hermano del de arriba, que se había quedado sin arreglar: decía «1 limpiados». */
+  const limpiadosTxt = (n: number) => `${n} ${n === 1 ? "limpiado" : "limpiados"}.`;
 
   /**
    * Rehace los guiones que quedaron viejos, en pasadas, igual que `limpiarTodos`.

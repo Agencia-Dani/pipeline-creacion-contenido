@@ -123,12 +123,21 @@ en §Agent skills; acá solo se ubican.
   2026-08-30 da **1**: es la prueba viva del cierre 121, no adopción. *Redefinir un canario por fecha
   no lo protege de quien lo mide — lo expone más, porque toda escritura de verificación cae del lado
   nuevo.* **El primer dato de adopción es la fila 2.**
-  🔴 **Y `creado_por` dejó de ser confiable como medida de adopción: `guardarLimpio` lo pisa en cada
-  upsert, así que re-limpiar le roba la autoría a quien limpió primero.** Al 30/08 da **Majo 58 ·
-  Mani 7** donde ADR-074 registró **61 · 4**; el re-limpiado del cierre 121 explica **1** de esos 3 y
-  **los otros 2 no se pudieron reconstruir**. Decisión pendiente de Mani (¿preservar `creado_por`, o
-  columna aparte de *quién lo rehizo*?), y **hasta que se tome no se aprieta *Rehacer 25***: serían
-  25 guiones de Majo pasando a nombre de Mani, o sea borrar la evidencia que cerró D3.
+  ✅ **`creado_por` ya no se pisa al rehacer, y el canario se mudó** (ADR-074 §Enmienda, 30/08).
+  `guardarLimpio` lo mandaba en cada upsert, así que re-limpiar le robaba la autoría a quien limpió
+  primero; ahora solo va en el INSERT —el `motivo` de ADR-080 ya particionaba exacto por INSERT vs
+  UPDATE— y ***Rehacer 25* se puede apretar**. Verificado en prod con una colección de un video: la
+  fila se reescribió (huella `97ff9195`→`72210da7`, voz derivada, `actualizado_en` nuevo) y el
+  conteo quedó **igual: Majo 58 · Mani 7**.
+  🔑 **Y el `61 · 4` que este archivo citaba nunca fue un conteo de `creado_por`.** Se reproduce
+  exacto desde los eventos contando **escrituras por voz** e ignorando **quién** (`32` de Majo + las
+  `2` con voz de Mani = 34; `15+12` = 27), así que el delta de 3 filas **puede no haber existido
+  nunca**: eran dos preguntas leídas como la misma. *Un canario mal consultado miente igual que uno
+  mal escrito — van dos veces en dos días.*
+  📌 **El canario vive ahora en `app.eventos`, que nadie pisa**, y la `032` quedó corregida en su
+  propio archivo: `select count(*) from app.eventos where tipo = 'colecciones.limpiar' and
+  usuario_id <> '<uuid de Mani>'`. El evento además guarda **`claves`** —cuáles, no solo cuántos—
+  porque los del 26/08 guardaban solo el número y por eso una fila perdió su autor sin rastro.
   📏 **Ese mismo día Majo hizo 80 calificaciones, 13 referentes y 12 ediciones de voces/proyectos,
   sola — y con eso se cerró D3 y la última condición del "MVP declarado cuando" (ROADMAP §4).**
   *Este renglón decía **"sigue en CERO"** y era correcto cuando se escribió el 20/08 a las 16:30;

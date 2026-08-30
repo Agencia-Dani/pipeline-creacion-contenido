@@ -1,6 +1,8 @@
 # ADR-074 — El guion limpio es un artefacto nuevo; el crudo no se toca
 
-- **Estado:** aceptada — 2026-08-21. **Enmienda [ADR-009](./ADR-009-scripts-literales-y-aprendizaje-en-scoring.md)
+- **Estado:** aceptada — 2026-08-21, **enmendada el 2026-08-30** (§Enmienda al final: `creado_por`
+  se pisaba al rehacer, así que el canario que este ADR escribió medía mal; el canario se muda a
+  `app.eventos` y el evento pasa a guardar **cuáles**). **Enmienda [ADR-009](./ADR-009-scripts-literales-y-aprendizaje-en-scoring.md)
   y [ROADMAP §1.1](../../ROADMAP.md).** Se apoya en
   [ADR-072](./ADR-072-el-video-es-la-unidad-una-llave-una-tarjeta.md) (la llave) y
   [ADR-073](./ADR-073-la-coleccion-es-una-bolsa-de-videos.md) (dónde se dispara).
@@ -110,3 +112,95 @@ intuición.
   tomó una decisión discutible (el prompt lo obliga a marcarlo con ⚠️).
 - (−) ROADMAP §1.1 queda con una enmienda. Es el segundo punto del norte que se toca (el primero fue
   el disparo on-demand, ADR-023), y como aquel, **se suma sin retirar nada**.
+
+## Enmienda — 2026-08-30: `creado_por` no es un canario, y el evento tiene que guardar CUÁLES
+
+*Toca `lib/guiones-limpios.ts`, la zona `curar/colecciones` del cockpit y **el comentario del canario
+en [`core/schema/032`](../../core/schema/032_guiones_limpios.sql)**. Sin migración, sin n8n, sin
+cambio de esquema: la tabla queda igual y `app.eventos.detalle` ya es `jsonb`.*
+
+### El defecto
+
+`guardarLimpio` manda `creado_por: usuarioId` en **cada** upsert, y el upsert es `merge`. Como
+re-limpiar pisa la fila (decisión de este ADR, §"Versionar cada limpieza" en Alternativas
+descartadas), **rehacer un guion le roba la autoría a quien lo limpió primero**.
+
+Eso convierte en falso al canario que este mismo ADR escribió en la `032`:
+
+```sql
+select count(*) from app.guiones_limpios where creado_por <> '<uuid de Mani>';
+```
+
+La columna que decide si el feature sirvió **es la columna que el botón pisa**. Con
+[ADR-080 §Enmienda](./ADR-080-la-limpieza-la-decide-el-video-no-quien-aprieta.md) el daño dejó de ser
+teórico: *Rehacer 25* pondría 25 guiones de Majo a nombre de quien apriete, y el canario leería
+**abandono** justo por haber usado el sistema.
+
+### 📏 Medido el 2026-08-30 contra prod, y corrige dos números que circulaban
+
+| | |
+|---|---|
+| Filas de `app.guiones_limpios` | **65** |
+| `creado_por` | **Majo 58 · Mani 7** — el canario de la `032` da **58** |
+| Eventos `colecciones.limpiar` | **11**, que suman **69** escrituras |
+| ⇒ Filas escritas más de una vez | **al menos 4** |
+
+🩸 **Y ninguna fila está fechada el 29/08 aunque hubo una escritura ese día.** Ese hueco *es* el
+borrado, visible en la tabla: la escritura del 30/08 la tapó.
+
+🔑 **El `61 · 4` que se citaba nunca fue un conteo de `creado_por`.** Se reproduce exacto desde los
+eventos contando **escrituras por voz** e ignorando **quién**: Majo con voz `13+18+1 = 32`, más las
+2 escrituras con voz de Mani del 21/08 ⇒ **34**; Majo sin voz `15+12` ⇒ **27**. `34+27 = 61`. Las
+filas de hoy por voz dan **33 · 32**, no 34 · 27. **El delta de 3 filas que se creía perdido puede
+no haber existido nunca**: eran dos preguntas distintas leídas como la misma. *Un canario mal
+consultado miente igual que uno mal escrito.*
+
+⬜ **Lo que NO se pudo cerrar, y su razón es la decisión 2 de abajo:** varias líneas de tiempo
+distintas encajan en los mismos números, porque el evento guarda `limpiados` y no **cuáles**. No
+falta esfuerzo: **está subdeterminado por diseño**. La fila `instagram:3961380848620303234` perdió su
+`creado_por` original y **no es recuperable**.
+
+### 1. `creado_por` se escribe en el INSERT y nunca más
+
+La columna vuelve a decir lo que su nombre dice: **quién lo limpió la primera vez**. Se logra sin
+mandar la columna en el upsert cuando la fila ya existe — PostgREST con `merge-duplicates` solo pisa
+lo que se le manda.
+
+🔑 **Y el corte ya existía, no hubo que inventarlo.** `limpiarFaltantes` apunta por definición a
+filas que **no existen** (`!yaLimpios.has(clave)`) y `relimpiarViejos` solo a filas que **sí
+existen**. El `motivo` de ADR-080 —que se agregó para otra cosa— **ya particiona exactamente por
+INSERT vs UPDATE**: no hace falta una rama nueva ni leer antes de escribir.
+
+Se descartó **una columna `rehecho_por`** (migración → `core/` → ADR propio) porque guarda solo al
+**último** que rehizo, no la serie: es la opción cara que contesta menos que la decisión 2.
+
+### 2. El evento guarda las CLAVES, no solo cuántas
+
+`colecciones.limpiar` suma `claves: ["instagram:123", …]` junto a `limpiados`. Con eso *"quién
+rehizo qué"* se contesta desde `app.eventos`, **que no se pisa nunca**, y la reconstrucción que esta
+enmienda no pudo hacer queda posible la próxima vez.
+
+Acotado: la tanda más grande medida fue **18** videos y el tope del botón es 25 ⇒ ~900 bytes de
+`jsonb`. No es una columna nueva: `detalle` ya es `jsonb` y ya lleva `motivo` y `sin_voz`.
+
+### 3. El canario de la `032` queda corregido en su archivo
+
+`creado_por` sirve para **atribuir una fila**, no para medir adopción. La adopción se lee del
+stream, que nadie pisa:
+
+```sql
+-- ¿Cuántas limpiezas hizo alguien que no sea quien construyó el botón?
+select count(*) from app.eventos
+ where tipo = 'colecciones.limpiar' and usuario_id <> '<uuid de Mani>';
+```
+
+### Consecuencias
+
+- (+) La columna deja de mentir, y *Rehacer 25* deja de ser peligroso: se puede apretar.
+- (+) El canario vive en la tabla append-only, o sea que **la próxima medición no depende de que
+  nadie use el sistema mientras tanto**.
+- (+) El agujero forense se cierra: el evento pasa a decir *cuáles*.
+- (−) *Quién rehizo* no queda en la fila, solo en el stream. Contestarlo cuesta un `select` sobre
+  `app.eventos` en vez de leer una columna. Es el precio de no abrir migración.
+- (−) `creado_por` de las filas ya pisadas no se restaura: **no hay de dónde**. Los eventos del
+  26/08 guardan cuántos, no cuáles.

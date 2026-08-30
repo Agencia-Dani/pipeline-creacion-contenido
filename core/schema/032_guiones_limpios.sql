@@ -145,7 +145,19 @@ create policy "tenant" on app.guiones_limpios for all to authenticated
 -- 🔴 **El canario, y es el que decide si el feature sirvió** (la lección medida de ADR-069: una
 -- marca puesta por quien construyó el botón no es evidencia de adopción):
 --
---   select count(*) from app.guiones_limpios where creado_por <> '<el uuid de Mani>';
+--   select count(*) from app.eventos
+--    where tipo = 'colecciones.limpiar' and usuario_id <> '<el uuid de Mani>';
 --
 -- A las dos semanas. Si da cero, o si Majo sigue limpiando a mano en Claude, el feature no sirvió y
 -- lo que hay que revisar es el prompt o el modelo — no agregarle más pantalla.
+--
+-- 🩸 **Este canario decía `guiones_limpios.creado_por` y ESTABA MAL** (corregido el 2026-08-30,
+-- ADR-074 §Enmienda). `guardarLimpio` mandaba `creado_por` en cada upsert y el upsert es `merge`:
+-- **re-limpiar le robaba la autoría a quien limpió primero**, así que el canario bajaba justo
+-- cuando alguien usaba el sistema. Medido: 65 filas contra 69 escrituras en 11 eventos, y ninguna
+-- fila fechada el 29/08 pese a haber una escritura ese día. *La columna que decide si el feature
+-- sirvió no puede ser una columna que el propio feature pisa.*
+--
+-- `creado_por` sigue existiendo y ahora dice lo que su nombre dice —**quién lo limpió la primera
+-- vez**, se escribe en el INSERT y nunca más— pero **atribuye una fila; no mide adopción**. La
+-- adopción se lee de `app.eventos`, que es append-only y nadie pisa.

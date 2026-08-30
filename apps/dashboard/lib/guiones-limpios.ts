@@ -93,6 +93,14 @@ export async function huellasDeLimpios(ctx: TenantContext): Promise<Map<string, 
  *
  * `merge`: re-limpiar **pisa**. Una fila por video, sin historial — el punto de comparación que
  * importa es el crudo, que está intacto en otra tabla, no las limpiezas anteriores.
+ *
+ * 🔑 **`usuarioId` solo se manda cuando la fila es NUEVA** (ADR-074 §Enmienda). `creado_por`
+ * significa *quién lo limpió la primera vez*, y mandarlo en cada upsert se lo robaba a esa persona:
+ * `merge` pisa lo que se le manda, así que rehacer un guion de Majo lo ponía a nombre de quien
+ * apretara. Con la columna afuera del payload, PostgREST no la toca.
+ *
+ * El que llama ya sabe cuál de los dos casos es sin leer nada: `limpiarFaltantes` apunta a videos
+ * **sin** limpio y `relimpiarViejos` solo a los que **ya** lo tienen.
  */
 export async function guardarLimpio(
   ctx: TenantContext,
@@ -102,7 +110,8 @@ export async function guardarLimpio(
     modelo: string;
     criteriosHash: string;
     vozId: string | null;
-    usuarioId: string;
+    /** El autor. `null` = la fila ya existe y su `creado_por` no se toca. */
+    usuarioId: string | null;
   },
 ): Promise<void> {
   const { error } = await (await scoped(ctx)).upsert(
@@ -115,7 +124,7 @@ export async function guardarLimpio(
         modelo: datos.modelo,
         criterios_hash: datos.criteriosHash,
         voz_id: datos.vozId,
-        creado_por: datos.usuarioId,
+        ...(datos.usuarioId === null ? {} : { creado_por: datos.usuarioId }),
         actualizado_en: new Date().toISOString(),
       },
     ],

@@ -46,7 +46,7 @@
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
 > | La topología de n8n sigue siendo ritual manual | dev | Enmienda de ADR-053, no ADR nuevo ([plan-multi-tenant §14.2](./plan-multi-tenant.md)) |
-> | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ El mecanismo existe desde el 30/08 (ADR-080 §Enmienda, cierre 121). 🔴 **NO apretar *Rehacer 25* todavía**: `guardarLimpio` pisa `creado_por` y convertiría 25 guiones de Majo en guiones de Mani |
+> | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ **DESBLOQUEADO el 30/08** (ADR-074 §Enmienda): `guardarLimpio` ya no manda `creado_por` al rehacer, así que *Rehacer 25* **se puede apretar**. Verificado en prod con una colección de un video: la fila se reescribió (huella `97ff9195`→`72210da7`, voz derivada) y el conteo quedó **igual, Majo 58 · Mani 7** |
 
 > # ⛔ DECISIÓN ABIERTA — LEER ANTES DE TOCAR CUALQUIER ETAPA DE LINKEDIN
 > ## ¿Qué es un candidato de LinkedIn: material crudo para curar, o un post ya generado?
