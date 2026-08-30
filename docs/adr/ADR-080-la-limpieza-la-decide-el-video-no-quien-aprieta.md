@@ -153,9 +153,29 @@ evento registró `motivo: "viejos"` con `sin_voz: 0`, y el conteo global cruzó 
 limpi**aron**"* y *"1 rehech**os**"*. Los 442 tests estaban en verde y la pantalla de un solo video
 los mostró al primer click. *Un plural roto no tiene assert que lo cace; tiene una pantalla con n=1.*
 
-⬜ **Lo que NO se probó, y no se declara probado:** el badge de `degradaria` nunca se pintó — el
-único caso está fuera de toda colección. La rama existe y está testeada en dominio; en pantalla no
-la vio nadie.
+✅ **CERRADO el 2026-08-30, y no era "sin ver": era un bug.** El `degradaria` **no tenía badge**. Se
+pintaba como `"limpio · su voz ya no está"` en `text-muted-foreground` — o sea gris atenuado, al
+lado del `"limpio"` gris de la tarjeta de al lado — que es **exactamente la falta que el comentario
+de tres líneas más arriba advierte** (la lección de Transcribir: *"una pastilla gris al lado de otra
+gris, presente en el DOM e invisible al ojo"*). Ahora es `<Badge variant="outline">sin voz
+propia</Badge>`: `outline` y no `destructive` porque **no es accionable** —el botón no lo toca a
+propósito— así que no compite con el rojo, que sí llama a apretar algo.
+
+📏 **Visto andar, con su único caso** (30/08): se armó una colección de un video con
+`instagram:3969563104307506409` (*jefferson_fisher*, el 1 de los 8 huérfanos), y se borró después.
+La pastilla renderiza con borde de 1px y texto en `lab(2.75)` contra el gris atenuado de `lab(48.5)`
+— medido con el estilo computado de la página viva y no con un screenshot, porque el pane devolvía
+imágenes desfasadas. Y **sin botón *Rehacer***, que es la mitad que importa.
+
+🩸 **Y la razón que este ADR le atribuía al caso era falsa.** Decía *"su video ya no deriva voz (su
+candidato se archivó)"*. Medido: **sí deriva voz — Milena Morales**, que lo que no tiene es
+`perfil_limpieza` cargado. El estado es el mismo y la decisión de no rehacerlo también, pero el copy
+de pantalla repetía la causa equivocada y le negaba al equipo la salida real: **cargar cómo habla esa
+voz en *Curar → Voces y proyectos* lo recupera**. Ahora el aviso lo dice.
+
+*La pantalla de un solo video destapó, además, tres copys rotos más de la familia del cierre 121:
+`"Otros 1"` sin antecedente cuando no hay ningún viejo, `"1 se limpiaron"` y `"recuperarlos"` para
+un solo guion. **Van seis plurales en dos días, todos encontrados con n=1 y ninguno por un test.***
 
 ### El registro no se partió en dos
 

@@ -14,7 +14,7 @@ publique**.
 > | La fachada | ✅ `GET /api/engine/run-plan` sirve el plan de LinkedIn (ADR-068), **verificado en prod** |
 > | El manifest | ✅ [`workflow.yaml`](workflow.yaml), válido contra el contrato |
 > | El `workflow.json` | ✅ **16 nodos**: los 11 de infraestructura + la espina `colectar → calidad → entregar`. `calidad` está **entera**; `colectar` es un **stub** |
-> | El motor en n8n | 🔧 **11 nodos, INACTIVO** — en n8n vive todavía el esqueleto del 09/08. Los 5 nodos nuevos son **topología** y desde el 30/08 `n8n:push` **sí** los cubre (ADR-053 §Enmienda) — pero el workflow está bajo el ⛔ de producto, así que **no se empujan**. ⚠️ Y `n8n:diff` **no los grita**: sin `N8N_WF_LINKEDIN` en el `.env` saltea este workflow entero con un aviso de que no puede mirarlo (medido el 30/08) |
+> | El motor en n8n | 🔴 **NO ESTÁ EN USO** (Mani, 30/08): el pipeline no corre y no se está usando. Sin `N8N_WF_LINKEDIN` en el `.env`, `n8n:diff` **saltea este workflow entero con aviso** — y eso es lo correcto, no una deuda: no hay nada que sincronizar. Cuando se decida activarlo, los nodos que falten entran por `n8n:push` como cualquier otro (ADR-053 §Enmienda, desde el 30/08 cubre topología) |
 > | Lo que falta | ❌ `generar` (bloqueada por los few-shot) · ❌ el carril copiable entero (bloqueado por el banco) · ❌ sin cron en el dispatcher |
 >
 > ### 🔧 Qué hace hoy la espina, y qué NO

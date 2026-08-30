@@ -545,9 +545,18 @@ export function Detalle({
                   contado. Rehacerlos los dejaría neutros: peor de lo que están, y pagando. */}
               {perdieronLaVoz.size > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Otros {perdieronLaVoz.size} se limpiaron con una voz que su video ya no tiene
-                  (se archivó, o la voz se renombró). <strong>No se rehacen</strong>: saldrían
-                  neutros, que es peor de lo que están hoy.
+                  {/* «Otros N» solo si hubo un N antes. Con 0 viejos, "Otros 1" no tiene
+                      antecedente y se lee como si faltara un renglón — lo destapó la pantalla de
+                      un solo video, igual que los plurales del cierre 121. */}
+                  {desactualizados.size > 0 ? "Otros " : ""}
+                  {perdieronLaVoz.size}{" "}
+                  {perdieronLaVoz.size === 1 ? "se limpió" : "se limpiaron"} con el perfil de una
+                  voz, y hoy a su video no le toca ninguno: o su voz ya no tiene cargado cómo
+                  habla, o el video ya no deriva voz.{" "}
+                  <strong>{perdieronLaVoz.size === 1 ? "No se rehace" : "No se rehacen"}</strong>:{" "}
+                  {perdieronLaVoz.size === 1 ? "saldría neutro" : "saldrían neutros"}, que es peor
+                  de lo que {perdieronLaVoz.size === 1 ? "está" : "están"} hoy. Para {perdieronLaVoz.size === 1 ? "recuperarlo" : "recuperarlos"}, cargá cómo habla esa voz en{" "}
+                  <em>Curar → Voces y proyectos</em> y volvé acá.
                 </p>
               )}
             </div>
@@ -622,16 +631,23 @@ export function Detalle({
                         acá*, no como un estado más — es lo que vuelve visible el modo de falla #1
                         de ADR-080, que estuvo 26 veces en pantalla sin que nadie pudiera notarlo. */}
                     {desactualizados.has(v.clave) && <Badge variant="destructive">limpio viejo</Badge>}
+                    {/* 🩸 **Esto era texto gris y por eso nadie lo vio nunca** (arreglado el
+                        2026-08-30). El comentario de arriba dice que una pastilla gris al lado de
+                        otra gris queda invisible al ojo — y `degradaria` cometía exactamente esa
+                        falta: se pintaba como `"limpio · su voz ya no está"` en
+                        `text-muted-foreground`, indistinguible del `"limpio"` de al lado.
+                        `outline` y no `destructive`: es un estado que hay que ver, pero **no es
+                        accionable** —el botón no lo toca a propósito— así que no compite con el
+                        rojo, que sí llama a apretar algo. */}
+                    {perdieronLaVoz.has(v.clave) && <Badge variant="outline">sin voz propia</Badge>}
                     <span className="truncate text-xs text-muted-foreground">
-                      {desactualizados.has(v.clave)
+                      {desactualizados.has(v.clave) || perdieronLaVoz.has(v.clave)
                         ? ""
-                        : perdieronLaVoz.has(v.clave)
-                          ? "limpio · su voz ya no está"
-                          : limpios.has(v.clave)
-                            ? "limpio"
-                            : v.likes != null
-                              ? `${v.likes.toLocaleString("es-AR")} likes`
-                              : "—"}
+                        : limpios.has(v.clave)
+                          ? "limpio"
+                          : v.likes != null
+                            ? `${v.likes.toLocaleString("es-AR")} likes`
+                            : "—"}
                     </span>
                     <Button
                       variant={marcados.has(v.clave) ? "ghost" : "outline"}

@@ -43,6 +43,7 @@
 > | Qué | Quién | Nota |
 > |---|---|---|
 > | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
+> | ~~El badge de `degradaria` nunca se pintó~~ | — | ✅ **CERRADO el 30/08** (ADR-080 §Enmienda): no era "sin ver", era un bug — se pintaba como texto gris atenuado, indistinguible del `"limpio"` de al lado. Ahora es un badge `outline`, visto andar con su único caso |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
 > | ~~La topología de n8n sigue siendo ritual manual~~ | — | ✅ **CERRADO el 30/08** (ADR-053 §Enmienda). `n8n:push` empuja nodos y conexiones; el re-import queda solo para crear un workflow de cero. El bloqueo no eran las credenciales sino que `cuerpoPut` mandaba las conexiones del live |
@@ -136,6 +137,99 @@
 >    stub deja de emitir posts terminados para emitir material crudo.
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
+
+> ## 🔧 2026-08-30 (cierre 122) · DOS CANARIOS Y UN OBSTÁCULO QUE MEDÍAN LO QUE NO ERA (Claude, pedido de Mani)
+>
+> **En una línea:** se arreglaron tres cosas que **los docs describían mal, no que faltara hacer** —
+> el canario de ADR-074 vivía en la columna que el propio botón pisa, el bloqueo de la topología de
+> n8n nunca fueron las credenciales, y el badge de `degradaria` no estaba "sin ver" sino roto.
+> **Migraciones: ninguna. n8n en producción: cero escrituras.** Commits `b5a3a4d`, `2502869`,
+> `c65a6bc` + el de este cierre.
+>
+> ### 1. `creado_por` — [ADR-074 §Enmienda](../adr/ADR-074-el-guion-limpio-es-un-artefacto-nuevo.md)
+>
+> `guardarLimpio` lo mandaba en **cada** upsert, y el upsert es `merge`: rehacer un guion le robaba
+> la autoría a quien lo limpió primero. Y esa columna **era** el canario de la `032`, o sea que
+> bajaba justo cuando alguien usaba el sistema — *Rehacer 25* habría leído como abandono.
+>
+> Ahora solo va en el INSERT. 🔑 **El corte no hubo que inventarlo:** el `motivo` de ADR-080 ya
+> particiona exacto por INSERT vs UPDATE (`faltantes` apunta a filas que no existen, `viejos` solo a
+> las que sí). El canario se mudó a `app.eventos`, que es append-only, y el evento pasa a guardar
+> **`claves`** — cuáles, no solo cuántos.
+>
+> ✅ **Verificado en prod**, colección de un video creada y borrada: la fila de Majo se reescribió
+> (`97ff9195`→`72210da7`, voz derivada, timestamp nuevo) y **el conteo quedó igual: Majo 58 · Mani
+> 7**. Antes habría sido 57 · 8. ***Rehacer 25* está desbloqueado.**
+>
+> 🩸 **Y el `61 · 4` que circulaba nunca fue un conteo de `creado_por`.** Se reproduce exacto desde
+> los eventos contando **escrituras por voz** e ignorando **quién** (Majo con voz `13+18+1 = 32`, más
+> las 2 con voz de Mani ⇒ 34; sin voz `15+12` ⇒ 27). Las filas de hoy por voz dan **33 · 32**. **El
+> delta de 3 filas que se creía perdido puede no haber existido nunca.** Lo que no se pudo cerrar
+> —qué línea de tiempo fue— estaba **subdeterminado por diseño**: el evento guardaba `limpiados` y
+> no cuáles. Por eso la decisión 2.
+>
+> ### 2. La topología de n8n — [ADR-053 §Enmienda](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)
+>
+> 🔑 **El bloqueo nunca fueron las credenciales, aunque ADR-053 §Contexto y §14.2 lo dijeran 27
+> días:** `cuerpoPut()` mandaba `connections: live.connections`, **siempre**, así que aunque el push
+> supiera crear el nodo **llegaba huérfano**. Y el mapa nombre→id ya no tiene ni un caso — 4 nombres
+> en los 6 `workflow.json`, los 4 en la instancia, y `<<CREDENCIAL_GOOGLE_SHEETS>>` se fue con
+> ADR-057.
+>
+> Cuando el delta lleva topología, las conexiones vienen del **repo, enteras** (una conexión es un
+> par: "solo las aristas del nodo nombrado" dejaría el grafo a medio cablear). Un nodo nuevo viene
+> entero del repo **con su `position`** —en n8n v1 la posición *es* el orden de ejecución— más
+> credenciales resueltas y sin `webhookId`, que lo emite n8n.
+>
+> 🔒 **Cuatro redes, ninguna es un prompt** (siguen sirviendo sin TTY): `--nodos` obligatorio si crea
+> nodos · `--borrar "A,B"` nombrando lo que desaparece **o pierde cableado de salida** · fail-closed
+> en credenciales · y **se niega si dejaría un nodo inalcanzable** (pedido de Mani), con la
+> definición tomada de `auditar-workflows.mjs` §2 y no reinventada.
+> **Cada bandera nombra su propio acto**: pedir el mismo nombre en las dos dejaría pasar borrados
+> autorizados que no ocurren, en silencio.
+>
+> ✅ `npm run n8n:test` pasa de 17 a **38 checks**, y los 7 últimos son el *hecho cuando* de §14.2
+> literal, **sobre un workflow ACTIVO**. *Se copia el error handler y no el dispatcher por seguridad:
+> su `errorTrigger` solo corre si otro workflow lo declara, mientras que activar una copia del
+> dispatcher habría disparado corridas reales — una es "domingo 6pm".*
+>
+> ### 3. El badge de `degradaria` — [ADR-080 §Enmienda](../adr/ADR-080-la-limpieza-la-decide-el-video-no-quien-aprieta.md)
+>
+> No era "sin ver": **era un bug**. Se pintaba como texto gris atenuado, indistinguible del `"limpio"`
+> de al lado — **la falta exacta que el comentario tres líneas arriba advierte**. Ahora es
+> `<Badge variant="outline">sin voz propia</Badge>`. Visto andar con su único caso
+> (`instagram:3969563104307506409`), colección creada y borrada.
+> 🩸 Y la razón que ADR-080 le atribuía era falsa: **sí deriva voz (Milena Morales)**, lo que no tiene
+> es `perfil_limpieza`. Con eso el copy le negaba al equipo la salida real, que ahora dice.
+>
+> ### 4. Dos afirmaciones de docs que eran falsas
+>
+> - **`n8n:diff` compara 5 workflows, no 6.** Sin `N8N_WF_LINKEDIN` en el `.env` saltea LinkedIn con
+>   aviso (ADR-068). Con eso cae también *"diff grita por los 5 nodos que le faltan"*: avisa que **no
+>   puede** mirarlo.
+> - **El pipeline de LinkedIn NO está en uso** (Mani, 30/08): no corre y no se usa, así que **no haber nada que
+>   sincronizar es lo correcto, no una deuda**.
+>
+> ### 🧠 La idea portable, y es la misma tres veces
+>
+> **Un obstáculo escrito envejece igual que un canario, y se re-mide igual.** Los tres arreglos de
+> hoy no fueron trabajo pendiente: fueron docs que describían mal la realidad y mandaron a mirar el
+> lugar equivocado durante semanas. Y el corolario del §1: **un canario no puede vivir en algo que el
+> propio feature escribe.**
+>
+> 📏 **Van seis plurales rotos en dos días** (`"1 limpiados"` ×3, `"1 agregados"`, `"Otros 1"`,
+> `"1 se limpiaron"`/`"recuperarlos"`), **todos encontrados con una pantalla de n=1 y ninguno por un
+> test**. Con 442 tests en verde. *No hay assert que cace un plural; hay una pantalla con un solo
+> elemento.*
+>
+> ### Qué sigue
+>
+> Nada bloqueado por código. Mani puede **apretar *Rehacer 25*** cuando quiera. Lo que falta es
+> humano y está arriba en §Pendiente vivo (la auditoría de descartes de Majo, los ⬜ de
+> verificaciones-humanas, los 4 canarios a re-mirar el **2026-09-04**). El ⛔ de producto de LinkedIn
+> sigue esperando a Alejandro.
+> **Skills sugeridas:** `/grill-with-docs` antes de la próxima decisión de LinkedIn; `/diagnose` si
+> algo del push de topología muerde en un workflow real.
 
 > ## 🧹 2026-08-30 (cierre 121) · LOS GUIONES VIEJOS YA SE VEN — Y REHACERLOS LE ROBA LA AUTORÍA A MAJO (Claude, pedido de Mani)
 >

@@ -181,10 +181,14 @@ re-import queda solo para topología, y solo ahí aplican sus placeholders y cre
 `Leer plan` fail-closed) más la **espina del carril personal** — `Colectar (stub personal)` →
 `Calidad (R-1 + R-2)` → `Preparar candidatos` → `POST Candidatos`. **`calidad` está entera** (R-1 y
 R-2 de ADR-055 §4, con `node Workflows/workflow-linkedin/test-nodos.mjs`); **`colectar` es un stub
-que emite piezas fijas** y lo reemplaza la Fase 1.4. 🔴 **En n8n vive todavía el esqueleto de 11**:
-los 5 nodos nuevos son topología, no entran por `n8n:push` y `n8n:diff` los grita a propósito. Lo que
-falta no es plomería: `generar` sigue bloqueada por los few-shot y el carril copiable por el banco de
-referentes. `workflow-substack/` sigue siendo solo manifest, sin `workflow.json`.)*
+que emite piezas fijas** y lo reemplaza la Fase 1.4.
+🔴 **El pipeline de LinkedIn NO está en uso: no corre, no se usa, y no hay nada que sincronizar**
+(Mani, 30/08). Por eso `N8N_WF_LINKEDIN` no está en el `.env` y `n8n:diff` lo saltea con aviso — eso
+es lo correcto, no una deuda. *Este bloque decía que `n8n:diff` "grita a propósito" por los 5 nodos
+que le faltan al live, y era falso por partida doble: el barrido nunca lo mira, y desde el 30/08 la
+topología sí entra por `n8n:push` (ADR-053 §Enmienda) — lo que la frena es el ⛔ de producto, no una
+limitación.* Lo que falta no es plomería: `generar` sigue bloqueada por los few-shot y el carril
+copiable por el banco de referentes. `workflow-substack/` sigue siendo solo manifest, sin `workflow.json`.)*
 
 ## Agent skills
 
