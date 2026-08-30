@@ -88,7 +88,8 @@ TT a juzgar sobre contenido como IG. Un piso de seguidores sería un knob de una
 
 **Cambiar este workflow ya no es re-importarlo** (ADR-053): se parchea el live por la API con
 `cd core/scripts && npm run n8n:push -- descubrimiento --nodos "…"`, y `npm run n8n:diff` dice si el
-live corre lo que dice el repo. El re-import completo queda solo para cambios de topología, y ahí sí
+live corre lo que dice el repo. Desde el 30/08 el push **también cubre la topología** (ADR-053
+§Enmienda); el re-import queda solo para **crear el workflow de cero**, y ahí sí
 hay que rellenar los placeholders del `Config` (`<<SUPABASE_URL>>`, `<ANTHROPIC_API_KEY>` en **ambos**
 code de vetting) y mapear las credenciales `Supabase account`, `Run Plan Header`,
 `Webhook Descubrimiento Header` y la de Apify. `<<INSTANCE_ID>>` y `<<AIRTABLE_BASE_ID>>` ya no

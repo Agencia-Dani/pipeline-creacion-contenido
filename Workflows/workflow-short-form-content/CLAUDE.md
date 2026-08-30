@@ -100,11 +100,12 @@ Es **dry-run**; se aplica con `--apply`. Snapshotea antes en `.n8n-snapshots/` y
 `npm run n8n:restore -- motor <snapshot> --apply`. Jamás toca credenciales, ids, posiciones ni
 `settings`. Antes y después: `npm run n8n:diff` (solo lee) dice si el live corre lo que dice el repo.
 
-**El re-import completo queda solo para cambios de topología** (nodos o conexiones nuevos) — el push
-los detecta y se niega. Ahí sí hay que rellenar los placeholders y mapear las credenciales a mano, que
-es donde históricamente se rompió todo: ver el aviso de abajo.
+**Desde el 2026-08-30 el push también cubre la topología** (nodos y conexiones, [ADR-053 §Enmienda](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)): pide `--nodos` si crea nodos, `--borrar` para lo que desaparece o pierde cableado, y se niega si dejaría un nodo inalcanzable. **El re-import completo queda solo para crear un workflow desde cero**, y ahí sí aplican los placeholders y las credenciales de abajo.
 
-## Convención de placeholders *(solo aplican al re-import de topología)*
+Ahí sí hay que rellenar los placeholders y mapear las credenciales a mano, que es donde
+históricamente se rompió todo: ver el aviso de abajo.
+
+## Convención de placeholders *(solo al crear el workflow de cero)*
 
 Los completa una persona en el editor **cuando hay re-import**; en el camino normal (`n8n:push`) se
 resuelven solos porque el script los **aprende del propio live**. API keys `<ANTHROPIC_API_KEY>` /

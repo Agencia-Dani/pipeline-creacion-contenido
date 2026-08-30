@@ -62,9 +62,10 @@ cd core/scripts && npm run n8n:push -- errores --nodos "Marcar run como fallo"
 ```
 
 Dry-run; `--apply` escribe, `npm run n8n:restore -- errores <snapshot> --apply` revierte. El
-**re-import completo queda solo para topología**, y ahí aplica todo lo de abajo.
+push **también cubre la topología** desde el 30/08 (ADR-053 §Enmienda), así que el **re-import
+completo queda solo para crear el workflow de cero**, y ahí aplica todo lo de abajo.
 
-## Si hay que volver a importarlo *(solo por topología)*
+## Si hay que volver a importarlo *(solo si se crea de cero)*
 
 ⚠️ **El orden importa.** Busca por `params.execution_id`, así que los tres `Abrir run` tienen que
 estar escribiéndolo antes (ya lo hacen). Placeholder único: `<<SUPABASE_URL>>`. Credencial:

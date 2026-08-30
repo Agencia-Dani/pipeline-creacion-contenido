@@ -235,14 +235,24 @@ módulos), `/handoff` (compactar una sesión).
   (`motor` no se deriva de `workflow-short-form-content`) y cualquier otro dir con `workflow.json`
   entra por su id, sin tocar el script. Un alias descubierto sin su `N8N_WF_<ALIAS>` en el `.env`
   todavía no está importado: el barrido lo **saltea con aviso**, nunca en silencio.
-  **Cambios de topología (nodos o conexiones nuevas) siguen siendo re-import
-  completo: el push los detecta y se niega.** Su test: `npm run n8n:test` (⚠️ crea y borra un
-  workflow desechable e inactivo en n8n; corrélo si tocaste `n8n-sync.mjs`).
-  🟡 *La topología es el **único ritual manual que queda**, y ya no por un límite de la API:
-  `GET /credentials` existe y responde, así que el mapa nombre→id se puede aprender igual que los
-  placeholders. Falta decidir la red de seguridad (`nodes` **reemplaza**: un push que crea nodos
-  también puede borrarlos). Escrito para retomarlo en
-  [plan-multi-tenant §14.2](docs/agents/plan-multi-tenant.md).*
+  ✅ **Desde el 2026-08-30 el push también cubre TOPOLOGÍA** (nodos y conexiones,
+  [ADR-053 §Enmienda](docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)): **se murió el
+  último ritual manual.** El re-import queda solo para crear un workflow desde cero. Cuando el delta
+  lleva topología las **conexiones vienen del repo, enteras**, y un nodo nuevo viene entero del repo
+  (incluida su `position`, que en n8n v1 **es** el orden de ejecución) con las credenciales
+  resueltas contra la instancia por nombre.
+  🔒 **Cuatro redes, y nombrar es consentir** — ninguna es un prompt, así que sigue sirviendo sin
+  TTY: **`--nodos` obligatorio** si el delta crea nodos · **`--borrar "A,B"`** nombrando lo que
+  desaparece *o pierde cableado de salida* (un recableado deja al otro corriendo en vacío, y eso
+  termina en verde) · **fail-closed en credenciales**, igual que los placeholders · y **el push se
+  niega si dejaría un nodo inalcanzable** desde todo trigger, con la definición tomada de
+  `auditar-workflows.mjs` §2 y no reinventada.
+  🩸 *El bloqueo nunca fueron las credenciales, aunque ADR-053 §Contexto y plan-multi-tenant §14.2
+  lo dijeran durante 27 días: era que `cuerpoPut()` mandaba `connections: live.connections`,
+  siempre — el nodo habría llegado huérfano. **Un obstáculo escrito se re-mide, igual que un
+  canario.***
+  Su test: `npm run n8n:test` — **38 checks**, y los 7 últimos sobre un workflow **ACTIVO**
+  (⚠️ crea y borra dos workflows desechables en n8n; corrélo si tocaste `n8n-sync.mjs`).
 - **Arreglar el orden de ejecución de las ramas:** `npm run n8n:orden -- <alias> [--apply]`. En n8n
   v1 las hermanas corren por posición en el canvas (Y menor primero, desempata X — **medido**, no
   asumido), así que arrastrar un nodo cambia la semántica sin tocar código. El comando permuta las

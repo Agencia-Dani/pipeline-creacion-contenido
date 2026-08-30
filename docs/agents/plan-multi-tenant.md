@@ -681,7 +681,7 @@ commits (`b1b8212`, `66bd25e`, `e5c6668`, `ab6f480`). El commit toca `domain/ten
 
 </details>
 
-### 14.2 🟡 `n8n:push` no cubre topología — y la razón que da ADR-053 para eso ya no es cierta
+### 14.2 ✅ CERRADO — `n8n:push` cubre topología, y el bloqueo no era el que este § nombró
 
 **Qué.** Desde [ADR-053](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md), cambiar un
 `jsCode` cuesta un comando. Agregar **un nodo** sigue costando el re-import completo, que es donde se
@@ -711,6 +711,25 @@ humana explícita.
 
 **Hecho cuando.** Un nodo nuevo entra a un workflow **activo** con `npm run n8n:push -- <alias>
 --apply`, `n8n:diff` queda limpio después, y `n8n:restore` lo saca.
+
+> ✅ **CUMPLIDO el 2026-08-30** ([ADR-053 §Enmienda](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)).
+> `npm run n8n:test` pasa **38 checks**, y los 7 del final son ese *hecho cuando* literal, sobre una
+> copia **activa** del error handler: el nodo entró, el workflow siguió activo, `diff` quedó limpio
+> y `restore` lo sacó. *Se copió el error handler y no el dispatcher por seguridad: su `errorTrigger`
+> solo corre si otro workflow lo declara, y a una copia recién creada no la apunta nadie — activar
+> una copia del dispatcher habría disparado corridas reales, una de ellas "domingo 6pm".*
+>
+> 🩸 **Y este § señalaba la puerta equivocada durante 27 días.** El bloqueo no eran las credenciales:
+> **`cuerpoPut()` mandaba `connections: live.connections`, siempre**, así que aunque el push supiera
+> crear el nodo, llegaba **huérfano** — existe en el canvas y no corre. El mapa nombre→id, además,
+> ya no tiene ni un caso que resolver: los 6 `workflow.json` referencian 4 nombres, los 4 existen en
+> la instancia, y `<<CREDENCIAL_GOOGLE_SHEETS>>` se fue con los nodos del Sheet (ADR-057).
+> *Un obstáculo escrito envejece igual que un canario: se re-mide, no se cita.*
+>
+> Las cuatro redes quedaron en la enmienda: `--nodos` obligatorio si el delta **crea** nodos ·
+> `--borrar "A,B"` nombrando lo que desaparece **o pierde cableado de salida** · fail-closed en
+> credenciales · y el push **se niega si dejaría un nodo inalcanzable** desde todo trigger (pedido
+> de Mani), con la definición de alcanzable tomada de `auditar-workflows.mjs` §2 y no reinventada.
 
 ### 14.3 ✅ CERRADO — el aislamiento ya no es solo TypeScript: la Capa 2 está viva en producción
 

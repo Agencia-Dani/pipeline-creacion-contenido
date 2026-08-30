@@ -127,6 +127,7 @@ manifest + escaneo de secretos).
 **Llevarlo al live ya no es re-importarlo** ([ADR-053](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)):
 `npm run n8n:push -- motor --nodos "<nodos tocados>"` parchea los `parameters` por la API (dry-run;
 `--apply` escribe, `n8n:restore` revierte), y `npm run n8n:diff` verifica que el live corra lo que dice
-el repo. El re-import completo queda solo para **topología** (nodos o conexiones nuevos). La conducta
+el repo. Desde el 30/08 el push **también cubre la topología** (ADR-053 §Enmienda) y el re-import
+queda solo para **crear el workflow de cero**. La conducta
 final se valida en n8n con *Execute* — el motor corre ahí, no localmente. Detalle en
 [CLAUDE.md §Operación](./CLAUDE.md).

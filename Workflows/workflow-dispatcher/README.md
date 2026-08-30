@@ -46,10 +46,10 @@ cd core/scripts && npm run n8n:push -- dispatcher --nodos "Config"
 ```
 
 Dry-run; `--apply` escribe y `npm run n8n:restore -- dispatcher <snapshot> --apply` revierte.
-`npm run n8n:diff` (solo lee) verifica que el live corra lo que dice el repo. El **re-import completo
-queda solo para topología** (nodos o conexiones nuevos) — el push los detecta y se niega.
+`npm run n8n:diff` (solo lee) verifica que el live corra lo que dice el repo.
+**Desde el 2026-08-30 el push también cubre la topología** (nodos y conexiones, [ADR-053 §Enmienda](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)): pide `--nodos` si crea nodos, `--borrar` para lo que desaparece o pierde cableado, y se niega si dejaría un nodo inalcanzable. **El re-import completo queda solo para crear un workflow desde cero**, y ahí sí aplican los placeholders y las credenciales de abajo.
 
-## Placeholders *(solo al re-importar por topología)*
+## Placeholders *(solo al crear el workflow de cero)*
 
 En el camino normal se resuelven solos: `n8n-sync` los **aprende del propio live**.
 

@@ -15,6 +15,10 @@
 //   · `settings` mergea: timezone y errorWorkflow sobreviven a un push
 //   · restore vuelve atrás desde el snapshot
 //   · FAIL-CLOSED: si un placeholder no se puede aprender, aborta sin escribir
+//   · TOPOLOGÍA (ADR-053 §Enmienda): crea un nodo, lo cablea con las conexiones del repo, borra el
+//     que sobra, y se NIEGA sin --nodos, sin --borrar, o si dejaría un nodo inalcanzable
+//   · el "hecho cuando" de §14.2: el mismo push sobre un workflow ACTIVO (copia del error handler,
+//     cuyo errorTrigger no lo apunta nadie, así que activarla es inerte)
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +53,7 @@ const check = (nombre, cond, detalle = '') => {
 };
 
 let copiaId = null;
+let copiaActivaId = null;
 try {
   const real = (await api('GET', `/workflows/${REAL}`)).json;
 
@@ -120,20 +125,128 @@ try {
   check('restore vuelve al estado roto del snapshot',
     restaurado.nodes.find((n) => n.name === 'Resumen').parameters.jsCode.includes('ROTO'), rs.slice(-300));
 
+  console.log('\n▸ TOPOLOGÍA (ADR-053 §Enmienda) — la copia arranca SIN "Resumen" y con un huérfano');
+  // Se rearma la copia: se le saca el nodo final del repo (para que el push tenga que CREARLO) y se
+  // le agrega uno que el repo no tiene, colgado de "Disparar por instancia" (para que el push tenga
+  // que BORRARLO y para que "Disparar por instancia" pierda cableado de salida).
+  const base = await leer();
+  const sinResumen = base.nodes.filter((n) => n.name !== 'Resumen');
+  const intruso = { name: 'ZZ Intruso', type: 'n8n-nodes-base.noOp', typeVersion: 1, position: [2000, 400], parameters: {} };
+  const connsRotas = { ...base.connections, 'Disparar por instancia': { main: [[{ node: 'ZZ Intruso', type: 'main', index: 0 }]] } };
+  await api('PUT', `/workflows/${copiaId}`, {
+    name: base.name, nodes: [...sinResumen, intruso], connections: connsRotas, settings: { executionOrder: 'v1' },
+  });
+
+  const sinFlags = limpio(sync(['push', 'dispatcher', '--apply'], E));
+  check('sin --nodos se niega y nombra lo que crearía', /--nodos/.test(sinFlags) && /Resumen/.test(sinFlags), sinFlags.slice(-400));
+  check('y NO escribió', (await leer()).nodes.some((n) => n.name === 'ZZ Intruso'));
+
+  const sinBorrar = limpio(sync(['push', 'dispatcher', '--nodos', 'Resumen', '--apply'], E));
+  check('sin --borrar se niega y nombra lo que desaparece', /ZZ Intruso/.test(sinBorrar) && /--borrar/.test(sinBorrar), sinBorrar.slice(-400));
+  check('y nombra el ORIGEN que pierde cableado', /Disparar por instancia/.test(sinBorrar), sinBorrar.slice(-400));
+  check('sigue sin escribir', (await leer()).nodes.some((n) => n.name === 'ZZ Intruso'));
+
+  const deMas = limpio(sync(['push', 'dispatcher', '--nodos', 'Resumen', '--borrar', 'ZZ Intruso,Disparar por instancia,Config', '--apply'], E));
+  check('--borrar rechaza nombres que no pierden nada', /no pierden nada/.test(deMas), deMas.slice(-300));
+
+  console.log('\n▸ y el huérfano: si el push dejaría un nodo inalcanzable, se niega');
+  const soloIntruso = limpio(sync(['push', 'dispatcher', '--nodos', 'Resumen', '--borrar', 'Disparar por instancia', '--apply'], E));
+  check('exige autorizar TODO lo que pierde, no una parte', /no está autorizado/.test(soloIntruso), soloIntruso.slice(-400));
+
+  console.log('\n▸ el push bueno: crea "Resumen", borra el intruso y trae las conexiones del repo');
+  const topo = limpio(sync(['push', 'dispatcher', '--nodos', 'Resumen', '--borrar', 'ZZ Intruso,Disparar por instancia', '--apply'], E));
+  const trasTopo = await leer();
+  check('aplicó', /✓ aplicado/.test(topo), topo.slice(-600));
+  check('el nodo nuevo existe', trasTopo.nodes.some((n) => n.name === 'Resumen'));
+  check('el intruso se fue', !trasTopo.nodes.some((n) => n.name === 'ZZ Intruso'));
+  check('el nodo nuevo trae el jsCode del repo',
+    trasTopo.nodes.find((n) => n.name === 'Resumen')?.parameters?.jsCode ===
+    repo.nodes.find((n) => n.name === 'Resumen').parameters.jsCode);
+  check('el nodo nuevo trae la position del repo (= el orden de ejecución)',
+    JSON.stringify(trasTopo.nodes.find((n) => n.name === 'Resumen')?.position) ===
+    JSON.stringify(repo.nodes.find((n) => n.name === 'Resumen').position));
+  check('quedó CABLEADO: las conexiones son las del repo',
+    JSON.stringify(trasTopo.connections) === JSON.stringify(repo.connections),
+    JSON.stringify(trasTopo.connections).slice(0, 300));
+  const dTopo = limpio(sync(['diff', 'dispatcher'], E));
+  check('diff queda limpio después', /live corre lo que dice el repo/.test(dTopo), dTopo.slice(0, 500));
+
+  console.log('\n▸ las credenciales del nodo nuevo se aprendieron de la instancia');
+  const credNodo = trasTopo.nodes.find((n) => n.credentials && Object.keys(n.credentials).length);
+  check('algún nodo tiene credencial con id real',
+    !!credNodo && Object.values(credNodo.credentials).every((v) => v.id && /^[A-Za-z0-9]+$/.test(v.id)),
+    JSON.stringify(credNodo?.credentials));
+
+  console.log('\n▸ restore saca el nodo nuevo');
+  const snapsTopo = (await import('node:fs')).readdirSync(path.join(RAIZ, '.n8n-snapshots')).filter((f) => f.startsWith('dispatcher-')).sort();
+  const rt = limpio(sync(['restore', 'dispatcher', path.join('.n8n-snapshots', snapsTopo.at(-1)), '--apply'], E));
+  const trasRestore = await leer();
+  check('restore devuelve el grafo de antes del push de topología',
+    !trasRestore.nodes.some((n) => n.name === 'Resumen') && trasRestore.nodes.some((n) => n.name === 'ZZ Intruso'), rt.slice(-300));
+
+  // Se deja la copia con la forma del repo otra vez: el bloque de abajo prueba el fail-closed de
+  // PLACEHOLDERS, y con topología pendiente chocaría antes contra el freno de topología.
+  sync(['push', 'dispatcher', '--nodos', 'Resumen', '--borrar', 'ZZ Intruso,Disparar por instancia', '--apply'], E);
+
   console.log('\n▸ fail-closed: un placeholder que no se puede aprender aborta');
   // Se rompe el Config de la copia para que ninguna alineación funcione, y se apunta TODOS los
   // alias a la copia para que no pueda aprender <<WEBHOOK_URL_*>> de ningún otro workflow.
-  const rotoCfg = restaurado.nodes.map((n) =>
+  const rotoCfg = (await leer()).nodes.map((n) =>
     n.name === 'Config' ? { ...n, parameters: { assignments: { assignments: [] } } } : n);
+  const antesFF = await leer();
   await api('PUT', `/workflows/${copiaId}`, {
-    name: restaurado.name, nodes: rotoCfg, connections: restaurado.connections, settings: { executionOrder: 'v1' },
+    name: antesFF.name, nodes: rotoCfg, connections: antesFF.connections, settings: { executionOrder: 'v1' },
   });
   const ff = limpio(sync(['push', 'dispatcher', '--nodos', 'Config', '--apply'],
     { N8N_WF_DISPATCHER: copiaId, N8N_WF_MOTOR: copiaId, N8N_WF_ARCHIVADO: copiaId, N8N_WF_DESCUBRIMIENTO: copiaId }));
   check('aborta con placeholders sin resolver', /placeholders sin resolver/.test(ff), ff.slice(-400));
   const finalCfg = JSON.stringify((await leer()).nodes.find((n) => n.name === 'Config').parameters);
   check('NO escribió el placeholder literal en producción', !/<<WEBHOOK_URL/.test(finalCfg));
+  // ── el "hecho cuando" de plan-multi-tenant §14.2: un workflow ACTIVO ──────────────────
+  //
+  // ⚠️ Se copia el ERROR HANDLER y no el dispatcher, y la razón es de seguridad, no de comodidad:
+  // el dispatcher tiene dos schedule triggers, así que activar su copia dispararía corridas reales
+  // (y una de ellas es "domingo 6pm"). El error handler arranca en un `errorTrigger`, que SOLO
+  // corre cuando otro workflow lo declara en `settings.errorWorkflow` — y una copia recién creada
+  // no la apunta nadie. Activarla es inerte, y aun así es un workflow activo de verdad.
+  console.log('\n▸ TOPOLOGÍA sobre un workflow ACTIVO');
+  const errReal = (await api('GET', `/workflows/${process.env.N8N_WF_ERRORES}`)).json;
+  const FALTA = 'Marcar run como fallo';
+  const creadaAct = await api('POST', '/workflows', {
+    name: 'ZZ TEST n8n-sync — copia errores ACTIVA (borrar)',
+    nodes: errReal.nodes.filter((n) => n.name !== FALTA)
+      .map((n) => Object.fromEntries(Object.entries(n).filter(([k]) => campos.includes(k)))),
+    connections: Object.fromEntries(Object.entries(errReal.connections).filter(([k]) => k !== 'Preparar datos del fallo')),
+    settings: { executionOrder: 'v1' },
+  });
+  copiaActivaId = creadaAct.json?.id;
+  const act = await api('POST', `/workflows/${copiaActivaId}/activate`);
+  const EA = { N8N_WF_ERRORES: copiaActivaId };
+  const leerAct = async () => (await api('GET', `/workflows/${copiaActivaId}`)).json;
+  check('la copia quedó ACTIVA', (await leerAct()).active === true, `activate → ${act.status}`);
+
+  const pushAct = limpio(sync(['push', 'errores', '--nodos', FALTA, '--apply'], EA));
+  const trasAct = await leerAct();
+  check('el nodo nuevo entró en el workflow activo', trasAct.nodes.some((n) => n.name === FALTA), pushAct.slice(-600));
+  check('y el workflow SIGUE activo', trasAct.active === true);
+  check('quedó cableado desde "Preparar datos del fallo"',
+    JSON.stringify(trasAct.connections) === JSON.stringify(errReal.connections),
+    JSON.stringify(trasAct.connections));
+  const dAct = limpio(sync(['diff', 'errores'], EA));
+  check('n8n:diff queda limpio después', /live corre lo que dice el repo/.test(dAct), dAct.slice(0, 400));
+
+  const snapsAct = (await import('node:fs')).readdirSync(path.join(RAIZ, '.n8n-snapshots')).filter((f) => f.startsWith('errores-')).sort();
+  const rAct = limpio(sync(['restore', 'errores', path.join('.n8n-snapshots', snapsAct.at(-1)), '--apply'], EA));
+  const trasRAct = await leerAct();
+  check('n8n:restore lo saca', !trasRAct.nodes.some((n) => n.name === FALTA), rAct.slice(-300));
+  check('y el workflow sigue activo tras el restore', trasRAct.active === true);
 } finally {
+  if (copiaActivaId) {
+    await api('POST', `/workflows/${copiaActivaId}/deactivate`);
+    const d2 = await api('DELETE', `/workflows/${copiaActivaId}`);
+    const c2 = await api('GET', `/workflows/${copiaActivaId}`);
+    console.log(`\n🧹 copia ACTIVA borrada → DELETE ${d2.status} · GET ${c2.status} (404 = limpio)`);
+  }
   if (copiaId) {
     const del = await api('DELETE', `/workflows/${copiaId}`);
     const chk = await api('GET', `/workflows/${copiaId}`);

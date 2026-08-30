@@ -45,7 +45,7 @@
 > | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
-> | La topología de n8n sigue siendo ritual manual | dev | Enmienda de ADR-053, no ADR nuevo ([plan-multi-tenant §14.2](./plan-multi-tenant.md)) |
+> | ~~La topología de n8n sigue siendo ritual manual~~ | — | ✅ **CERRADO el 30/08** (ADR-053 §Enmienda). `n8n:push` empuja nodos y conexiones; el re-import queda solo para crear un workflow de cero. El bloqueo no eran las credenciales sino que `cuerpoPut` mandaba las conexiones del live |
 > | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ **DESBLOQUEADO el 30/08** (ADR-074 §Enmienda): `guardarLimpio` ya no manda `creado_por` al rehacer, así que *Rehacer 25* **se puede apretar**. Verificado en prod con una colección de un video: la fila se reescribió (huella `97ff9195`→`72210da7`, voz derivada) y el conteo quedó **igual, Majo 58 · Mani 7** |
 
 > # ⛔ DECISIÓN ABIERTA — LEER ANTES DE TOCAR CUALQUIER ETAPA DE LINKEDIN

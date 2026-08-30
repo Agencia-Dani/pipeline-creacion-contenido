@@ -116,14 +116,83 @@ async function permitidos() {
   return _schema;
 }
 
-async function cuerpoPut(live, nodes) {
+// ── credenciales: el mapa nombre→id se APRENDE de la instancia ───────────────────────────
+//
+// Los `workflow.json` referencian credenciales por NOMBRE y sin id (medido: 4 nombres distintos en
+// los 6 workflows, los 4 existentes en la instancia). ADR-053 daba eso como razón para no empujar
+// nodos nuevos; su §Enmienda lo cierra: `GET /credentials` responde 200 con `{id, name, type}`, así
+// que se aprende igual que los placeholders y por la misma razón — una tabla en el `.env` sería una
+// segunda verdad, y el día que alguien renombre una credencial la pisaría hacia atrás.
+let _creds = null;
+async function credencialesDeLaInstancia() {
+  if (_creds) return _creds;
+  const r = await api('GET', '/credentials?limit=250');
+  const porNombre = new Map();
+  for (const cr of r.data || []) {
+    // Nombre repetido = el mapa es ambiguo y elegir sería adivinar. Se marca y se niega al usarlo.
+    if (porNombre.has(cr.name)) porNombre.set(cr.name, null);
+    else porNombre.set(cr.name, cr.id);
+  }
+  _creds = porNombre;
+  return _creds;
+}
+
+/**
+ * Resuelve los `credentials` de un nodo NUEVO contra la instancia.
+ *
+ * FAIL-CLOSED igual que los placeholders: un nodo empujado con la credencial desbindeada corre y
+ * falla a mitad de corrida, que es el modo de falla silencioso que este script existe para matar.
+ * Y es la causa raíz medida de los DOS re-imports fallidos del 03/08, los dos por elegir mal en un
+ * desplegable.
+ */
+async function resolverCredenciales(nodo, sinResolver) {
+  if (!nodo.credentials) return undefined;
+  const mapa = await credencialesDeLaInstancia();
+  const out = {};
+  for (const [tipo, ref] of Object.entries(nodo.credentials)) {
+    const nombre = ref?.name;
+    const id = nombre ? mapa.get(nombre) : undefined;
+    if (!id) { sinResolver.push(`"${nodo.name}" · ${tipo} → ${nombre ?? '(sin nombre)'}${mapa.get(nombre) === null ? ' (nombre repetido en la instancia)' : ''}`); continue; }
+    out[tipo] = { id, name: nombre };
+  }
+  return out;
+}
+
+// ── alcanzabilidad ──────────────────────────────────────────────────────────────────────
+//
+// 🔑 **La definición NO se inventa acá**: es la de `Workflows/auditar-workflows.mjs` §2, que audita
+// este mismo invariante sobre el repo. Acá se aplica al grafo que va a QUEDAR en la instancia.
+const esTrigger = (n) =>
+  /Trigger$/.test(n.type) || n.type === 'n8n-nodes-base.webhook' || n.type === 'n8n-nodes-base.formTrigger';
+
+/** Nombres alcanzables desde algún trigger, siguiendo `connections` hacia adelante. */
+function alcanzablesDesdeTriggers(nodes, connections) {
+  const vivos = new Set(nodes.filter(esTrigger).map((n) => n.name));
+  const cola = [...vivos];
+  while (cola.length) {
+    const actual = cola.pop();
+    for (const salidas of Object.values(connections?.[actual] || {})) {
+      for (const rama of salidas || []) {
+        for (const x of rama || []) {
+          if (x?.node && !vivos.has(x.node)) { vivos.add(x.node); cola.push(x.node); }
+        }
+      }
+    }
+  }
+  return vivos;
+}
+
+async function cuerpoPut(live, nodes, conexiones = null) {
   const ok = await permitidos();
   const filtrar = (obj, permitidas) =>
     Object.fromEntries(Object.entries(obj || {}).filter(([k]) => permitidas.has(k)));
   const body = {
     name: live.name,
     nodes: nodes.map((n) => filtrar(n, ok.node)),
-    connections: live.connections,
+    // Por defecto las del LIVE: un push de `parameters` no tiene por qué tocar la forma del grafo.
+    // Cuando el push lleva topología llegan las del repo (ADR-053 §Enmienda 1) — enteras, porque una
+    // conexión es un PAR y "solo las aristas del nodo nombrado" dejaría el grafo a medio cablear.
+    connections: conexiones ?? live.connections,
     // settings MERGEA: mandamos solo lo que el schema admite y lo demás (binaryMode,
     // timeSavedMode) sobrevive intacto en la instancia. Verificado, no asumido.
     settings: filtrar(live.settings, ok.settings),
@@ -371,34 +440,114 @@ async function cmdPush(alias, opts) {
   const { mapa } = await aprenderMapa();
 
   const hall = comparar(repo, live, mapa);
-  const topologia = hall.filter((h) => h.sev === 'topologia');
-  if (topologia.length) {
-    console.log(`${c.rojo}✖ hay cambios de topología: el sync no los cubre (ADR-053), va re-import completo.${c.off}`);
-    topologia.forEach((h) => console.log(`   ${h.txt}`));
-    process.exit(1);
+
+  // ── topología (ADR-053 §Enmienda) ─────────────────────────────────────────────────────
+  // `nodes` REEMPLAZA: el push que crea nodos también puede borrarlos. Por eso acá hay cuatro
+  // frenos y ninguno es un prompt — los 5 comandos del repo son dry-run + `--apply`, y eso tiene
+  // que seguir sirviendo sin TTY.
+  const enRepo = new Map(repo.nodes.map((n) => [n.name, n]));
+  const enLive = new Map(live.nodes.map((n) => [n.name, n]));
+  const nuevos = repo.nodes.filter((n) => !enLive.has(n.name)).map((n) => n.name);
+  const sobran = live.nodes.filter((n) => !enRepo.has(n.name)).map((n) => n.name);
+
+  // Un recableado que NO borra ningún nodo igual puede dejar a alguien sin recibir nada: el nodo
+  // corre y termina en verde. Se listan los ORÍGENES cuyo cableado de salida pierde algo.
+  const aristas = (conns, src) => new Set(
+    Object.values(conns?.[src] || {}).flat(2).filter(Boolean).map((x) => x.node));
+  const origenesQuePierden = [...new Set([...Object.keys(live.connections || {})])].filter((src) => {
+    const antes = aristas(live.connections, src), desp = aristas(repo.connections, src);
+    return [...antes].some((d) => !desp.has(d));
+  });
+
+  const hayTopologia = nuevos.length || sobran.length || hall.some((h) => h.sev === 'topologia');
+
+  if (hayTopologia) {
+    console.log(`${c.neg}▸ topología${c.off}`);
+    nuevos.forEach((n) => console.log(`  ${c.verde}+ nodo "${n}"${c.off}`));
+    sobran.forEach((n) => console.log(`  ${c.rojo}- nodo "${n}"${c.off} ${c.gris}(está en live y no en el repo)${c.off}`));
+    origenesQuePierden.forEach((n) => console.log(`  ${c.rojo}~ "${n}" pierde cableado de salida${c.off}`));
+
+    // Freno 1 — `--nodos` obligatorio, pero SOLO acá. Cambiar un jsCode sigue costando
+    // `n8n:push -- motor` a secas, que es lo que ADR-053 vino a abaratar.
+    //
+    // 🔑 **Cada bandera nombra su propio acto**: `--nodos` lo que se crea o cambia, `--borrar` lo
+    // que desaparece o pierde cableado. Pedir el mismo nombre en las dos sería tipearlo dos veces
+    // — y peor: un borrado autorizado en `--borrar` pero olvidado en `--nodos` no pasaría, en
+    // silencio, que es justo la clase de falla que estos frenos existen para evitar.
+    if (nuevos.length && !opts.nodos) {
+      die(`el delta crea nodos: nombralos con --nodos ${JSON.stringify(nuevos.join(','))}.\n` +
+          '  `nodes` reemplaza, así que un push sin lista podría tocar lo que no miraste.');
+    }
+
+    // Freno 2 — nombrar lo que PIERDE algo es el consentimiento. Una bandera booleana no sirve: se
+    // copia de un comando anterior sin releerla, y ahí autoriza el borrado de hoy con la decisión
+    // de ayer.
+    const pierden = [...new Set([...sobran, ...origenesQuePierden])];
+    const autorizados = opts.borrar ? opts.borrar.split(',').map((x) => x.trim()).filter(Boolean) : [];
+    const sinAutorizar = pierden.filter((n) => !autorizados.includes(n));
+    const deMas = autorizados.filter((n) => !pierden.includes(n));
+    if (sinAutorizar.length) {
+      die(`esto pierde cableado o desaparece y no está autorizado: ${sinAutorizar.map((n) => `"${n}"`).join(', ')}\n` +
+          `  Repetí con --borrar ${JSON.stringify(pierden.join(','))} si es lo que querés.`);
+    }
+    if (deMas.length) die(`--borrar nombra cosas que no pierden nada: ${deMas.join(', ')}`);
+  } else if (hall.some((h) => h.sev === 'topologia')) {
+    die('hay diferencias de conexiones que no se pudieron clasificar. Corré `diff` y mirá.');
   }
 
   const candidatos = [...new Set(hall.filter((h) => h.nodo).map((h) => h.nodo))];
   const objetivo = opts.nodos ? opts.nodos.split(',').map((s) => s.trim()) : candidatos;
-  if (!objetivo.length) { console.log(`${c.verde}✓ nada que empujar: ${alias} ya está en sync.${c.off}`); return; }
 
-  const desconocidos = objetivo.filter((n) => !repo.nodes.some((x) => x.name === n));
+  // Los borrados NO pasan por `--nodos`: ya se autorizaron por nombre en `--borrar`, y por
+  // definición no están en el repo, así que no hay nada que empujarles.
+  const aBorrar = new Set(sobran);
+  if (!objetivo.length && !aBorrar.size && !hayTopologia) {
+    console.log(`${c.verde}✓ nada que empujar: ${alias} ya está en sync.${c.off}`); return;
+  }
+
+  const desconocidos = objetivo.filter((n) => !enRepo.has(n));
   if (desconocidos.length) die(`estos nodos no existen en el repo: ${desconocidos.join(', ')}`);
 
   // El array de nodos va COMPLETO (nodes reemplaza, verificado). Del repo se toman los
   // parameters y los campos de comportamiento; jamás id, credentials, webhookId ni position:
   // eso es identidad y layout de la instancia.
   const pendientes = new Set();
-  const armarNodos = () => live.nodes.map((ln) => {
-    if (!objetivo.includes(ln.name)) return ln;
-    const rn = repo.nodes.find((x) => x.name === ln.name);
-    const nuevo = { ...ln, parameters: sustituir(rn.parameters ?? {}, mapa, pendientes) };
-    for (const campo of ['typeVersion', 'onError', 'retryOnFail', 'executeOnce', 'alwaysOutputData', 'disabled']) {
-      if (rn[campo] !== undefined) nuevo[campo] = rn[campo];
+  const sinCredencial = [];
+  const armarNodos = async () => {
+    sinCredencial.length = 0;
+    const patchados = live.nodes
+      // Un nodo nombrado que no está en el repo se está BORRANDO: se cae del array, y como `nodes`
+      // reemplaza, eso lo borra en la instancia.
+      .filter((ln) => !aBorrar.has(ln.name))
+      .map((ln) => {
+        if (!objetivo.includes(ln.name)) return ln;
+        const rn = enRepo.get(ln.name);
+        const nuevo = { ...ln, parameters: sustituir(rn.parameters ?? {}, mapa, pendientes) };
+        for (const campo of ['typeVersion', 'onError', 'retryOnFail', 'executeOnce', 'alwaysOutputData', 'disabled']) {
+          if (rn[campo] !== undefined) nuevo[campo] = rn[campo];
+        }
+        return nuevo;
+      });
+
+    // 🔑 **Un nodo NUEVO viene entero del repo** (ADR-053 §Enmienda 2): no hay gemelo en live del
+    // que proteger identidad ni layout, así que el repo es la única fuente que tiene. `position`
+    // VIAJA, y eso es lo contraintuitivo: en n8n v1 la posición en el canvas ES el orden de
+    // ejecución de las ramas hermanas, así que dejar que n8n lo ubique sería dejar que n8n elija la
+    // semántica. Dos excepciones: `credentials` se resuelve contra la instancia, y `webhookId` se
+    // omite para que n8n lo emita — el del repo salió de otra instancia y podría chocar.
+    for (const nombre of objetivo.filter((n) => nuevos.includes(n))) {
+      const rn = enRepo.get(nombre);
+      const { webhookId, credentials, ...resto } = rn;
+      const nodo = { ...resto, parameters: sustituir(rn.parameters ?? {}, mapa, pendientes) };
+      if (credentials) {
+        const res = await resolverCredenciales(rn, sinCredencial);
+        if (res && Object.keys(res).length) nodo.credentials = res;
+      }
+      patchados.push(nodo);
     }
-    return nuevo;
-  });
-  let nodos = armarNodos();
+    return patchados;
+  };
+  let nodos = await armarNodos();
 
   // El live no enseñó todo: probá el `.env` (ADR-077). Segunda pasada, no parche sobre la primera.
   if (pendientes.size) {
@@ -406,7 +555,7 @@ async function cmdPush(alias, opts) {
     if (delEnv.length) {
       console.log(`${c.amar}⚠ ${delEnv.length} placeholder(s) resueltos desde el .env y NO del live: ${delEnv.join(' ')}${c.off}`);
       pendientes.clear();
-      nodos = armarNodos();
+      nodos = await armarNodos();
     }
   }
 
@@ -418,10 +567,33 @@ async function cmdPush(alias, opts) {
         `o revisá que el nodo gemelo exista en live.`);
   }
 
+  // Freno 3 — FAIL-CLOSED en credenciales, misma regla que los placeholders y por la misma razón:
+  // un nodo con la credencial desbindeada corre y falla a mitad de corrida. Es la causa raíz medida
+  // de los DOS re-imports fallidos del 03/08, los dos por elegir mal en un desplegable.
+  if (sinCredencial.length) {
+    die(`credenciales que no resuelven contra la instancia:\n    ${sinCredencial.join('\n    ')}\n` +
+        `  Creála en n8n con ese nombre exacto, o corregí el nombre en el workflow.json.`);
+  }
+
+  // Freno 4 — un push NO puede dejar nodos huérfanos. Si `--nodos` es parcial, el grafo resultante
+  // puede tener un nodo que el repo ya no cablea y que nadie nombró: queda vivo, inalcanzable y
+  // mudo. La definición de trigger/alcanzable es la de `Workflows/auditar-workflows.mjs` §2.
+  const conexionesFinales = hayTopologia ? repo.connections : live.connections;
+  if (hayTopologia) {
+    const vivos = alcanzablesDesdeTriggers(nodos, conexionesFinales);
+    const huerfanos = nodos.filter((n) => !vivos.has(n.name)).map((n) => n.name);
+    if (huerfanos.length) {
+      die(`el grafo resultante deja nodos inalcanzables desde todo trigger: ${huerfanos.map((n) => `"${n}"`).join(', ')}\n` +
+          `  O se cablean en el workflow.json, o se sacan (y entonces van en --borrar).`);
+    }
+  }
+
   console.log(`${c.neg}▸ push ${alias}${c.off} ${c.gris}(${live.name})${c.off}`);
+  for (const n of aBorrar) console.log(`  ${c.rojo}- "${n}"${c.off} ${c.gris}(se borra)${c.off}`);
   for (const n of objetivo) {
     const antes = live.nodes.find((x) => x.name === n)?.parameters ?? {};
     const desp = nodos.find((x) => x.name === n).parameters;
+    if (nuevos.includes(n)) console.log(`  ${c.verde}+ "${n}"${c.off} ${c.gris}${nodos.find((x) => x.name === n).type}${c.off}`);
     const keys = [...new Set([...Object.keys(antes), ...Object.keys(desp)])]
       .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(desp[k]));
     console.log(`  ${keys.length ? c.amar + '~' : c.gris + '='} "${n}"${c.off} ${keys.length ? `campos: ${keys.join(', ')}` : '(sin cambios)'}`);
@@ -438,18 +610,28 @@ async function cmdPush(alias, opts) {
   }
 
   const snap = await cmdPull(alias);                       // rollback ANTES de tocar nada
-  const body = await cuerpoPut(live, nodos);
+  const body = await cuerpoPut(live, nodos, hayTopologia ? repo.connections : null);
   await api('PUT', `/workflows/${idDe(alias)}`, body);
 
   // Verificar contra la instancia, no confiar en el 200.
   const despues = await api('GET', `/workflows/${idDe(alias)}`);
-  const malos = objetivo.filter((n) => {
-    const esperado = nodos.find((x) => x.name === n).parameters;
-    return JSON.stringify(despues.nodes.find((x) => x.name === n)?.parameters) !== JSON.stringify(esperado);
-  });
+  const malos = [
+    // Un nodo que se borró tiene que NO estar. Verificarlo por su ausencia y no por el 200 es la
+    // misma regla que rige las migraciones del repo: se mide el efecto, no el haber corrido.
+    ...[...aBorrar].filter((n) => despues.nodes.some((x) => x.name === n)),
+    ...objetivo.filter((n) => {
+      const esperado = nodos.find((x) => x.name === n).parameters;
+      return JSON.stringify(despues.nodes.find((x) => x.name === n)?.parameters) !== JSON.stringify(esperado);
+    }),
+  ];
   if (malos.length) die(`el PUT devolvió 200 pero estos nodos no quedaron como se esperaba: ${malos.join(', ')}\n  Rollback: restore ${alias} ${path.relative(RAIZ, snap)} --apply`);
 
-  console.log(`\n${c.verde}✓ aplicado${c.off} · ${objetivo.length} nodo(s) · workflow ${despues.active ? 'sigue activo' : 'inactivo'}`);
+  if (hayTopologia && JSON.stringify(despues.connections) !== JSON.stringify(repo.connections)) {
+    die(`el PUT devolvió 200 pero las conexiones no quedaron como el repo.\n` +
+        `  Rollback: restore ${alias} ${path.relative(RAIZ, snap)} --apply`);
+  }
+
+  console.log(`\n${c.verde}✓ aplicado${c.off} · ${objetivo.length} nodo(s)${aBorrar.size ? ` · ${aBorrar.size} borrado(s)` : ''}${hayTopologia ? ' · conexiones del repo' : ''} · workflow ${despues.active ? 'sigue activo' : 'inactivo'}`);
   console.log(`  ${c.gris}rollback: node n8n-sync.mjs restore ${alias} ${path.relative(RAIZ, snap)} --apply${c.off}`);
 }
 
@@ -584,14 +766,18 @@ const opts = {
   apply: resto.includes("--apply"),
   todo: resto.includes("--todo"),
   nodos: (() => { const i = resto.indexOf('--nodos'); return i >= 0 ? resto[i + 1] : null; })(),
+  borrar: (() => { const i = resto.indexOf('--borrar'); return i >= 0 ? resto[i + 1] : null; })(),
 };
-const libres = resto.filter((a, i) => !a.startsWith('--') && resto[i - 1] !== '--nodos');
+const libres = resto.filter((a, i) => !a.startsWith('--') && resto[i - 1] !== '--nodos' && resto[i - 1] !== '--borrar');
 
 const uso = `n8n-sync — repo↔live por la API de n8n (ADR-053)
 
   diff [alias]                          compara (no escribe)
   pull <alias>                          snapshot del live → .n8n-snapshots/
   push <alias> [--nodos "A,B"] [--apply]  aplica los parameters del repo al live
+       ... y topología (nodos y conexiones), ADR-053 §Enmienda:
+       --nodos es OBLIGATORIO si el delta crea o borra nodos
+       --borrar "A,B"  nombra lo que desaparece o pierde cableado de salida
   orden <alias> [--apply]               reacomoda el canvas para que el orden de ramas = el del repo
   restore <alias> <snapshot> --apply    vuelve atrás
 

@@ -180,10 +180,9 @@ Dry-run; `--apply` escribe, snapshotea en `.n8n-snapshots/` y `npm run n8n:resto
 `npm run n8n:diff` (solo lee) dice si el live corre lo que dice el repo — **corrélo antes de tocar el
 `workflow.json` y después de cualquier cambio en n8n**.
 
-El **re-import completo queda solo para topología** (nodos o conexiones nuevos): el push los detecta y
-se niega. Solo en ese caso aplican los placeholders y las credenciales de abajo.
+**Desde el 2026-08-30 el push también cubre la topología** (nodos y conexiones, [ADR-053 §Enmienda](../../docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)): pide `--nodos` si crea nodos, `--borrar` para lo que desaparece o pierde cableado, y se niega si dejaría un nodo inalcanzable. **El re-import completo queda solo para crear un workflow desde cero**, y ahí sí aplican los placeholders y las credenciales de abajo.
 
-## Placeholders *(solo al re-importar por topología)*
+## Placeholders *(solo al crear el workflow de cero)*
 
 En el camino normal se resuelven solos: `n8n-sync` los **aprende del propio live**. Verificados contra
 el `workflow.json` el 2026-08-03 — son **7**:
