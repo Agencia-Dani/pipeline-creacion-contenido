@@ -41,6 +41,7 @@ import {
   marcarGrabadosEnColeccion,
   quitar,
   quitarSeleccionados,
+  relimpiarViejos,
   vocesParaLimpiar,
 } from "../actions";
 import { Guiones } from "./guiones";
@@ -90,12 +91,18 @@ export function Detalle({
   coleccionId,
   videos,
   conLimpio,
+  viejos,
+  degradarian,
   grabados,
 }: {
   coleccionId: string;
   videos: Video[];
   /** Las claves que ya tienen guion limpio. Viaja como array: un Set no cruza el límite server/client. */
   conLimpio: string[];
+  /** Las que se limpiaron con criterios que ya no son los de hoy y **conviene** rehacer (ADR-080). */
+  viejos: string[];
+  /** Las que también quedaron viejas pero rehacerlas las dejaría neutras: su video perdió la voz. */
+  degradarian: string[];
   /** Las claves ya marcadas como grabadas, del cockpit entero (ADR-070). Array por lo mismo. */
   grabados: string[];
 }) {
@@ -113,6 +120,9 @@ export function Detalle({
   // releyendo el plan en vez de mirar la pantalla.
   const seleccion = usarSeleccion();
   const [filtroGrabado, setFiltroGrabado] = useState<FiltroRegistro>("todos");
+  // Confirma EN EL LUGAR, como `BotonBorrar`: el botón se reemplaza por la pregunta. Un
+  // `window.confirm` se ve como un error del browser y no se puede escribir en el idioma del equipo.
+  const [confirmandoRelimpiar, setConfirmandoRelimpiar] = useState(false);
   // 🔽 **Abre en Vistas ↓**, y es lo único de esta pantalla que no es un default de diseño sino un
   // pedido textual: *"Poner de mayor a menor vistas en el documento que se descarga de colecciones"*
   // (Majo, 28/08). Vive acá y no en la descarga porque así hay **una sola** regla de orden: el
@@ -133,6 +143,11 @@ export function Detalle({
   const orden = usarOrden(sinFiltrar, CRITERIOS, FACETAS, "views");
 
   const limpios = new Set(conLimpio);
+  // 🔑 **Las dos listas llegan calculadas del servidor, con la misma función que usa la acción de
+  // re-limpiar** (`clasificarLimpios`). Acá no se recalcula nada: si la pantalla tuviera su propia
+  // cuenta, el badge y el botón podrían señalar cosas distintas.
+  const desactualizados = new Set(viejos);
+  const perdieronLaVoz = new Set(degradarian);
   const sinIdentificar = videos.filter(necesitaEnriquecer).length;
   const sinLimpiar = videos.filter((v) => !limpios.has(v.clave)).length;
 
@@ -183,6 +198,36 @@ export function Detalle({
         quedan = pasada.quedan;
       }
       setAviso({ ok: true, mensaje: `${total} limpiados.` });
+    });
+  }
+
+  /** «1 rehecho», no «1 rehechos»: el aviso lo lee una persona y el plural roto se nota. */
+  const rehechos = (n: number) => `${n} ${n === 1 ? "rehecho" : "rehechos"}.`;
+
+  /**
+   * Rehace los guiones que quedaron viejos, en pasadas, igual que `limpiarTodos`.
+   *
+   * 🔴 **Botón propio y confirmación aparte, nunca adentro de *Limpiar*** (ADR-080): meterlo ahí
+   * gastaría de nuevo en cada click sobre una colección que ya está entera. Los que perdieron la
+   * voz no entran: la pasada los dejaría neutros.
+   */
+  function relimpiar() {
+    if (trabajando) return;
+    startTransition(async () => {
+      let quedan = desactualizados.size;
+      let total = 0;
+      while (quedan > 0) {
+        const pasada = await relimpiarViejos(cockpit, coleccionId);
+        total += pasada.limpiados;
+        // Misma guardia que la limpieza: una pasada que no movió la aguja corta en vez de girar
+        // pagándole a Haiku por nada.
+        if (pasada.limpiados === 0) {
+          setAviso(total > 0 ? { ok: true, mensaje: rehechos(total) } : pasada);
+          return;
+        }
+        quedan = pasada.quedan;
+      }
+      setAviso({ ok: true, mensaje: rehechos(total) });
     });
   }
 
@@ -438,6 +483,74 @@ export function Detalle({
             </p>
           )}
 
+          {/* 🔴 **Los guiones viejos, con su propio botón** (ADR-080). Va acá abajo y no al lado de
+              *Limpiar* porque son dos actos distintos: uno hace lo que falta, el otro **rehace lo
+              que ya se pagó**. Juntarlos volvería a gastar en cada click. */}
+          {(desactualizados.size > 0 || perdieronLaVoz.size > 0) && (
+            <div className="w-full space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              {desactualizados.size > 0 && (
+                <>
+                  <p className="text-sm">
+                    <strong>
+                      {desactualizados.size}{" "}
+                      {desactualizados.size === 1 ? "guion quedó viejo" : "guiones quedaron viejos"}
+                    </strong>
+                    :{" "}
+                    {desactualizados.size === 1
+                      ? "se limpió con criterios que ya no son los que hoy le tocan a su video. Lo más probable es que haya salido neutro pudiendo sonar a la voz que lo va a grabar."
+                      : "se limpiaron con criterios que ya no son los que hoy le tocan a su video. Casi siempre salieron neutros pudiendo sonar a la voz que los va a grabar."}
+                  </p>
+                  {confirmandoRelimpiar ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        Se paga una limpieza por guion y el limpio actual se pisa. El guion original
+                        no se toca.
+                      </p>
+                      <Button
+                        size="sm"
+                        disabled={trabajando}
+                        onClick={() => {
+                          setConfirmandoRelimpiar(false);
+                          relimpiar();
+                        }}
+                      >
+                        {trabajando ? "Rehaciendo…" : `Sí, rehacer ${desactualizados.size}`}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={trabajando}
+                        onClick={() => setConfirmandoRelimpiar(false)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={trabajando}
+                      onClick={() => setConfirmandoRelimpiar(true)}
+                    >
+                      {trabajando
+                        ? "Rehaciendo…"
+                        : `Rehacer ${desactualizados.size} ${desactualizados.size === 1 ? "guion" : "guiones"}`}
+                    </Button>
+                  )}
+                </>
+              )}
+              {/* No entran al botón y hay que decir por qué, o el número de arriba parece mal
+                  contado. Rehacerlos los dejaría neutros: peor de lo que están, y pagando. */}
+              {perdieronLaVoz.size > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Otros {perdieronLaVoz.size} se limpiaron con una voz que su video ya no tiene
+                  (se archivó, o la voz se renombró). <strong>No se rehacen</strong>: saldrían
+                  neutros, que es peor de lo que están hoy.
+                </p>
+              )}
+            </div>
+          )}
+
           <CriteriosDeLaCasa />
         </div>
       )}
@@ -502,12 +615,21 @@ export function Detalle({
                         gris, presente en el DOM e invisible al ojo. **El estado se muestra fuerte,
                         la acción se ofrece callada.** Mismo criterio que Históricos. */}
                     {marcados.has(v.clave) && <Badge>✓ Grabado</Badge>}
+                    {/* 🎨 `destructive` y no `default`: al lado de «✓ Grabado», que es sólido,
+                        dos badges fuertes competirían. Éste tiene que leerse como *algo está mal
+                        acá*, no como un estado más — es lo que vuelve visible el modo de falla #1
+                        de ADR-080, que estuvo 26 veces en pantalla sin que nadie pudiera notarlo. */}
+                    {desactualizados.has(v.clave) && <Badge variant="destructive">limpio viejo</Badge>}
                     <span className="truncate text-xs text-muted-foreground">
-                      {limpios.has(v.clave)
-                        ? "limpio"
-                        : v.likes != null
-                          ? `${v.likes.toLocaleString("es-AR")} likes`
-                          : "—"}
+                      {desactualizados.has(v.clave)
+                        ? ""
+                        : perdieronLaVoz.has(v.clave)
+                          ? "limpio · su voz ya no está"
+                          : limpios.has(v.clave)
+                            ? "limpio"
+                            : v.likes != null
+                              ? `${v.likes.toLocaleString("es-AR")} likes`
+                              : "—"}
                     </span>
                     <Button
                       variant={marcados.has(v.clave) ? "ghost" : "outline"}

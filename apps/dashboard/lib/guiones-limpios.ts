@@ -39,7 +39,7 @@ const ARBITER = "instance_id,plataforma,external_id";
  *
  * ⚠️ **Trae el `texto`, que es largo, y eso es deliberado acá y NO en la lista de la colección.** La
  * regla del payload de `domain/feed.ts` (los textos largos no viajan con la grilla) se respeta
- * pidiendo `clavesConLimpio` para dibujar los badges; esta función es para cuando alguien abre un
+ * pidiendo `huellasDeLimpios` para dibujar los badges; esta función es para cuando alguien abre un
  * guion o baja el documento, que es cuando el texto hace falta de verdad.
  */
 export async function leerLimpios(ctx: TenantContext): Promise<Map<string, GuionLimpio>> {
@@ -61,18 +61,31 @@ export async function leerLimpios(ctx: TenantContext): Promise<Map<string, Guion
   return mapa;
 }
 
-/** Qué videos ya tienen limpio, sin traerse los textos. Es lo que dibuja el badge en la grilla. */
-export async function clavesConLimpio(ctx: TenantContext): Promise<Set<string>> {
+/**
+ * Qué videos ya tienen limpio y con qué huella salió cada uno, **sin traerse los textos**.
+ *
+ * Es lo que dibuja los badges de la grilla: quién está limpio, y cuál de esos quedó viejo. Las
+ * claves del mapa siguen siendo la respuesta a *"¿tiene limpio?"*; el valor es lo que agrega
+ * ADR-080. El `texto` no viaja: para eso está `leerLimpios`, que se pide al abrir un guion.
+ *
+ * La huella puede ser `null` (guiones limpiados antes de la `032`) y eso NO es un dato faltante:
+ * `estadoDelLimpio` los cuenta al día a propósito.
+ */
+export async function huellasDeLimpios(ctx: TenantContext): Promise<Map<string, string | null>> {
   const { data, error } = await (await scoped(ctx)).select(
     "app.guiones_limpios",
-    "plataforma, external_id",
+    "plataforma, external_id, criterios_hash",
   );
   if (error) throw new Error(`Supabase respondió con error: ${error.message}`);
-  const claves = new Set<string>();
-  for (const f of z.array(fila.pick({ plataforma: true, external_id: true })).parse(data ?? [])) {
-    claves.add(claveDe({ plataforma: f.plataforma as Plataforma, external_id: f.external_id }));
+  const huellas = new Map<string, string | null>();
+  const columnas = fila.pick({ plataforma: true, external_id: true, criterios_hash: true });
+  for (const f of z.array(columnas).parse(data ?? [])) {
+    huellas.set(
+      claveDe({ plataforma: f.plataforma as Plataforma, external_id: f.external_id }),
+      f.criterios_hash,
+    );
   }
-  return claves;
+  return huellas;
 }
 
 /**

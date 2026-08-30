@@ -116,3 +116,50 @@ export function estaAlDia(huellaGuardada: string | null, perfilVoz: string | nul
   if (huellaGuardada === null) return true;
   return huellaGuardada === huellaDeCriterios(perfilVoz);
 }
+
+/**
+ * En qué estado quedó un guion limpio frente a los criterios que HOY le tocan a su video.
+ *
+ * 🔑 **Es `estaAlDia` con el caso que faltaba nombrar.** ADR-080 dejó 28 guiones viejos, y uno de
+ * ellos no se parece a los otros 27: se limpió *con* una voz que tiene perfil, pero su video ya no
+ * deriva voz (su candidato se archivó). Está viejo por la huella, y sin embargo **re-limpiarlo lo
+ * dejaría neutro** — peor de lo que está, pagando por empeorarlo.
+ */
+export type EstadoLimpio = "al-dia" | "viejo" | "degradaria";
+
+export function estadoDelLimpio(
+  huellaGuardada: string | null,
+  perfilDeHoy: string | null,
+): EstadoLimpio {
+  if (estaAlDia(huellaGuardada, perfilDeHoy)) return "al-dia";
+  // Hoy le tocaría el prompt BASE y no salió de ahí ⇒ la pasada perdería el perfil con el que se
+  // limpió. No hace falta saber de qué voz era: las huellas solas lo dicen.
+  if (huellaDeCriterios(perfilDeHoy) === huellaDeCriterios(null)) return "degradaria";
+  return "viejo";
+}
+
+/**
+ * Los limpios de una pantalla, partidos en lo que se puede mejorar y lo que se empeoraría.
+ *
+ * 🔑 **Vive acá y no en la pantalla porque la usan DOS lados** —la grilla para pintar el badge y la
+ * acción para elegir a quién re-limpiar— y dos implementaciones de la misma cuenta terminan
+ * ofreciendo un botón que no re-limpia lo que la tarjeta marcó.
+ *
+ * Un video sin limpio no es asunto de esta función: de ése se ocupa *Limpiar*.
+ */
+export function clasificarLimpios(
+  videos: readonly { clave: string; vozId: string | null }[],
+  huellas: ReadonlyMap<string, string | null>,
+  perfilPorVoz: ReadonlyMap<string, string | null>,
+): { viejos: string[]; degradarian: string[] } {
+  const viejos: string[] = [];
+  const degradarian: string[] = [];
+  for (const v of videos) {
+    if (!huellas.has(v.clave)) continue;
+    const perfil = v.vozId ? (perfilPorVoz.get(v.vozId) ?? null) : null;
+    const estado = estadoDelLimpio(huellas.get(v.clave) ?? null, perfil);
+    if (estado === "viejo") viejos.push(v.clave);
+    else if (estado === "degradaria") degradarian.push(v.clave);
+  }
+  return { viejos, degradarian };
+}

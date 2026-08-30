@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { enElOrdenPedido, queFaltaEnriquecer, validarNombre } from "@/domain/colecciones";
 import type { GuionParaDocumento } from "@/domain/docx";
-import { huellaDeCriterios } from "@/domain/limpieza";
+import { clasificarLimpios, huellaDeCriterios } from "@/domain/limpieza";
 import { parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";
 import { traerMetadata, traerVideoUrls, TOPE_POR_LOTE } from "@/lib/apify";
@@ -531,18 +531,23 @@ export async function vocesParaLimpiar(
 }
 
 /**
- * Una pasada de limpieza sobre los videos de la colección que todavía no tienen guion limpio.
+ * Una pasada de limpieza sobre los videos de la colección que la razón `motivo` señala.
  *
  * 🔴 **Deliberada, no automática — al revés que `identificarFaltantes`.** Identificar es siempre
- * deseable y barato; limpiar es un acto con una decisión adentro (para qué voz) y un resultado que
- * alguien tiene que mirar. Por eso lo dispara un botón y no un `useEffect`.
+ * deseable y barato; limpiar **cuesta plata** y su resultado alguien lo tiene que mirar. Por eso lo
+ * dispara un botón y no un `useEffect`.
  *
  * Corre con presupuesto y devuelve conteos, así que una colección grande se termina en varias
  * pasadas sin que la función de Vercel la corte por la mitad.
+ *
+ * 🔑 **Las dos razones comparten esta pasada a propósito** (ADR-080): el presupuesto, el orden
+ * serial y el registro son los mismos, y dos copias del mismo bucle divergen la primera vez que
+ * alguien toca una sola. Lo único que cambia es a quién apunta.
  */
-export async function limpiarFaltantes(
+async function pasadaDeLimpieza(
   enRuta: CockpitEnRuta,
   coleccionId: string,
+  motivo: "faltantes" | "viejos",
 ): Promise<ResultadoAccion & { limpiados: number; quedan: number }> {
   const { usuario, ctx, cockpit } = await exigirTenant("curar", enRuta.cliente, enRuta.pipeline);
   if (!uuid.safeParse(coleccionId).success) {
@@ -572,9 +577,29 @@ export async function limpiarFaltantes(
     return { ok: false, mensaje: "No se pudo leer la colección.", limpiados: 0, quedan: 0 };
   }
 
-  const faltan = miembros.filter((m) => !yaLimpios.has(m.clave));
-  if (faltan.length === 0) {
-    return { ok: true, mensaje: "Ya están todos limpios.", limpiados: 0, quedan: 0 };
+  // A quién apunta esta pasada. **La misma función que usa la pantalla para pintar el badge**: si
+  // fueran dos cuentas distintas, el botón podría re-limpiar algo que la tarjeta no marcó.
+  const objetivos =
+    motivo === "faltantes"
+      ? miembros.filter((m) => !yaLimpios.has(m.clave))
+      : (() => {
+          const viejos = new Set(
+            clasificarLimpios(
+              miembros.map((m) => ({ clave: m.clave, vozId: seSabe.get(m.clave)?.vozId ?? null })),
+              new Map([...yaLimpios].map(([clave, g]) => [clave, g.criteriosHash])),
+              perfilPorVoz,
+            ).viejos,
+          );
+          return miembros.filter((m) => viejos.has(m.clave));
+        })();
+
+  if (objetivos.length === 0) {
+    return {
+      ok: true,
+      mensaje: motivo === "faltantes" ? "Ya están todos limpios." : "No quedó ninguno viejo.",
+      limpiados: 0,
+      quedan: 0,
+    };
   }
 
   const hasta = Date.now() + PRESUPUESTO_LIMPIEZA_MS;
@@ -586,7 +611,7 @@ export async function limpiarFaltantes(
   // caracteres, y lo que se quiere acá no es throughput sino **no pasarse del presupuesto**. Una
   // pasada que hace 3 y devuelve el resto es mejor que una que arranca 8 y la corta Vercel a la
   // mitad, dejando llamadas pagadas cuyo resultado se tira.
-  for (const m of faltan) {
+  for (const m of objetivos) {
     if (Date.now() > hasta) break;
     try {
       const crudo = await leerCrudo(ctx, m.plataforma, m.external_id);
@@ -621,31 +646,61 @@ export async function limpiarFaltantes(
 
   await registrarEvento(ctx, usuario.id, "colecciones.limpiar", {
     coleccion: coleccionId,
+    // 🔑 **El mismo evento para los dos actos, con la razón adentro.** Es el precedente del modo
+    // selección (`origen: pegote | seleccion`): así "cuántas limpiezas hubo" sigue siendo una sola
+    // serie, y el desglose está cuando se lo pida.
+    motivo,
     // `voz` era la del selector, una sola para toda la pasada. Ahora es por video, así que lo que
     // se registra es **cuántos no tenían ninguna**: es el número que dice si la derivación anda.
     sin_voz: sinVoz,
     limpiados,
     sin_guion: sinGuion,
-    pedidos: faltan.length,
+    pedidos: objetivos.length,
   });
   revalidatePath(rutaDe(comoRuta(cockpit), `curar/colecciones/${coleccionId}`));
 
   // Los que no tienen guion NO cuentan como pendientes: volver a intentarlos no los va a hacer
   // aparecer. Sin esto el bucle del cliente giraría para siempre sobre los links cargados a mano.
-  const quedan = Math.max(0, faltan.length - limpiados - sinGuion);
+  const quedan = Math.max(0, objetivos.length - limpiados - sinGuion);
 
   if (limpiados === 0) {
-    const motivo =
+    const porQue =
       sinGuion > 0
         ? `${sinGuion} de esos videos no tienen guion en el sistema: se cargaron a mano.`
         : "No se pudo limpiar ninguno. Probá de nuevo en un rato.";
-    return { ok: false, mensaje: motivo, limpiados: 0, quedan };
+    return { ok: false, mensaje: porQue, limpiados: 0, quedan };
   }
 
   const partes = [`${limpiados} limpiados`];
   if (sinGuion > 0) partes.push(`${sinGuion} sin guion`);
   if (quedan > 0) partes.push(`quedan ${quedan}`);
   return { ok: true, mensaje: partes.join(" · ") + ".", limpiados, quedan };
+}
+
+/** Limpia los videos de la colección que todavía no tienen guion limpio. */
+export async function limpiarFaltantes(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+): Promise<ResultadoAccion & { limpiados: number; quedan: number }> {
+  return pasadaDeLimpieza(enRuta, coleccionId, "faltantes");
+}
+
+/**
+ * Rehace los guiones que quedaron viejos: los que se limpiaron con criterios que ya no son los que
+ * hoy le tocan a su video (ADR-080).
+ *
+ * 🔴 **Nunca los que `clasificarLimpios` marca como `degradaria`.** Ésos también tienen la huella
+ * desactualizada, pero su video perdió la voz con la que se limpiaron: la pasada los dejaría
+ * neutros, o sea pagando por empeorarlos. Es el único error que ADR-080 llama caro.
+ *
+ * 🔴 **Y va en su propio botón, jamás adentro de *Limpiar*.** Un solo botón que además rehiciera lo
+ * viejo volvería a gastar en cada click sobre una colección que ya está entera.
+ */
+export async function relimpiarViejos(
+  enRuta: CockpitEnRuta,
+  coleccionId: string,
+): Promise<ResultadoAccion & { limpiados: number; quedan: number }> {
+  return pasadaDeLimpieza(enRuta, coleccionId, "viejos");
 }
 
 /** Tira el limpio de un video para poder rehacerlo. El crudo no se toca. */

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { clasificarLimpios } from "@/domain/limpieza";
 import { comoRuta, rutaDe } from "@/domain/rutas";
 import type { Video } from "@/domain/video";
 import { exigirPantallaDeCurar } from "@/lib/auth";
 import { leerColeccion, leerMiembros } from "@/lib/colecciones";
 import { leerMarcas } from "@/lib/grabados";
-import { clavesConLimpio } from "@/lib/guiones-limpios";
+import { huellasDeLimpios } from "@/lib/guiones-limpios";
+import { leerVoces } from "@/lib/proyectos";
 import { leerLoQueSeSabe } from "@/lib/videos";
 import { Detalle } from "./detalle";
 
@@ -34,13 +36,16 @@ export default async function ColeccionPage({
   // que acá no hay nada, no mandarlo a otra pantalla como si se hubiera equivocado de camino.
   if (!coleccion) notFound();
 
-  const [miembros, seSabe, limpios, marcas] = await Promise.all([
+  const [miembros, seSabe, limpios, marcas, voces] = await Promise.all([
     leerMiembros(ctx, id),
     leerLoQueSeSabe(ctx),
-    clavesConLimpio(ctx),
+    huellasDeLimpios(ctx),
     // Las marcas de "ya se grabó" son del cockpit entero (ADR-070: la marca es por video, no por
     // colección), así que la mayoría no está en esta lista. La pantalla cruza por clave.
     leerMarcas(ctx),
+    // Solo para saber qué guiones quedaron viejos: el perfil de hoy de cada voz es la mitad de la
+    // huella con la que se compara (ADR-080).
+    leerVoces(ctx),
   ]);
 
   // El miembro manda la identidad y la url (es la fila que existe seguro); lo que se sabe llena el
@@ -56,6 +61,15 @@ export default async function ColeccionPage({
         views: null, likes: null, seguidores: null, idioma: null, heat: null,
         vozId: null,
       },
+  );
+
+  // 🔑 **La cuenta se hace acá, con la MISMA función que usa la acción de re-limpiar.** Si la
+  // pantalla marcara viejos por su cuenta, el botón podría ofrecerse a arreglar algo distinto de lo
+  // que la tarjeta señala — y nadie lo notaría hasta pagar la pasada.
+  const { viejos, degradarian } = clasificarLimpios(
+    videos,
+    limpios,
+    new Map(voces.map((v) => [v.id, v.perfil_limpieza ?? null])),
   );
 
   return (
@@ -75,7 +89,9 @@ export default async function ColeccionPage({
       <Detalle
         coleccionId={id}
         videos={videos}
-        conLimpio={[...limpios]}
+        conLimpio={[...limpios.keys()]}
+        viejos={viejos}
+        degradarian={degradarian}
         grabados={[...marcas.keys()]}
       />
     </div>

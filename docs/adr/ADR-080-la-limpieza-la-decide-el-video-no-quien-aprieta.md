@@ -1,6 +1,7 @@
 # ADR-080 — La limpieza la decide el video, no quien aprieta el botón
 
-- **Estado:** aceptada — 2026-08-29 (pedido de Mani: *"no debería ser necesario elegir la voz, sino
+- **Estado:** aceptada — 2026-08-29, **enmendada el 2026-08-30** (§Enmienda al final: la deuda de
+  los guiones viejos pasó de aplazada a tener mecanismo). Pedido de Mani: *"no debería ser necesario elegir la voz, sino
   que solo se aplican los criterios de cada voz sobre los videos respectivos"*).
   **Enmienda [ADR-074](./ADR-074-el-guion-limpio-es-un-artefacto-nuevo.md)**, que creó la limpieza
   con un selector de voz por tanda. **No toca `core/`, sin migración**: `app.guiones_limpios` ya
@@ -88,10 +89,9 @@
     dice **con qué voz** salió, pero **ninguno dice que quedó viejo**: `estaAlDia()` existe, está
     testeada y **no la llama nadie**. *La consecuencia de una decisión no se declara resuelta por el
     mecanismo que la haría resoluble.*
-    🅿️ **Deuda conocida, aplazada por Mani el 29/08.** Re-limpiar cuesta plata y esa decisión es de
-    una persona (ADR-074 ya lo estableció). Cuando se retome, lo que falta es conectar `estaAlDia` a
-    la pantalla y darle un botón propio que confirme antes de gastar — nunca meterlo en *Limpiar*,
-    que gastaría de nuevo en cada click.
+    ✅ **SALDADA el 2026-08-30** (§Enmienda de abajo): `estaAlDia` ya la llama alguien, cada guion
+    viejo lo dice en su tarjeta y hay un botón propio con confirmación. La deuda que queda es de
+    **datos, no de mecanismo**: 25 guiones en la colección y 2 fuera de toda colección.
   - (−) **La voz depende de que el video esté en `candidatos` u `outputs`.** El barrido del domingo
     vacía `candidatos`, pero lo calificado pasa a `outputs`, así que la cadena aguanta. Lo que no
     tiene voz es lo pegado a mano — y ése es el caso #4, que ya está resuelto.
@@ -102,3 +102,64 @@
 - **Toca `core/`:** no. Sin migración y sin cambio de contrato. Cambia `domain/video.ts` (el video
   gana `vozId`), `lib/videos.ts` (las fuentes lo aportan), `lib/guiones-limpios.ts`, y la zona
   `curar/colecciones` del cockpit.
+
+---
+
+## Enmienda — 2026-08-30: la deuda tiene mecanismo, y dos decisiones nuevas
+
+*Cierra el (−) de arriba. **No toca `core/`, sin migración, sin n8n.** Lo que cambia son
+`domain/limpieza.ts`, `lib/guiones-limpios.ts` y la zona `curar/colecciones` del cockpit.*
+
+### 1. Un guion viejo tiene DOS estados, no uno
+
+`estaAlDia` contestaba sí/no, y con eso el guion 28 —el que se limpió *con* Juan Pablo y cuyo video
+ya no deriva voz— caía del mismo lado que los otros 27. **Pero re-limpiarlo lo dejaría neutro: peor
+de lo que está, pagando por empeorarlo**, o sea justo el único error que este ADR llama caro.
+
+`estadoDelLimpio` devuelve **`al-dia` · `viejo` · `degradaria`**, y lo tercero **se despeja de las
+huellas solas**: si la huella de hoy es la de `armarPrompt(null)` y la guardada no lo es, la pasada
+perdería el perfil. *No hace falta consultar voces ni saber de qué voz era el guion.* Los
+`degradaria` **nunca entran** al botón, y la pantalla dice por qué — si no, el número de arriba
+parece mal contado.
+
+### 2. El botón alcanza la colección, y eso deja 2 guiones afuera a propósito
+
+Alternativas evaluadas: una pantalla global de guiones viejos, o un aviso de huérfanos en el índice.
+Se eligió **solo el detalle de la colección**, que es donde ya vive *Limpiar* y es la unidad de
+trabajo del equipo. Los huérfanos se alcanzan metiéndolos a una colección, camino que ya existe
+desde el Feed, Transcribir e Históricos.
+
+📏 **Y el costo está medido, no supuesto** (2026-08-30, contra prod, rehaciendo la fusión de
+`leerLoQueSeSabe` desde `candidatos` y `outputs` con las mismas funciones de la app):
+
+| | viejos | degradarían | al día |
+|---|---|---|---|
+| **Los 65 del cockpit** | **27** | **1** | **37** |
+| En la colección *Test* (57) | **26** | 0 | 31 |
+| Fuera de toda colección (8) | **1** | **1** | 6 |
+
+**Reproduce el 28 y el 37 de arriba por un camino distinto al de la pantalla.** La pantalla dice 26
+porque solo clasifica lo que muestra: **2 de los 28 son inalcanzables con este alcance**, y eso es
+la decisión, no un defecto.
+
+### 3. Verificado en pantalla montando el caso, no leyendo texto
+
+Se armó una colección de **un solo video viejo**, se apretó *Rehacer*, y se borró la colección. La
+huella pasó de `97ff9195` a `72210da7`, `voz_id` quedó en Juan Pablo **derivado del video**, el
+evento registró `motivo: "viejos"` con `sin_voz: 0`, y el conteo global cruzó **exactamente uno**
+(33/32 → 32/33). La colección *Test* bajó de 26 a 25, con 25 + 32 = 57.
+
+🩸 **Los dos defectos que aparecieron ahí no los podía ver ningún test:** *"1 guion quedó viejo: se
+limpi**aron**"* y *"1 rehech**os**"*. Los 442 tests estaban en verde y la pantalla de un solo video
+los mostró al primer click. *Un plural roto no tiene assert que lo cace; tiene una pantalla con n=1.*
+
+⬜ **Lo que NO se probó, y no se declara probado:** el badge de `degradaria` nunca se pintó — el
+único caso está fuera de toda colección. La rama existe y está testeada en dominio; en pantalla no
+la vio nadie.
+
+### El registro no se partió en dos
+
+`relimpiarViejos` y `limpiarFaltantes` comparten la pasada (presupuesto, orden serial, evento) y
+emiten **el mismo `colecciones.limpiar` con `motivo: "faltantes" | "viejos"`** — el precedente de
+`origen: pegote | seleccion` del modo selección. Así *"cuántas limpiezas hubo"* sigue siendo una
+sola serie y el desglose está cuando se lo pida.
