@@ -123,6 +123,24 @@ concurrencia.
 *Se descartó bajar `cap_top_n` para que entrara en el presupuesto: arregla el síntoma bajando el
 techo de la corrida, cuando la capacidad medida daba de sobra.*
 
+> ⚠️ **La condición se cumplió el mismo día, y por la UI: el tope real ya es 350, no 250.**
+> `cap_top_n` sale de `pick('cap_top_n', 250)`, y **el ajuste del cockpit gana sobre `Config`**
+> (`AJUSTE_MAP`: *"Videos a transcribir por corrida"* → `cap_top_n`). Mani lo subió a **350** el
+> 31/08 junto con el umbral de vistas. O sea que el margen que este ADR dejó escrito como *370 vs
+> 250* (48%) hoy es **374 vs 350: 7%**, justo en el borde que la propia regla nombraba.
+>
+> **No es una alarma todavía** —el cap no ha mordido en ninguna corrida real: la del 00:56 llegó a
+> 164 videos distintos y la del 04:30 a 90, porque el supply corta antes— **pero el colchón se
+> gastó**. Si el supply crece (más referentes, umbral más bajo) y el cap muerde de verdad, 350
+> videos piden ~814 s de los 870 y cualquier lentitud de Supadata pasa a **quemar**. La palanca es
+> subir `concurrencia_transcribir`, midiendo primero los 429 como se midió acá — no bajar el cap.
+>
+> 🔑 *Y el aprendizaje portable: una regla de dimensionamiento escrita contra dos números no
+> sobrevive sola si **uno de los dos se toca desde una UI**. Este ADR fijó la capacidad en el código
+> y dejó el tope en manos del equipo, sin nada que los compare en tiempo real. Lo correcto sería que
+> el motor calcule su propio margen y lo avise en `metricas.avisos`, como ya hace con las
+> transcripciones vacías.*
+
 ### Lo que esta enmienda NO toca
 
 **`processed_items` sigue escribiéndose antes de transcribir** (ADR-029 §2 intacto). Se elimina la

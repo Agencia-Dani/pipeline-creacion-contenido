@@ -63,6 +63,10 @@ ADR-009); el "link" es la URL del video original.
   🔑 **La regla que las ata, y la que hay que sostener al mover cualquiera: CAPACIDAD > `cap_top_n`.**
   Mientras el presupuesto alcance para más videos que el tope, muerde el tope (posterga) y nunca el
   presupuesto (quema). Al 30/08: 870 s a 8 en vuelo ≈ **370 videos** contra un `cap_top_n` de 250.
+  ⚠️ **Pero `cap_top_n` NO se lee de acá: el ajuste del cockpit lo pisa** (*"Videos a transcribir por
+  corrida"*, `AJUSTE_MAP` en `Armar plan de corrida`), y el 31/08 el equipo lo subió a **350** por la
+  UI. Margen real hoy: **374 vs 350 = 7%**. Antes de mover cualquiera de los tres, mirá el **ajuste**,
+  no este número ([ADR-030 §Enmienda](../../docs/adr/ADR-030-descarte-duro-sin-transcript.md)).
   🩸 **Y ojo con subir la concurrencia por las malas razones.** El comentario del nodo justificaba
   24 en vuelo con un promedio de req/s, y era falso: **el límite se cobra en el PICO**, los 24
   workers arrancan juntos y un 429 rápido libera al worker que dispara otro pedido, así que la
