@@ -112,12 +112,19 @@ export async function leerFeed(
     viralPorTamano: r.viral_por_tamano,
     calificacion: esCalificacion(r.calificacion) ? r.calificacion : null,
     estado: (r.estado as Estado) ?? "nuevo",
-    corrida: r.run_id ? (etiquetas.get(r.run_id) ?? null) : null,
+    corrida: r.run_id ? (etiquetas.get(r.run_id)?.etiqueta ?? null) : null,
+    corridaInicio: r.run_id ? (etiquetas.get(r.run_id)?.inicio ?? null) : null,
   } satisfies CandidatoFeed));
 }
 
 /**
- * `run_id` → *"30 ago, 22:50"*, para las corridas que aparecen en estas filas y ninguna más.
+ * `run_id` → su etiqueta legible **y su ISO**, para las corridas que aparecen en estas filas y
+ * ninguna más.
+ *
+ * ⚠️ **Los dos, y no solo la etiqueta.** La etiqueta es texto para humanos (`"31 ago, 22:50"`) y
+ * ordenar por ella pone *"1 sep"* antes de *"31 ago"* — el modo "agrupar por corrida" quedaría con
+ * las corridas mezcladas sin que nada falle. El ISO ya venía en esta misma query; lo único que
+ * cambiaba era tirarlo.
  *
  * 🔑 **Va acá y no en un embed de PostgREST.** `app.candidatos` está en el esquema `app` y `runs` en
  * `public`: un `runs(inicio)` sería un embed cruzando esquemas, que depende de cómo esté expuesto
@@ -134,7 +141,7 @@ export async function leerFeed(
 async function etiquetasDeCorrida(
   ctx: TenantContext,
   ids: readonly string[],
-): Promise<Map<string, string>> {
+): Promise<Map<string, { etiqueta: string; inicio: string }>> {
   if (ids.length === 0) return new Map();
   try {
     const { data, error } = await (await scoped(ctx))
@@ -144,7 +151,7 @@ async function etiquetasDeCorrida(
     return new Map(
       z.array(z.object({ id: z.string(), inicio: z.string() }))
         .parse(data ?? [])
-        .map((r) => [r.id, fechaHora(r.inicio)] as const),
+        .map((r) => [r.id, { etiqueta: fechaHora(r.inicio), inicio: r.inicio }] as const),
     );
   } catch (e) {
     console.error("[candidatos] no se pudieron leer las corridas del feed (ADR-081):", e);

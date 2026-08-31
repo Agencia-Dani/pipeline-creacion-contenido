@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import {
   agrupar,
+  agruparPorCorrida,
   ajustarCuentas,
   camposDeCalificacion,
   condicionDeFiltro,
@@ -9,6 +10,7 @@ import {
   esFiltro,
   esVeredicto,
   estadoDe,
+  SIN_CORRIDA,
   FILTROS,
   ordenarDescartes,
   pasaFiltro,
@@ -249,5 +251,77 @@ describe("descartes", () => {
     const entrada = [desc("a", 0.1), desc("b", 0.9)];
     ordenarDescartes(entrada);
     assert.deepEqual(entrada.map((d) => d.id), ["a", "b"]);
+  });
+});
+
+describe("agruparPorCorrida", () => {
+  const video = (
+    id: string,
+    proyecto: string,
+    corrida: string | null,
+    corridaInicio: string | null,
+    heat = 0,
+  ) => ({ id, proyecto, heat, corrida, corridaInicio });
+
+  it("anida: corrida afuera, proyecto adentro", () => {
+    const grupos = agruparPorCorrida([
+      video("a", "Ansiedad", "31 ago, 04:30", "2026-08-31T04:30:00Z"),
+      video("b", "Psicología", "31 ago, 04:30", "2026-08-31T04:30:00Z"),
+      video("c", "Ansiedad", "31 ago, 04:30", "2026-08-31T04:30:00Z"),
+    ]);
+    assert.equal(grupos.length, 1);
+    assert.equal(grupos[0].total, 3);
+    assert.deepEqual(
+      grupos[0].proyectos.map((p) => [p.proyecto, p.candidatos.length]),
+      [["Ansiedad", 2], ["Psicología", 1]],
+    );
+  });
+
+  it("las corridas van de más nueva a más vieja", () => {
+    const grupos = agruparPorCorrida([
+      video("a", "P", "29 ago, 10:00", "2026-08-29T10:00:00Z"),
+      video("b", "P", "31 ago, 04:30", "2026-08-31T04:30:00Z"),
+      video("c", "P", "30 ago, 22:50", "2026-08-30T22:50:00Z"),
+    ]);
+    assert.deepEqual(grupos.map((g) => g.corrida), [
+      "31 ago, 04:30",
+      "30 ago, 22:50",
+      "29 ago, 10:00",
+    ]);
+  });
+
+  it("🩸 ordena por el ISO y NO por la etiqueta: '1 sep' es posterior a '31 ago'", () => {
+    // La etiqueta es texto para humanos. Ordenando por ella, "1 sep" cae antes que "31 ago" y el
+    // feed queda con las corridas mezcladas sin que nada falle — que es por qué el ISO viaja.
+    const grupos = agruparPorCorrida([
+      video("a", "P", "31 ago, 04:30", "2026-08-31T04:30:00Z"),
+      video("b", "P", "1 sep, 08:00", "2026-09-01T08:00:00Z"),
+    ]);
+    assert.deepEqual(grupos.map((g) => g.corrida), ["1 sep, 08:00", "31 ago, 04:30"]);
+  });
+
+  it("los sin corrida son un grupo propio y va ÚLTIMO", () => {
+    // No se esconden: son las filas anteriores a la `034` (medido: 242 de 274 candidatos vivos al
+    // 2026-08-31). Esconderlas dejaría el feed casi vacío sin decir por qué.
+    const grupos = agruparPorCorrida([
+      video("a", "P", null, null),
+      video("b", "P", "31 ago, 04:30", "2026-08-31T04:30:00Z"),
+      video("c", "P", null, null),
+    ]);
+    assert.deepEqual(grupos.map((g) => g.corrida), ["31 ago, 04:30", SIN_CORRIDA]);
+    assert.equal(grupos[1].total, 2);
+    assert.equal(grupos[1].inicio, null);
+  });
+
+  it("adentro de cada proyecto sigue mandando el heat, como en el agrupado de siempre", () => {
+    const grupos = agruparPorCorrida([
+      video("frio", "P", "31 ago", "2026-08-31T04:30:00Z", 1),
+      video("caliente", "P", "31 ago", "2026-08-31T04:30:00Z", 99),
+    ]);
+    assert.deepEqual(grupos[0].proyectos[0].candidatos.map((c) => c.id), ["caliente", "frio"]);
+  });
+
+  it("un feed vacío no inventa grupos", () => {
+    assert.deepEqual(agruparPorCorrida([]), []);
   });
 });

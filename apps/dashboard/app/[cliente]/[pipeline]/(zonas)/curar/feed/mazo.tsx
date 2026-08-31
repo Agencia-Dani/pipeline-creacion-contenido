@@ -13,6 +13,7 @@ import { BotonArchivar } from "../../operar/boton-archivar";
 import { cn } from "@/lib/utils";
 import {
   agrupar,
+  agruparPorCorrida,
   ajustarCuentas,
   ETIQUETA_FILTRO,
   FILTRO_INICIAL,
@@ -20,6 +21,7 @@ import {
   type Calificacion,
   type CandidatoFeed,
   type Filtro,
+  type Grupo,
 } from "@/domain/feed";
 // 🔴 `ordenar` sale del dominio, NO del componente: `orden.tsx` no lo re-exporta.
 import { ordenar, type CriterioOrden, type Faceta } from "@/domain/orden";
@@ -99,7 +101,15 @@ export function Mazo({
   const [originales, setOriginales] = useState<Record<string, Calificacion | null>>({});
   // ⚠️ `plegados` es estado propio y separado: plegar es solo dejar de dibujar un grupo, no tocar
   // qué está cargado. Arranca vacío — todo desplegado, que es el comportamiento de siempre.
+  //
+  // 🔑 **Las claves llevan prefijo** (`p:`, `c:`, `c:…/p:…`) desde que hay dos modos de agrupar: sin
+  // eso, plegar el proyecto "Ansiedad" en un modo lo dejaría plegado en el otro, y peor, un grupo de
+  // corrida y un proyecto que se llamaran igual serían el mismo estado.
   const [plegados, setPlegados] = useState<Set<string>>(new Set());
+  // Agrupar por corrida es un nivel ARRIBA del proyecto, nunca en lugar de él: los criterios de
+  // relevancia son por proyecto y mezclarlos vuelve inconsistente el juicio (`domain/feed.ts`).
+  // Por eso esto es un modo de vista y no un criterio de la barra de orden.
+  const [porCorrida, setPorCorrida] = useState(false);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<Set<string>>(new Set());
   const [errores, setErrores] = useState<Record<string, string>>({});
@@ -118,10 +128,10 @@ export function Mazo({
     Object.entries(puestas).map(([id, despues]) => ({ antes: originales[id] ?? null, despues })),
   );
 
-  function alternarPlegado(proyecto: string) {
+  function alternarPlegado(clave: string) {
     setPlegados((p) => {
       const s = new Set(p);
-      if (!s.delete(proyecto)) s.add(proyecto);
+      if (!s.delete(clave)) s.add(clave);
       return s;
     });
   }
@@ -235,14 +245,17 @@ export function Mazo({
   // 🔴 Ordenar NO aplana los grupos: `domain/feed.ts` tiene escrito que los criterios de relevancia
   // son por proyecto y mezclarlos vuelve inconsistente el juicio. Un control de orden no re-litiga
   // eso (ADR-076 §6).
-  const grupos = agrupar(orden.visibles).map((g) => ({
+  const criterio = CRITERIOS.find((c) => c.clave === orden.claveCriterio) ?? null;
+  const reordenar = (g: Grupo<CandidatoFeed>) => ({
     ...g,
-    candidatos: ordenar(
-      g.candidatos,
-      CRITERIOS.find((c) => c.clave === orden.claveCriterio) ?? null,
-      orden.direccion,
-    ),
-  }));
+    candidatos: ordenar(g.candidatos, criterio, orden.direccion),
+  });
+  const grupos = agrupar(orden.visibles).map(reordenar);
+  // El agrupado por corrida delega el nivel de adentro a `agrupar()`, así que el criterio elegido
+  // se aplica exactamente igual: una sola implementación del orden, en los dos modos.
+  const gruposCorrida = porCorrida
+    ? agruparPorCorrida(orden.visibles).map((g) => ({ ...g, proyectos: g.proyectos.map(reordenar) }))
+    : [];
   const abierto = cargados.find((c) => c.id === abiertoId) ?? null;
   const pendientes = ajustadas["sin-calificar"];
 
@@ -266,6 +279,21 @@ export function Mazo({
         {/* La barra convive con los chips de calificación y NO se unifica con ellos: aquéllos
             filtran un atributo mutable y por eso van a la query (ADR-034 / ADR-076 §4). */}
         <BarraOrden orden={orden} />
+        {/* 🔑 **Agrupar y filtrar por corrida conviven, y no es redundancia.** La faceta "Corrida"
+            de la barra contesta *"mostrame SOLO lo de anoche"*; el toggle contesta *"mostrame todo,
+            separado por corrida"*. Son dos preguntas distintas y la segunda no se puede hacer
+            filtrando. */}
+        <button
+          type="button"
+          onClick={() => setPorCorrida((v) => !v)}
+          aria-pressed={porCorrida}
+          className={cn(
+            "rounded-full border px-3 py-1 text-sm transition-colors",
+            porCorrida ? "border-primary bg-primary/10 font-medium" : "hover:bg-accent",
+          )}
+        >
+          Agrupar por corrida
+        </button>
         <span className="ml-auto flex flex-wrap items-center gap-2">
           {/* Archivar vive acá y en Operar, el mismo componente (ver `boton-archivar.tsx`). Acá
               porque es donde alguien termina de calificar: hasta hoy, para que lo calificado
@@ -288,14 +316,10 @@ export function Mazo({
             : "Nada en este filtro."}
         </p>
       ) : (
-        grupos.map((g) => (
-          <GrupoPlegable
-            key={g.proyecto}
-            titulo={g.proyecto}
-            conteo={g.candidatos.length}
-            plegado={plegados.has(g.proyecto)}
-            onAlternar={() => alternarPlegado(g.proyecto)}
-          >
+        (() => {
+          // La grilla de un grupo de proyecto, una sola vez: la dibujan los dos modos y duplicarla
+          // habría sido dos lugares donde arreglar cada cosa de la tarjeta.
+          const grilla = (g: Grupo<CandidatoFeed>) => (
             <GrillaVideos>
               {g.candidatos.map((c) => (
                 <Tarjeta
@@ -314,8 +338,48 @@ export function Mazo({
                 />
               ))}
             </GrillaVideos>
-          </GrupoPlegable>
-        ))
+          );
+
+          if (!porCorrida) {
+            return grupos.map((g) => (
+              <GrupoPlegable
+                key={g.proyecto}
+                titulo={g.proyecto}
+                conteo={g.candidatos.length}
+                plegado={plegados.has(`p:${g.proyecto}`)}
+                onAlternar={() => alternarPlegado(`p:${g.proyecto}`)}
+              >
+                {grilla(g)}
+              </GrupoPlegable>
+            ));
+          }
+
+          // Corrida afuera, proyecto adentro: el nivel de adentro es el de siempre, con su mismo
+          // componente y su mismo orden por heat.
+          return gruposCorrida.map((gc) => (
+            <GrupoPlegable
+              key={gc.corrida}
+              titulo={gc.corrida}
+              conteo={gc.total}
+              plegado={plegados.has(`c:${gc.corrida}`)}
+              onAlternar={() => alternarPlegado(`c:${gc.corrida}`)}
+            >
+              <div className="space-y-4 border-l-2 pl-3">
+                {gc.proyectos.map((g) => (
+                  <GrupoPlegable
+                    key={g.proyecto}
+                    titulo={g.proyecto}
+                    conteo={g.candidatos.length}
+                    plegado={plegados.has(`c:${gc.corrida}/p:${g.proyecto}`)}
+                    onAlternar={() => alternarPlegado(`c:${gc.corrida}/p:${g.proyecto}`)}
+                  >
+                    {grilla(g)}
+                  </GrupoPlegable>
+                ))}
+              </div>
+            </GrupoPlegable>
+          ));
+        })()
       )}
 
       <BarraSeleccion seleccion={seleccion}>

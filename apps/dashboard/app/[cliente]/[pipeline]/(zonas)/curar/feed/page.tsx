@@ -65,7 +65,7 @@ export default async function FeedPage({
         <h1 className="mt-1 text-2xl font-semibold">Feed</h1>
         <p className="text-muted-foreground">
           Los videos que el motor trajo, agrupados por proyecto y ordenados de más caliente a más
-          frío. 🔥 y 👍 lo aprueban (el 🔥 además se usa como ejemplo para afinar los criterios);
+          frío (o por corrida, con el toggle de arriba). 🔥 y 👍 lo aprueban (el 🔥 además se usa como ejemplo para afinar los criterios);
           👎 lo descarta. Con un click alcanza — abrí la tarjeta solo si el título no te alcanza
           para decidir.
         </p>

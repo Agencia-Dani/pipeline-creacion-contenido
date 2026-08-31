@@ -110,3 +110,52 @@ efecto de aplicar la migración.
 - (−) La etiqueta de la corrida es su **fecha de inicio**, no su id: dos corridas del mismo minuto
   colisionarían en la faceta. El guard single-flight lo hace imposible hoy, y si algún día deja de
   serlo la etiqueta tiene que llevar los primeros 8 del uuid.
+
+---
+
+## Enmienda 2026-08-31 — Filtrar por corrida no es agruparlas: van las dos
+
+**Estado:** aceptada · **construida y verificada en el navegador** (no toca `core/`, sin migración,
+sin n8n).
+
+Mani pidió *"un toggle que me permita agrupar, además de por proyecto, por corrida"*. Esta ADR ya
+había puesto la corrida como **faceta** de la barra de ADR-076 — o sea que la pregunta era si el
+toggle sobraba.
+
+**No sobra, y son dos preguntas distintas.** La faceta contesta *"mostrame SOLO lo de anoche"*; el
+toggle contesta *"mostrame todo, separado por corrida"*. La segunda **no se puede hacer filtrando**:
+comparar dos corridas exige verlas a la vez. Las dos conviven y no se borra nada.
+
+### Anida, no reemplaza
+
+El agrupado por corrida es un nivel **arriba** del proyecto, nunca en su lugar. La razón por la que
+el mazo agrupa por proyecto —los criterios de relevancia son por proyecto, y mezclarlos obliga a
+rotar de criterio en cada tarjeta (`domain/feed.ts`)— no deja de valer porque alguien quiera separar
+las corridas. Por eso `agruparPorCorrida()` **delega el nivel de adentro a `agrupar()`** en vez de
+reimplementarlo: una sola implementación del orden por heat, en los dos modos. Y por eso es un modo
+de vista y no un criterio de la barra de orden — ordenar no aplana grupos (ADR-076 §6).
+
+### 🩸 El ISO viaja además de la etiqueta, y sin eso el modo miente
+
+Esta ADR decidió que **viaja la etiqueta y no el uuid**, y sigue siendo correcto. Pero la etiqueta es
+texto para humanos (`"31 ago, 04:30"`): **ordenar grupos por ese string pone *"1 sep"* antes de
+*"31 ago"***, y el feed queda con las corridas mezcladas sin que nada falle. Ahora viaja también
+`corridaInicio`, el ISO crudo, **solo para ordenar**. Sale de la misma query que ya resuelve la
+etiqueta, así que no es plomería nueva: era el mismo dato, tirado. Clavado como test.
+
+### El cajón de los sin corrida se dibuja, y va último
+
+Misma regla que `(sin proyecto)`. 📏 **Medido el 31/08: 242 de 274 candidatos vivos (88%) no tienen
+corrida**, porque esta ADR entró sin backfill — o sea que hoy ese grupo es casi todo el feed.
+**Esconderlo dejaría el feed pareciendo vacío sin decir por qué**, y el barrido de 20 días lo cura
+solo. Se descartó también aproximar la corrida por `creado_en` para los viejos: es exactamente la
+derivación que el cuerpo de esta ADR descartó midiendo.
+
+Se descartó apagar el toggle hasta que haya 2+ corridas (sería consistente con las facetas, pero el
+control no se vería andar el día que se deploya) y reemplazar la faceta por el toggle.
+
+- (+) *"¿Qué trajo la corrida de anoche?"* se contesta sin filtrar, y se compara con la anterior.
+- (−) Hoy el modo muestra **un grupo real y un cajón enorme**: nace correcto y casi vacío.
+- (−) `plegados` pasó a llevar claves con prefijo (`p:`, `c:`, `c:…/p:…`): sin eso, plegar un
+  proyecto en un modo lo dejaba plegado en el otro, y una corrida y un proyecto homónimos habrían
+  compartido estado.

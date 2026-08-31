@@ -105,6 +105,17 @@ export type CandidatoFeed = {
    * lugar, `lib/candidatos.ts`, que es donde vive el IO.
    */
   corrida: string | null;
+  /**
+   * El `inicio` crudo de esa corrida (ISO), y viaja **solo para ordenar los grupos**.
+   *
+   * 🩸 La etiqueta de arriba es `"31 ago, 22:50"`, o sea texto para humanos: ordenar grupos por ese
+   * string pone *"1 sep"* antes de *"31 ago"* y el feed queda con las corridas mezcladas sin que
+   * nada falle. Se resuelve donde ya se resuelve la etiqueta (`lib/candidatos.ts`), en la misma
+   * query, así que no es plomería nueva — es el mismo dato sin formatear.
+   *
+   * `null` cuando `corrida` es `null`: los dos salen del mismo `run_id`.
+   */
+  corridaInicio: string | null;
 };
 
 /**
@@ -268,6 +279,72 @@ export function agrupar<T extends { id: string; proyecto: string; heat: number |
       if (a.proyecto === SIN_PROYECTO) return 1;
       if (b.proyecto === SIN_PROYECTO) return -1;
       return a.proyecto.localeCompare(b.proyecto, "es");
+    });
+}
+
+export const SIN_CORRIDA = "Sin corrida";
+
+/** Un grupo de corrida: adentro siguen los grupos por proyecto, intactos. */
+export type GrupoCorrida<T> = {
+  /** La etiqueta legible (`"31 ago, 04:30"`), o `SIN_CORRIDA`. */
+  corrida: string;
+  /** El ISO, para ordenar. `null` en el grupo sin corrida. */
+  inicio: string | null;
+  proyectos: Grupo<T>[];
+  total: number;
+};
+
+/**
+ * Agrupa por corrida y, **adentro de cada una, por proyecto**.
+ *
+ * 🔑 **Anida, no reemplaza.** El agrupado por proyecto existe porque los criterios de relevancia son
+ * por proyecto y mezclarlos obliga a rotar de criterio en cada tarjeta (ver `agrupar`); esa razón no
+ * deja de valer porque alguien quiera ver las corridas separadas. Por eso la corrida es un nivel
+ * ARRIBA y el de adentro se delega a `agrupar()` sin reimplementarlo — si se copiara el ordenamiento
+ * por heat acá, serían dos implementaciones de la misma regla, que es el error que ya nombró ADR-072.
+ *
+ * **Las corridas van de más nueva a más vieja** (al revés que los proyectos, que van alfabéticos):
+ * la pregunta que trae a alguien a este modo es *"¿qué trajo la corrida de anoche?"*, y la respuesta
+ * tiene que estar arriba.
+ *
+ * ⚠️ **`SIN_CORRIDA` se dibuja y va último**, misma regla que `(sin proyecto)`. No es una categoría
+ * inventada: son las filas anteriores a la migración `034` y aquellas donde el registro —que es
+ * sumidero— no pudo abrir el run (ADR-081). Esconderlas haría que el feed parezca casi vacío sin
+ * decir por qué. 📏 Medido contra prod el 2026-08-31: **242 de 274 candidatos vivos (88%) no tienen
+ * corrida**, porque ADR-081 entró sin backfill. O sea que hoy este grupo es casi todo el feed, y el
+ * barrido de 20 días lo cura solo.
+ */
+export function agruparPorCorrida<
+  T extends {
+    id: string;
+    proyecto: string;
+    heat: number | null;
+    corrida: string | null;
+    corridaInicio: string | null;
+  },
+>(candidatos: T[]): GrupoCorrida<T>[] {
+  const porCorrida = new Map<string, { inicio: string | null; lista: T[] }>();
+  for (const c of candidatos) {
+    const clave = c.corrida ?? SIN_CORRIDA;
+    const grupo = porCorrida.get(clave);
+    if (grupo) grupo.lista.push(c);
+    else porCorrida.set(clave, { inicio: c.corrida ? c.corridaInicio : null, lista: [c] });
+  }
+
+  return [...porCorrida.entries()]
+    .map(([corrida, { inicio, lista }]) => ({
+      corrida,
+      inicio,
+      proyectos: agrupar(lista),
+      total: lista.length,
+    }))
+    .sort((a, b) => {
+      if (a.corrida === SIN_CORRIDA) return 1;
+      if (b.corrida === SIN_CORRIDA) return -1;
+      // Sin ISO no se puede ordenar por fecha, y la etiqueta no sirve para eso. Se cae al nombre
+      // para que el orden siga siendo estable, que es lo que el mazo necesita mientras se recorre.
+      if (!a.inicio || !b.inicio) return a.corrida.localeCompare(b.corrida);
+      return b.inicio.localeCompare(a.inicio);
     });
 }
 
