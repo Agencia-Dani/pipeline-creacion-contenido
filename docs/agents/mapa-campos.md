@@ -206,6 +206,7 @@ Los escribe **MOTOR** (`Preparar batch Airtable`) salvo donde diga otra cosa. **
 | `proyecto` · `voz` (links) | MOTOR | ARCH (`Armar filas`, `Computar métricas`, `Destilar` agrupan por `proyecto[0]`) | ✅ |
 | `fecha` (createdTime) | Airtable | **ARCH** (`Leer Candidatos nuevos viejos`: `IS_BEFORE({fecha}, -20 días)`) | ⚠️ **Load-bearing y se crea a mano.** `setup-airtable.mjs` no lo crea (la API no hace campos computados) — lo pide por consola. Base nueva sin `fecha` ⇒ el `filterByFormula` del barrido **falla** y los `nuevo` viejos se acumulan. Misma clase de bug que los toggles faltantes → **anotado en §3**. |
 | `fecha_calificacion` (lastModified de `calificacion`) | Airtable | ARCH (`calificado_en` de `outputs` + Sheet) | ✅ Con fallback a `now()` si falta. |
+| `run_id` | MOTOR (`Preparar candidatos`) | **equipo** (badge + faceta *Corrida* en el Feed) | ✅ **Nuevo 2026-08-30 ([ADR-081](../adr/ADR-081-el-candidato-sabe-de-que-corrida-salio.md), migración `034`).** Nullable a propósito: `Abrir run en el registro` es sumidero, así que un registro caído deja el candidato **sin corrida** en vez de tumbar la entrega. 📏 **No se deriva de `creado_en`**: medido el 30/08, **68 de 168** candidatos vivos (40%) caen fuera de toda ventana `[inicio, fin]` — son el rescate manual del 22/08 y su `creado_en` es la hora del rescate, no la de la corrida. ⚠️ **El archivado NO lo lleva a `outputs`**: `outputs.run_id` es el run del *archivado*, así que la corrida de origen se pierde al archivar (anotado en ADR-081, no resuelto acá). |
 
 ### 4.4 `Referentes propuestos`
 

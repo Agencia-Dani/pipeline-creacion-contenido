@@ -100,6 +100,17 @@ en §Agent skills; acá solo se ubican.
   insert de rescate al lado. *Medir el martes no autoriza a borrar el jueves.*
   *Se corrió de número dos veces el 21/08, porque `videos_meta` y `colecciones` llegaron antes — que
   es la regla escrita: **el número se toma cuando el archivo existe, no cuando un doc lo reserva**.*
+  ⛔ **La [`034`](core/schema/034_candidatos_run.sql) (ADR-081) está escrita y NO aplicada** — es el
+  único gate humano abierto del repo al 2026-08-30. Agrega `app.candidatos.run_id`: de qué corrida
+  salió cada candidato. 🔴 **El orden importa y su modo de falla es caro:** la migración va
+  **ANTES** que `n8n:push` al motor. Al revés, `POST Candidatos` manda una columna que no existe,
+  PostgREST contesta 400, y ese nodo es **fail-closed** ⇒ **muere la entrega entera, después de
+  haber pagado Supadata y Haiku**. 📏 Su porqué es una medición, no un gusto: la alternativa barata
+  era derivar la corrida de `creado_en` contra `runs.inicio/fin`, y contra prod el 30/08 **68 de
+  168 candidatos vivos (40%) caen fuera de toda ventana** — son el rescate manual del 22/08, cuyo
+  `creado_en` es la hora del rescate y no la de la corrida. *La derivación no falla ruidosa: le
+  diría "sin corrida" al 40% del feed teniendo la corrida en la tabla.* **No hace backfill**: las
+  viejas quedan en `null` y el barrido de 20 días lo cura solo.
   🟢 **El canario de ADR-069/070 SE DESPERTÓ el 20/08, y es el primer uso real del sistema por
   alguien que no lo construyó.** `app.grabados` tiene **294 filas**: **288 las cargó Majo Duarte**,
   en dos escrituras de 166 y 122. No se dedujo de los timestamps —eso es una sola señal— sino de

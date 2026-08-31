@@ -24,8 +24,9 @@
 
 > # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
-> **Nada espera a Mani para la próxima corrida.** El único bloqueo del repo es el ⛔ de abajo, y es
-> de producto, no de código.
+> ⛔ **Desde el 30/08 (cierre 123) SÍ espera algo: la migración `034` sin aplicar.** Este renglón
+> decía *"nada espera a Mani para la próxima corrida"* y dejó de ser cierto el mismo día. El otro
+> bloqueo, el de abajo, sigue siendo de producto y no de código.
 >
 > - **El MVP está declarado** (ROADMAP §4): la última condición —*el equipo usa el sistema un día
 >   completo sin un dev*— la cumplió **Majo el 26/08**, sola. Con eso **D3 se cerró por medición y
@@ -45,7 +46,8 @@
 > | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
 > | ~~El badge de `degradaria` nunca se pintó~~ | — | ✅ **CERRADO el 30/08** (ADR-080 §Enmienda): no era "sin ver", era un bug — se pintaba como texto gris atenuado, indistinguible del `"limpio"` de al lado. Ahora es un badge `outline`, visto andar con su único caso |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
-> | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
+> | ⛔ **Aplicar la migración [`034`](../../core/schema/034_candidatos_run.sql)** (ADR-081) y **recién después** `n8n:push -- motor --nodos "Preparar candidatos"` y el deploy | **Mani** | 🔴 **El orden no es opcional.** Al revés, `POST Candidatos` manda una columna que no existe, PostgREST da 400 y ese nodo es **fail-closed** ⇒ muere la entrega ya pagada. Ver cierre 123 |
+| Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
 > | ~~La topología de n8n sigue siendo ritual manual~~ | — | ✅ **CERRADO el 30/08** (ADR-053 §Enmienda). `n8n:push` empuja nodos y conexiones; el re-import queda solo para crear un workflow de cero. El bloqueo no eran las credenciales sino que `cuerpoPut` mandaba las conexiones del live |
 > | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ **DESBLOQUEADO el 30/08** (ADR-074 §Enmienda): `guardarLimpio` ya no manda `creado_por` al rehacer, así que *Rehacer 25* **se puede apretar**. Verificado en prod con una colección de un video: la fila se reescribió (huella `97ff9195`→`72210da7`, voz derivada) y el conteo quedó **igual, Majo 58 · Mani 7** |
 
@@ -137,6 +139,114 @@
 >    stub deja de emitir posts terminados para emitir material crudo.
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
+
+> ## 🧭 2026-08-30 (cierre 123) · EL FEED YA DICE DE QUÉ CORRIDA SALIÓ CADA VIDEO (Claude, pedido de Mani)
+>
+> **En una línea:** Operar decía *"hace X · entregó N"* y el Feed no decía nada; ahora el candidato
+> **lleva su corrida** ([ADR-081](../adr/ADR-081-el-candidato-sabe-de-que-corrida-salio.md) +
+> migración [`034`](../../core/schema/034_candidatos_run.sql)), se ve en la tarjeta y se filtra con
+> la barra de ADR-076.
+>
+> ### 📏 La medición que decidió el diseño, y descartó la opción barata
+>
+> La alternativa sin migración era derivar la corrida por rango: *el candidato es de la corrida cuya
+> ventana `[inicio, fin]` contiene su `creado_en`*. Se midió antes de descartarla, contra prod, sobre
+> los **168 candidatos vivos** y los **38 runs de motor**:
+>
+> | Caen en… | Cuántos |
+> |---|---|
+> | **1** ventana | 100 |
+> | **0** ventanas | **68 (40%)** |
+> | 2+ (ambiguos) | **0** |
+>
+> **Los 68 comparten `creado_en` AL MICROSEGUNDO** (`2026-08-22T02:35:28.3151`). No es estadística:
+> es un `INSERT` único — **el rescate manual del cierre 114**, cuando la corrida `f3fcf3e7` murió
+> quemando 814 transcripciones el 21/08 a las 20:24 y sus filas ya armadas se re-insertaron por
+> PostgREST para no volver a pagarlas. **Su `creado_en` es la hora del rescate, no la de la corrida.**
+>
+> 🔑 **La idea portable: la derivación no falla ruidosa, falla en silencio con la respuesta
+> equivocada.** Le diría *"sin corrida"* al 40% del feed, y la corrida **existe**, está en la tabla y
+> es justamente la interesante (la que se cayó). Un `null` honesto y una atribución perdida se
+> dibujan idénticos.
+>
+> 🔑 **Y los 0 ambiguos no salvan a la derivación: la condenan.** Son 0 porque el guard single-flight
+> impide corridas de motor solapadas, o sea que **el modo de falla que se temía —el solape— es el que
+> NO se materializó**. El que sí se materializó no estaba en la hipótesis. *Medir el riesgo que uno
+> imaginó no es medir el riesgo.*
+>
+> ### 🩸 Hallazgo de paso, y no era el que se buscaba
+>
+> **`outputs.run_id` es el run del ARCHIVADO, no el del motor.** `Armar filas archivado` hace
+> `$('Abrir run en el registro')` dentro de *su propio* workflow, así que **hoy la corrida que
+> produjo el guion se pierde para siempre al archivar** — y ninguna derivación puede rescatarla
+> después, porque el candidato ya no está. **Anotado, no resuelto**: llevarla a `outputs` cambia el
+> contrato del histórico y merece su ADR (ADR-081 §Lo que NO se decide acá).
+>
+> ### Qué se construyó
+>
+> | Dónde | Qué |
+> |---|---|
+> | `core/schema/034_candidatos_run.sql` | `app.candidatos.run_id` uuid **nullable** → `runs (id)`. Sin índice (la faceta vive en el cliente) y **sin backfill** |
+> | `Workflows/workflow-short-form-content/workflow.json` | `Preparar candidatos` manda `run_id`. **Solo ese nodo**, un `jsCode` |
+> | `test-nodos.mjs` | 3 checks nuevos: lleva el run · **con el registro caído sale con `null`** · un id vacío no viaja como `""` |
+> | `apps/dashboard` | `CandidatoFeed.corrida` (la etiqueta, no el uuid) · `etiquetasDeCorrida` en `lib/candidatos.ts` · faceta **Corrida** en el mazo · texto en la tarjeta |
+>
+> **Nullable no es una concesión:** `Abrir run en el registro` es **sumidero**
+> (`onError: continueRegularOutput`, invariante #1 de PLAN §2.5). Un `not null` convertiría el
+> registro en dependencia de ejecución. El nodo copia la forma que `Armar filas archivado` ya usa.
+>
+> **Sin backfill, y el porqué es un precedente de esta misma semana:** escribir un valor **derivado**
+> en una columna de registro lo vuelve indistinguible de uno **medido** — es el mecanismo que
+> contaminó el canario de ADR-074 el 30/08 (cierre 122). Las viejas quedan en `null`, el Feed lo
+> dibuja como falta, y el barrido de 20 días lo cura solo. 🔓 Las 68 del rescate son la excepción y
+> va **comentada y opt-in** en la `034`: su corrida **se sabe** por dos señales independientes
+> (`estado = 'fallo'` + `fin` = 20:24 del 21/08), así que atribuirlas es **recordar**, no derivar.
+>
+> ### ✅ Verificado / ⛔ lo que NO se pudo
+>
+> - ✅ `node Workflows/workflow-short-form-content/test-nodos.mjs` — **todo en verde**, con los 3 nuevos.
+> - ✅ `node Workflows/auditar-workflows.mjs` — **sin hallazgos** (6 workflows).
+> - ✅ `npm run validate` — **2479 checks, 0 errores**.
+> - ✅ dashboard: `npm run typecheck` limpio · `npm test` **442 pass / 0 fail** · `npm run build` OK.
+> - ⛔ **NO se verificó en el navegador, y no se puede todavía**: la `034` no está aplicada, así que
+>   `leerFeed` pediría `run_id` a PostgREST y se llevaría un 400. La verificación visual va **después**
+>   del gate de abajo.
+>
+> ### ⛔ EL GATE, Y SU ORDEN NO ES OPCIONAL
+>
+> **1) Aplicar la `034` en el SQL Editor. 2) Recién después `npm run n8n:push -- motor --nodos
+> "Preparar candidatos" --apply`. 3) Recién después deployar el dashboard.**
+>
+> 🔴 **Al revés se rompe caro:** con el motor empujado y la columna sin crear, `POST Candidatos` manda
+> una columna inexistente, PostgREST contesta 400 — y ese nodo es **fail-closed** ⇒ **muere la
+> entrega entera, después de haber pagado Supadata y Haiku**. Es literalmente el modo de falla de la
+> ejecución 136. Lo mismo para el dashboard: deployado antes de la migración, el Feed **no abre**.
+>
+> Hasta que se empuje, `npm run n8n:diff` va a reportar **drift en `Preparar candidatos`**. Eso es
+> correcto y esperado: el repo va adelante del live a propósito.
+>
+> ### 🩸 Y de paso: `n8n:diff` NO estaba verde, y el handoff decía que sí
+>
+> Corriéndolo para separar mi drift del ajeno apareció **un segundo drift en el motor que no es
+> mío**: `Config · assignments`, y adentro **`concurrencia_transcribir` — el live corre `6`, el repo
+> dice `24`**. Confirmado contra `git show HEAD`: el repo tiene 24 desde antes de esta sesión, así
+> que el que cambió fue el live.
+>
+> **Qué significa, con el número que el propio dev-doc calcula:** con 24 en vuelo el presupuesto de
+> 840 s cubre **~745 videos**; con 6, **~186**. O sea que el nodo caro corre a **un cuarto** de lo
+> que [ADR-044](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md) decidió, y el presupuesto **quema**
+> (`POST processed_items` corre antes), así que lo que no entra no se posterga: se pierde.
+>
+> ⚠️ **No lo toqué, y no se decide desde acá.** Puede ser una bajada deliberada después de la
+> ejecución 136 (la que quemó 814 transcripciones el 21/08) que nunca volvió al repo. **Mani decide**
+> si gana el repo (`n8n:push -- motor --nodos "Config"`) o gana el live (bajar el número en el JSON,
+> con su porqué). Lo que no puede quedar es la tercera opción, que es la de hoy: los dos números
+> distintos y un doc afirmando que están iguales.
+>
+> 🔑 **La lección se repite dos cierres seguidos:** el cierre 122 encontró tres docs que describían
+> mal lo que ya estaba, y este encontró un **`✓ verde` citado en vez de medido** — el estado del
+> 29/08 dice *"el live corre lo que dice el repo (`n8n:diff` verde, 5 workflows)"* y bastó correrlo
+> para verlo rojo. *Un `n8n:diff` verde se re-corre, no se cita.*
 
 > ## 🔧 2026-08-30 (cierre 122) · DOS CANARIOS Y UN OBSTÁCULO QUE MEDÍAN LO QUE NO ERA (Claude, pedido de Mani)
 >

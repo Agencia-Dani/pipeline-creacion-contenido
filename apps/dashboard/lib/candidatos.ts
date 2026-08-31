@@ -12,6 +12,7 @@ import {
   type TextosCandidato,
 } from "@/domain/feed";
 import type { TenantContext } from "@/domain/tenant";
+import { fechaHora } from "@/lib/fechas";
 import { scoped } from "@/lib/supabase/scoped";
 
 // El feed de calificación. Desde D7 los candidatos viven **en Postgres**: los escribe el motor por
@@ -50,6 +51,7 @@ const filaCandidato = z.object({
   viral_por_tamano: z.boolean(),
   calificacion: z.string().nullable(),
   estado: z.string(),
+  run_id: z.string().nullable(),
   proyectos: z.object({ nombre: z.string() }).nullable(),
   voces: z.object({ nombre: z.string() }).nullable(),
 });
@@ -59,7 +61,7 @@ const filaCandidato = z.object({
 const COLUMNAS =
   "id, titulo, thumbnail_url, referente, url_referente, heat_score, relevancia_score, " +
   "idioma, views, likes, seguidores, engagement, viral_por_tamano, " +
-  "calificacion, estado, proyectos(nombre), voces(nombre)";
+  "calificacion, estado, run_id, proyectos(nombre), voces(nombre)";
 
 /**
  * El feed **entero** de ESTE cockpit para un filtro, con el proyecto ya resuelto a nombre por la FK.
@@ -86,7 +88,13 @@ export async function leerFeed(
 
   if (error) throw new Error(`Supabase respondió con error leyendo el feed: ${error.message}`);
 
-  return z.array(filaCandidato).parse(data ?? []).map((r) => ({
+  const filas = z.array(filaCandidato).parse(data ?? []);
+  const etiquetas = await etiquetasDeCorrida(
+    ctx,
+    [...new Set(filas.map((r) => r.run_id).filter((id): id is string => id !== null))],
+  );
+
+  return filas.map((r) => ({
     id: r.id,
     titulo: r.titulo,
     thumbnail: r.thumbnail_url,
@@ -104,7 +112,44 @@ export async function leerFeed(
     viralPorTamano: r.viral_por_tamano,
     calificacion: esCalificacion(r.calificacion) ? r.calificacion : null,
     estado: (r.estado as Estado) ?? "nuevo",
+    corrida: r.run_id ? (etiquetas.get(r.run_id) ?? null) : null,
   } satisfies CandidatoFeed));
+}
+
+/**
+ * `run_id` → *"30 ago, 22:50"*, para las corridas que aparecen en estas filas y ninguna más.
+ *
+ * 🔑 **Va acá y no en un embed de PostgREST.** `app.candidatos` está en el esquema `app` y `runs` en
+ * `public`: un `runs(inicio)` sería un embed cruzando esquemas, que depende de cómo esté expuesto
+ * PostgREST y falla en tiempo de ejecución, no de compilación. Una segunda query contra
+ * `public.runs` —que ya está en el mapa de `scoped`, con grano instancia— usa el camino que el
+ * resto del cockpit ya usa.
+ *
+ * **Es sumidero: si falla, devuelve el mapa vacío y el feed se dibuja sin corridas.** Saber de qué
+ * corrida salió un video no puede impedir calificarlo, que es a lo que la pantalla existe.
+ *
+ * ⚠️ La etiqueta es la fecha de inicio, no el uuid (ADR-081): dos corridas del mismo minuto
+ * colisionarían. El guard single-flight (ADR-023 C.3) lo hace imposible mientras exista.
+ */
+async function etiquetasDeCorrida(
+  ctx: TenantContext,
+  ids: readonly string[],
+): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  try {
+    const { data, error } = await (await scoped(ctx))
+      .select("public.runs", "id, inicio")
+      .in("id", [...ids]);
+    if (error) throw new Error(error.message);
+    return new Map(
+      z.array(z.object({ id: z.string(), inicio: z.string() }))
+        .parse(data ?? [])
+        .map((r) => [r.id, fechaHora(r.inicio)] as const),
+    );
+  } catch (e) {
+    console.error("[candidatos] no se pudieron leer las corridas del feed (ADR-081):", e);
+    return new Map();
+  }
 }
 
 /** El lado PostgREST de `condicionDeFiltro`, aplicado al builder. */

@@ -94,6 +94,18 @@ export function Tarjeta({
           {candidato.referente ?? "sin referente"}
           {candidato.views !== null && ` · ${miles(candidato.views)} vistas`}
           {candidato.viralPorTamano && " · high-end"}
+          {" · "}
+          {/* La corrida que lo trajo (ADR-081). **El `sin corrida` se dibuja**, no se omite: la
+              falta es un estado real —fila anterior a la `034`, o registro caído— y omitirla la
+              haría indistinguible de "esta pantalla todavía no muestra la corrida" (ADR-072 §4).
+              Se apaga solo: el barrido de 20 días se lleva las filas viejas. */}
+          <span title={
+            candidato.corrida
+              ? "La corrida del motor que trajo este video."
+              : "No se sabe de qué corrida salió: es anterior a que el motor lo registrara, o el registro no pudo abrir la corrida."
+          }>
+            {candidato.corrida ?? "sin corrida"}
+          </span>
         </>
       }
       pie={
