@@ -63,7 +63,17 @@ const CRITERIOS: readonly CriterioOrden<CandidatoFeed>[] = [
   { clave: "titulo", etiqueta: "Título A-Z", valor: (c) => c.titulo },
 ];
 
+// 🔑 **La corrida va primero**: es la pregunta que trae a alguien a esta barra ("¿qué trajo la
+// corrida de anoche?"), y el idioma es un afinado. Las dos son facetas de las que MIRAN (ADR-076
+// §4): nadie edita la corrida ni el idioma de un candidato desde la pantalla, así que un `.filter()`
+// vivo no puede hacer desaparecer una tarjeta de abajo del cursor.
+//
+// **Corrida no es criterio de ORDEN**, a propósito: el mazo ya llega ordenado por heat y una fecha
+// de corrida no es una métrica del video. Y la faceta se apaga sola cuando no aporta — `usarOrden`
+// sólo dibuja las que tienen 2+ valores, así que un feed de una sola corrida no muestra un control
+// que no hace nada.
 const FACETAS: readonly Faceta<CandidatoFeed>[] = [
+  { clave: "corrida", etiqueta: "Corrida", valor: (c) => c.corrida },
   { clave: "idioma", etiqueta: "Idioma", valor: (c) => c.idioma },
 ];
 

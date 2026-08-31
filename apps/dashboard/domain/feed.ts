@@ -94,6 +94,17 @@ export type CandidatoFeed = {
   viralPorTamano: boolean;
   calificacion: Calificacion | null;
   estado: Estado;
+  /**
+   * De qué corrida salió, ya legible (`"30 ago, 22:50"`). `null` = **no se sabe**, y es un estado
+   * real: las filas anteriores a la migración `034` y las corridas donde el registro —que es
+   * sumidero— no pudo abrir el run (ADR-081).
+   *
+   * 🔑 **Viaja la etiqueta y no el uuid.** El uuid no se puede dibujar ni poner en un chip, así que
+   * mandarlo obligaría a resolverlo en el cliente y a plumbear el mapa de corridas por los DOS
+   * caminos que cargan el mazo (el server component y `leerMazo`). La resolución vive en un solo
+   * lugar, `lib/candidatos.ts`, que es donde vive el IO.
+   */
+  corrida: string | null;
 };
 
 /**

@@ -718,9 +718,13 @@ await (async () => {
 // empresa equivocada) y un `proyecto_id` perdido manda todo al grupo `(sin proyecto)` del feed.
 // Ninguno tira error: entregan, en verde, mal.
 const IID = 'inst-42';
-const runPrepCandidatos = (videos) => {
+const RUN_ID = 'run-7';
+// `run` es lo que devolvió `Abrir run en el registro`. El default trae el id; el caso interesante es
+// pasarle `{}`, que es lo que deja un registro caído — ese nodo es SUMIDERO (invariante #1).
+const runPrepCandidatos = (videos, run = { id: RUN_ID }) => {
   const $ = (n) => {
     if (n === 'Config') return { first: () => ({ json: { instance_id: IID } }) };
+    if (n === 'Abrir run en el registro') return { first: () => ({ json: run }) };
     throw new Error('nodo no mockeado: ' + n);
   };
   const $input = { all: () => videos.map((j) => ({ json: j })) };
@@ -781,6 +785,23 @@ seccion('Preparar candidatos — la instancia viaja en cada fila (ADR-048)');
   // sin él, no con un string vacío que la FK rechace.
   const filas = runPrepCandidatos([cvid('c', { proyecto_id: '', voz_id: undefined })]);
   check('sin proyecto resoluble la fila va con null, no con "" (la FK lo rechazaría)', filas[0].proyecto_id === null && filas[0].voz_id === null, JSON.stringify([filas[0].proyecto_id, filas[0].voz_id]));
+}
+
+seccion('Preparar candidatos — la corrida de origen viaja en cada fila (ADR-081)');
+{
+  const filas = runPrepCandidatos([cvid('r1'), cvid('r2')]);
+  check('cada candidato lleva su run_id', filas.length === 2 && filas.every((f) => f.run_id === RUN_ID), JSON.stringify(filas.map((f) => f.run_id)));
+
+  // 🔴 El caso que decide si esto respeta el invariante #1: `Abrir run en el registro` es sumidero,
+  // así que puede devolver un error en vez de la fila. La corrida TIENE que entregar igual, con el
+  // candidato sin corrida — nunca reventar acá y perder la entrega ya pagada.
+  const sinRun = runPrepCandidatos([cvid('r3')], {});
+  check('con el registro caído la fila sale igual, con run_id null', sinRun.length === 1 && sinRun[0].run_id === null, JSON.stringify(sinRun[0] && sinRun[0].run_id));
+
+  // Y que el `|| null` no deje pasar un string vacío, que la FK rechazaría con 23503 y tumbaría el
+  // POST entero — o sea toda la entrega, no una fila.
+  const vacio = runPrepCandidatos([cvid('r4')], { id: '' });
+  check('un id vacío viaja como null, no como "" (la FK lo rechazaría)', vacio[0].run_id === null, JSON.stringify(vacio[0].run_id));
 }
 
 seccion('Preparar descartes — misma regla, misma instancia');
