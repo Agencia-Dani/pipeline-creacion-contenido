@@ -593,6 +593,101 @@ await (async () => {
 })();
 
 // ════════════════════════════════════════════════════════════════════════════
+// Pre-trim relevancia — chunks + pool, y el fail-open que dejó de ser invisible
+// ════════════════════════════════════════════════════════════════════════════
+// Mandaba UNA llamada por proyecto con TODOS sus captions y `max_tokens: 1000` para la lista de ids
+// a descartar. Medido sobre la ejecución 150 (31/08): 465 videos = ~40k tokens de prompt, y el peor
+// proyecto usó ~469 tokens de respuesta = **47% del techo** ⇒ a 2x está en 94% y a 4x TRUNCA. Los dos
+// extremos terminan en el MISMO síntoma, que es el peor posible: el regex no matchea el JSON cortado,
+// el catch se lo traga y el nodo descarta CERO, sin un error y sin una línea en el log.
+const runPretrim = async ({ items = [], projects = {}, cfg = {}, delayMs = 0, descartarFn, respuesta, falla = false } = {}) => {
+  const llamadas = [];
+  let enVuelo = 0, maxEnVuelo = 0;
+  const thisMock = { helpers: { httpRequest: async (opts) => {
+    llamadas.push(opts);
+    enVuelo++; maxEnVuelo = Math.max(maxEnVuelo, enVuelo);
+    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+    enVuelo--;
+    if (falla) throw new Error('haiku caído (mock)');
+    if (respuesta !== undefined) return respuesta;
+    const usr = (((opts.body || {}).messages || [])[0] || {}).content || '';
+    let ids = [];
+    try { ids = JSON.parse(usr.slice(usr.indexOf('VIDEOS:\n') + 8)).map((v) => v.id); } catch (e) {}
+    return { content: [{ text: JSON.stringify({ descartar: descartarFn ? ids.filter(descartarFn) : [] }) }] };
+  } } };
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: cfg }) };
+    if (n === 'Armar plan de corrida') return { first: () => ({ json: { projects } }) };
+    if (n === 'Asignar proyecto+voz') return { all: () => items.map((j) => ({ json: j })) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const logs = [];
+  const out = await new AsyncFn('$', 'console', jsCode('Pre-trim relevancia')).call(thisMock, $, { log: (m) => logs.push(m) });
+  return { out: out.map((i) => i.json), logs, llamadas, maxEnVuelo: () => maxEnVuelo };
+};
+// caption largo a propósito: el filtro de "caption pobre" (<25 chars de señal) exime del juicio
+const qvid = (id, pid = 'P1') => ({ external_id: id, proyecto_id: pid, descripcion: 'un caption con texto real y suficiente senal para juzgar ' + id, hashtags: '#algo' });
+
+seccion('Pre-trim — chunks de 100 (una sola llamada por proyecto se pasaba de ventana)');
+await (async () => {
+  const P1 = { P1: { nombre: 'P1', criterios: 'trading' } };
+  const muchos = (n, pid = 'P1') => { const a = []; for (let i = 0; i < n; i++) a.push(qvid(pid + '-v' + i, pid)); return a; };
+  {
+    const { llamadas } = await runPretrim({ items: muchos(450), projects: P1 });
+    check('450 videos se parten en 5 chunks (antes: 1 llamada de ~40k tokens)', llamadas.length === 5, llamadas.length + ' llamadas');
+    check('y cada chunk manda como mucho 100 videos', llamadas.every((l) => JSON.parse(l.body.messages[0].content.split('VIDEOS:\n')[1]).length <= 100), 'algún chunk se pasó de 100');
+  }
+  {
+    const { maxEnVuelo } = await runPretrim({ items: muchos(800), projects: P1, delayMs: 15 });
+    check('los chunks van en paralelo', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
+  }
+  {
+    const items = muchos(100, 'P1').concat(muchos(700, 'P2'));
+    const projects = { P1: { nombre: 'P1', criterios: 'trading' }, P2: { nombre: 'P2', criterios: 'psico' } };
+    const { maxEnVuelo } = await runPretrim({ items, projects, delayMs: 15 });
+    check('el pool cruza proyectos (1 chunk + 7 chunks corren juntos)', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
+  }
+  {
+    const { llamadas } = await runPretrim({ items: muchos(50), projects: P1 });
+    check('🔑 max_tokens sube a 2000: 100 ids descartados entran con colchón', llamadas[0].body.max_tokens === 2000, String(llamadas[0].body.max_tokens));
+  }
+  {
+    const { out } = await runPretrim({ items: muchos(30), projects: P1, descartarFn: (id) => id.endsWith('0') });
+    check('sigue descartando lo que Haiku marca (el trabajo del nodo no cambió)', out.length === 27, out.length + ' de 30');
+  }
+  {
+    const { out } = await runPretrim({ items: muchos(30), projects: P1 });
+    check('y sin descartes pasa todo', out.length === 30, out.length + ' de 30');
+  }
+
+  // ── El fail-open dejó de ser invisible ──
+  // Medido el 31/08: dos proyectos de 465 videos descartaron CERO, y no había forma de saber si el
+  // tema estaba limpio o la llamada se había roto. Ahora se distinguen.
+  {
+    const { out, logs } = await runPretrim({ items: muchos(30), projects: P1, falla: true });
+    check('🔴 Haiku caído: pasa todo (fail-open intacto)', out.length === 30, out.length + ' de 30');
+    check('🔊 pero los items quedan marcados _pretrim_fallo', out.every((o) => o._pretrim_fallo === true), 'alguno sin marcar');
+    check('y el nodo lo grita en el log', logs.some((l) => l.includes('chunks sin juicio')), JSON.stringify(logs));
+  }
+  {
+    // El caso que da nombre al arreglo: respuesta TRUNCADA. No es un error, es un JSON cortado —
+    // antes era indistinguible de "no había nada que descartar".
+    const { out, logs } = await runPretrim({ items: muchos(30), projects: P1, respuesta: { content: [{ text: '{"descartar":["a","b","c' }] } });
+    check('🔴 respuesta truncada: pasa todo, igual que antes', out.length === 30, out.length + ' de 30');
+    check('🔊 pero AHORA se distingue de "no había nada off-topic"', out.every((o) => o._pretrim_fallo === true), 'no se marcó: volvió a ser invisible');
+    check('y también grita', logs.some((l) => l.includes('truncada')), JSON.stringify(logs.slice(-1)));
+  }
+  {
+    const { out } = await runPretrim({ items: muchos(30), projects: P1 });
+    check('un chunk sano NO se marca (una marca que sale siempre no marca nada)', out.every((o) => o._pretrim_fallo === false), 'hay marcados de más');
+  }
+  {
+    const { out, llamadas } = await runPretrim({ items: muchos(30), projects: { P1: { nombre: 'P1' } } });
+    check('sin criterios sigue sin llamar a Haiku y pasa todo', llamadas.length === 0 && out.length === 30, `llamadas=${llamadas.length} out=${out.length}`);
+  }
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
 // Heat-score v1 — dedup blindado (ADR-029): processed_items (primaria, fail-closed) ∪ feed vivo
 // (secundaria, fail-open) + cap_top_n. Cubre la ruta que explica los duplicados del run 20→21/07,
 // que antes no tenía red de regresión.
@@ -630,6 +725,40 @@ seccion('Heat-score v1 — dedup blindado (ADR-029)');
 {
   const { out } = runHeat({ items: [hvid('a'), hvid('b'), hvid('c')], procesados: [{ external_id: 'a', platform: 'ig' }], feed: [feedPage('b')] });
   check('procesados ∪ feed: caen los dos, sale solo el fresco', out.length === 1 && out[0].external_id === 'c', JSON.stringify(out.map((o) => o.external_id)));
+}
+// ── El feed vivo también tiene guard, y por qué eso no contradice su fail-open ──
+// ADR-029 la eligió como línea SECUNDARIA y best-effort; su §Enmienda midió que hacía el **100%**
+// del dedup (la primaria aportó 0). Y hasta hoy se cortaba en 1.000 igual que la otra, sin paginar.
+// La distinción que sostiene los dos comportamientos: un servicio CAÍDO devuelve 0 filas o revienta
+// (fail-open, la corrida sigue); una PAGINACIÓN ROTA devuelve exactamente 1.000, y ahí el motor está
+// ciego sin saberlo.
+{
+  const mil = []; for (let i = 0; i < 1000; i++) mil.push('f' + i);
+  let msg = '';
+  try { runHeat({ items: [hvid('a')], feed: [feedPage(...mil)] }); } catch (e) { msg = e.message; }
+  check('🔒 exactamente 1000 filas del feed vivo = una sola página ⇒ aborta', msg.includes('Leer feed vivo') && msg.includes('paginacion'), msg || 'no tiró');
+}
+{
+  const casi = []; for (let i = 0; i < 999; i++) casi.push('f' + i);
+  const { out } = runHeat({ items: [hvid('a')], feed: [feedPage(...casi)] });
+  check('999 no dispara nada (el guard es el número exacto, no "muchas")', out.length === 1, out.length + ' items');
+}
+{
+  // El fail-open de siempre sigue en pie: que el feed se caiga NO puede abortar la corrida.
+  const $roto = { all: () => { throw new Error('supabase caído (mock)'); } };
+  const out = (() => {
+    const $ = (n) => {
+      if (n === 'Config') return { first: () => ({ json: CFG_HEAT }) };
+      if (n === 'Armar plan de corrida') return { first: () => ({ json: { ajustes: {} } }) };
+      if (n === 'Pre-trim relevancia') return { all: () => [{ json: hvid('a') }] };
+      if (n === 'Leer procesados') return { all: () => [] };
+      if (n === 'Leer señal selección') return { all: () => [] };
+      if (n === 'Leer feed vivo') return $roto;
+      throw new Error('nodo no mockeado: ' + n);
+    };
+    return new Function('$', 'console', jsCode('Heat-score v1'))($, { log: () => {} });
+  })();
+  check('y el feed caído sigue siendo fail-open: la corrida entrega igual', out.length === 1, out.length + ' items');
 }
 {
   let threw = false, msg = '';

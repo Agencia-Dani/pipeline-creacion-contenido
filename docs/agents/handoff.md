@@ -77,7 +77,9 @@
 > | **Podar los referentes de cola** — 24 de 40 aportan 1-3 videos cada uno | Majo / Mani | 📌 **Hallazgo del cierre 124, y explica el *"trae pocos videos"* mejor que la ráfaga.** 11 cuentas ponen el **94%** del supply; varias de la cola (`tesco`, `virginradiouk`, `filmmakerzara`) ni son cuentas de contenido — entraron por el descubrimiento y nadie las podó |
 > | ~~**El margen de `cap_top_n` se gastó** — el presupuesto quema~~ | — | ✅ **DESACTIVADO el 31/08** (cierre 127, [ADR-084](../adr/ADR-084-la-memoria-guarda-lo-resuelto-no-lo-intentado.md)). El margen sigue siendo 374 vs 350 (7%), pero **ya no importa igual**: el presupuesto de transcripción **posterga en vez de quemar**, así que morder dejó de ser pérdida permanente y pasó a ser demora. La palanca sigue siendo subir `concurrencia_transcribir` midiendo los 429, no bajar el cap. *Lo que NO se hizo es la parte que ADR-030 §Enmienda pedía —que el motor calcule su propio margen y lo avise—; sí se hizo para el otro tope repartido entre dos dueños (ADR-016 §Enmienda), y el patrón queda escrito ahí para copiarlo* |
 > | **La corrida de fuego de ADR-084 + ADR-044 §Enmienda** — 3 números | quien tome la sesión | 📌 **Es lo que sigue, y va ANTES de subir volumen.** El Gate tiene que caer de **492.7 s** a ~60 (si no, la concurrencia no está entrando); `metricas.gate_sin_presupuesto` tiene que dar **0**; y `processed_items` tiene que crecer **menos** por corrida — con la contracara de que algunos videos vuelvan, que es lo buscado y no un dedup roto. Recién con eso se sube *Resultados por cuenta de referente* **un escalón por vez** |
-> | **Pasos 3 y 4 del plan del 31/08** — los dos silenciosos | quien tome la sesión | 📌 Ninguno muerde hoy; los dos muerden al subir volumen, **y ninguno hace ruido cuando lo hace**. (3) **Chunkear el pre-trim**: hoy manda 1 llamada por proyecto con TODOS sus captions y `max_tokens: 1000` para la respuesta ⇒ cuando la lista de ids a descartar no entra, el JSON sale truncado, el `match` falla y el fail-open **no descarta nada**. (4) **Paginar `Leer feed vivo`**: sin paginación contra el `max-rows` de 1.000 de PostgREST — es la advertencia textual de [ADR-029 §Enmienda](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md), hoy en 274 filas, y es la **misma falla muda** que el cierre 125 ya pagó en `Leer procesados` |
+> | ~~**Pasos 3 y 4 del plan del 31/08**~~ | — | ✅ **HECHOS el 31/08** (cierre 128, ADR-044 §Enmienda + [ADR-029 §Enmienda 2](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md)). El pre-trim va en chunks de 100 con pool y `max_tokens` 2.000 (medido: el peor proyecto usaba el **47%** del techo de 1.000, a 2× el 94%, a 4× truncaba), y `Leer feed vivo` **pagina** con guard propio. 🔊 Y los dos fail-open dejaron de ser invisibles: `metricas.pretrim_sin_juicio` + `metricas.gate_sin_presupuesto`, cada uno con su aviso. ⚠️ **Falta empujarlos al live** — el push del cierre 127 fue antes de esto |
+> | **Subir el volumen: el clic que falta** | Mani | 📌 **El techo se movió, el pedido no.** `cap_resultados_referente` pasó a 500 en el `Config`, pero el ajuste vivo *"Resultados por cuenta de referente"* **sigue en 50** ⇒ la corrida colecta exactamente lo mismo que antes. Subirlo es un clic en `/curar/ajustes`, y va **después** de la corrida de fuego y de empujar el cierre 128. Un escalón por vez |
+> | **Punto ciego de `n8n:diff`** — mezcla ruido con cambios sin empujar | quien tome la sesión | 📌 Clasifica `"Leer feed vivo" · options` (donde vive la paginación nueva) como **benigno**, junto a `method` y `resource` ⇒ **un nodo HTTP puede quedarse sin paginación con el diff en verde**. Que este cambio sí llega se verificó por el precedente (`Leer procesados` tiene su `pagination` en el live desde el cierre 125, mismo mecanismo), no por el diff. Anotado al final de ADR-029 §Enmienda 2 |
 > | **Soltar los 1.029 huérfanos restantes** por tandas | quien tome la sesión | Cuesta una corrida del script; lo que vuelva es upside. ⚠️ **Los 255 del primer lote que no volvieron NO cuentan**: están fuera del alcance del método, correr el motor otra vez colecta los mismos 520 |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
@@ -4552,6 +4554,54 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-31 (cierre 128) — Los dos pasos que faltaban para subir volumen, y los dos fallaban callados (Claude, con Mani).**
+
+**Qué se hizo:** los pasos 3 y 4 del plan del cierre 127 —
+[ADR-044 §Enmienda](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md) (el pre-trim) y
+[ADR-029 §Enmienda 2](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md) (`Leer feed vivo` pagina)—.
+**152 checks** de `test-nodos.mjs`, auditor sin hallazgos, validador verde. ⚠️ **En el repo, todavía
+sin empujar** (el push del 127 fue antes de esto).
+
+**📏 El pre-trim, medido contando los items reales de la ejecución 150** (no estimado): mandaba UNA
+llamada por proyecto con TODOS sus captions — **465 videos = ~40k tokens de prompt** — y tenía
+`max_tokens: 1000` para la lista de ids a descartar, de los que **el peor proyecto ya usaba el 47%**.
+A 2× está en 94%, a 4× trunca, a 5× el prompt se pasa de la ventana. Ahora va en chunks de 100 con
+pool cross-proyecto y `max_tokens` 2.000.
+
+**🩸 Y el hallazgo salió de mirar los números, no el código: en esa misma ejecución DOS proyectos de
+465 videos descartaron CERO.** No había manera de saber si el tema estaba limpio o si la llamada se
+había roto — el código trataba *"no había nada off-topic"* y *"no pude mirar"* exactamente igual, los
+dos hacían nada. Un JSON truncado tampoco falla: no matchea el regex, el `catch` se lo traga y el
+nodo deja de filtrar en silencio. **Un fail-open sin contador es un fail-open invisible**, y ahora
+los dos tienen el suyo: `metricas.pretrim_sin_juicio` y `metricas.gate_sin_presupuesto`, cada uno con
+aviso.
+
+**🔑 El feed vivo pagina, y el guard convive con su fail-open porque son dos eventos distintos:** un
+servicio **caído** devuelve 0 filas o revienta ⇒ fail-open, la corrida sigue (que es lo que ADR-029
+eligió); una **paginación rota** devuelve exactamente 1.000 = una página ⇒ aborta, porque ahí el
+motor está ciego y no lo sabe. Por eso el `try/catch` envuelve solo la lectura y el guard va afuera:
+adentro, el `throw` habría caído en el propio `catch` que lo tenía que dejar pasar.
+
+**🩸 Y una corrección a Mani que vale anotar: subir `cap_resultados_referente` a 500 NO subió el
+volumen.** Preguntó *"ya no es 50 por cuenta, lo subimos a 500 no?"* y la respuesta es no: 500 es el
+**techo** en `Config`, y el **pedido** es el ajuste *"Resultados por cuenta de referente"*, que sigue
+en **50** (medido contra prod). Antes los dos eran 50, o sea pegado al techo sin poder pasarlo; ahora
+el techo está lejos y el pedido no se movió. *Un límite repartido entre dos dueños confunde también a
+quien lo mueve, no solo al que lo lee.*
+
+**⚠️ Punto ciego nuevo, y es del tooling:** `n8n:diff` clasificó `"Leer feed vivo" · options` —donde
+vive la paginación que acabo de agregar— en el balde **benigno**, junto a `method` y `resource`. O
+sea que **un nodo HTTP puede quedarse sin paginación con el diff en verde**. Que este cambio sí llega
+se verificó por el precedente, leyendo el live: `Leer procesados` tiene su `pagination` desde el
+cierre 125, empujada por el mismo mecanismo. El balde merece su propia sesión (hay chip).
+
+**Qué sigue, en orden:** (1) empujar el cierre 128 al live —`Config`, `Pre-trim relevancia`, `Leer
+feed vivo`, `Heat-score v1`, `Resumen del run`, solo `--nodos`, sin topología—; (2) la corrida de
+fuego con sus tres números (el Gate de 492.7 s ⇒ ~60, `gate_sin_presupuesto` en 0, `processed_items`
+creciendo menos); (3) recién ahí el clic de Mani en Ajustes, **un escalón por vez**.
+
+**Skills para la próxima:** `/diagnose` si la corrida de fuego no baja el Gate.
 
 **2026-08-31 (cierre 127) — Transcribir dejó de ser el que descarta, y el Gate dejó de ser el que mata la corrida (Claude, con Mani).**
 

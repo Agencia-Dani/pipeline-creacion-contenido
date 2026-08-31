@@ -273,3 +273,47 @@ propio**, y ahí caen las dos líneas a la vez. Queda anotado, no resuelto acá.
 - **El costo en plata no está medido y no se afirma.** En la corrida del 31/08 fue 0. Podría no serlo
   en otras —un video **archivado** sale de `candidatos` y queda solo en `processed_items`, o sea sin
   red de abajo— pero eso no se midió y no se escribe como si sí.
+
+---
+
+## Enmienda 2 · 2026-08-31 — la línea que sostiene el dedup ya no se corta en 1.000
+
+La enmienda de arriba cerró con una advertencia textual: *"⚠️ Y las dos se cortan en el mismo 1.000.
+`Leer feed vivo` va contra `app.candidatos`, que hoy tiene 274 filas. El día que pase de 1.000 se
+trunca igual, con la misma falla muda y sin guard propio, y ahí caen las dos líneas a la vez. Queda
+anotado, no resuelto acá."*
+
+Se resuelve acá, y el disparador es que **subir el volumen por corrida la acerca**: el plan del 31/08
+sube *Resultados por cuenta de referente*, o sea más candidatos por corrida y un feed que crece más
+rápido hacia ese 1.000.
+
+**Lo que cambia:** `Leer feed vivo` **pagina** (50 páginas × 1.000, idéntico a `Leer procesados`), y
+`Heat-score v1` le pone su propio guard.
+
+🔑 **El guard tiene que convivir con el fail-open, y la distinción que lo permite es la que ordena
+todo:**
+
+| Qué pasó | Cómo se ve | Qué hace |
+|---|---|---|
+| el servicio se cayó | 0 filas, o la lectura revienta | **fail-open** — la corrida sigue, `processed_items` cubre |
+| la paginación se rompió | **exactamente 1.000** filas = una página | **aborta** — el motor está ciego y no lo sabe |
+
+No son el mismo evento y no merecen la misma respuesta. Un servicio caído es lo que este ADR
+contempló al hacerla best-effort; una paginación rota es *el motor creyendo que ve todo*. Por eso el
+`try/catch` se queda envolviendo **solo la lectura**, y el guard vive afuera — antes el `throw` habría
+caído dentro del propio `catch` que lo tenía que dejar pasar.
+
+**Y no es teórico:** el cierre 125 pagó exactamente este bug en la línea de al lado. `Leer procesados`
+pedía `limit=50000` contra un `max-rows` de 1.000 y devolvía 1.000 de 1.547 filas, con el motor ciego
+al 35% de su propia memoria y un guard escrito contra un techo que no existía.
+
+**Toca:** `Leer feed vivo` (paginación + `limit=1000` en la URL), `Heat-score v1` (los dos guards).
+Probado en `test-nodos.mjs` (4 casos: 1.000 exacto aborta nombrando la paginación, 999 no, el feed
+caído sigue siendo fail-open, y el dedup normal intacto). **No toca `core/`, sin migración.**
+
+⚠️ **Un punto ciego que queda, y no es de este nodo:** `n8n:diff` clasifica `"Leer feed vivo" ·
+options` como **benigno** —en el balde de *"defaults de n8n, o cambios sin empujar"*, junto a cosas
+como `method` y `resource`— o sea que **la paginación de un nodo HTTP puede faltar en el live con el
+diff en verde**. Que este cambio sí llega se verificó por el precedente, leyendo el live: `Leer
+procesados` tiene su `pagination` desde el cierre 125, empujada por el mismo mecanismo. Pero el balde
+mezcla ruido con cambios reales y eso merece su propia sesión.

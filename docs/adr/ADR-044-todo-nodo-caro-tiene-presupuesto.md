@@ -159,3 +159,39 @@ un aviso. **Un fail-open sin contador es un fail-open invisible**, que es el hal
 (2 knobs), `Resumen del run` (contador + aviso). Probado en `test-nodos.mjs` (10 casos: paralelismo
 real en vuelo, el pool cruzando proyectos con la rúbrica correcta de cada uno, la concurrencia desde
 Config, y el presupuesto que degrada marcando). **No toca `core/`, sin migración.**
+
+### Y el mismo día, el nodo caro que quedaba: el `Pre-trim`
+
+El Gate no era el único que este ADR no había mirado. El `Pre-trim relevancia` mandaba **una sola
+llamada por proyecto con TODOS sus captions**, y tenía dos techos, uno en cada punta:
+
+📏 **Medido sobre la ejecución 150 (31/08), contando los items reales que entraron:**
+
+| | |
+|---|---|
+| videos por llamada | **465, 465, 427, 380** |
+| prompt de la más grande | ~158.000 chars ≈ **~40k tokens** |
+| descartes del peor proyecto | 67 ids ≈ **~469 tokens de respuesta** |
+| `max_tokens` de la respuesta | **1.000** ⇒ el peor proyecto usa el **47%** |
+
+A 2× volumen la respuesta está al **94%** del techo. A 4× **trunca**, y a 5× el prompt se pasa de la
+ventana de Haiku. **Las dos puntas terminan en el mismo síntoma, y es el peor posible:** un JSON
+cortado no matchea el `/\{[\s\S]*\}/` de abajo, el `catch` se lo traga, y el nodo **descarta cero**
+sin un error y sin una línea en el log. No falla: deja de filtrar.
+
+**Lo que cambia:** chunks de 100 (≈8,5k tokens de entrada, ≈700 de salida en el peor caso, con
+`max_tokens` en 2.000 de colchón), pool cross-proyecto con `concurrencia_pretrim` (8), y **el
+fail-open deja de ser invisible**.
+
+🩸 **Esto último es el hallazgo, y salió de mirar los números en vez del código.** En esa misma
+ejecución **dos proyectos de 465 videos descartaron CERO**, y no hay manera de saber si el tema
+estaba limpio o si la llamada se rompió: el código trataba *"no había nada off-topic"* y *"no pude
+mirar"* exactamente igual — los dos hacían nada. Ahora un chunk que falla (o que vuelve truncado)
+marca sus videos con `_pretrim_fallo`, y `Resumen del run` los cuenta en
+`metricas.pretrim_sin_juicio` con su aviso. **Es la misma regla que el `_gate_sin_presupuesto` de
+arriba, un paso más temprano: un fail-open sin contador es un fail-open invisible.**
+
+**Toca:** `Pre-trim relevancia` (chunks + pool + la marca), `Config` (`concurrencia_pretrim`),
+`Resumen del run` (contador + aviso). Probado en `test-nodos.mjs` (15 casos, con harness nuevo para
+este nodo: el chunking, el pool cruzando proyectos, el `max_tokens`, y **la respuesta truncada
+distinguiéndose de "no había nada que descartar"**). **No toca `core/`, sin migración.**
