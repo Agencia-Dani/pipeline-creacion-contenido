@@ -28,6 +28,11 @@
 > está aplicada y el motor ya empujado, cierre 123). El otro bloqueo, el ⛔ de abajo, sigue siendo de
 > producto y no de código.
 >
+> ✅ **El dedup del motor ya no está ciego** (cierre 125): `Leer procesados` devolvía 1.000 filas de
+> 1.547 y el guard fail-closed nunca disparaba. Paginado y empujado al live, `n8n:diff` verde en los
+> 5. Y el umbral de vistas bajó a 100.000 (lo movió Mani por la UI), que sobre el último lote lleva
+> de 189 a 286 videos por encima del corte.
+>
 > ✅ **El rescate del cierre 124 ya corrió entero:** 337 huérfanos soltados, corrida disparada y
 > medida — **28 de los 32 candidatos que entregó (88%) son rescatados**. Y dejó un hallazgo que vale
 > más que el rescate: **el supply está concentrado en 11 cuentas de 40** (94% de los crudos), con 24
@@ -157,6 +162,83 @@
 >    stub deja de emitir posts terminados para emitir material crudo.
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
+
+> ## 🔍 2026-08-31 (cierre 125) · EL MOTOR LLEVABA MESES CIEGO A UN TERCIO DE SU MEMORIA DE DEDUP (Claude, pedido de Mani)
+>
+> **En una línea:** preguntando *por qué el embudo entrega tan poco* apareció que `Leer procesados`
+> devolvía **1.000 filas de 1.547** y que el guard fail-closed de ADR-029 **nunca había disparado**;
+> ahora el nodo pagina y los guards son dos ([ADR-029 §Enmienda](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md)).
+>
+> ### 📏 El embudo, que era la pregunta original
+>
+> Mani preguntó por qué de 520 colectados quedan 336 y después 90. **La primera respuesta es que 336
+> y 90 no son dos cortes: son el mismo punto.** El motor reporta **items** (video × proyecto) y 336
+> items son 90 videos distintos. El embudo real, todo en distintos:
+>
+> | paso | videos | |
+> |---|---|---|
+> | colectados | **520** | de 35 cuentas |
+> | asignados a proyecto | **465** | 55 no matchean ninguna cuenta |
+> | **heat-score** | **90** | ⬅️ **acá se va el 81%** |
+> | pasan el gate | 56 | 18 vacíos + 16 rechazados |
+> | candidatos | **32** | corte por N de cada proyecto |
+>
+> **De los 465 que llegan al corte: 276 (59%) mueren por el umbral de vistas, 95 (20%) por dedup, 90
+> (20%) pasan.** Y el umbral estaba en 200.000 con la **mediana de la cosecha en 142.016**: por
+> diseño mataba a más de la mitad. **Mani lo bajó a 100.000** desde el dashboard (evento
+> `ajustes.editar` a las 04:53, con su autoría). Sobre el mismo lote eso lleva de 189 a **286**
+> videos por encima del umbral, y el techo de transcripción (350) no está mordiendo: se transcribían
+> 90.
+>
+> 🔑 **Y lo que el filtro mata NO queda quemado**: corre *antes* de escribir `processed_items`, así
+> que bajar el umbral los recupera solos en la corrida siguiente. No hay nada que rescatar.
+>
+> ### 🩸 El bug que apareció de paso, y es el más caro
+>
+> `Leer procesados` pedía `&limit=50000`. **PostgREST tiene `max-rows` en 1.000**, así que devolvía
+> 1.000 — sin error y sin aviso. Medido con dos señales: la URL exacta del nodo devuelve **1.000**, y
+> `Prefer: count=exact` dice **1.547**. **El motor veía el 65% de su memoria de dedup.**
+>
+> **Y el guard puesto justo para esto comparaba contra 50.000**, un número que la lectura no podía
+> alcanzar ni queriendo: `if (_proc.length >= 50000) throw`. *Un fail-closed que mide contra un techo
+> inexistente no protege de nada, solo tranquiliza.*
+>
+> **La causa estaba escrita en el `notes` del propio nodo:** *"Lectura completa: la tabla es chica
+> (~400 filas / 26 KB)"*. Era cierta al escribirla y **caducó sola, porque `processed_items` no se
+> barre nunca** — el archivado borra `candidatos`, no la memoria, y la tabla crece 80-250 filas por
+> corrida sin techo. *Una suposición sobre un tamaño se vence igual que un canario.*
+>
+> ### ✅ Cómo se arregló, y cómo se verificó antes de tocar un workflow activo
+>
+> `Leer procesados` **pagina por `offset`** (1.000 × 50 páginas) con la paginación nativa del nodo
+> HTTP. Los guards pasan a ser **dos**: el de 50.000 (que **recién ahora ES el techo real**) y el de
+> **1.000 exacto**, que es el que habría cazado esto.
+>
+> 🔒 **La config de paginación se probó en un workflow DESECHABLE antes de empujar al motor, que está
+> activo:** creado por API, disparado por webhook, borrado en el `finally` con 404 confirmado.
+> Devolvió **1.547 filas y 1.547 ids distintos** contra las 1.547 de `count=exact`. Recién con ese
+> número se empujó.
+>
+> Después: `test-nodos.mjs` verde con **3 casos nuevos sobre los guards** —incluido el
+> **contraejemplo de 999 y 1.001 que NO abortan**, sin el cual un guard tipo *"abortá si hay muchas
+> filas"* pasaría el test igual—, `auditar-workflows.mjs` sin hallazgos, `n8n:push` de los 2 nodos
+> con el workflow **activo**, `n8n:diff` **verde en los 5**, y la config releída de la API del live.
+>
+> ### 📌 Lo que queda anotado y no se resolvió
+>
+> - ⚠️ **`Leer feed vivo` tapaba el agujero y se corta en el mismo 1.000.** Medido: 0 duplicados en el
+>   feed y 0 videos vivos ya archivados, porque esa segunda línea (274 filas) alcanzaba. **El día que
+>   el feed pase de 1.000, la defensa secundaria cae con la misma falla silenciosa.** Hoy no urge.
+> - **El costo era plata, no corrección.** Re-colectar y re-transcribir lo ya visto no produce ningún
+>   síntoma que alguien mire: sale en la factura. Por eso vivió meses.
+> - 🔎 **Un cambio de perilla del 28/08 no tiene autor:** los eventos muestran *Mínimo de vistas*
+>   `0 → 600.000` y después `600.000 → 100.000`, pero el paso intermedio a **200.000 no dejó evento**,
+>   o sea que se escribió por script y no por la app. Es el mismo modo de falla que casi repito hoy:
+>   un PATCH por PostgREST cambia el valor **sin registrar quién**. (El mío terminó siendo un no-op:
+>   Mani ya lo había bajado por la UI.)
+> - **`Mínimo de vistas` es global, no por proyecto.** Un proyecto con referentes chicos nunca llena
+>   su N, y aflojarle el umbral se lo afloja a todos. Hacerlo por proyecto pide campo nuevo +
+>   migración: es una conversación, no una perilla.
 
 > ## 🔥 2026-08-31 (cierre 124) · EL 34% DE LA COSECHA HISTÓRICA ESTABA QUEMADA, Y 337 VIDEOS VOLVIERON A LA CANCHA (Claude, pedido de Mani)
 >

@@ -584,12 +584,32 @@ seccion('Heat-score v1 — dedup blindado (ADR-029)');
   check('processed_items caído aborta el run (fail-closed, ADR-029)', threw && /\[Dedup\]/.test(msg), 'threw=' + threw + ' msg=' + msg);
 }
 {
-  // La lectura ya no filtra por in.(ids): trae la tabla entera con limit=50000. Si algún día toca
-  // ese techo, la memoria llega truncada y los duplicados vuelven en silencio -> abortar.
+  // La lectura trae la tabla entera PAGINANDO por offset (50 páginas × 1000). Si algún día toca ese
+  // techo, la memoria llega incompleta y los duplicados vuelven en silencio -> abortar.
   const procesados = []; for (let i = 0; i < 50000; i++) procesados.push({ external_id: 'p' + i, platform: 'ig' });
   let threw = false, msg = '';
   try { runHeat({ items: [hvid('a')], procesados }); } catch (e) { threw = true; msg = e.message; }
-  check('processed_items truncado en el límite aborta el run', threw && /truncado/.test(msg), 'threw=' + threw + ' msg=' + msg);
+  check('processed_items en el techo de 50.000 aborta el run', threw && /50\.000/.test(msg), 'threw=' + threw + ' msg=' + msg);
+}
+{
+  // 🩸 EL TEST QUE FALTABA, y por eso el bug vivió meses. El guard de arriba comparaba contra 50.000
+  // mientras el techo REAL era el `max-rows` de PostgREST, que es 1000: la URL pedía limit=50000 y la
+  // base devolvía 1000 filas de 1547, o sea que el motor quedaba ciego al 35% de su propia memoria y
+  // el fail-closed nunca disparaba (medido el 2026-08-31, ADR-029 §Enmienda).
+  // 1000 EXACTO = una sola página. Con la paginación andando no puede pasar; si pasa, se apagó.
+  const procesados = []; for (let i = 0; i < 1000; i++) procesados.push({ external_id: 'p' + i, platform: 'ig' });
+  let threw = false, msg = '';
+  try { runHeat({ items: [hvid('a')], procesados }); } catch (e) { threw = true; msg = e.message; }
+  check('exactamente 1000 filas = una sola página de PostgREST -> aborta', threw && /UNA sola pagina/.test(msg), 'threw=' + threw + ' msg=' + msg);
+}
+{
+  // Y el contraejemplo, que es lo que hace que el guard de arriba sea un guard y no un estorbo: 999 y
+  // 1001 son lecturas sanas y NO pueden abortar. Sin esto, "abortá si hay muchas filas" pasaría igual.
+  const mk = (n) => { const a = []; for (let i = 0; i < n; i++) a.push({ external_id: 'p' + i, platform: 'ig' }); return a; };
+  let ok999 = false, ok1001 = false;
+  try { runHeat({ items: [hvid('z')], procesados: mk(999) }); ok999 = true; } catch { /* no debe */ }
+  try { runHeat({ items: [hvid('z')], procesados: mk(1001) }); ok1001 = true; } catch { /* no debe */ }
+  check('999 y 1001 filas NO abortan (el guard mira 1000 exacto, no "muchas")', ok999 && ok1001, '999=' + ok999 + ' 1001=' + ok1001);
 }
 {
   const { out } = runHeat({ items: [hvid('a'), hvid('b')], procesados: [{ external_id: 'a', platform: 'ig' }], feed: [{ error: 'airtable 500' }] });

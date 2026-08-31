@@ -175,3 +175,75 @@
   escribir **`run_id`** (`null` si el run no se abrió: la columna es FK a `runs(id)`), sin lo cual la
   memoria no se puede atribuir a su corrida. Probado en `test-nodos.mjs` (+4 casos). Sin nodos nuevos,
   sin cambio de schema ni de contrato. **Pide re-import del motor.**
+
+## Enmienda (2026-08-31) — el fail-closed comparaba contra un techo que no existe
+
+**El guard que este ADR puso para que la memoria nunca llegue truncada nunca disparó, y por eso el
+motor llevaba meses ciego a un tercio de su propio dedup.**
+
+### 📏 Lo medido
+
+`Leer procesados` pedía `…&limit=50000` y el guard abortaba con `if (_proc.length >= 50000)`. Pero
+**PostgREST tiene `max-rows` en 1.000**: pedir 50.000 devuelve 1.000 igual, sin error y sin aviso.
+Medido el 31/08 con la URL exacta del nodo, y con dos señales:
+
+| | |
+|---|---|
+| filas que devuelve la URL del nodo (`limit=50000`) | **1.000** |
+| filas que hay de verdad (`Prefer: count=exact`) | **1.547** |
+
+⇒ **el motor veía el 65% de su memoria de dedup.** Y el guard escrito justo para cazar esto comparaba
+contra 50.000, un número que la lectura no podía alcanzar ni queriendo. *Un fail-closed que mide
+contra un techo inexistente no protege de nada; solo tranquiliza.*
+
+**Se descubrió leyendo la ejecución de n8n para otra pregunta** (por qué el embudo entrega poco,
+[ADR-082](./ADR-082-un-video-quemado-se-rescata-borrandole-la-memoria.md)), no por un síntoma. Es la
+forma que tienen de aparecer estos bugs: **la sobre-lectura de duplicados no falla en rojo, sale en
+la factura.**
+
+### 🕰️ La causa: una suposición escrita que caducó
+
+El `notes` del propio nodo la tenía escrita: *"Lectura completa: la tabla es chica (~400 filas /
+26 KB)"*. Era **cierta cuando se escribió**, y dejó de serlo sola, porque **`processed_items` no se
+barre nunca**: el archivado borra `candidatos`, no la memoria. La tabla crece ~80-250 filas por
+corrida, sin techo. *Una suposición sobre un tamaño se vence igual que un canario: se re-mide.*
+
+### La decisión
+
+**`Leer procesados` pagina por `offset`** (páginas de 1.000, tope de 50 páginas = 50.000 filas), con
+la paginación nativa del nodo HTTP de n8n. Nada más cambia: sigue siendo un nodo HTTP con
+`executeOnce`, `retryOnFail ×3` y fail-closed, que es lo que este ADR decidió.
+
+**Y el guard pasa a ser dos**, porque uno solo no cubre las dos formas de fallar:
+
+1. `_proc.length >= 50000` — el tope de páginas. **Recién ahora ese número ES el techo real**, así que
+   el guard original empieza a funcionar como estaba escrito. Está acoplado a `maxRequestsPerPage`:
+   si uno se mueve, el otro también, y eso queda dicho en los dos lados.
+2. `_proc.length === 1000` — **el guard que sí habría cazado este bug.** 1.000 exacto es el `max-rows`
+   de PostgREST, o sea *una sola página*: con la paginación andando no puede pasar salvo que la
+   paginación se haya apagado. El falso positivo posible (que la tabla mida 1.000 justo) es **una
+   corrida en toda la vida de la tabla** y termina en un aborto ruidoso que un humano resuelve
+   leyendo el mensaje — que es exactamente el intercambio que este ADR ya eligió sobre re-pagar en
+   silencio.
+
+### ✅ Verificación
+
+**La configuración de paginación se probó en un workflow DESECHABLE antes de tocar el motor, que está
+activo:** creado por API, disparado por webhook, borrado en el `finally` con el 404 confirmado.
+Devolvió **1.547 filas y 1.547 ids distintos**, contra las 1.547 que dice `count=exact`. Recién con
+ese número se empujó al live.
+
+Después: `test-nodos.mjs` en verde con **3 casos sobre los guards** —el tope de 50.000, el de 1.000
+exacto, y **el contraejemplo de 999 y 1.001 que NO abortan**, sin el cual "abortá si hay muchas
+filas" pasaría el test igual—, `auditar-workflows.mjs` sin hallazgos, `n8n:push` de los 2 nodos con
+el workflow **activo**, `n8n:diff` verde en los 5, y la config leída de vuelta de la API del live.
+
+### Lo que NO cambia
+
+- **No hay duplicados visibles hoy**, y se midió: 0 `external_id` repetidos en el feed y 0 videos
+  vivos que ya estuvieran archivados. La segunda línea de este mismo ADR —`Leer feed vivo`, 274
+  filas— tapaba el agujero para los candidatos vivos. ⚠️ **Pero esa red también se corta en 1.000**:
+  el día que el feed pase esa marca, la defensa secundaria cae con la misma falla silenciosa. Queda
+  anotado, no resuelto acá (hoy son 274).
+- **El costo era plata, no corrección**: re-colectar y re-transcribir videos ya vistos. Por eso nunca
+  hubo un síntoma que mirara nadie.

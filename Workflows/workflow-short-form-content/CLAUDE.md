@@ -89,6 +89,17 @@ ADR-009); el "link" es la URL del video original.
   cualquier lookup **de corrida** (URL igual para todos) necesita `executeOnce: true` o dispara
   cientos de requests idénticos y muere por timeout. Ya pasó: mató el cron del 27/07 en `Leer
   procesados`. Los 3 del segmento de dedup lo tienen + retry ×3 (dev-doc §2.1).
+- 🩸 **`Leer procesados` PAGINA, y no es un detalle de implementación: sin eso el dedup miente.**
+  PostgREST tiene **`max-rows` en 1.000**, así que el viejo `&limit=50000` devolvía 1.000 filas de
+  1.547 — sin error, sin aviso — y el motor quedaba **ciego al 35% de su memoria** re-colectando y
+  re-transcribiendo lo ya visto. Peor: el guard fail-closed de ADR-029 comparaba contra `>= 50000`,
+  un número que la lectura no podía alcanzar, así que **nunca disparó**. Hoy el nodo pagina por
+  `offset` (1.000 × 50 páginas) y hay **dos** guards en `Heat-score v1`: el de 50.000 (que recién
+  ahora es el techo real, **acoplado a `maxRequestsPerPage`** — si movés uno, mové el otro) y el de
+  **1.000 exacto**, que detecta que la paginación se apagó. Ver
+  [ADR-029 §Enmienda 2026-08-31](../../docs/adr/ADR-029-dedup-blindado-fail-closed-y-feed.md).
+  ⚠️ **`processed_items` NO se barre nunca** (el archivado borra `candidatos`), así que la tabla
+  crece sin techo: cualquier lectura entera de esa tabla necesita paginar, hoy y siempre.
 - **`heat_score` es composite** (ADR-010): `peso_relevancia·score_haiku + (1-peso)·percentil(prescore
   métrico)`. El gate también guarda `relevancia_score`/`relevancia_razon` (se escriben en `app.candidatos`). El
   substring de tema **no existe** (salió en el refactor de relevancia).
