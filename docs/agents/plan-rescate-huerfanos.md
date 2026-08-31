@@ -134,45 +134,169 @@ Aplican a todas las tareas:
 
 ## §5 · Las tareas
 
-### Tarea 1 — El script, en modo que solo mira
+**Stack:** ESM `.mjs` plano corriendo en Node 26, **sin dependencias y sin transpilar**, igual que
+sus hermanos `verificar-corrida.mjs` y `test-nodos.mjs`. Se invoca siempre así:
 
-- [ ] Crear `Workflows/workflow-short-form-content/rescatar-huerfanos.mjs`.
-- [ ] Implementar `shortcodeAId(sc)` y `idDeUrl(url)` (base64 con alfabeto
-      `A-Za-z0-9-_`), y probarlo contra candidatos reales que tengan `external_id` y
-      `url_referente`: **tiene que dar 100%**, no "casi todos".
-- [ ] Leer de Supabase, paginando de a 1000: `processed_items`, `app.candidatos`, `outputs`,
-      `app.descartes`.
-- [ ] Calcular los huérfanos **al correr**, nunca desde una lista guardada de antes.
-- [ ] Aceptar `--desde <YYYY-MM-DD>` (filtra por `primera_vez`) y `--plataforma` (default
-      `instagram`).
-- [ ] Salida: cuántos huérfanos, cuántos quedan afuera por cada una de las tres razones, y el
-      desglose por corrida.
+```bash
+set -a && source .env && set +a && node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs [flags]
+```
 
-**Verificación:** correrlo con `--desde 2026-08-24` tiene que reportar **337 huérfanos de
-Instagram**, y ningún id que esté en candidatos, outputs o descartes.
+**Interfaz del script** (esto es lo que las tareas siguientes consumen, y no cambia):
 
-### Tarea 2 — Guardar la lista, y recién después borrar
+| flag | qué hace |
+|---|---|
+| *(ninguno)* | dry-run: calcula y reporta, no escribe nada |
+| `--desde <YYYY-MM-DD>` | acota por `processed_items.primera_vez` |
+| `--plataforma <p>` | default `instagram` |
+| `--apply` | escribe: guarda el JSON y borra |
+| `--verificar <archivo.json>` | lee un rescate pasado y mide si volvieron |
 
-- [ ] Antes de cualquier `DELETE`, escribir `rescate-<YYYYMMDD-HHMM>.json` al lado del script, con
-      los ids, la ventana pedida y el momento.
-- [ ] Implementar el borrado: `DELETE` por **lista explícita de ids**, en lotes, acotado por
-      `instance_id`. Nunca un filtro de fecha suelto contra la tabla.
-- [ ] **Dry-run por defecto**; escribe solo con `--apply`, igual que `n8n:push`.
-- [ ] Con `--apply`, imprimir cuántas filas se borraron de verdad (del `Prefer: count`), no cuántas
-      se pidieron.
+---
 
-**Por qué el archivo va primero y no es burocracia:** el borrado **destruye la única evidencia de
-qué se rescató**. Las filas dejan de existir y `runs.metricas` solo tiene contadores, no ids. Sin la
-lista guardada, la pregunta *"¿volvieron?"* deja de tener respuesta posible. Es el mismo cuidado que
-los canarios de este repo: si el acto de medir borra el rastro, se guarda el rastro antes.
+### Tarea 1 — El decodificado de shortcode, probado antes que nada
 
-**Verificación:** correr sin `--apply` no cambia ningún conteo en `processed_items`.
+**Archivo:** crear `Workflows/workflow-short-form-content/rescatar-huerfanos.mjs`.
 
-### Tarea 3 — Soltar los 337 y correr el motor
+**Produce** (lo usan las tareas 2 y 4):
+`shortcodeAId(sc) -> string | null` · `idDeUrl(url) -> string | null` · `sb(path, esquema) -> Promise<any>`
 
-- [ ] `node rescatar-huerfanos.mjs --desde 2026-08-24 --apply`.
-- [ ] Confirmar contra prod que `processed_items` bajó **exactamente** en la cantidad reportada.
-- [ ] Disparar una corrida del motor desde *Operar* (⚠️ paga: Apify + Supadata + Haiku).
+> 🩸 **Lo que apareció construyendo, y era una falsa alarma con un hueco real adentro.** El primer
+> regex solo leía URLs de Instagram, y el reporte avisó de **2 urls que no pudo decodificar**.
+> Resultaron ser de TikTok, o sea inofensivas para *este* rescate (que corre con
+> `--plataforma instagram`). Pero `outputs` y `app.descartes` **mezclan las dos plataformas**, así que
+> un archivado de TikTok sin reconocer queda sin proteger el día que alguien corra el rescate sobre
+> TikTok. Se cerró ahí mismo: la URL de TikTok trae su `external_id` literal, no hay nada que
+> decodificar. El contador quedó en **0** y dejó de dar falsas alarmas.
+
+- [ ] **Paso 1 — Escribir el auto-test que falla.** Al arrancar, con `--test`, el script compara
+      `external_id` contra `url_referente` sobre **todos** los candidatos que tengan los dos campos,
+      y aborta si no da 100%:
+
+```js
+const AL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const IDX = new Map([...AL].map((c, i) => [c, i]));
+// El external_id de Instagram ES el shortcode en base64 con este alfabeto. Verificado contra
+// candidatos reales que traen los dos campos al lado; si algún día deja de valer, --test grita.
+const shortcodeAId = (sc) => {
+  let n = 0n;
+  for (const c of sc) {
+    const v = IDX.get(c);
+    if (v === undefined) return null;
+    n = n * 64n + BigInt(v);
+  }
+  return n > 0n ? n.toString() : null;
+};
+const idDeUrl = (url) => {
+  const m = /\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/.exec(url || "");
+  return m ? shortcodeAId(m[1]) : null;
+};
+```
+
+- [ ] **Paso 2 — Correrlo y ver que falla** (todavía no hay `sb()`, tira `sb is not defined`).
+
+Run: `node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs --test`
+
+- [ ] **Paso 3 — Implementar `sb()` con paginado.** `fetch` contra PostgREST con `apikey` +
+      `Authorization`, `Accept-Profile` opcional para el esquema `app`, y paginado de a 1000 hasta
+      que una página venga corta. Copiar la forma de `verificar-corrida.mjs`, no inventar otra.
+
+- [ ] **Paso 4 — Correr el auto-test y ver que pasa.**
+
+Run: `set -a && source .env && set +a && node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs --test`
+Esperado: `shortcode: N/N ✓` con N ≥ 200 y **cero fallas**. Si falla una sola, se para acá.
+
+- [ ] **Paso 5 — Commit.** `git commit -m "El external_id de Instagram es el shortcode: probado contra prod, no asumido"`
+
+---
+
+### Tarea 2 — Calcular los huérfanos (todavía sin borrar nada)
+
+**Archivo:** modificar `rescatar-huerfanos.mjs`.
+
+**Consume:** `sb()`, `idDeUrl()` de la Tarea 1.
+**Produce:** `huerfanos({desde, plataforma}) -> { filas, vivos: {candidatos, archivados, descartes} }`
+
+- [ ] **Paso 1 — Leer las cuatro tablas.** `processed_items` (`external_id, platform, run_id,
+      primera_vez`, esquema `public`), `app.candidatos` (`external_id`), `outputs` (`metadata`) y
+      `app.descartes` (`url_referente`).
+
+- [ ] **Paso 2 — Armar el conjunto de "vivos"** con las tres reglas de §2: `external_id` directo
+      para candidatos, `idDeUrl()` para archivados y descartes.
+
+- [ ] **Paso 3 — Restar y filtrar** por `--desde` (contra `primera_vez`) y `--plataforma`.
+
+- [ ] **Paso 4 — Reportar.** Total de filas en la ventana, cuántas caen por cada una de las tres
+      razones, cuántos huérfanos quedan, y el desglose por corrida con su
+      `metricas.transcripciones_vacias` al lado.
+
+- [ ] **Paso 5 — Verificar contra los números de §2.**
+
+Run: `set -a && source .env && set +a && node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs --desde 2026-08-24`
+Esperado: **574 filas de Instagram · 237 ya resueltos · 337 huérfanos**, y
+**0 urls que el decodificado no pudo leer**.
+
+⚠️ Los 237 son la **unión** de las tres razones, no su suma: por separado son 153 candidatos vivos,
+61 archivados y 50 descartes (264), y 27 de esos caen en dos categorías a la vez. El script reporta
+la unión porque es lo único que decide si una fila se borra o no.
+
+Si alguno no da, **no se sigue**: o cambió prod (y hay que re-medir el plan) o el cálculo está mal.
+
+- [ ] **Paso 6 — Confirmar que no escribió nada.** El conteo de `processed_items` sigue en 1.802.
+
+- [ ] **Paso 7 — Commit.** `git commit -m "Los huerfanos se calculan al correr, no se leen de una lista vieja"`
+
+---
+
+### Tarea 3 — Guardar y borrar, en ese orden
+
+**Archivo:** modificar `rescatar-huerfanos.mjs`.
+
+**Consume:** `huerfanos()` de la Tarea 2.
+**Produce:** el archivo `rescate-<YYYYMMDD-HHMM>.json` con la forma
+`{ generado_en, desde, plataforma, instance_id, ids: string[] }`.
+
+- [ ] **Paso 1 — Escribir el JSON ANTES del `DELETE`.** Si el archivo no se puede escribir, el
+      script **aborta y no borra**. No es prudencia genérica: el borrado destruye la única evidencia
+      de qué se rescató, y `runs.metricas` guarda contadores, no ids.
+
+- [ ] **Paso 2 — Implementar el borrado.** `DELETE` por **lista explícita de ids**
+      (`external_id=in.(...)`), en lotes de 200 para no reventar la URL, y siempre con
+      `instance_id=eq.<...>` y `platform=eq.<...>`. **Nunca** un filtro de fecha suelto contra la
+      tabla: si el cálculo tuviera un bug, un filtro por fecha se llevaría también los vivos.
+
+- [ ] **Paso 3 — Contar lo borrado de verdad.** Usar `Prefer: return=representation` y contar las
+      filas que devuelve, no las que se pidieron. Son dos números distintos y el que importa es el
+      segundo.
+
+- [ ] **Paso 4 — Dejar `--apply` como única puerta de escritura.** Sin el flag, el script imprime
+      el plan de borrado y sale con código 0.
+
+- [ ] **Paso 5 — Probar el dry-run.**
+
+Run: `... --desde 2026-08-24` (sin `--apply`)
+Esperado: dice que borraría 337, **no crea el JSON**, y `processed_items` sigue en 1.802.
+
+- [ ] **Paso 6 — Commit.** `git commit -m "La lista se guarda antes de borrar: el borrado destruye su propia evidencia"`
+
+---
+
+### Tarea 4 — Soltar los 337
+
+- [ ] **Paso 1 — Correr con `--apply`.**
+
+```bash
+set -a && source .env && set +a && node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs --desde 2026-08-24 --apply
+```
+
+- [ ] **Paso 2 — Verificar contra prod que bajó exactamente lo reportado.** `processed_items`
+      tiene que quedar en **1.802 − (lo borrado)**, y los 153 candidatos vivos + 61 archivados +
+      50 descartes de la ventana tienen que **seguir teniendo su fila**. Ese segundo chequeo es el
+      que prueba que el decodificado hizo su trabajo.
+
+- [ ] **Paso 3 — Commitear el JSON del rescate.** Va al repo, no al `.gitignore`: es la evidencia.
+
+- [ ] **Paso 4 — Disparar una corrida del motor** desde *Operar* (o `POST "$MOTOR_WEBHOOK_URL"`).
+      ⚠️ **Paga**: Apify + Supadata + Haiku. Confirmar con Mani antes.
 
 **Lo que hay que saber antes de apretar:**
 - El techo es *Videos a transcribir por corrida* = **350**, así que los rescatados **compiten con el
@@ -182,12 +306,22 @@ los canarios de este repo: si el acto de medir borra el rastro, se guarda el ras
   huérfanos) a esta ventana, porque separarlos uno por uno es justo lo que la base no puede hacer
   (§1). Transcripción pagada dos veces, y es el precio conocido.
 
-### Tarea 4 — Verificar, con el dato y no con la sensación
+---
 
-- [ ] Implementar `--verificar <archivo.json>`: lee los ids guardados y los cruza contra
-      `app.candidatos` filtrando por la corrida (`run_id`), que existe desde ADR-081.
-- [ ] Reportar: cuántos de los N rescatados volvieron a aparecer, cuántos llegaron al feed, y
-      cuántos se quemaron otra vez.
+### Tarea 5 — Verificar, con el dato y no con la sensación
+
+**Archivo:** modificar `rescatar-huerfanos.mjs`.
+
+**Consume:** el JSON de la Tarea 3, y `candidatos.run_id` (ADR-081).
+
+- [ ] **Paso 1 — Implementar `--verificar <archivo.json>`.** Lee los ids, busca la corrida del
+      motor posterior a `generado_en`, y cruza contra `app.candidatos` de esa corrida.
+
+- [ ] **Paso 2 — Reportar tres números:** cuántos de los N rescatados volvieron a entrar a
+      `processed_items`, cuántos llegaron al feed como candidatos, y cuántos se quemaron otra vez
+      (los que volvieron a `processed_items` pero no a `candidatos`).
+
+- [ ] **Paso 3 — Correrlo después de la corrida** y anotar el resultado en el handoff.
 
 **🐤 Esto es además el primer uso real de `candidatos.run_id`.** Su canario nació en cero a
 propósito (0 filas rellenadas, sin backfill) justamente para que la primera fila con corrida la
