@@ -199,7 +199,7 @@ async function aplicar(filas) {
   const { join, dirname } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
 
-  const sello = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 13);
+  const sello = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 13);
   const ruta = join(dirname(fileURLToPath(import.meta.url)), `rescate-${sello}.json`);
   const evidencia = {
     generado_en: new Date().toISOString(),
