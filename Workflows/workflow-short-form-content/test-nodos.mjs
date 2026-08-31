@@ -500,6 +500,42 @@ await (async () => {
     const { out } = await runTranscribir([tvid('r3')], { falla: true, backoff: 0 });
     check('🔴 429/timeout que agota los reintentos ⇒ NO resuelta (vuelve la próxima corrida)', out[0]._tx_resuelta === false, String(out[0]._tx_resuelta));
   }
+
+  // ── `_tx_429`: cuánto aire queda antes del techo de Supadata ──
+  // "0 videos perdidos" y "0 rate limiting" son DOS preguntas, y hasta hoy solo se podía contestar
+  // la primera: un 429 que el backoff recupera sale con guion y no deja rastro en ningún lado.
+  // Medido en la ejecución 156 (288 videos a 8 en vuelo): 0 perdidos — pero sin este contador no se
+  // sabía si eso era aire de sobra o el borde justo, y de eso depende cuánto se puede subir la
+  // concurrencia.
+  {
+    const { out } = await runTranscribir([tvid('a1')]);
+    check('sin rechazos, el contador va en 0 (no en undefined)', out[0]._tx_429 === 0, String(out[0]._tx_429));
+  }
+  {
+    const s = [{ _throw: '429 - {"error":"limit-exceeded"}' }, { content: 'entró al segundo', lang: 'en' }];
+    const { out } = await runTranscribir([tvid('a2')], { secuencia: s });
+    check('🔑 un 429 que el backoff RECUPERA igual se cuenta (si no, es invisible)', out[0]._tx_429 === 1 && out[0].transcripcion === 'entró al segundo', `429=${out[0]._tx_429} tx='${out[0].transcripcion}'`);
+  }
+  {
+    const s = [{ _throw: '429' }, { _throw: '429' }, { _throw: '429' }, { content: 'al cuarto', lang: 'en' }];
+    const { out } = await runTranscribir([tvid('a3')], { secuencia: s });
+    check('cuenta los tres rechazos, no solo el último', out[0]._tx_429 === 3, String(out[0]._tx_429));
+  }
+  {
+    // Un timeout de red NO es el techo de Supadata. Contarlos juntos haría bajar la concurrencia
+    // por un problema que no es de concurrencia.
+    const { out } = await runTranscribir([tvid('a4')], { secuencia: [{ _throw: 'ETIMEDOUT socket hang up' }, { content: 'ok', lang: 'en' }] });
+    check('un timeout de red NO cuenta como rechazo por límite', out[0]._tx_429 === 0, String(out[0]._tx_429));
+  }
+  {
+    const { out, logs } = await runTranscribir([tvid('a5')], { secuencia: [{ _throw: '429' }, { content: 'ok', lang: 'en' }] });
+    check('y el nodo lo dice en el log, con la concurrencia al lado', logs.some((l) => /rechazos por limite/.test(l)), JSON.stringify(logs.filter((l) => /limite/.test(l))));
+    check('el 0 también se dice (saber que hay aire es el dato que habilita subirla)', out.length === 1, 'ok');
+  }
+  {
+    const { logs } = await runTranscribir([tvid('a6')]);
+    check('sin rechazos el log dice que hay aire', logs.some((l) => /0 rechazos por limite/.test(l)), JSON.stringify(logs.slice(-1)));
+  }
   {
     // El caso que da nombre al arreglo: el presupuesto deja videos sin arrancar siquiera.
     const items = []; for (let i = 0; i < 30; i++) items.push(tvid('p' + i));

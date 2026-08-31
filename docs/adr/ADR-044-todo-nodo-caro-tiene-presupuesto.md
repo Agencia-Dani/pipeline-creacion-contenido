@@ -195,3 +195,13 @@ arriba, un paso más temprano: un fail-open sin contador es un fail-open invisib
 `Resumen del run` (contador + aviso). Probado en `test-nodos.mjs` (15 casos, con harness nuevo para
 este nodo: el chunking, el pool cruzando proyectos, el `max_tokens`, y **la respuesta truncada
 distinguiéndose de "no había nada que descartar"**). **No toca `core/`, sin migración.**
+
+#### Corrección del mismo día: chunkear rompió el contador de costo
+
+`haiku_lotes_pretrim` calculaba *"un lote por proyecto"*, que era exacto mientras el pre-trim mandara
+una sola llamada por proyecto. Al chunkear dejó de serlo y nadie lo movió: **en la ejecución 156
+informó 4 llamadas y la corrida hizo ~38** — subestimaba el costo casi 10×. Pasa a
+`_lotesChunk(..., 100)`, el mismo helper que ya usaba el gate. Sigue siendo una **cota superior**,
+igual que antes: los captions pobres y los proyectos sin criterios no llaman.
+
+*Un cambio de forma que no arrastra su métrica deja un número que sigue pareciendo correcto.*

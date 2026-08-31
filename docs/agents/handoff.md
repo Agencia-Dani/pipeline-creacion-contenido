@@ -76,10 +76,12 @@
 > | ~~Disparar una corrida del motor y correr `--verificar`~~ | — | ✅ **CERRADO el 31/08** (ADR-082, cierre 124). Corrida `04:30` cerrada `ok`: volvieron 82 de 337 (24%) y **28 de los 32 candidatos entregados (88%) son rescatados**. El 24% es tasa de colección pura, verificado leyendo la ejecución de n8n nodo por nodo: entran 82 al scrape y llegan **los mismos 82** a `Transcribir` |
 > | **Podar los referentes de cola** — 24 de 40 aportan 1-3 videos cada uno | Majo / Mani | 📌 **Hallazgo del cierre 124, y explica el *"trae pocos videos"* mejor que la ráfaga.** 11 cuentas ponen el **94%** del supply; varias de la cola (`tesco`, `virginradiouk`, `filmmakerzara`) ni son cuentas de contenido — entraron por el descubrimiento y nadie las podó |
 > | ~~**El margen de `cap_top_n` se gastó** — el presupuesto quema~~ | — | ✅ **DESACTIVADO el 31/08** (cierre 127, [ADR-084](../adr/ADR-084-la-memoria-guarda-lo-resuelto-no-lo-intentado.md)). El margen sigue siendo 374 vs 350 (7%), pero **ya no importa igual**: el presupuesto de transcripción **posterga en vez de quemar**, así que morder dejó de ser pérdida permanente y pasó a ser demora. La palanca sigue siendo subir `concurrencia_transcribir` midiendo los 429, no bajar el cap. *Lo que NO se hizo es la parte que ADR-030 §Enmienda pedía —que el motor calcule su propio margen y lo avise—; sí se hizo para el otro tope repartido entre dos dueños (ADR-016 §Enmienda), y el patrón queda escrito ahí para copiarlo* |
-> | **La corrida de fuego de ADR-084 + ADR-044 §Enmienda** — 3 números | quien tome la sesión | 📌 **Es lo que sigue, y va ANTES de subir volumen.** El Gate tiene que caer de **492.7 s** a ~60 (si no, la concurrencia no está entrando); `metricas.gate_sin_presupuesto` tiene que dar **0**; y `processed_items` tiene que crecer **menos** por corrida — con la contracara de que algunos videos vuelvan, que es lo buscado y no un dedup roto. Recién con eso se sube *Resultados por cuenta de referente* **un escalón por vez** |
+> | ~~**La corrida de fuego**~~ | — | ✅ **CORRIDA Y MEDIDA el 31/08** (ejecución 156, cierre 129). **El Gate pasó de 492.7 s a 85.6 s con MÁS carga** (26 → 36 chunks): por chunk, de 18.95 s a 2.38 s = **7.97×**, o sea exactamente la concurrencia de 8 — el pool entró sin pérdida. `gate_sin_presupuesto` **0**, `pretrim_sin_juicio` **0**, `avisos` **vacío**, `registro_dedup` ok. Y **las 4 pantallas entregaron 20/20 con `razon_faltante: null`, por primera vez**: 80 candidatos contra 54 y 32 de las dos corridas previas |
+> | **Volumen: el siguiente escalón NO todavía** | Mani | 📌 *Resultados por cuenta de referente* está en **150** (era 50) y funcionó: 1.088 crudos, ~US$ 2,72 de Apify. **Antes de ir a 300, correr una vez con `concurrencia_transcribir` en 12 y leer `metricas.rechazos_supadata`.** El margen se había gastado: 288 videos en 695,5 s ⇒ el presupuesto de 870 s da para ~360 contra un cap de 350 (3%). Y **el presupuesto no puede subir**: 870 s ya roza el watchdog de 900 s |
 > | ~~**Pasos 3 y 4 del plan del 31/08**~~ | — | ✅ **HECHOS el 31/08** (cierre 128, ADR-044 §Enmienda + [ADR-029 §Enmienda 2](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md)). El pre-trim va en chunks de 100 con pool y `max_tokens` 2.000 (medido: el peor proyecto usaba el **47%** del techo de 1.000, a 2× el 94%, a 4× truncaba), y `Leer feed vivo` **pagina** con guard propio. 🔊 Y los dos fail-open dejaron de ser invisibles: `metricas.pretrim_sin_juicio` + `metricas.gate_sin_presupuesto`, cada uno con su aviso. ⚠️ **Falta empujarlos al live** — el push del cierre 127 fue antes de esto |
 > | **Subir el volumen: el clic que falta** | Mani | 📌 **El techo se movió, el pedido no.** `cap_resultados_referente` pasó a 500 en el `Config`, pero el ajuste vivo *"Resultados por cuenta de referente"* **sigue en 50** ⇒ la corrida colecta exactamente lo mismo que antes. Subirlo es un clic en `/curar/ajustes`, y va **después** de la corrida de fuego y de empujar el cierre 128. Un escalón por vez |
-> | **Punto ciego de `n8n:diff`** — mezcla ruido con cambios sin empujar | quien tome la sesión | 📌 Clasifica `"Leer feed vivo" · options` (donde vive la paginación nueva) como **benigno**, junto a `method` y `resource` ⇒ **un nodo HTTP puede quedarse sin paginación con el diff en verde**. Que este cambio sí llega se verificó por el precedente (`Leer procesados` tiene su `pagination` en el live desde el cierre 125, mismo mecanismo), no por el diff. Anotado al final de ADR-029 §Enmienda 2 |
+> | ~~**Punto ciego de `n8n:diff`**~~ | — | ✅ **CERRADO el 31/08** por la sesión del worktree ([ADR-053 §Enmienda 2](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md), commit `f6e2065`, mergeado a `main`). Lo benigno se decide por **clave + VALOR** contra una lista cerrada de 6 pares, y lo que no está grita en un balde propio `sin-empujar`. *Una lista de nombres de clave habría reproducido el bug un escalón más abajo: un `method: 'POST'` sin empujar contra un live en GET sería "benigno" por llamarse `method`* |
+> | **Una corrida que no encuentra nada nuevo se registra como `fallo`** | quien tome la sesión | 🐛 **Visto dos veces el 31/08.** `Heat-score v1` devuelve 0 items ⇒ nada río abajo corre, incluidos `Resumen del run` y `Cerrar run en el registro` ⇒ la fila queda `en_curso` y **el barredor de zombies la marca `fallo` a los 60 min**. En n8n la ejecución figura **success**. Pasó con la ejecución 155, que hizo exactamente lo correcto (miró 530 videos, ninguno era nuevo). Es pre-existente y ensucia las métricas de todo lo demás |
 > | **Soltar los 1.029 huérfanos restantes** por tandas | quien tome la sesión | Cuesta una corrida del script; lo que vuelva es upside. ⚠️ **Los 255 del primer lote que no volvieron NO cuentan**: están fuera del alcance del método, correr el motor otra vez colecta los mismos 520 |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
@@ -4554,6 +4556,49 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-31 (cierre 129) — El Gate bajó 5.8x con más carga, y las cuatro entregaron completo por primera vez (Claude, con Mani).**
+
+**Qué se hizo:** se empujó el cierre 128, se subió *Resultados por cuenta de referente* de **50 a 150**
+y se corrió la corrida de fuego (**ejecución 156**, 29m20s, `ok`). Después, dos arreglos que salieron
+de mirar sus números: la métrica que yo mismo había roto y el contador que faltaba para poder subir la
+concurrencia. También se mergeó a `main` la sesión del worktree (`f6e2065`, ADR-053 §Enmienda 2).
+
+**📏 El resultado, medido:**
+
+| | ejecución 150 | ejecución 156 |
+|---|---|---|
+| **Gate** | **492.7 s** en 26 chunks | **85.6 s** en **36** |
+| por chunk | 18.95 s | **2.38 s** ⇒ **7.97×** = la concurrencia exacta |
+| colectados | 520 | **1.088** |
+| entregados | 74/80 | **80/80, las 4 con `razon_faltante: null`** |
+| `gate_sin_presupuesto` · `pretrim_sin_juicio` · `avisos` | — | **0 · 0 · vacío** |
+
+**🩸 Y quedó probado que el pre-trim viejo estaba roto, con dos corridas del mismo día y el mismo
+input:** la de las 13:00 (código viejo) descartó **0 de 1.773**; la de las 14:10 (chunks) descartó
+**666 de 1.773 (38%)**, con 0 chunks fallidos. *Los "dos proyectos que descartaron 0 sobre 465 videos"
+no eran temas limpios: era la llamada rompiéndose y el `catch` tragándosela.*
+
+**Dos arreglos posteriores:**
+1. **`haiku_lotes_pretrim` informaba 4 llamadas y la corrida hizo ~38** — el contador decía *"un lote
+   por proyecto"*, cierto hasta que se chunkeó. *Un cambio de forma que no arrastra su métrica deja un
+   número que sigue pareciendo correcto.*
+2. **`concurrencia_transcribir` 8 → 12, pero midiendo primero.** ADR-030 §Enmienda ya decía *"subila
+   midiendo los 429"*, y al ir a hacerlo apareció que **ese número no existía**. Lo que sí se pudo
+   medir: las 24 vacías de la 156 fueron **24 sin-voz definitivos, cero perdidas por límite** (se
+   separan gracias al `_tx_resuelta` de ADR-084). 🔑 **Pero *"0 perdidos"* no es *"0 rate limiting"*:
+   un 429 que el backoff recupera sale con guion y no aparece en ningún número.** Ahora se cuenta
+   (`_tx_429` → `metricas.rechazos_supadata`), distinguiendo un 429 de un timeout de red.
+
+**🐛 Bug destapado, pre-existente:** una corrida que legítimamente no encuentra nada nuevo **no cierra
+y termina registrada como `fallo`**. `Heat-score v1` devuelve 0 ⇒ `Resumen del run` y `Cerrar run`
+nunca corren ⇒ el barredor la marca a los 60 min, mientras en n8n figura `success`. Le pasó a la
+ejecución 155. En el tablero.
+
+**Qué sigue:** empujar estos 3 nodos (`Config`, `Transcribir`, `Resumen del run` — sin topología),
+correr una vez a concurrencia 12 y **leer `rechazos_supadata` antes de tocar el volumen otra vez**. El
+margen está en 3%: 288 videos en 695,5 s ⇒ el presupuesto de 870 s da para ~360 contra un cap de 350,
+y **el presupuesto no puede subir porque 870 s ya roza el watchdog de 900**.
 
 **2026-08-31 (cierre 129) — El diff dejaba pasar un cambio sin empujar en el mismo balde que el ruido de n8n (Claude, con Mani).**
 

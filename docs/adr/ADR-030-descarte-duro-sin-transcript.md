@@ -155,3 +155,39 @@ comentarios falsos corregidos), `Config` (`concurrencia_transcribir` 8, `presupu
 870, `backoff_transcribir_ms` 500 nuevo). Docs: CLAUDE.md del motor. Probado en `test-nodos.mjs`
 (4 casos nuevos: sin-voz no reintenta, 429 recupera, aguanta 4 rechazos seguidos, el backoff no
 pisa el presupuesto). Sin cambio de schema.
+
+---
+
+## Enmienda 2 · 2026-08-31 — subir la concurrencia, pero midiendo lo que hasta hoy no se medía
+
+La §Enmienda de arriba dejó la instrucción escrita: *"la palanca es subir `concurrencia_transcribir`,
+midiendo primero los 429 como se midió acá — no bajar el cap"*. Al ejecutarla apareció que **ese
+número no existía**.
+
+📏 **Lo que sí se podía medir, en la ejecución 156** (288 videos a 8 en vuelo, tras subir el volumen a
+150 por cuenta): **24 transcripciones vacías, y las 24 resueltas como *sin voz* definitivo. Cero
+perdidas por límite.** Eso se pudo separar recién ahora, gracias al `_tx_resuelta` de
+[ADR-084](./ADR-084-la-memoria-guarda-lo-resuelto-no-lo-intentado.md).
+
+🔑 **Pero *"0 videos perdidos"* no es *"0 rate limiting"*, y confundirlos habría sido subir la perilla
+a ciegas.** Un `429` que el backoff recupera sale **con guion**: no aparece en las vacías, no aparece
+en los no-resueltos, no aparece en ningún número de la corrida. Son dos preguntas distintas y sólo se
+podía contestar la primera.
+
+**Lo que cambia:**
+1. **`Transcribir` cuenta los rechazos por límite por video (`_tx_429`), incluidos los recuperados**,
+   y distingue un `429` de un timeout de red — contarlos juntos haría bajar la concurrencia por un
+   problema que no es de concurrencia. `Resumen del run` publica `rechazos_supadata` y
+   `videos_con_rechazo`, con aviso cuando aparecen.
+2. **`concurrencia_transcribir` 8 → 12.** Paso corto y deliberado: 1,5×, no el 24 del que se volvió.
+   Restaura el margen que la §Enmienda de arriba había dado por gastado — a 12 la capacidad pasa de
+   ~360 a ~540 videos contra un `cap_top_n` de 350, o sea que **vuelve a morder el cap (que posterga)
+   y no el presupuesto**.
+
+⚖️ **Por qué es seguro subirla ahora y no antes:** el presupuesto ya no quema (ADR-084), así que el
+peor caso de pasarse pasó de *perder videos para siempre* a *demorarlos una corrida*. Y el contador
+nuevo hace que la próxima corrida conteste sola si 12 es demasiado.
+
+**Toca:** `Transcribir (Supadata)` (contador + clasificación del error), `Resumen del run` (2 métricas
++ aviso), `Config` (`concurrencia_transcribir` 12). Probado en `test-nodos.mjs` (6 casos, incluido el
+que importa: **un 429 recuperado se cuenta igual**). **No toca `core/`, sin migración.**
