@@ -339,6 +339,51 @@ escriba el motor y no una verificación. Esa corrida lo despierta.
 | **20–60%** | vuelven algunos | soltar por tandas y medir cada una; no dar por buena la tasa |
 | **< 20%** | el video ya se cayó del top 50 | **A no alcanza**: acá sí se discute B, con este número atrás |
 
+### ✅ RESULTADO — corrida `2026-08-31 04:30`, cerrada `ok` en 13 min
+
+| | |
+|---|---|
+| el motor los volvió a ver | **82 de 337 (24%)** |
+| llegaron al feed | **28 (8% de los 337)** |
+| **de lo que entregó la corrida entera** | **28 de 32 candidatos = 88%** |
+
+**El 8% es el número engañoso y el 88% es el que contesta el reclamo de Majo.** El rescate no aportó
+al margen: **fue casi toda la cosecha de la corrida** (el material nuevo puso 4 candidatos).
+
+**Se descartó el confundido antes de leer el 24%.** `processed_items` se escribe **después** del
+heat-score, así que un video colectado y matado por el filtro de vistas se vería igual que uno que
+ni se colectó. Se leyó la ejecución de n8n nodo por nodo:
+
+| nodo | distintos | de los 337 |
+|---|---|---|
+| `Normalizar IG` (scrape crudo) | 520 | **82** |
+| `Asignar proyecto+voz` | 465 | **82** |
+| `Heat-score v1` | 90 | **82** |
+| `Transcribir (Supadata)` | 90 | **82** |
+
+**82 entran y 82 llegan: cero rescatados se perdieron aguas abajo.** El 24% es tasa de colección
+pura. El video vuelve o no vuelve, y eso se decide en el scrape.
+
+### 🩸 Por qué es 24% — y por qué el criterio de arriba leía mal la causa
+
+La lectura que da la tabla (*20-60% ⇒ soltar por tandas y medir cada una*) **acierta la acción y
+erra el porqué**: da a entender que la tasa depende del tamaño de la tanda. No depende. Depende de
+**qué cuentas siguen listando el video**, y eso ya está medido:
+
+De 40 referentes activos, **35 devolvieron algo y el supply está concentrado**: 11 cuentas ponen 490
+de los 520 crudos (**94%**), y las otras 24 ponen entre 1 y 3 cada una. **Solo 4 cuentas tocan el
+tope de 50.**
+
+⇒ **Los 255 que no volvieron no están "pendientes": están fuera del alcance de este método.** Correr
+el motor de nuevo colecta los mismos 520. La tanda siguiente traerá lo suyo, pero **estos 255 no
+vuelven salvo que su cuenta los vuelva a listar**, y no hay que contarlos como upside futuro.
+
+*El criterio se deja escrito tal como se redactó, con la corrección al lado y no encima: acomodarlo
+después sería exactamente lo que ese criterio existía para impedir.*
+
+🐤 **El canario de ADR-081 se despertó con esta corrida:** 32 candidatos con `run_id`, los 32
+escritos por el motor. Primera fila de uso real, ninguna de verificación.
+
 ---
 
 ## §6 · Lo que este plan NO hace

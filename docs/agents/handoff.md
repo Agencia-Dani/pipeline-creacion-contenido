@@ -24,10 +24,14 @@
 
 > # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
-> ⚠️ **Al 31/08 esperan DOS cosas, ninguna de código:** deployar el dashboard (la `034` ya está
-> aplicada y el motor ya empujado, cierre 123) y **disparar una corrida del motor** para que los 337
-> videos rescatados del cierre 124 lleguen al feed. El otro bloqueo, el ⛔ de abajo, sigue siendo de
+> ⚠️ **Al 31/08 espera UNA sola cosa, y no frena una corrida:** deployar el dashboard (la `034` ya
+> está aplicada y el motor ya empujado, cierre 123). El otro bloqueo, el ⛔ de abajo, sigue siendo de
 > producto y no de código.
+>
+> ✅ **El rescate del cierre 124 ya corrió entero:** 337 huérfanos soltados, corrida disparada y
+> medida — **28 de los 32 candidatos que entregó (88%) son rescatados**. Y dejó un hallazgo que vale
+> más que el rescate: **el supply está concentrado en 11 cuentas de 40** (94% de los crudos), con 24
+> referentes de cola que aportan 1-3 videos cada uno y varios que ni son cuentas de contenido.
 >
 > ✅ **Los "2 drifts ajenos del motor" ya no existen, y nunca fueron drift:** eran los cambios de la
 > OTRA sesión, que trabajó sobre `main` mientras ésta corría en un worktree. Al mergear las dos
@@ -55,7 +59,9 @@
 > |---|---|---|
 > | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
 > | ~~El badge de `degradaria` nunca se pintó~~ | — | ✅ **CERRADO el 30/08** (ADR-080 §Enmienda): no era "sin ver", era un bug — se pintaba como texto gris atenuado, indistinguible del `"limpio"` de al lado. Ahora es un badge `outline`, visto andar con su único caso |
-> | **Disparar una corrida del motor** y después correr `--verificar` | Mani | 🔥 **Es lo único que convierte el rescate del cierre 124 en videos en el feed.** Los 337 ya tienen la memoria de dedup borrada y esperan que alguien mire. **Paga** (Apify + Supadata + Haiku). El criterio de éxito está escrito antes de medir: >60% ⇒ soltar los 1.029 restantes · <20% ⇒ el camino A no alcanza |
+> | ~~Disparar una corrida del motor y correr `--verificar`~~ | — | ✅ **CERRADO el 31/08** (ADR-082, cierre 124). Corrida `04:30` cerrada `ok`: volvieron 82 de 337 (24%) y **28 de los 32 candidatos entregados (88%) son rescatados**. El 24% es tasa de colección pura, verificado leyendo la ejecución de n8n nodo por nodo: entran 82 al scrape y llegan **los mismos 82** a `Transcribir` |
+> | **Podar los referentes de cola** — 24 de 40 aportan 1-3 videos cada uno | Majo / Mani | 📌 **Hallazgo del cierre 124, y explica el *"trae pocos videos"* mejor que la ráfaga.** 11 cuentas ponen el **94%** del supply; varias de la cola (`tesco`, `virginradiouk`, `filmmakerzara`) ni son cuentas de contenido — entraron por el descubrimiento y nadie las podó |
+> | **Soltar los 1.029 huérfanos restantes** por tandas | quien tome la sesión | Cuesta una corrida del script; lo que vuelva es upside. ⚠️ **Los 255 del primer lote que no volvieron NO cuentan**: están fuera del alcance del método, correr el motor otra vez colecta los mismos 520 |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
 | ~~El repo quedó atrás del live en 2 nodos del motor~~ | — | ✅ **CERRADO el 31/08 por el merge** (`68b79df`). No hacía falta ningún porqué nuevo: los dos nodos eran los cambios de la otra sesión, ya argumentados en `491aa39` y ADR-030 §Enmienda. `n8n:diff` verde en los 5, y el live confirmado por lectura directa de la API (`RETRIES=4`, corte en sin-voz, jitter, `run_id`) |
@@ -245,26 +251,57 @@
 >   plataformas**, así que un archivado de TikTok quedaría sin proteger el día que alguien corra el
 >   rescate sobre TikTok. Cerrado ahí mismo: la URL de TikTok trae su `external_id` literal.
 >
-> ### ⬜ Lo que falta, y es de Mani
+> ### ✅ CORRIDO Y MEDIDO — corrida `2026-08-31 04:30`, cerrada `ok` en 13 min
 >
-> **Disparar una corrida del motor.** Es lo único que convierte esto en videos en el feed, y **paga**
-> (Apify + Supadata + Haiku). Después:
+> | | |
+> |---|---|
+> | el motor los volvió a ver | **82 de 337 (24%)** |
+> | llegaron al feed | **28 (8% de los 337)** |
+> | **de lo que entregó la corrida entera** | **28 de 32 candidatos = 88%** |
+>
+> **El 8% es el número engañoso; el 88% es el que contesta el reclamo de Majo.** El rescate no aportó
+> al margen: **fue casi toda la cosecha** (el material nuevo puso 4 candidatos de 32).
+>
+> **Se descartó el confundido antes de leer el 24%.** `processed_items` se escribe **después** del
+> heat-score, así que un video colectado y matado por el filtro de vistas se vería igual que uno que
+> ni se colectó. Leída la ejecución de n8n nodo por nodo: `Normalizar IG` (scrape crudo) 520
+> distintos con **82** de los rescatados, y `Heat-score` y `Transcribir` **los mismos 82**. **Entran
+> 82 y llegan 82: cero rescatados se perdieron aguas abajo.** El 24% es tasa de colección pura.
+>
+> ### 🩸 Por qué es 24%, y por qué el criterio escrito antes leía mal la causa
+>
+> El criterio decía *20-60% ⇒ soltar por tandas y medir cada una*. **Acierta la acción y erra el
+> porqué:** sugiere que la tasa depende del tamaño de la tanda, y no depende. Depende de **qué
+> cuentas siguen listando el video**, y eso está medido: de 40 referentes activos, **35 devolvieron
+> algo y 11 ponen 490 de los 520 crudos (94%)**; las otras 24 ponen entre 1 y 3 cada una, y **solo 4
+> tocan el tope de 50**.
+>
+> ⇒ **Los 255 que no volvieron no están pendientes: están fuera del alcance de este método.** Correr
+> el motor otra vez colecta los mismos 520. **No cuentan como upside futuro.**
+>
+> *El criterio quedó escrito tal cual se redactó, con la corrección al lado y no encima — acomodarlo
+> después sería justo lo que ese criterio existía para impedir.*
+>
+> 🐤 **El canario de ADR-081 SE DESPERTÓ con esta corrida:** **32 candidatos con `run_id`, los 32
+> escritos por el motor.** Primera fila de uso real, ninguna de verificación — que es exactamente
+> para lo que nació en cero.
+>
+> ### 📌 El hallazgo lateral que vale más que el rescate: **el supply está concentrado en 11 cuentas**
+>
+> No es un bug del scraper, es la lista de referentes diluida. Las 24 cuentas de cola (`tesco`,
+> `virginradiouk`, `jamessmith`, `filmmakerzara`…) aportan **~30 videos entre todas, el 6%**, y varias
+> ni son cuentas de contenido: entraron por el descubrimiento y nadie las podó. **Esto explica el
+> *"trae pocos videos"* mejor que la ráfaga**, y no lo arregla ningún rescate. Queda anotado, no
+> resuelto acá.
+>
+> ### ⬜ Lo que sigue
+>
+> **Soltar los 1.029 huérfanos restantes por tandas**, midiendo cada una. Cuesta una corrida del
+> script y lo que vuelva es upside; lo que no vuelva ya se sabe que no vuelve.
 >
 > ```bash
-> set -a && source .env && set +a && node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs --verificar Workflows/workflow-short-form-content/rescate-20260831-0143.json
+> set -a && source .env && set +a && node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs --desde <fecha>
 > ```
->
-> 🐤 **Esa corrida es además el primer uso real de `candidatos.run_id`** (ADR-081), cuyo canario nació
-> en cero a propósito para que la primera fila con corrida la escriba el motor y no una verificación.
->
-> **El criterio de éxito está escrito ANTES de medir, para no acomodarlo después:** >60% vueltos ⇒
-> soltar los 1.029 huérfanos restantes por tandas · 20–60% ⇒ tandas midiendo cada una · <20% ⇒ el
-> video ya se cayó del top 50 y **el camino A no alcanza**, ahí se discute construir el modo rescate
-> en el motor con el número atrás.
->
-> ⚠️ **Antes de apretar, dos cosas que se saben:** los rescatados **compiten con el material nuevo**
-> por el techo de *Videos a transcribir por corrida* (**350**), así que una o dos corridas van a
-> traer menos videos frescos de lo normal; y ~150 de los 337 los va a volver a rechazar el gate.
 
 > ## 🧭 2026-08-30 (cierre 123) · EL FEED YA DICE DE QUÉ CORRIDA SALIÓ CADA VIDEO (Claude, pedido de Mani)
 >

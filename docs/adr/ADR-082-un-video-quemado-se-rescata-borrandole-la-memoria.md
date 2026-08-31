@@ -1,10 +1,11 @@
 # ADR-082 — Un video quemado se rescata borrándole la memoria, no reconstruyéndolo
 
-- **Estado:** aceptada · **construida y aplicada** — 2026-08-31 (con Mani). Script
+- **Estado:** aceptada · **construida, aplicada y MEDIDA** — 2026-08-31 (con Mani). Script
   [`rescatar-huerfanos.mjs`](../../Workflows/workflow-short-form-content/rescatar-huerfanos.mjs),
   **337 filas de `processed_items` borradas** en prod y verificadas por su efecto con cuatro
-  señales. **No toca `core/`, no toca el motor, no toca la app, sin migración.** Plan de ejecución
-  en [plan-rescate-huerfanos.md](../agents/plan-rescate-huerfanos.md).
+  señales. **Corrida `04:30` cerrada `ok`: 82 de 337 volvieron (24%) y 28 de los 32 candidatos que
+  entregó (88%) son rescatados.** **No toca `core/`, no toca el motor, no toca la app, sin
+  migración.** Plan de ejecución en [plan-rescate-huerfanos.md](../agents/plan-rescate-huerfanos.md).
 
 ## Contexto
 
@@ -99,10 +100,36 @@ depende de dos knobs que cambiaron esta semana: **Días de recencia = 150** y **
 = 50**. La antigüedad del video **ya no es el límite**; el único límite es que siga entre los últimos
 50 de su cuenta.
 
-**Es un supuesto, no un hecho medido**, y por eso el rescate arranca acotado (337 de 1.029) y trae su
+**Era un supuesto, no un hecho medido**, y por eso el rescate arrancó acotado (337 de 1.029) con su
 propia verificación. El criterio se escribió **antes** de medir: >60% vueltos ⇒ soltar el resto por
 tandas · 20–60% ⇒ tandas midiendo cada una · **<20% ⇒ esta decisión no alcanza** y hay que construir
 el modo rescate en el motor.
+
+### ✅ Ya se midió: 24%, y el supuesto se sostiene por una razón distinta a la esperada
+
+Corrida `2026-08-31 04:30`, cerrada `ok` en 13 min. **82 de 337 volvieron (24%)**, 28 llegaron al
+feed — y esos 28 son **el 88% de todo lo que la corrida entregó** (32 candidatos; el material nuevo
+puso 4). *El 8% sobre los rescatados es el número engañoso; el 88% sobre la cosecha es el que
+contesta el reclamo que originó todo esto.*
+
+**El confundido se descartó antes de leer el 24%.** `processed_items` se escribe **después** del
+heat-score, así que un video colectado y matado por el filtro de vistas se vería igual que uno que ni
+se colectó. Leyendo la ejecución de n8n nodo por nodo: `Normalizar IG` (scrape crudo) trae 520
+distintos con **82** rescatados, y `Heat-score` y `Transcribir` traen **los mismos 82**. Entran 82 y
+llegan 82: **cero rescatados se perdieron aguas abajo**, o sea que el 24% es tasa de colección pura.
+
+**🩸 Y el criterio de arriba acierta la acción pero erra la causa.** *20-60% ⇒ soltar por tandas*
+sugiere que la tasa depende del tamaño de la tanda. No depende: depende de **qué cuentas siguen
+listando el video**. De 40 referentes activos, **35 devolvieron algo y 11 ponen 490 de los 520 crudos
+(94%)**; las otras 24 ponen entre 1 y 3 cada una y **solo 4 tocan el tope de 50**.
+
+⇒ **Los 255 que no volvieron no están pendientes: están fuera del alcance de esta decisión.** Correr
+el motor otra vez colecta los mismos 520. No cuentan como upside futuro, y **el modo rescate del
+motor (plan B) sigue siendo lo único que los alcanzaría** — pero con 88% de la cosecha resuelto por
+el camino barato, no se justifica hoy.
+
+*El criterio queda escrito tal como se redactó, con la corrección al lado y no encima: acomodarlo
+después sería justo lo que existía para impedir.*
 
 ## Alternativas descartadas
 
@@ -139,5 +166,10 @@ cálculo en pérdida de memoria de videos vivos.
   alguien corra el rescate sobre esa plataforma.*
 - **Esto no arregla la causa**, que ya está arreglada (ADR-030 §Enmienda). Es la limpieza de lo que
   la causa dejó atrás.
+- 📌 **El hallazgo lateral vale más que el rescate: el supply está concentrado en 11 cuentas de 40**
+  (94% de los 520 crudos). Las 24 de cola aportan **~30 videos entre todas (6%)** y varias ni son
+  cuentas de contenido (`tesco`, `virginradiouk`, `filmmakerzara`): entraron por el descubrimiento
+  (ADR-020) y nadie las podó. **Esto explica el *"trae pocos videos"* mejor que la ráfaga**, y no lo
+  arregla ningún rescate. Anotado, no resuelto acá.
 - 🐤 **La corrida de verificación es el primer uso real de `candidatos.run_id`** (ADR-081), cuyo
   canario nació en cero a propósito para que la primera fila con corrida la escriba el motor.
