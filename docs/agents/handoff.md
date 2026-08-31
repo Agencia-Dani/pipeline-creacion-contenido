@@ -4555,6 +4555,68 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
 
 ## Log de avance (más reciente arriba)
 
+**2026-08-31 (cierre 129) — El diff dejaba pasar un cambio sin empujar en el mismo balde que el ruido de n8n (Claude, con Mani).**
+
+**Qué se hizo:** el punto ciego que el cierre 128 dejó anotado, cerrado como
+[ADR-053 §Enmienda 2](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md). El balde benigno de
+`n8n:diff` se llamaba *"defaults de n8n, **o cambios sin empujar**"* y esa `o` era el bug: la regla
+era **estructural** (`live ⊆ repo`), así que cualquier campo que el repo agregara y nadie empujara
+salía junto a `method`, con el comando cerrando en verde. Ahora lo benigno se decide por **clave +
+VALOR** contra una lista cerrada de 6 pares (`DEFAULTS_N8N`), **lo que no está en ella grita**, y cae
+en un balde propio y accionable: `sin-empujar`.
+
+**🩸 El diagnóstico del 128 se quedó corto: el balde tenía DOS puertas, y la segunda era la de la
+paginación.** Además del campo ausente en el live, `clasificar` tenía `subconjunto(enLive, enRepo)` —
+el repo declara *más* **dentro del mismo campo**, que es exactamente `options: {timeout, pagination}`
+contra `options: {timeout}`. 📏 Medida sobre los 5 workflows: esa rama clasificaba **0 campos**. No
+callaba ruido; esperaba a un campo anidado para callarlo. *Una regla que hoy no silencia nada no está
+inactiva: está sin estrenar.*
+
+**🔑 Por qué clave + VALOR y no una lista de nombres**, que era la opción obvia y más corta: los
+nombres reproducen el mismo fallo un escalón abajo. Un `method: 'POST'` sin empujar, contra un live
+sin `method` (o sea corriendo GET), sería *"benigno"* por llamarse `method`. El par cuesta lo mismo.
+
+**📏 Un dato medido que no era obvio y ordena la tabla:** que un default sobreviva en el live **no
+depende de su semántica sino de cómo se guardó el nodo por última vez** — un `PUT` escribe exacto lo
+que le mandamos, un save del editor poda. Por eso `Leer feed vivo` (empujado) **sí** tiene
+`method: GET` en el live y `Leer señal selección` (editado a mano) no, siendo los dos `httpRequest`.
+
+**Descartado, con su porqué:** (a) **recursión en las subclaves de `options`** — no cambia **ni un
+veredicto**, con la tabla un `options` con contenido ya sale accionable; solo afinaba el mensaje, y
+para eso alcanzó pegarle la frase. (b) **ensanchar `drift`** — el remedio es el mismo `push`, pero
+`drift` está *definido* en tres docs como *"los dos lados tienen valor y difieren"*, y agregar una
+palabra sale más barato que redefinir una que otros citan.
+
+**Verificación (dos señales, no una):** `n8n:diff` y `-- --todo` contra los 5 reales salen
+**idénticos campo por campo** a antes del cambio (24 benignos, 0 accionables, verde) ⇒ **cero falsas
+alarmas nuevas**. Y el bug **reproducido contra el motor real en solo lectura**, corriendo los dos
+clasificadores sobre el mismo input mutado (`options.pagination` agregada en el repo a
+`Leer señal selección`, que el live no tiene): el **viejo** cerró en `✓ motor corre lo que dice el
+repo` con el contador pasando de 10 a 11 benignos —ahí se escondía—; el **nuevo** lo saca en rojo.
+`n8n:test` **42 ok · 0 fallidos** (38 + 4 nuevos, que cubren las dos puertas *y* el ruido en la misma
+pasada). Validador 2533/0.
+
+**Gotchas para el próximo:**
+- ⚠️ **Un test que busque `sin-empujar` suelto da falso rojo:** el pie de ayuda del propio `diff` la
+  nombra siempre (*"Las de [drift] y [sin-empujar] se aplican con push"*). Se busca por el campo, no
+  por la palabra. Me lo comí escribiéndolo y quedó anotado en el test.
+- 🩸 **Este cierre se perdió entero una vez:** el worktree se recicló con el trabajo sin commitear.
+  Se pudo replayear porque los cambios se habían hecho con scripts de parcheo en `/tmp` y no a mano.
+  *En un worktree, commitear temprano es la red — el árbol de trabajo no es almacenamiento.*
+- 📌 **Deuda de doc que NO toqué** (pre-existente, no la creó este cierre): `CLAUDE.md` y el índice
+  dicen **"ADRs 001–083"** y ya existe la **084**. Un renglón, pero es el índice.
+
+**Toca:** `core/scripts/n8n-sync.mjs` (solo `diff`; **sigue siendo solo lectura**), su test,
+ADR-053, ADR-029, `CLAUDE.md`, índice de ADRs. Sin migración, sin cambios en los `workflow.json`,
+sin tocar el live. De paso se corrigió el renglón de ADR-053 en el índice, que seguía diciendo *"el
+re-import completo sigue siendo el camino para cambios de topología"* — falso desde su §Enmienda del
+30/08.
+
+**Qué sigue:** sin cambios respecto del 128 — (1) la corrida de fuego que mide si el Gate bajó, (2)
+deployar el dashboard (cierres 123/126/127 sin pushear). Para la próxima sesión: `/tdd` si se
+retoma construcción, `/diagnose` si la corrida de fuego sale rara.
+
+
 **2026-08-31 (cierre 128) — Los dos pasos que faltaban para subir volumen, y los dos fallaban callados (Claude, con Mani).**
 
 **Qué se hizo:** los pasos 3 y 4 del plan del cierre 127 —
@@ -4595,6 +4657,9 @@ vive la paginación que acabo de agregar— en el balde **benigno**, junto a `me
 sea que **un nodo HTTP puede quedarse sin paginación con el diff en verde**. Que este cambio sí llega
 se verificó por el precedente, leyendo el live: `Leer procesados` tiene su `pagination` desde el
 cierre 125, empujada por el mismo mecanismo. El balde merece su propia sesión (hay chip).
+✅ **Cerrado en el cierre 129, el mismo día** — ADR-053 §Enmienda 2. Y el diagnóstico de arriba se
+quedó corto en una cosa: el balde tenía **dos** puertas, no una, y la segunda era justo la de la
+paginación.
 
 **Qué sigue, en orden:** (1) empujar el cierre 128 al live —`Config`, `Pre-trim relevancia`, `Leer
 feed vivo`, `Heat-score v1`, `Resumen del run`, solo `--nodos`, sin topología—; (2) la corrida de
