@@ -24,9 +24,13 @@
 
 > # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
-> ⛔ **Desde el 30/08 (cierre 123) SÍ espera algo: la migración `034` sin aplicar.** Este renglón
-> decía *"nada espera a Mani para la próxima corrida"* y dejó de ser cierto el mismo día. El otro
-> bloqueo, el de abajo, sigue siendo de producto y no de código.
+> ⚠️ **Al 31/08 espera DOS cosas, y ninguna frena una corrida:** deployar el dashboard (la `034` ya
+> está aplicada y el motor ya empujado, cierre 123) y **decidir el porqué de los 2 drifts del motor
+> que vienen de otra sesión** (`Config` y `Transcribir`). El otro bloqueo, el ⛔ de abajo, sigue
+> siendo de producto y no de código.
+>
+> *Este renglón decía "nada espera a Mani para la próxima corrida" el 29/08 y dejó de ser cierto al
+> día siguiente. Un estado se re-mide, no se cita.*
 >
 > - **El MVP está declarado** (ROADMAP §4): la última condición —*el equipo usa el sistema un día
 >   completo sin un dev*— la cumplió **Majo el 26/08**, sola. Con eso **D3 se cerró por medición y
@@ -46,7 +50,8 @@
 > | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
 > | ~~El badge de `degradaria` nunca se pintó~~ | — | ✅ **CERRADO el 30/08** (ADR-080 §Enmienda): no era "sin ver", era un bug — se pintaba como texto gris atenuado, indistinguible del `"limpio"` de al lado. Ahora es un badge `outline`, visto andar con su único caso |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
-> | ⛔ **Aplicar la migración [`034`](../../core/schema/034_candidatos_run.sql)** (ADR-081) y **recién después** `n8n:push -- motor --nodos "Preparar candidatos"` y el deploy | **Mani** | 🔴 **El orden no es opcional.** Al revés, `POST Candidatos` manda una columna que no existe, PostgREST da 400 y ese nodo es **fail-closed** ⇒ muere la entrega ya pagada. Ver cierre 123 |
+> | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
+| **El repo quedó atrás del live en 2 nodos del motor** — `Config` (`concurrencia_transcribir`: repo 24, live 8) y `Transcribir (Supadata)` | **Mani** | Son cambios **de otra sesión** y por eso el live gana. Falta el **porqué** para escribirlos en el JSON: un número sin argumento reabre lo que ADR-044 cerró. Hasta entonces `n8n:diff` va a estar rojo a propósito |
 | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
 > | ~~La topología de n8n sigue siendo ritual manual~~ | — | ✅ **CERRADO el 30/08** (ADR-053 §Enmienda). `n8n:push` empuja nodos y conexiones; el re-import queda solo para crear un workflow de cero. El bloqueo no eran las credenciales sino que `cuerpoPut` mandaba las conexiones del live |
 > | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ **DESBLOQUEADO el 30/08** (ADR-074 §Enmienda): `guardarLimpio` ya no manda `creado_por` al rehacer, así que *Rehacer 25* **se puede apretar**. Verificado en prod con una colección de un video: la fila se reescribió (huella `97ff9195`→`72210da7`, voz derivada) y el conteo quedó **igual, Majo 58 · Mani 7** |
@@ -208,22 +213,33 @@
 > - ✅ `node Workflows/auditar-workflows.mjs` — **sin hallazgos** (6 workflows).
 > - ✅ `npm run validate` — **2479 checks, 0 errores**.
 > - ✅ dashboard: `npm run typecheck` limpio · `npm test` **442 pass / 0 fail** · `npm run build` OK.
-> - ⛔ **NO se verificó en el navegador, y no se puede todavía**: la `034` no está aplicada, así que
->   `leerFeed` pediría `run_id` a PostgREST y se llevaría un 400. La verificación visual va **después**
->   del gate de abajo.
+> ### ✅ EL GATE SE CERRÓ EL MISMO DÍA — migración, push y navegador
 >
-> ### ⛔ EL GATE, Y SU ORDEN NO ES OPCIONAL
+> **1) `034` aplicada por Mani** (00:5x del 31/08 UTC). Verificada **por su efecto** y con dos
+> señales: PostgREST devuelve `run_id` (no `42703`), y un uuid inventado rebota con **`23503 ·
+> candidatos_run_id_fkey → runs`**. **0 filas rellenadas**, o sea que el "sin backfill" es real y no
+> una intención.
 >
-> **1) Aplicar la `034` en el SQL Editor. 2) Recién después `npm run n8n:push -- motor --nodos
-> "Preparar candidatos" --apply`. 3) Recién después deployar el dashboard.**
+> **2) `n8n:push -- motor --nodos "Preparar candidatos" --apply`** — 1 nodo, `jsCode` 2203b → 3039b,
+> workflow sigue activo. Verificado leyendo el live: manda `run_id` y lee `Abrir run en el registro`.
+> Snapshot: `.n8n-snapshots/motor-2026-08-31T00-57-05-477Z.json`.
 >
-> 🔴 **Al revés se rompe caro:** con el motor empujado y la columna sin crear, `POST Candidatos` manda
-> una columna inexistente, PostgREST contesta 400 — y ese nodo es **fail-closed** ⇒ **muere la
-> entrega entera, después de haber pagado Supadata y Haiku**. Es literalmente el modo de falla de la
-> ejecución 136. Lo mismo para el dashboard: deployado antes de la migración, el Feed **no abre**.
+> **3) Navegador, contra la base de producción.** El Feed abre sin 400, la consola sin errores, y
+> `sin corrida` se pinta en las 91 tarjetas del filtro abierto. **La faceta NO se dibujaba** — que es
+> lo correcto: con 0 valores `usarOrden` no monta un control que no hace nada.
 >
-> Hasta que se empuje, `npm run n8n:diff` va a reportar **drift en `Preparar candidatos`**. Eso es
-> correcto y esperado: el repo va adelante del live a propósito.
+> 🔬 **Para ver la faceta funcionando hizo falta datos, y se hicieron y se borraron** (mismo
+> procedimiento que verificó la `031`): `run_id` temporal a **6 candidatos**, repartidos en las dos
+> corridas reales del 30/08. Resultado: dos chips (`30 ago, 07:06 p. m. · 3` y `30 ago, 05:50 p. m.
+> · 2`), y al prender uno **quedan 3 tarjetas, todas de esa corrida, 0 de la otra y 0 sin corrida**
+> — los nulos afuera, como `filtrarPor` promete — con los grupos por proyecto intactos y el
+> *Limpiar* visible. **Revertido enseguida y verificado con dos señales: `run_id not.is.null` vuelve
+> a 0 y el total sigue en 168.**
+>
+> 🕐 **De paso quedó probada la zona horaria**, que en este repo ya se pagó una vez: el run de
+> `2026-08-31T00:06Z` se dibuja **`30 ago, 07:06 p. m.`** y no *31 ago*. Bogotá, vía `fechaHora`.
+>
+> ⬜ **Lo único que queda: deployar el dashboard.** El orden ya no importa — la columna existe.
 >
 > ### 🩸 Y de paso: `n8n:diff` NO estaba verde, y el handoff decía que sí
 >
@@ -237,11 +253,25 @@
 > que [ADR-044](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md) decidió, y el presupuesto **quema**
 > (`POST processed_items` corre antes), así que lo que no entra no se posterga: se pierde.
 >
-> ⚠️ **No lo toqué, y no se decide desde acá.** Puede ser una bajada deliberada después de la
-> ejecución 136 (la que quemó 814 transcripciones el 21/08) que nunca volvió al repo. **Mani decide**
-> si gana el repo (`n8n:push -- motor --nodos "Config"`) o gana el live (bajar el número en el JSON,
-> con su porqué). Lo que no puede quedar es la tercera opción, que es la de hoy: los dos números
-> distintos y un doc afirmando que están iguales.
+> ✅ **Contestado por Mani el 31/08: los cambios de n8n son de OTRA SESIÓN y no se descartan.** Así
+> que **gana el live** y lo que falta es que el repo se ponga al día — no al revés. **No se hizo acá
+> porque falta el porqué**, y este repo no acepta un número sin argumento: escribir `8` en el JSON
+> sin decir por qué bajó de 24 deja la misma trampa que ADR-044 vino a cerrar.
+>
+> 🔴 **Y creció mientras esta sesión corría:** a las 00:37 el live decía `6`, a las 00:57 decía **`8`**,
+> y apareció **un drift nuevo en `Transcribir (Supadata) · jsCode`** que antes no estaba. Al 31/08 el
+> motor tiene **2 drifts ajenos** (`Config` y `Transcribir`) más el mío ya empujado.
+>
+> ✅ **Mi push NO pisó nada, y se puede probar:** el snapshot que tomó *antes* de escribir ya traía
+> `concurrencia_transcribir = 8` y `Transcribir` en 9036 bytes — **idénticos a lo que el live tiene
+> ahora**. Sus cambios entraron a las `00:51:34`, mi PUT a las `00:57:06`, y `n8n-sync` copia tal cual
+> (`if (!objetivo.includes(ln.name)) return ln;`) todo nodo que no esté en `--nodos`.
+>
+> ⚠️ **Pero el riesgo es real y conviene escribirlo: `n8n:push` es un read-modify-write del array
+> ENTERO de nodos, sin chequeo de versión.** Si la otra sesión hubiera guardado en la ventana de ~1 s
+> entre el GET y el PUT, su cambio se habría perdido **en silencio y con el push en verde**. Con dos
+> sesiones tocando el mismo workflow eso deja de ser teórico. *No es un bug de esta sesión: es una
+> propiedad del script que nadie había tenido motivo de mirar.*
 >
 > 🔑 **La lección se repite dos cierres seguidos:** el cierre 122 encontró tres docs que describían
 > mal lo que ya estaba, y este encontró un **`✓ verde` citado en vez de medido** — el estado del

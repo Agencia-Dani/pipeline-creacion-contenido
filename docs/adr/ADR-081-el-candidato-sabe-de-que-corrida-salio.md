@@ -1,6 +1,6 @@
 # ADR-081 — El candidato sabe de qué corrida salió
 
-- **Estado:** aceptada — 2026-08-30 (con Mani). Migración
+- **Estado:** aceptada · **construida y verificada** — 2026-08-30/31 (con Mani). Migración **aplicada** (`23503` de la FK como segunda señal), nodo **empujado al live**, y la faceta vista filtrar en el navegador con 6 candidatos de prueba creados y borrados. Migración
   [`034_candidatos_run.sql`](../../core/schema/034_candidatos_run.sql), una línea en el nodo
   `Preparar candidatos` del motor, y la corrida como badge + faceta en el Feed (extiende
   [ADR-076](./ADR-076-ordenar-es-una-vista-no-una-consulta.md), que ya montó la barra).
