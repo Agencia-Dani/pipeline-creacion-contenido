@@ -24,9 +24,10 @@
 
 > # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
-> ⚠️ **Al 31/08 espera UNA sola cosa, y no frena una corrida:** deployar el dashboard (la `034` ya
-> está aplicada y el motor ya empujado, cierre 123). El otro bloqueo, el ⛔ de abajo, sigue
-> siendo de producto y no de código.
+> ⚠️ **Al 31/08 esperan DOS cosas, ninguna de código:** deployar el dashboard (la `034` ya está
+> aplicada y el motor ya empujado, cierre 123) y **disparar una corrida del motor** para que los 337
+> videos rescatados del cierre 124 lleguen al feed. El otro bloqueo, el ⛔ de abajo, sigue siendo de
+> producto y no de código.
 >
 > ✅ **Los "2 drifts ajenos del motor" ya no existen, y nunca fueron drift:** eran los cambios de la
 > OTRA sesión, que trabajó sobre `main` mientras ésta corría en un worktree. Al mergear las dos
@@ -54,6 +55,7 @@
 > |---|---|---|
 > | **Auditar los descartes** — 80 de 82 sin `veredicto` | Majo | 🚀 **Se le pidió por WhatsApp el 29/08.** Sin esto `falsos_negativos` da 0 siempre y se lee como *"el gate está perfecto"* |
 > | ~~El badge de `degradaria` nunca se pintó~~ | — | ✅ **CERRADO el 30/08** (ADR-080 §Enmienda): no era "sin ver", era un bug — se pintaba como texto gris atenuado, indistinguible del `"limpio"` de al lado. Ahora es un badge `outline`, visto andar con su único caso |
+> | **Disparar una corrida del motor** y después correr `--verificar` | Mani | 🔥 **Es lo único que convierte el rescate del cierre 124 en videos en el feed.** Los 337 ya tienen la memoria de dedup borrada y esperan que alguien mire. **Paga** (Apify + Supadata + Haiku). El criterio de éxito está escrito antes de medir: >60% ⇒ soltar los 1.029 restantes · <20% ⇒ el camino A no alcanza |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
 | ~~El repo quedó atrás del live en 2 nodos del motor~~ | — | ✅ **CERRADO el 31/08 por el merge** (`68b79df`). No hacía falta ningún porqué nuevo: los dos nodos eran los cambios de la otra sesión, ya argumentados en `491aa39` y ADR-030 §Enmienda. `n8n:diff` verde en los 5, y el live confirmado por lectura directa de la API (`RETRIES=4`, corte en sin-voz, jitter, `run_id`) |
@@ -149,6 +151,120 @@
 >    stub deja de emitir posts terminados para emitir material crudo.
 > 4. Recién ahí: ADR + su migración (la próxima libre de `core/schema/`; la `028` ya se usó) +
 >    `colectar` personal.
+
+> ## 🔥 2026-08-31 (cierre 124) · EL 34% DE LA COSECHA HISTÓRICA ESTABA QUEMADA, Y 337 VIDEOS VOLVIERON A LA CANCHA (Claude, pedido de Mani)
+>
+> **En una línea:** Majo reportó *"unas corridas trajeron muy pocos videos"*; medido, no eran unas
+> corridas sino **593 videos quemados sobre 1.755 mandados a Supadata (34%)**, y se les borró la
+> memoria del dedup a **337** para que la próxima corrida los vuelva a mirar. Plan completo en
+> [plan-rescate-huerfanos.md](./plan-rescate-huerfanos.md).
+>
+> ### 📏 Los números, medidos contra prod
+>
+> `POST processed_items` corre **antes** de `Transcribir` (ADR-029 §2), así que un video que se comió
+> un `429` ya está en la memoria del dedup: vuelve sin transcript, el gate lo mata como `sin_guion`
+> (ADR-030) y **ninguna corrida futura lo vuelve a mirar**. No se perdía media cosecha por corrida:
+> se quemaba.
+>
+> | corrida | transcribió | quemó | % |
+> |---|---|---|---|
+> | 2026-08-24 13:00 (`a80d8d3`) | 219 | 88 | 40% |
+> | 2026-08-26 03:29 (`364905d`) | 250 | 159 | **64%** |
+> | 2026-08-26 04:25 (`0d45a26`) | 250 | 144 | **58%** |
+> | 2026-08-31 00:56 (`94ecb6d`) | 164 | 18 | **11%** ← ya con el arreglo de ADR-030 §Enmienda |
+>
+> ### 🩸 Dos cosas que la medición desmintió, y no estaban escritas en ningún lado
+>
+> **1. *"Las corridas que hizo Majo"* no es una consulta que se pueda escribir.** `runs` **no guarda
+> quién dispara una corrida**: las 29 figuran `on_demand` sin autor, y `app.eventos` tiene
+> `operar.archivar` y `sugeridos.buscar` pero **ningún evento de correr el motor**. La ventana del
+> rescate salió de **cuándo trabajó ella** (20, 21, 26 y 31 de agosto, 176 eventos), no de la corrida.
+> *El hueco queda abierto: hoy no hay forma de contestar quién pidió una corrida.*
+>
+> **2. Un video quemado por el 429 y uno que el gate rechazó de verdad SE VEN IDÉNTICOS.** Los dos
+> son una fila de `processed_items` que no llegó a candidato. De los **1.056 huérfanos**, ~593 son
+> quemados y ~460 rechazos legítimos, y **la base no los puede separar**. El rescate suelta a los dos
+> y deja que el gate re-decida: ~150 de los 337 van a volver a caer, y esa transcripción se paga dos
+> veces. Es el precio, y está aceptado a ojos abiertos.
+>
+> ### 🔑 La pieza que sostiene todo: el `external_id` de Instagram ES el shortcode
+>
+> `processed_items` guarda `platform + external_id` y nada más — la columna `url` se la llevó la
+> [`023`](../../core/schema/023_poda_write_only.sql). Pero `outputs` y `app.descartes` guardan **la
+> URL y no el id**, así que sin convertir uno en el otro no hay forma de saber que un video ya está
+> archivado o ya se auditó. **El id es el shortcode en base64** con el alfabeto `A-Za-z0-9-_`:
+> probado contra los **242 candidatos** de prod que tienen los dos campos al lado, **242/242**.
+>
+> **Sin ese cruce el borrado se llevaba la memoria de 111 videos ya resueltos** (61 archivados + 50
+> descartes) y la próxima corrida se los ponía a Majo en el feed para calificar lo que ya calificó.
+> El decodificado no es una optimización: es lo único que evita ese daño.
+>
+> ### ⚖️ Por qué borrar la memoria y no reconstruir los videos
+>
+> Se descartaron dos caminos con su porqué. **Reconstruir** (modo rescate en el motor, corriendo
+> sobre una lista de URLs) pedía una rama de colección nueva **y** re-comprarle a Apify la metadata
+> video por video, porque el huérfano viene desnudo: sin cuenta, sin vistas, sin miniatura. **Pegar
+> en *Transcribir*** costaba cero y no servía: la [`010`](../../core/schema/010_transcripciones.sql)
+> dice a propósito que un enlace pegado *"no pasó por el gate ni tiene heat-score, así que NO es un
+> Candidato: es una lista suelta"*.
+>
+> **Borrar la memoria cuesta cero código y cero Apify** — el scraper ya baja esos 50 videos por
+> cuenta en CADA corrida y hoy el dedup los tira — y los devuelve al feed por el camino de siempre.
+> Lo que lo volvió viable son knobs de esta semana: **Días de recencia 150** y **Resultados por
+> cuenta 50**, o sea que la antigüedad del video ya no es el límite; el único límite es que siga
+> entre los últimos 50 de su cuenta. *Ese es el supuesto del plan, y la Tarea 5 existe para medirlo.*
+>
+> ### ✅ Verificado por su efecto, con cuatro señales
+>
+> - `processed_items` **1.802 → 1.465**, que es 1.802 − 337 exacto
+> - quedan **237** filas en la ventana, y **las 237 son las ya resueltas**: ninguna huérfana
+>   sobrevivió y ningún resuelto se borró
+> - **0** de los 337 ids borrados sigue vivo
+> - el `DELETE` **devolvió** 337 filas (`Prefer: return=representation`), no "337 pedidas"
+>
+> ### 🔒 La regla que quedó escrita: la evidencia se guarda ANTES de borrar
+>
+> El borrado **destruye la única prueba de qué se rescató** — las filas dejan de existir y
+> `runs.metricas` guarda contadores, no ids. Por eso el script escribe
+> `rescate-20260831-0143.json` **antes** del `DELETE` y aborta si no puede; el archivo va **al repo**,
+> no al `.gitignore`. Sin él, `--verificar` no tiene contra qué medir y la pregunta *"¿volvieron?"*
+> deja de tener respuesta posible.
+>
+> Y el `DELETE` va por **PRIMARY KEY** y acotado por instancia, nunca por un filtro de fecha contra la
+> tabla: si el cálculo tuviera un bug, un filtro por fecha se llevaría también los vivos. Con la PK,
+> lo peor que puede pasar es borrar de menos.
+>
+> ### 🐛 Dos cosas que aparecieron construyendo
+>
+> - **`sb()` no paginaba.** PostgREST corta en 1.000 filas por defecto y `processed_items` tiene
+>   1.802: sin paginar, todo lo que no entraba en la primera página se veía como *"no es candidato"*
+>   y el cálculo daba huérfanos de más. **Un script que lee una tabla grande sin paginar no falla
+>   ruidoso: sobre-cuenta en silencio.**
+> - **El reporte avisó de 2 urls sin decodificar, y eran de TikTok.** Inofensivas para este rescate
+>   (corre con `--plataforma instagram`), pero `outputs` y `app.descartes` **mezclan las dos
+>   plataformas**, así que un archivado de TikTok quedaría sin proteger el día que alguien corra el
+>   rescate sobre TikTok. Cerrado ahí mismo: la URL de TikTok trae su `external_id` literal.
+>
+> ### ⬜ Lo que falta, y es de Mani
+>
+> **Disparar una corrida del motor.** Es lo único que convierte esto en videos en el feed, y **paga**
+> (Apify + Supadata + Haiku). Después:
+>
+> ```bash
+> set -a && source .env && set +a && node Workflows/workflow-short-form-content/rescatar-huerfanos.mjs --verificar Workflows/workflow-short-form-content/rescate-20260831-0143.json
+> ```
+>
+> 🐤 **Esa corrida es además el primer uso real de `candidatos.run_id`** (ADR-081), cuyo canario nació
+> en cero a propósito para que la primera fila con corrida la escriba el motor y no una verificación.
+>
+> **El criterio de éxito está escrito ANTES de medir, para no acomodarlo después:** >60% vueltos ⇒
+> soltar los 1.029 huérfanos restantes por tandas · 20–60% ⇒ tandas midiendo cada una · <20% ⇒ el
+> video ya se cayó del top 50 y **el camino A no alcanza**, ahí se discute construir el modo rescate
+> en el motor con el número atrás.
+>
+> ⚠️ **Antes de apretar, dos cosas que se saben:** los rescatados **compiten con el material nuevo**
+> por el techo de *Videos a transcribir por corrida* (**350**), así que una o dos corridas van a
+> traer menos videos frescos de lo normal; y ~150 de los 337 los va a volver a rechazar el gate.
 
 > ## 🧭 2026-08-30 (cierre 123) · EL FEED YA DICE DE QUÉ CORRIDA SALIÓ CADA VIDEO (Claude, pedido de Mani)
 >
