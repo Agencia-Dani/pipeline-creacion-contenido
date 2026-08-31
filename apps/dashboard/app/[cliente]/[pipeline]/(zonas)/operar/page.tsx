@@ -3,8 +3,10 @@ import Link from "next/link";
 import { BotonBuscar } from "@/components/boton-buscar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -280,13 +282,20 @@ export default async function OperarPage({
         <CardHeader>
           <CardTitle>Corridas recientes</CardTitle>
           <CardDescription>
-            La de cada lunes 08:00 es el cron; las del botón aparecen al toque. Acá va solo el
-            titular del motor:{" "}
-            <Link href={rutaDe(base, "operar/corridas")} className="underline">
-              abrí Corridas
-            </Link>{" "}
-            para ver qué hizo cada una y por qué, y las de las otras tres máquinas.
+            Acá va solo el titular del motor: la de cada lunes 08:00 es el cron y las del botón
+            aparecen al toque. El detalle de cada una —y las otras tres máquinas— están en Corridas.
           </CardDescription>
+          {/* 🔑 **Botón y no un link adentro del párrafo.** La primera versión metía "abrí Corridas"
+              subrayado en la descripción y Mani no lo encontró: *"está muy escondido"*. Es el mismo
+              patrón que este repo ya se comió tres veces (el `BotonBuscar` sin renderizar, el
+              `borrar` huérfano de colecciones) — una pantalla a la que no hay cómo llegar es
+              indistinguible de una que no existe. `CardAction` lo ancla arriba a la derecha, que es
+              donde el resto del cockpit pone la acción de su card. */}
+          <CardAction>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={rutaDe(base, "operar/corridas")}>Ver todas las corridas →</Link>
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent>
           {!runs ? (
