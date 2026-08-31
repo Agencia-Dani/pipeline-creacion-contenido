@@ -315,7 +315,7 @@ seccion('Invariantes que no se tocan');
 // `this` mockeado; el mock cuenta llamadas y concurrencia en vuelo)
 // ════════════════════════════════════════════════════════════════════════════
 const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
-const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia } = {}) => {
+const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia, backoff = 1 } = {}) => {
   const llamadas = [];
   let enVuelo = 0, maxEnVuelo = 0;
   const thisMock = { helpers: { httpRequest: async (opts) => {
@@ -324,11 +324,18 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrenci
     await new Promise((r) => setTimeout(r, delayMs));
     enVuelo--;
     if (falla) throw new Error('supadata caída (mock)');
-    if (secuencia) return secuencia[Math.min(llamadas.length - 1, secuencia.length - 1)]; // respuestas en orden (para probar el retry)
+    if (secuencia) {
+      // respuestas en orden (para probar el retry). `_throw` simula un status de error: n8n
+      // rechaza la promesa en un 429, no devuelve cuerpo — que es justo lo que hay que distinguir
+      // del 206 `transcript-unavailable`, que SÍ resuelve con cuerpo.
+      const r = secuencia[Math.min(llamadas.length - 1, secuencia.length - 1)];
+      if (r && r._throw) throw new Error(r._throw);
+      return r;
+    }
     return respuesta || { content: 'transcript de prueba', lang: 'en' };
   } } };
   const $ = (n) => {
-    if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto, concurrencia_transcribir: concurrencia } }) };
+    if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto, concurrencia_transcribir: concurrencia, backoff_transcribir_ms: backoff } }) };
     if (n === 'Heat-score v1') return { all: () => items.map((j) => ({ json: j })) };
     throw new Error('nodo no mockeado: ' + n);
   };
@@ -354,10 +361,12 @@ await (async () => {
   }
   {
     // Config viejo (sin la clave) ⇒ cae al default del código, no a 1: un re-import a medias no
-    // puede devolver el nodo al throughput serial en silencio.
+    // puede devolver el nodo al throughput serial en silencio. El default bajó 24 → 8 el 30/08:
+    // 24 en vuelo es la ráfaga que Supadata contesta con 429 (ADR-030 §Enmienda), así que dejarlo
+    // de default era dejar armada la trampa para el que re-importe sin Config.
     const items = []; for (let i = 0; i < 30; i++) items.push(tvid('d' + i));
     const { maxEnVuelo } = await runTranscribir(items, { delayMs: 15 });
-    check('sin la clave en Config cae al default 24, no a 1', maxEnVuelo() === 24, 'max en vuelo = ' + maxEnVuelo());
+    check('sin la clave en Config cae al default 8, no a 1', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
   }
   {
     // fan-out: 3 copias de 2 videos → 2 llamadas, el transcript se reparte a las copias
@@ -422,7 +431,33 @@ await (async () => {
   }
   {
     const { out, llamadas } = await runTranscribir([tvid('r2')], { secuencia: [{ content: '', lang: '' }, { content: '', lang: '' }] });
-    check('dos vacías: fail-open (transcripcion vacía) tras agotar el retry', out[0].transcripcion === '' && llamadas.length === 2, `tx='${out[0].transcripcion}' llamadas=${llamadas.length}`);
+    check('vacía sin motivo: agota los 5 intentos y hace fail-open', out[0].transcripcion === '' && llamadas.length === 5, `tx='${out[0].transcripcion}' llamadas=${llamadas.length}`);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+  // ADR-030 §Enmienda (2026-08-31): "sin voz" y "Supadata saturada" dejan de tratarse igual.
+  // Los tres casos de abajo SON la enmienda. Medido contra los 27 videos que la corrida 146 dio
+  // por vacíos: a 24 en vuelo, 17 volvieron 429 `limit-exceeded` y UNO solo no tenía transcript
+  // de verdad; los mismos 27 a 4 en vuelo trajeron 24 guiones.
+  {
+    const { out, llamadas } = await runTranscribir([tvid('u1')], { respuesta: { error: 'transcript-unavailable', message: 'Transcript Unavailable' } });
+    check('sin voz (transcript-unavailable) NO se reintenta: 1 sola llamada', out[0].transcripcion === '' && llamadas.length === 1, `llamadas=${llamadas.length}`);
+  }
+  {
+    const { out, llamadas } = await runTranscribir([tvid('t429')], { secuencia: [{ _throw: '429 - {"error":"limit-exceeded"}' }, { content: 'recuperado tras el 429', lang: 'en' }] });
+    check('429 (saturada) SÍ se reintenta y recupera el guion', out[0].transcripcion === 'recuperado tras el 429' && llamadas.length === 2, `tx='${out[0].transcripcion}' llamadas=${llamadas.length}`);
+  }
+  {
+    // El caso que costó 27 videos: 4 rechazos seguidos y recién al quinto entra. Con RETRIES=1
+    // este video se perdía, y como `POST processed_items` ya corrió (ADR-029), se perdía PARA SIEMPRE.
+    const s = [{ _throw: '429' }, { _throw: '429' }, { _throw: '429' }, { _throw: '429' }, { content: 'entró al quinto', lang: 'en' }];
+    const { out, llamadas } = await runTranscribir([tvid('t429b')], { secuencia: s });
+    check('aguanta 4 rechazos seguidos y entra al quinto (antes se quemaba en el 2º)', out[0].transcripcion === 'entró al quinto' && llamadas.length === 5, `tx='${out[0].transcripcion}' llamadas=${llamadas.length}`);
+  }
+  {
+    // El backoff no puede pisar el presupuesto: si el tiempo se acabó, no espera ni reintenta.
+    const items = []; for (let i = 0; i < 12; i++) items.push(tvid('b' + i));
+    const { llamadas } = await runTranscribir(items, { presupuesto: 0.05, delayMs: 25, concurrencia: 2, falla: true, backoff: 200 });
+    check('con el presupuesto agotado el backoff no reintenta (no se cuelga el nodo)', llamadas.length < 12 * 5, llamadas.length + ' llamadas de 60 posibles');
   }
 })();
 

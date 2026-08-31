@@ -51,3 +51,89 @@
   `transcripciones_vacias` + aviso). Config: `cap_top_n` 250, `presupuesto_transcribir_s` 840
   (+ `workflow.yaml`). Docs: onboarding del equipo, dev-doc, CLAUDE.md. Probado en `test-nodos.mjs`
   (harness `runGate`, 5 casos + 2 de retry). Sin cambio de schema SQL (`runs.metricas` es jsonb).
+
+---
+
+## Enmienda 2026-08-31 — el §5 estaba a medias: se logueaba la diferencia y se actuaba igual
+
+**Estado:** aceptada — 2026-08-31, del audit de la corrida `ecd33926` (Mani, a pedido de Majo).
+Completa la decisión §5; no revierte nada.
+
+### Qué decía el §5, y qué faltaba
+
+El §5 mandaba reintentar 1 vez y **loguear la respuesta cruda** de las que quedan vacías *"para
+distinguir «sin voz» (no reintentar nunca) de falla transitoria"*. La primera mitad se hizo. **La
+segunda nunca:** el log distinguía los dos casos y el código los trataba idéntico, con un único
+reintento **inmediato** que caía dentro de la misma ráfaga que había causado la falla.
+
+Y esa mitad faltante no era cosmética. `metricas.avisos` venía diciendo *"posible caída de
+Supadata: 53% de transcripciones vacías"* y **eso era un diagnóstico equivocado del propio motor**:
+Supadata estaba sana, el que la saturaba era el motor.
+
+### Lo medido (contra producción, la noche del 30/08)
+
+De la corrida `ecd33926`: 51 videos entraron a transcribir, **27 volvieron vacíos (53%)**. Se
+tomaron esos **27 URLs exactos** y se los volvió a pedir:
+
+| Concurrencia | Con guion | Rechazados |
+|---|---|---|
+| **24** (lo que corría) | 9 / 27 | **17 con `429 limit-exceeded`** + 1 `transcript-unavailable` |
+| **4** | **24 / 27** | 3 `transcript-unavailable` |
+
+O sea que de las 27 "transcripciones vacías", **26 tenían guion** y una sola era un video mudo. La
+pérdida no era de Supadata: era la ráfaga del motor.
+
+**Y se pagaba dos veces.** Como `POST processed_items` corre ANTES de `Transcribir` (ADR-029 §2),
+se verificó que **los 27 quedaron en la memoria de dedup**: no se reintentan nunca. Cada corrida no
+perdía la mitad de su cosecha, la **quemaba**.
+
+### Por qué pasaba (el razonamiento falso, que estaba escrito en el nodo)
+
+> *"el plan da 10 req/s; con ~27 s/video, 24 en vuelo inician ~0.9 req/s — 11x por debajo del límite"*
+
+**Un promedio de req/s no dice nada del pico, y el límite se cobra en el pico.** Los 24 workers
+arrancan en el mismo milisegundo, y cuando un 429 vuelve rápido el worker queda libre y dispara el
+siguiente al toque: la ráfaga se realimenta sola. Por eso los fallos no se agrupaban al principio
+(58% en los primeros 24, 48% en el resto) y parecían una caída sostenida del proveedor.
+
+### Decisión
+
+1. **`transcript-unavailable` (HTTP 206, resuelve con cuerpo) es DEFINITIVO.** Se corta ahí: ni un
+   reintento ni un segundo de presupuesto gastado en un video que no tiene voz. Esto es el *"no
+   reintentar nunca"* que el §5 pedía.
+2. **429 / timeout / red (rechaza la promesa) es TRANSITORIO.** `RETRIES` 1 → **4**, con **backoff
+   exponencial y jitter** (`backoff_transcribir_ms`, default 500 ms, en `Config`). El jitter no es
+   adorno: sin él los N workers que se comieron el mismo 429 esperan lo mismo y **reconstruyen la
+   ráfaga** que los tumbó. El presupuesto manda sobre el backoff: agotado el tiempo, no espera ni
+   reintenta.
+3. **Se re-dimensionan las perillas con números medidos, no con el promedio de 07-17.** Latencia
+   real contra URLs vírgenes: **mediana 15–18 s**, no 27 s. A **8 en vuelo**: 0,43 videos/s y
+   **cero** rechazos por límite (24 URLs). `concurrencia_transcribir` 24 → **8** (también el default
+   del código, que era la misma trampa para quien re-importe sin `Config`) y
+   `presupuesto_transcribir_s` 840 → **870** (sigue bajo el watchdog de 900 s del pod).
+
+### La regla de dimensionamiento que queda escrita
+
+🔑 **CAPACIDAD > `cap_top_n`.** El corte de `cap_top_n` **posterga** (pasa dentro de `Heat-score
+v1`, antes del `POST processed_items`); el del presupuesto **quema**. Mientras el presupuesto
+alcance para más videos que el tope, el que muerde es siempre el que posterga. Al 30/08: 870 s a 8
+en vuelo ≈ **370 videos** contra un `cap_top_n` de **250**. Si el cap sube de ~350, se sube antes la
+concurrencia.
+
+*Se descartó bajar `cap_top_n` para que entrara en el presupuesto: arregla el síntoma bajando el
+techo de la corrida, cuando la capacidad medida daba de sobra.*
+
+### Lo que esta enmienda NO toca
+
+**`processed_items` sigue escribiéndose antes de transcribir** (ADR-029 §2 intacto). Se elimina la
+*causa* de la quema, no el orden. Queda vivo el caso residual: si alguna vez el presupuesto vuelve a
+morder, esos videos se siguen quemando. La regla de arriba es lo que lo mantiene lejos, y si algún
+día deja de alcanzar, la conversación es un ADR nuevo sobre compensar la memoria, no un parche acá.
+
+### Toca
+
+`Transcribir (Supadata)` (retry con backoff + corte definitivo en `transcript-unavailable` + los
+comentarios falsos corregidos), `Config` (`concurrencia_transcribir` 8, `presupuesto_transcribir_s`
+870, `backoff_transcribir_ms` 500 nuevo). Docs: CLAUDE.md del motor. Probado en `test-nodos.mjs`
+(4 casos nuevos: sin-voz no reintenta, 429 recupera, aguanta 4 rechazos seguidos, el backoff no
+pisa el presupuesto). Sin cambio de schema.

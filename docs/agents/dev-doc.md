@@ -297,11 +297,22 @@ Notas de orden que muerden si las ignorás:
     techo real de la corrida (170 traducciones sobre 191 transcritos el 31/07, 89% no-español) y el
     único nodo caro sin red.*
   - **La palanca de throughput es la CONCURRENCIA, no el presupuesto**, que no puede pasar de ~880 s
-    sin chocar con el watchdog. Las tres perillas salen de `Config` (`concurrencia_transcribir` 24,
-    `concurrencia_traducir` 8, `presupuesto_traducir_s` 840) para poder tunearlas desde n8n **sin
-    re-importar**. Con 24 en vuelo, 840 s cubren ~745 videos.
-  - **Aire disponible:** el plan pago de Supadata da **10 req/s**; 24 en vuelo a ~27 s/video inician
-    ~0.9 req/s, 11× por debajo. *(Historia: reventó el 2026-06-29 con 106 videos distintos, cuando el
+    sin chocar con el watchdog. Las perillas salen de `Config` (`concurrencia_transcribir` **8**,
+    `presupuesto_transcribir_s` **870**, `backoff_transcribir_ms` **500**, `concurrencia_traducir` 8,
+    `presupuesto_traducir_s` 840) para poder tunearlas desde n8n **sin re-importar**.
+  - 🔑 **La regla de dimensionamiento: CAPACIDAD > `cap_top_n`.** El cap posterga, el presupuesto
+    quema, así que el que muerde tiene que ser siempre el cap. Al 30/08: 870 s a 8 en vuelo ≈ **370
+    videos** contra un `cap_top_n` de 250.
+  - 🩸 **"Aire disponible" era un cálculo falso, y costó la mitad de la cosecha de cada corrida.**
+    Decía: *"el plan da 10 req/s; 24 en vuelo a ~27 s/video inician ~0.9 req/s, 11× por debajo"*.
+    **Un promedio de req/s no dice nada del PICO, y el límite se cobra en el pico:** los 24 workers
+    arrancan en el mismo milisegundo y un 429 rápido libera al worker, que dispara otro pedido — la
+    ráfaga se realimenta. Medido el 30/08 sobre los 27 videos que la corrida 146 dio por vacíos: a 24
+    en vuelo, **17 volvieron `429 limit-exceeded`** y solo 1 no tenía transcript; los mismos 27 a 4 en
+    vuelo trajeron **24 guiones**. Latencia real re-medida: **mediana 15–18 s**, no 27 s. A 8 en
+    vuelo: 0,43 videos/s y **cero** rechazos.
+    Ver [ADR-030 §Enmienda](../adr/ADR-030-descarte-duro-sin-transcript.md).
+    *(Historia: reventó el 2026-06-29 con 106 videos distintos, cuando el
     loop era serial y el free tier daba 100 créditos/mes a 1 req/s. Ese tier ya no existe acá.)*
   - Subir `N8N_RUNNERS_TASK_TIMEOUT` (InstaPods = VPS con SSH, va en el `.env`/compose de n8n) sigue
     valiendo para ampliar el headroom real; los presupuestos deben quedar por debajo del watchdog.

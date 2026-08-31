@@ -57,9 +57,20 @@ ADR-009); el "link" es la URL del video original.
   y no se reintenta nunca) y **el de `Traducir` DEGRADA** (sale en su idioma original y el gate lo
   juzga igual). Por eso el corte de `cap_top_n` es seguro —pasa dentro de `Heat-score v1`, antes de
   ese POST, o sea posterga— y el presupuesto no. **La palanca de throughput es la concurrencia**, no
-  el presupuesto: este no puede pasar de ~880 s. Las 4 perillas viven en `Config`
-  (`concurrencia_transcribir` 24 · `presupuesto_transcribir_s` 840 · `concurrencia_traducir` 8 ·
-  `presupuesto_traducir_s` 840) para tunearlas desde n8n **sin re-importar**.
+  el presupuesto: este no puede pasar de ~880 s. Las 5 perillas viven en `Config`
+  (`concurrencia_transcribir` 8 · `presupuesto_transcribir_s` 870 · `backoff_transcribir_ms` 500 ·
+  `concurrencia_traducir` 8 · `presupuesto_traducir_s` 840) para tunearlas desde n8n **sin re-importar**.
+  🔑 **La regla que las ata, y la que hay que sostener al mover cualquiera: CAPACIDAD > `cap_top_n`.**
+  Mientras el presupuesto alcance para más videos que el tope, muerde el tope (posterga) y nunca el
+  presupuesto (quema). Al 30/08: 870 s a 8 en vuelo ≈ **370 videos** contra un `cap_top_n` de 250.
+  🩸 **Y ojo con subir la concurrencia por las malas razones.** El comentario del nodo justificaba
+  24 en vuelo con un promedio de req/s, y era falso: **el límite se cobra en el PICO**, los 24
+  workers arrancan juntos y un 429 rápido libera al worker que dispara otro pedido, así que la
+  ráfaga se realimenta. Medido: a 24 en vuelo Supadata rechazó **17 de 27** con
+  `429 limit-exceeded`; los mismos 27 a 4 en vuelo trajeron 24 guiones
+  ([ADR-030 §Enmienda](../../docs/adr/ADR-030-descarte-duro-sin-transcript.md)). Desde el 30/08 el
+  nodo hace **backoff exponencial con jitter** y sólo reintenta lo transitorio, así que subir la
+  concurrencia ya no es la trampa que era — pero se sube midiendo, no razonando sobre promedios.
 - **Gates fail-open, con dos excepciones:** si Haiku falla, el item pasa (invariante #1: no conviertas
   un fallo externo en dependencia de ejecución). Fail-open aplica a los gates de *juicio* y a las
   *escrituras* de registro. **Excepción 1 (ADR-029):** la *lectura* de `processed_items`
