@@ -15,6 +15,8 @@
 //   · `settings` mergea: timezone y errorWorkflow sobreviven a un push
 //   · restore vuelve atrás desde el snapshot
 //   · FAIL-CLOSED: si un placeholder no se puede aprender, aborta sin escribir
+//   · que el balde benigno del diff NO se trague un cambio sin empujar (ADR-053 §Enmienda 2),
+//     y que en la misma corrida el ruido de verdad siga callado
 //   · TOPOLOGÍA (ADR-053 §Enmienda): crea un nodo, lo cablea con las conexiones del repo, borra el
 //     que sobra, y se NIEGA sin --nodos, sin --borrar, o si dejaría un nodo inalcanzable
 //   · el "hecho cuando" de §14.2: el mismo push sobre un workflow ACTIVO (copia del error handler,
@@ -124,6 +126,41 @@ try {
   const restaurado = await leer();
   check('restore vuelve al estado roto del snapshot',
     restaurado.nodes.find((n) => n.name === 'Resumen').parameters.jsCode.includes('ROTO'), rs.slice(-300));
+
+  // ── ADR-053 §Enmienda 2: el balde benigno no puede tragarse un cambio sin empujar ──────────
+  //
+  // Se le sacan AL LIVE dos cosas que el repo declara, una por cada rama que antes caía en
+  // "defaults de n8n, o cambios sin empujar":
+  //   · `options: {}` contra el `{timeout: 20000}` del repo → live ⊊ repo. Es la forma EXACTA que
+  //     tenía `Leer feed vivo · options` el 31/08 cuando le agregaron la paginación y el diff cerró
+  //     en verde igual, que es el bug que esta enmienda existe para matar.
+  //   · `sendHeaders` borrado → ausente en live, con un valor (`true`) que no es default de nada.
+  // Y en la misma corrida se verifica la otra mitad, que es la que hace útil al comando: `method:
+  // GET` está ausente del live en 9 nodos y NO puede aparecer. Un diff que grita por todo se
+  // aprende a ignorar, y ahí se vuelve a esconder el drift real.
+  console.log('\n▸ un campo que el repo declara y el live no corre NO es un default de n8n');
+  const antesSE = await leer();
+  const mutados = antesSE.nodes.map((n) => {
+    if (n.name === 'Leer instancias (fachada)') return { ...n, parameters: { ...n.parameters, options: {} } };
+    if (n.name === 'Disparar por instancia') { const p = { ...n.parameters }; delete p.sendHeaders; return { ...n, parameters: p }; }
+    return n;
+  });
+  const putCopia = (nodes) => api('PUT', `/workflows/${copiaId}`, {
+    name: antesSE.name, nodes, connections: antesSE.connections, settings: { executionOrder: 'v1' },
+  });
+  await putCopia(mutados);
+  const dSE = limpio(sync(['diff', 'dispatcher'], E));
+  check('[sin-empujar] caza el `options` que el live tiene a medias',
+    /\[sin-empujar\].*Leer instancias \(fachada\).*options/.test(dSE), dSE.slice(0, 700));
+  check('[sin-empujar] caza el campo ausente cuyo valor no es un default',
+    /\[sin-empujar\].*Disparar por instancia.*sendHeaders/.test(dSE), dSE.slice(0, 700));
+  check('y el ruido sigue callado: los 9 `method: GET` no se reportan',
+    !/method/.test(dSE), dSE.slice(0, 700));
+
+  await putCopia(antesSE.nodes);
+  const dSE2 = limpio(sync(['diff', 'dispatcher'], E));
+  check('devueltos al live, los dos desaparecen del diff',
+    !/options/.test(dSE2) && !/sendHeaders/.test(dSE2), dSE2);
 
   console.log('\n▸ TOPOLOGÍA (ADR-053 §Enmienda) — la copia arranca SIN "Resumen" y con un huérfano');
   // Se rearma la copia: se le saca el nodo final del repo (para que el push tenga que CREARLO) y se

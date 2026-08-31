@@ -311,9 +311,16 @@ al 35% de su propia memoria y un guard escrito contra un techo que no existía.
 Probado en `test-nodos.mjs` (4 casos: 1.000 exacto aborta nombrando la paginación, 999 no, el feed
 caído sigue siendo fail-open, y el dedup normal intacto). **No toca `core/`, sin migración.**
 
-⚠️ **Un punto ciego que queda, y no es de este nodo:** `n8n:diff` clasifica `"Leer feed vivo" ·
-options` como **benigno** —en el balde de *"defaults de n8n, o cambios sin empujar"*, junto a cosas
-como `method` y `resource`— o sea que **la paginación de un nodo HTTP puede faltar en el live con el
-diff en verde**. Que este cambio sí llega se verificó por el precedente, leyendo el live: `Leer
-procesados` tiene su `pagination` desde el cierre 125, empujada por el mismo mecanismo. Pero el balde
-mezcla ruido con cambios reales y eso merece su propia sesión.
+✅ **Cerrado el mismo día, en [ADR-053 §Enmienda 2](./ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md).**
+Lo benigno pasó a decidirse por **clave + valor** contra una lista cerrada de 6 pares (medida contra
+los 5 workflows live: cubre los 24 campos que hoy el live no guarda, y el `diff` sale idéntico), y
+lo que el repo declara y el live no corre cae en un balde propio, `sin-empujar`, que sí es
+accionable. El párrafo de abajo queda como estaba escrito, porque es el diagnóstico:
+
+> ⚠️ **Un punto ciego que queda, y no es de este nodo:** `n8n:diff` clasifica
+> `"Leer feed vivo" · options` como **benigno** —en el balde de *"defaults de n8n, o cambios sin
+> empujar"*, junto a cosas como `method` y `resource`— o sea que **la paginación de un nodo HTTP
+> puede faltar en el live con el diff en verde**. Que este cambio sí llega se verificó por el
+> precedente, leyendo el live: `Leer procesados` tiene su `pagination` desde el cierre 125,
+> empujada por el mismo mecanismo. Pero el balde mezcla ruido con cambios reales y eso merece su
+> propia sesión.

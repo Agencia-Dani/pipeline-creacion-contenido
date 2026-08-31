@@ -1,8 +1,9 @@
 # ADR-053 — El repo es la forma, el live es el estado: los workflows se parchean por la API de n8n
 
-- **Estado:** aceptada — 2026-08-02, **enmendada el 2026-08-30** (§Enmienda al final: `n8n:push`
+- **Estado:** aceptada — 2026-08-02, **enmendada dos veces**: el 2026-08-30 (§Enmienda: `n8n:push`
   cubre topología; el bloqueo no eran las credenciales sino que `cuerpoPut` manda las conexiones del
-  live). Sucede al `deploy.mjs` deprecado (que resolvía placeholders
+  live) y el 2026-08-31 (§Enmienda 2: el balde benigno del `diff` mezclaba el ruido de n8n con
+  cambios del repo sin empujar, y por eso podía cerrar en verde sobre uno). Sucede al `deploy.mjs` deprecado (que resolvía placeholders
   por-cliente y nunca se usó) y le saca el filo al ritual que arrastran
   [ADR-044](./ADR-044-todo-nodo-caro-tiene-presupuesto.md) y
   [ADR-048](./ADR-048-run-plan-v2-motor-por-instancia.md): *"obliga a re-importar"*.
@@ -215,3 +216,106 @@ exactamente este invariante sobre el repo. Acá se aplica al grafo que va a qued
   hace con `/variables` y `/projects`, que dan **403**— el push de topología se cae. Falla cerrado.
 - (−) La regla "nombrá lo que pierde algo" es una fricción real en recableados grandes. Es
   deliberada: el recableado silencioso es el modo de falla que este ADR persigue desde el título.
+
+---
+
+## Enmienda 2 — 2026-08-31: el balde benigno del `diff` mezclaba ruido con cambios sin empujar
+
+*Cierra el ⚠️ con el que termina [ADR-029 §Enmienda 2](./ADR-029-dedup-blindado-fail-closed-y-feed.md).
+Toca `core/scripts/n8n-sync.mjs` (comando `diff`) y su test. Sin migración, sin cambios en los
+`workflow.json`, y el `diff` sigue siendo SOLO LECTURA.*
+
+### 🩸 El balde se llamaba por sus dos contenidos, y uno de los dos no era benigno
+
+La etiqueta era, textual: *"N campos del repo que live no guarda (defaults de n8n, **o cambios sin
+empujar**)"*. Esa `o` era el bug. La regla que llenaba el balde era **estructural** —`live ⊆ repo`,
+sin mirar de qué campo se trataba— así que **cualquier cosa que el repo declarara y nadie hubiera
+empujado caía en el mismo montón que `method` y `resource`**, con el `diff` cerrando en
+`✓ live corre lo que dice el repo`.
+
+El caso concreto: el 31/08 se le agregó `options.pagination` al nodo `Leer feed vivo` del motor y el
+`diff` lo listó como `"Leer feed vivo" · options` entre los benignos. O sea que **un nodo HTTP puede
+quedarse sin paginación en el live con el comando en verde** — que es exactamente la clase de fallo
+que pagó el cierre 125: `Leer procesados` devolvía 1.000 filas de 1.547 y el motor quedaba ciego al
+35% de su memoria de dedup, sin un solo error.
+
+🔑 **Y el balde silencioso es peor que el ruidoso, por lo que dice ADR-053 de sí mismo:** *"el repo
+sigue sin ser fuente de verdad de lo que corre; **`diff` es lo que lo mantiene honesto**"*. Un `diff`
+que se calla un cambio no empujado no es una molestia menor: es el único mecanismo del sistema
+mintiendo en el sentido que nadie revisa.
+
+### 1. Lo benigno se decide por clave + VALOR, no por estructura
+
+`DEFAULTS_N8N` es una lista cerrada de pares. **Lo que no está en ella grita.**
+
+| par | tipo de nodo |
+|---|---|
+| `method: 'GET'` | httpRequest |
+| `resource: 'Actors'` · `authentication: 'apifyApi'` | apify |
+| `mode: 'append'` | merge |
+| `responseMode: 'onReceived'` | webhook |
+| `options: {}` | el `options` **vacío** es ruido; uno con contenido, nunca |
+
+📏 **Medido contra los 5 workflows live el 31/08: estos 6 pares cubren los 24 campos** que hoy el
+live no guarda, y el `diff` sale idéntico a antes — 24 benignos, 0 accionables, verde. La lista no
+se dedujo de la documentación de n8n: se leyó de la instancia.
+
+🔑 **Por qué el par y no el nombre de la clave a secas**, que era la opción obvia: una lista de
+nombres (`method`, `resource`, `options`…) reproduce el mismo fallo un escalón más abajo. Un
+`method: 'POST'` agregado al repo y nunca empujado, contra un live sin `method` —o sea corriendo
+GET— sería *"benigno"* por llamarse `method`. El par cuesta lo mismo de escribir y no tiene ese
+agujero.
+
+📏 **Un dato que ordena la lista y no era obvio: que un default sobreviva en el live no depende de
+su semántica, sino de cómo se guardó el nodo por última vez.** Un `PUT` escribe exacto lo que le
+mandamos; un save del editor poda los defaults. Por eso `Leer feed vivo` (empujado) **sí** tiene
+`method: GET` en el live y `Leer señal selección` (editado a mano) no, siendo los dos `httpRequest`.
+
+🔒 **Y por eso una lista incompleta es barata:** un default que falte ahí cuesta **una falsa alarma
+visible**, que se ve y se agrega en una línea. La regla anterior costaba un **falso verde**.
+
+### 2. La rama que no callaba nada hoy, y lo habría callado mañana
+
+`clasificar` tenía una segunda puerta al balde benigno: `subconjunto(enLive, enRepo)` — el repo
+declara *más* que el live **dentro del mismo campo**. Es la forma exacta de la paginación:
+`options: {timeout, pagination}` contra `options: {timeout}` es un subconjunto perfecto.
+
+📏 Medido el 31/08 sobre los 5 workflows: esa rama clasificaba **0 campos**. No estaba callando
+ruido — estaba esperando a que alguien agregara un campo anidado para callarlo. Ahora es
+`sin-empujar`.
+
+### 3. Un balde nuevo en vez de ensanchar `drift`
+
+El remedio es el mismo (`n8n:push --nodos`), así que no se parte por comportamiento sino por
+diagnóstico: `drift` está **definido** —en el encabezado del script, en el índice de ADRs y en
+`CLAUDE.md` §Feedback loops— como *"los dos lados tienen valor y difieren"*. Meter ahí *"el repo lo
+tiene y el live no"* **redefine en silencio una palabra que tres docs citan**; agregar una palabra
+es más barato que redefinir una. Y el operador necesita las dos frases distintas: *alguien cambió el
+live* no es *esto nunca se empujó*. Los hallazgos de este balde llevan la frase pegada
+(`· options — el repo lo declara y el live no lo corre`), porque el mensaje viejo (`· options`) es
+la mitad del motivo por el que nadie lo miró.
+
+### Alternativa descartada
+
+**Comparar las SUBCLAVES de `options` en vez de la clave entera** (`options.timeout` en los dos,
+`options.pagination` solo en el repo). Se descartó porque **no cambia ni un veredicto**: con la
+tabla de pares, un `options` con contenido que el live no tiene ya sale accionable, recursión o no.
+Sólo afinaría el texto del mensaje, y para eso alcanza la frase del §3. Además la recursión sola
+tampoco arreglaba nada: el caso anidado termina igual en *"el repo tiene una hoja que el live no"*,
+que es precisamente la pregunta que contesta `DEFAULTS_N8N`.
+
+### Verificación
+
+- `npm run n8n:diff` y `-- --todo` contra los 5 workflows reales: **idénticos a antes del cambio** —
+  24 benignos, 0 accionables, los 5 en verde. **Cero falsas alarmas nuevas.**
+- **El bug reportado, reproducido contra el motor real y en solo lectura**: se le agregó
+  `options.pagination` en el repo a `Leer señal selección` (el live no la tiene) y se corrieron los
+  dos clasificadores sobre el mismo input. El viejo cerró en `✓ motor corre lo que dice el repo`,
+  con el contador de benignos pasando de 10 a 11 — ahí se escondía. El nuevo lo saca en rojo:
+  `[sin-empujar] "Leer señal selección" · options`.
+- `npm run n8n:test`: **42 ok · 0 fallidos** (38 + 4). Los 4 nuevos corren contra la copia
+  desechable y cubren **las dos ramas y el ruido en la misma pasada**: se le saca al live el
+  `options` (dejándolo en `{}` contra el `{timeout: 20000}` del repo, la forma exacta de la
+  paginación) y el `sendHeaders` entero, y se verifica que los dos salen `[sin-empujar]`, que
+  **`method: GET` sigue sin reportarse**, y que devolviéndolos al live desaparecen.
+- `npm run validate`: 2533 checks OK, 0 errores.

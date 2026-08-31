@@ -299,16 +299,17 @@ function completarConEnv(mapa, pendientes) {
 // ── diff ─────────────────────────────────────────────────────────────────────────────────
 // El problema del diff crudo es el ruido: n8n reescribe el JSON al guardar, así que un
 // `JSON.stringify` distinto NO significa que live esté corriendo otro código. Cada campo se
-// clasifica, y solo `drift` es accionable:
+// clasifica, y hay DOS baldes accionables:
 //
 //   normalizacion — repo ⊆ live: n8n AGREGÓ campos suyos (`options.version`,
 //                   `attemptToConvertTypes`). Mismo comportamiento.
-//   default       — live ⊆ repo: n8n BORRÓ campos que ya eran el default (`method: GET`,
-//                   `responseMode: onReceived`, `mode: append`). Mismo comportamiento.
-//                   ⚠️ Acá cae también un campo que agregaste al repo y NO empujaste: por eso
-//                   se listan los nombres en vez de esconderlos detrás de un contador.
+//   default       — el live no guarda un campo cuyo valor en el repo YA ES el default de ese tipo
+//                   de nodo, o sea uno de los que n8n borra al guardar. Mismo comportamiento.
+//                   La lista es cerrada y está abajo: `DEFAULTS_N8N`.
 //   binding       — repo tiene un slug y live un resourceLocator `__rl` con el id interno
 //                   (los 3 nodos de Apify). Es identidad de la instancia: no se empuja nunca.
+//   sin-empujar   — el repo declara algo que el live no tiene y NO es un default de n8n. El live
+//                   está corriendo SIN eso. Se aplica con `push`, igual que un drift.
 //   drift         — los dos lados tienen valor y son distintos. Esto sí es live corriendo
 //                   otra cosa que el repo.
 const subconjunto = (a, b) => {
@@ -319,12 +320,53 @@ const subconjunto = (a, b) => {
   return Object.keys(a).every((k) => k in b && subconjunto(a[k], b[k]));
 };
 
-function clasificar(enRepo, enLive) {
+// Lo que n8n BORRA al guardar porque el valor YA ERA el default de ese tipo de nodo. Es la lista
+// que decide qué se calla el diff, así que es cerrada: **lo que no está acá grita**.
+//
+// 🩸 **Por qué existe** (ADR-053 §Enmienda 2, 2026-08-31). El balde benigno se llamaba *"campos del
+// repo que live no guarda (defaults de n8n, **o cambios sin empujar**)"* y esa `o` era el bug: la
+// regla era estructural (`live ⊆ repo`), o sea que **cualquier cosa que el repo agregara y nunca se
+// empujara caía en el mismo montón que `method` y `resource`** — con el diff cerrando en verde.
+// Lo destapó `"Leer feed vivo" · options`: la paginación de un nodo HTTP podía faltar en el live
+// sin que nadie se enterara, que es exactamente lo que pagó el cierre 125 (`Leer procesados`
+// devolvía 1.000 filas de 1.547 y el motor quedaba ciego al 35% de su memoria de dedup).
+//
+// 🔑 **Es clave + VALOR, y ahí está toda la diferencia.** Una lista de nombres de clave (`method`,
+// `resource`, `options`…) reproduce el mismo fallo un escalón más abajo: un `method: 'POST'` en el
+// repo, sin empujar, contra un live sin `method` (o sea corriendo GET) sería "benigno" por llamarse
+// `method`. El par cuesta lo mismo de escribir y no tiene ese agujero.
+//
+// 📏 **Medido, no supuesto** (31/08, contra los 5 workflows live): estos 6 pares cubren **los 24
+// campos** que hoy el live no guarda. Y el que un default sobreviva o no depende de **cómo se guardó
+// el nodo por última vez**, no de su semántica: un `PUT` escribe exacto lo que le mandamos y un save
+// del editor poda los defaults. Por eso `Leer feed vivo` (empujado) SÍ tiene `method: GET` en live
+// y `Leer señal selección` (editado a mano) no, siendo los dos `httpRequest`.
+//
+// 🔒 **Y por eso la lista incompleta es barata:** un default nuevo que falte acá cuesta una falsa
+// alarma que se ve y se agrega en una línea. La regla anterior costaba un falso verde.
+const DEFAULTS_N8N = [
+  ['method', 'GET'],                   // httpRequest
+  ['resource', 'Actors'],              // apify
+  ['authentication', 'apifyApi'],      // apify (ojo: 'predefinedCredentialType' NO es default)
+  ['mode', 'append'],                  // merge
+  ['responseMode', 'onReceived'],      // webhook
+  ['options', {}],                     // el `options` VACÍO es ruido; uno con contenido, nunca
+];
+const esDefaultDeN8n = (campo, enRepo) =>
+  DEFAULTS_N8N.some(([k, v]) => k === campo && JSON.stringify(v) === JSON.stringify(enRepo));
+
+function clasificar(campo, enRepo, enLive) {
   if (enLive && typeof enLive === 'object' && enLive.__rl === true) return 'binding';
-  if (enLive === undefined) return 'default';          // live no guarda un campo que el repo sí tiene
+  // live no guarda un campo que el repo sí tiene: benigno SOLO si el valor del repo es uno de los
+  // que n8n poda. Si no, el live está corriendo sin eso y nadie lo empujó.
+  if (enLive === undefined) return esDefaultDeN8n(campo, enRepo) ? 'default' : 'sin-empujar';
   if (enRepo === undefined) return 'normalizacion';    // live guarda un campo que el repo no declara
   if (subconjunto(enRepo, enLive)) return 'normalizacion';
-  if (subconjunto(enLive, enRepo)) return 'default';
+  // 🩸 Esta rama —el repo declara MÁS que el live dentro del mismo campo— es la que silenciaba la
+  // paginación: `options: {timeout, pagination}` contra `options: {timeout}` es un subconjunto
+  // perfecto. Medido el 31/08: clasificaba **0 campos** de los 5 workflows, o sea que no callaba
+  // ruido — solo esperaba a un campo anidado nuevo para callarlo.
+  if (subconjunto(enLive, enRepo)) return 'sin-empujar';
   return 'drift';
 }
 
@@ -345,8 +387,11 @@ function comparar(repo, live, mapa) {
       const keys = new Set([...Object.keys(esperado), ...Object.keys(l.parameters || {})]);
       const dif = [...keys].filter((k) => JSON.stringify(esperado[k]) !== JSON.stringify(l.parameters?.[k]));
       for (const k of dif) {
-        const sev = clasificar(esperado[k], l.parameters?.[k]);
-        hall.push({ sev, nodo: nombre, campo: k, txt: `"${nombre}" · ${k}` });
+        const sev = clasificar(k, esperado[k], l.parameters?.[k]);
+        // El sufijo va solo en `sin-empujar`: es el balde que nació de un mensaje que no decía
+        // nada ("· options"), y el operador necesita la frase, no el nombre del campo.
+        const detalle = sev === 'sin-empujar' ? ' — el repo lo declara y el live no lo corre' : '';
+        hall.push({ sev, nodo: nombre, campo: k, txt: `"${nombre}" · ${k}${detalle}` });
       }
     }
     if (pend.size) hall.push({ sev: 'placeholder', txt: `"${nombre}": placeholders sin aprender → ${[...pend].join(' ')}` });
@@ -380,7 +425,7 @@ function comparar(repo, live, mapa) {
 }
 
 // ── comandos ─────────────────────────────────────────────────────────────────────────────
-const ACCIONABLE = new Set(['drift', 'topologia', 'orden', 'placeholder']);
+const ACCIONABLE = new Set(['drift', 'sin-empujar', 'topologia', 'orden', 'placeholder']);
 
 async function cmdDiff(alias, opts) {
   const { mapa, conflictos } = await aprenderMapa();
@@ -408,7 +453,7 @@ async function cmdDiff(alias, opts) {
     if (!rojo.length) console.log(`  ${c.verde}✓ live corre lo que dice el repo${c.off}`);
     for (const h of rojo) console.log(`  ${c.rojo}[${h.sev}]${c.off} ${h.txt}`);
 
-    for (const [sev, etiqueta] of [['default', 'campos del repo que live no guarda (defaults de n8n, o cambios sin empujar)'],
+    for (const [sev, etiqueta] of [['default', 'defaults que n8n borra al guardar (mismo comportamiento)'],
                                    ['normalizacion', 'campos que n8n agregó al guardar'],
                                    ['binding', 'identidad de la instancia (resourceLocator) — nunca se empuja']]) {
       const g = grupo(sev);
@@ -419,7 +464,7 @@ async function cmdDiff(alias, opts) {
   }
   if (!opts?.todo) console.log(`${c.gris}\n(--todo para ver los campos clasificados como benignos)${c.off}`);
   console.log(accionables
-    ? `${c.amar}${accionables} diferencia(s) accionable(s).${c.off} Las de [drift] se aplican con ` +
+    ? `${c.amar}${accionables} diferencia(s) accionable(s).${c.off} Las de [drift] y [sin-empujar] se aplican con ` +
       `push <alias> --nodos "…"; las de [orden] con orden <alias>. ` +
       // 🩸 Esta línea decía "[topologia] NO va por push: re-import (ADR-053)" y era falsa desde el
       // 30/08: ADR-053 §Enmienda le dio topología al push y el re-import quedó solo para crear un

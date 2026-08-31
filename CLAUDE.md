@@ -243,9 +243,19 @@ módulos), `/handoff` (compactar una sesión).
   no está en el `.env`**, así que el barrido lo **saltea con aviso** (ADR-068) y **nunca lo mira**.
   Medido el 30/08 leyendo la salida, no el doc. O sea que el "`n8n:diff` grita por los 5 nodos que
   faltan en LinkedIn" tampoco pasa: avisa que **no puede** mirarlo, que es otra cosa.* Clasifica cada campo, así que solo grita lo accionable:
-  **drift** (los dos lados tienen valor y difieren), **topología**, **orden de ramas** y placeholders
-  que no pudo aprender. Lo benigno (defaults que n8n borra, campos que agrega, resourceLocators de
-  Apify) va a un contador; `-- --todo` los lista. Solo lee. **Corrélo antes de tocar un workflow.json
+  **drift** (los dos lados tienen valor y difieren), **sin-empujar** (el repo lo declara y el live no
+  lo corre), **topología**, **orden de ramas** y placeholders que no pudo aprender. Lo benigno
+  (defaults que n8n borra, campos que agrega, resourceLocators de Apify) va a un contador;
+  `-- --todo` los lista.
+  ⚠️ *El balde benigno se llamaba **"defaults de n8n, o cambios sin empujar"** y esa `o` era un bug,
+  no una imprecisión: la regla era estructural (`live ⊆ repo`), así que **un campo que el repo
+  agregara y nadie empujara salía en el mismo montón que `method`, con el comando en verde**. Lo
+  destapó `options.pagination` en `Leer feed vivo` el 31/08 — la misma clase de fallo mudo que pagó
+  el cierre 125. Desde [ADR-053 §Enmienda 2](docs/adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md)
+  lo benigno se decide por **clave + VALOR** contra una lista cerrada de 6 pares (medida: cubren los
+  24 campos que hoy el live no guarda, y el diff sale idéntico), y **lo que no está en la lista
+  grita**. Una lista incompleta cuesta una falsa alarma visible; la regla vieja costaba un falso
+  verde.* Solo lee. **Corrélo antes de tocar un workflow.json
   y después de cualquier cambio en n8n.**
 - **Aplicar un cambio del repo al live:** `npm run n8n:push -- <alias> --nodos "Nodo A,Nodo B"` —
   dry-run; agregá `--apply` para escribir. Toma el live como base y le pone los `parameters` del repo
@@ -272,7 +282,7 @@ módulos), `/handoff` (compactar una sesión).
   lo dijeran durante 27 días: era que `cuerpoPut()` mandaba `connections: live.connections`,
   siempre — el nodo habría llegado huérfano. **Un obstáculo escrito se re-mide, igual que un
   canario.***
-  Su test: `npm run n8n:test` — **38 checks**, y los 7 últimos sobre un workflow **ACTIVO**
+  Su test: `npm run n8n:test` — **42 checks**, y los 7 últimos sobre un workflow **ACTIVO**
   (⚠️ crea y borra dos workflows desechables en n8n; corrélo si tocaste `n8n-sync.mjs`).
 - **Arreglar el orden de ejecución de las ramas:** `npm run n8n:orden -- <alias> [--apply]`. En n8n
   v1 las hermanas corren por posición en el canvas (Y menor primero, desempata X — **medido**, no
