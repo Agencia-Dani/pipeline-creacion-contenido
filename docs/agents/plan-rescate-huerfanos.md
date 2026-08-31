@@ -12,7 +12,11 @@ código nuevo en el motor, sin migración y sin volver a pagarle a Apify.
 filas de `processed_items` para que la corrida siguiente vuelva a ver esos videos como nuevos y los
 pase por el camino de siempre (asignar proyecto y voz → heat → transcribir → gate → feed).
 
-**Decisión que lo gobierna:** [ADR-030 §Enmienda](../adr/ADR-030-descarte-duro-sin-transcript.md)
+**Decisión que lo gobierna:** [ADR-082](../adr/ADR-082-un-video-quemado-se-rescata-borrandole-la-memoria.md).
+El porqué de *borrar la memoria y no reconstruir el video*, con las alternativas descartadas, vive
+ahí; acá viven los pasos.
+
+**Contexto:** [ADR-030 §Enmienda](../adr/ADR-030-descarte-duro-sin-transcript.md)
 (la ráfaga y su arreglo) y [ADR-029](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md) (por
 qué la memoria se escribe **antes** de transcribir, que es la causa de que el video quemado no se
 reintente nunca). Contexto de la medición: [ADR-081](../adr/ADR-081-el-candidato-sabe-de-que-corrida-salio.md),
