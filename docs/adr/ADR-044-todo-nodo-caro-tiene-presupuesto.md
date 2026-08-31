@@ -113,3 +113,49 @@ está limitando de verdad**, no qué dice su nombre. Este se llama *Videos a tra
 se lee como presupuesto de plata; lo que gobierna es cuántas semanas dura el pozo de videos frescos.
 El corolario operativo: **el techo se sube cuando sube `sum(N)` o cuando el equipo vacía el feed**, no
 cuando sobra cupo en Supadata.
+
+---
+
+## Enmienda 2026-08-31 — el nodo caro que este ADR no miró era el más caro de todos
+
+Este ADR le puso pool y presupuesto a `Transcribir` y a `Traducir`, y dejó al **`Gate de relevancia`
+sin ninguno de los dos**: chunks de 25 uno atrás del otro, con un `sleep(1000)` entre medio. La
+omisión no fue una decisión, fue no haberlo medido — y cuando se midió, resultó ser **el nodo más
+lento de la corrida**.
+
+📏 **Ejecución 150 (31/08), tiempos por nodo leídos de la API de n8n:**
+
+| Nodo | Tiempo | Carga |
+|---|---|---|
+| **Gate de relevancia** | **492.7 s** | 26 chunks, serial |
+| Apify — IG Reels | 456.8 s | 11 cuentas |
+| Transcribir (Supadata) | 239.0 s | 164 videos, 8 en vuelo |
+| Traducir (Claude Haiku) | 58.0 s | 143 traducciones, 8 en vuelo |
+| Pre-trim relevancia | 55.1 s | 4 llamadas |
+
+El watchdog del task runner (`N8N_RUNNERS_TASK_TIMEOUT`, 900 s en el pod) mata el **nodo entero**, así
+que el margen real es **1.8×** del volumen de hoy. Pasado eso, la corrida no entrega **nada** después
+de haber pagado Apify, Supadata y las traducciones: es literalmente el modo de falla que este ADR
+existe para evitar, en el único nodo que se salteó.
+
+**Lo que cambia:** `concurrencia_gate` (8) y `presupuesto_gate_s` (600) en `Config`, y el `sleep`
+serial se va. El pool es **cross-proyecto** a propósito: si cada proyecto corriera su propia tanda,
+el que tiene 3 videos dejaría 7 workers parados mientras el de al lado tiene 300. Con 8 en vuelo, los
+99 chunks que pediría un 4× del volumen pasan de ~1.870 s a ~235 s.
+
+**El `sleep(1000)` no protegía de nada.** A 8 en vuelo con ~19 s por chunk son ~0,4 req/s contra la
+cuenta de Anthropic, *más lento* que el pool de `Traducir` que ya corre a 8 desde este mismo ADR.
+
+🔑 **Y su presupuesto no es igual al de los otros dos, aunque se escriba igual.** El de `Transcribir`
+**posterga** trabajo a la próxima corrida (ADR-084) y el de `Traducir` **degrada** el idioma. El del
+gate degrada el **juicio**: el chunk que no corre deja a sus videos sin score y pasan igual
+(fail-open, lo mismo que ya pasaba con un chunk que fallaba). El problema de eso es que **un gate que
+no llegó a juzgar y un gate generoso entregan lo mismo y se leen idéntico**. Por eso los videos salen
+marcados `_gate_sin_presupuesto` y `Resumen del run` los cuenta en `metricas.gate_sin_presupuesto` +
+un aviso. **Un fail-open sin contador es un fail-open invisible**, que es el hallazgo que ADR-029
+§Enmienda ya había pagado una vez.
+
+**Toca:** `Gate de relevancia` (pool cross-proyecto en dos pasadas + presupuesto + la marca), `Config`
+(2 knobs), `Resumen del run` (contador + aviso). Probado en `test-nodos.mjs` (10 casos: paralelismo
+real en vuelo, el pool cruzando proyectos con la rúbrica correcta de cada uno, la concurrencia desde
+Config, y el presupuesto que degrada marcando). **No toca `core/`, sin migración.**

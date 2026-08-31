@@ -78,3 +78,42 @@
   `external_id`), `Gate de relevancia` o un nodo posterior (corte final a N videos distintos por heat
   compuesto). **Pendiente manual en la base viva:** mover los knobs en `Ajustes`, borrar
   `top_n`/`dias_recencia` del Proyecto, y armar la **página Global** del dashboard (P0 del cierre 20).
+
+---
+
+## Enmienda 2026-08-31 — el tope dev-only avisa, o no es un tope: es una mentira
+
+Este ADR dejó `cap_resultados_referente` en el `Config` del motor como red contra un número absurdo,
+y el knob del equipo (*"Resultados por cuenta de referente"*) en la pantalla. El motor los combina con
+`Math.min(...)`. Lo que nunca se decidió es **qué pasa cuando la red muerde**, y la respuesta que
+quedó por omisión fue: nada. Ni un log.
+
+`apps/dashboard/domain/ajustes.ts` lo dice explícito —*"el tope va escrito en la `descripcion` del
+knob — informa, no manda"*— así que escribir 200 en la pantalla **guarda 200 en la base** y el motor
+usa 50. **Un knob que acepta un valor y lo ignora es peor que uno que no existe.**
+
+📏 **Y ya estaba mordiendo.** Medido contra prod el 31/08: el ajuste vivo estaba en **50** y el tope
+en **50**. El equipo estaba apoyado exactamente contra el techo, sin manera de enterarse — y el
+síntoma que reportaron (*"trae pocos videos"*) tiene ahí una de sus causas.
+
+**Lo que cambia:**
+1. **El tope avisa.** Cuando recorta, `Armar plan de corrida` emite un aviso que nombra **los dos
+   números** ("pide 200, el tope lo baja a 50") y lo manda en el plan. `Resumen del run` lo reenvía a
+   `runs.metricas.avisos`, o sea que llega a la pantalla de Corridas como cualquier otro aviso.
+   *El que sabe por qué se recortó es el que recorta; el Resumen solo reenvía.*
+2. **El tope deja de ser el valor de operación: pasa de 50 a 500.** No es aflojar la red, es correrla
+   a donde tiene sentido. Medido en Apify el 31/08: **USD 0,115 por cuenta de ~47 resultados**, o sea
+   ~USD 0,0025 el resultado ⇒ un 5000 de dedo sobre 11 cuentas serían ~USD 137 de scraping en una sola
+   corrida. **500 es la red; 50 era el techo.**
+
+**Lo que NO cambia:** la red se queda, y sigue siendo dev-only en `Config`. Duplicarla en
+`domain/ajustes.ts` sería dos dueños para el mismo número, que es lo que este ADR ya había descartado.
+
+🔑 **El aprendizaje portable, y es hermano del que dejó ADR-030 §Enmienda:** un límite repartido entre
+dos dueños (uno en el código, otro en una UI) **tiene que avisar cuando uno le gana al otro**. Sin
+eso, el que edita ve un número y el que corre usa otro, y los dos creen tener razón.
+
+**Toca:** `Armar plan de corrida` (el aviso), `Config` (`cap_resultados_referente` 50 → 500),
+`Resumen del run` (reenvía los avisos del plan). Probado en `test-nodos.mjs` (3 casos: sigue
+recortando, el aviso nombra los dos números, y bajo el tope no avisa — un aviso que sale siempre no es
+un aviso). **No toca `core/`, sin migración.**

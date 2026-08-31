@@ -421,7 +421,13 @@ async function cmdDiff(alias, opts) {
   console.log(accionables
     ? `${c.amar}${accionables} diferencia(s) accionable(s).${c.off} Las de [drift] se aplican con ` +
       `push <alias> --nodos "…"; las de [orden] con orden <alias>. ` +
-      `${c.gris}[topologia] NO va por push: re-import (ADR-053).${c.off}`
+      // 🩸 Esta línea decía "[topologia] NO va por push: re-import (ADR-053)" y era falsa desde el
+      // 30/08: ADR-053 §Enmienda le dio topología al push y el re-import quedó solo para crear un
+      // workflow de cero. O sea que la herramienta mandaba al ritual que ella misma había matado.
+      // *Un obstáculo escrito se re-mide, igual que un canario* — y el peor lugar donde envejece es
+      // en la salida del comando que lo desmiente.
+      `${c.gris}[topologia] también va por push (ADR-053 §Enmienda): nombrá los nodos en --nodos, ` +
+      `y lo que desaparece o pierde cableado de salida en --borrar.${c.off}`
     : `${c.verde}✓ ${revisados.length === 1 ? revisados[0] : `Los ${revisados.length} workflows`} corre${revisados.length === 1 ? '' : 'n'} lo que dice el repo.${c.off}`);
 }
 

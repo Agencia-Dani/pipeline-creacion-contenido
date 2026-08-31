@@ -27,7 +27,12 @@
 > ⚠️ **Al 31/08 espera UNA sola cosa, y no frena una corrida:** deployar el dashboard (la `034` ya
 > está aplicada y el motor ya empujado, cierre 123). **Y ahora hay más para deployar que entonces:**
 > el cierre 126 sumó la pantalla `operar/corridas` y el toggle *Agrupar por corrida* del Feed
-> (ADR-083 + ADR-081 §Enmienda), verificados contra la base de prod pero todavía sin pushear. El otro bloqueo, el ⛔ de abajo, sigue siendo de
+> (ADR-083 + ADR-081 §Enmienda), y el 127 el renombre de los dos botones de Operar a *▶ Buscar
+> contenido* y *▶ Buscar referentes* — todo verificado contra la base de prod pero todavía sin pushear.
+>
+> ⚙️ **El motor SÍ está al día en el live** (cierre 127): ADR-084 + ADR-044 §Enmienda + ADR-016
+> §Enmienda empujados con `n8n:push`, `n8n:diff` verde en los 5 y confirmado por lectura directa de la
+> API. **Falta la corrida de fuego que mide si el Gate bajó**, en la tabla de abajo. El otro bloqueo, el ⛔ de abajo, sigue siendo de
 > producto y no de código.
 >
 > ✅ **El dedup del motor ya no está ciego** (cierre 125): `Leer procesados` devolvía 1.000 filas de
@@ -70,7 +75,9 @@
 > | ~~El badge de `degradaria` nunca se pintó~~ | — | ✅ **CERRADO el 30/08** (ADR-080 §Enmienda): no era "sin ver", era un bug — se pintaba como texto gris atenuado, indistinguible del `"limpio"` de al lado. Ahora es un badge `outline`, visto andar con su único caso |
 > | ~~Disparar una corrida del motor y correr `--verificar`~~ | — | ✅ **CERRADO el 31/08** (ADR-082, cierre 124). Corrida `04:30` cerrada `ok`: volvieron 82 de 337 (24%) y **28 de los 32 candidatos entregados (88%) son rescatados**. El 24% es tasa de colección pura, verificado leyendo la ejecución de n8n nodo por nodo: entran 82 al scrape y llegan **los mismos 82** a `Transcribir` |
 > | **Podar los referentes de cola** — 24 de 40 aportan 1-3 videos cada uno | Majo / Mani | 📌 **Hallazgo del cierre 124, y explica el *"trae pocos videos"* mejor que la ráfaga.** 11 cuentas ponen el **94%** del supply; varias de la cola (`tesco`, `virginradiouk`, `filmmakerzara`) ni son cuentas de contenido — entraron por el descubrimiento y nadie las podó |
-> | **El margen de `cap_top_n` se gastó** — 374 vs 350 (7%) | quien tome la sesión | 📌 **Hallazgo del 31/08 al revisar pendientes.** ADR-030 §Enmienda fijó la regla *CAPACIDAD > `cap_top_n`* con 370 vs **250**, pero el tope real no sale de `Config`: lo pisa el ajuste *"Videos a transcribir por corrida"*, que el equipo subió a **350** por la UI. No mordió todavía (el supply corta antes: 164 y 90 videos distintos en las dos últimas corridas), pero si muerde, 350 videos piden ~814 s de los 870 y el presupuesto **quema**. La palanca es subir `concurrencia_transcribir` midiendo los 429, no bajar el cap. *Una regla escrita contra dos números no sobrevive si uno se toca desde una UI: lo correcto es que el motor calcule su propio margen y lo avise en `metricas.avisos`.* |
+> | ~~**El margen de `cap_top_n` se gastó** — el presupuesto quema~~ | — | ✅ **DESACTIVADO el 31/08** (cierre 127, [ADR-084](../adr/ADR-084-la-memoria-guarda-lo-resuelto-no-lo-intentado.md)). El margen sigue siendo 374 vs 350 (7%), pero **ya no importa igual**: el presupuesto de transcripción **posterga en vez de quemar**, así que morder dejó de ser pérdida permanente y pasó a ser demora. La palanca sigue siendo subir `concurrencia_transcribir` midiendo los 429, no bajar el cap. *Lo que NO se hizo es la parte que ADR-030 §Enmienda pedía —que el motor calcule su propio margen y lo avise—; sí se hizo para el otro tope repartido entre dos dueños (ADR-016 §Enmienda), y el patrón queda escrito ahí para copiarlo* |
+> | **La corrida de fuego de ADR-084 + ADR-044 §Enmienda** — 3 números | quien tome la sesión | 📌 **Es lo que sigue, y va ANTES de subir volumen.** El Gate tiene que caer de **492.7 s** a ~60 (si no, la concurrencia no está entrando); `metricas.gate_sin_presupuesto` tiene que dar **0**; y `processed_items` tiene que crecer **menos** por corrida — con la contracara de que algunos videos vuelvan, que es lo buscado y no un dedup roto. Recién con eso se sube *Resultados por cuenta de referente* **un escalón por vez** |
+> | **Pasos 3 y 4 del plan del 31/08** — los dos silenciosos | quien tome la sesión | 📌 Ninguno muerde hoy; los dos muerden al subir volumen, **y ninguno hace ruido cuando lo hace**. (3) **Chunkear el pre-trim**: hoy manda 1 llamada por proyecto con TODOS sus captions y `max_tokens: 1000` para la respuesta ⇒ cuando la lista de ids a descartar no entra, el JSON sale truncado, el `match` falla y el fail-open **no descarta nada**. (4) **Paginar `Leer feed vivo`**: sin paginación contra el `max-rows` de 1.000 de PostgREST — es la advertencia textual de [ADR-029 §Enmienda](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md), hoy en 274 filas, y es la **misma falla muda** que el cierre 125 ya pagó en `Leer procesados` |
 > | **Soltar los 1.029 huérfanos restantes** por tandas | quien tome la sesión | Cuesta una corrida del script; lo que vuelva es upside. ⚠️ **Los 255 del primer lote que no volvieron NO cuentan**: están fuera del alcance del método, correr el motor otra vez colecta los mismos 520 |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
@@ -4545,6 +4552,73 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-31 (cierre 127) — Transcribir dejó de ser el que descarta, y el Gate dejó de ser el que mata la corrida (Claude, con Mani).**
+
+**Qué se hizo:** los pasos 0, 1 y 2 del plan que salió de una pregunta de Mani —*"¿hay un cap de
+videos por corrida? ¿les decimos a los de redes que separen los proyectos en dos tandas?"*—.
+[ADR-084](../adr/ADR-084-la-memoria-guarda-lo-resuelto-no-lo-intentado.md) nueva, más §Enmienda en
+[ADR-016](../adr/ADR-016-knobs-de-ejecucion-globales-y-tope-de-costo.md) y
+[ADR-044](../adr/ADR-044-todo-nodo-caro-tiene-presupuesto.md). **Empujado al live y verificado ahí**
+(`n8n:diff` verde en los 5, más una lectura directa de la API que confirma topología, los 8
+marcadores del código y el Config). **Sin migración, sin schema, sin `core/`** salvo una línea de
+`n8n-sync.mjs`. 134 checks de `test-nodos.mjs`, auditor sin hallazgos, 2.533 del validador, 38 de
+`n8n:test`.
+
+**📏 La respuesta a la pregunta de Mani es NO, y la dan dos corridas reales de la misma semana:** con
+**10 proyectos** prendidos (30/08 22:50) colectó 524 y entregó **18 de 100**; con **4** (31/08 00:56)
+colectó 520 y entregó **74 de 80**. Los 10 comparten las mismas ~11 cuentas, y **la colecta es por
+cuenta de referente, no por proyecto** ⇒ prender más proyectos no trae un video más, parte los mismos
+en más pedazos y encarece el pre-trim. Separar en dos tandas es peor: la segunda re-scrapea las mismas
+cuentas (Apify completo de nuevo) y encuentra casi todo ya quemado. **La regla para redes es una
+frase: prender un proyecto que no trae cuentas propias no suma videos, reparte los que ya hay.**
+
+**🩸 Y el tope que sí importaba no era ninguno de los que Mani sospechaba.** `cap_top_n` (350) **nunca
+mordió** —las últimas 5 corridas transcribieron 90, 164, 27, 51 y 250—. Lo que estaba a punto de
+matar todo era el **Gate**: leídos los tiempos por nodo de la ejecución 150 por la API de n8n, fue el
+**nodo más lento de la corrida con 492.7 s** (Apify 456.8, Transcribir 239.0), serial y sin
+presupuesto, contra un watchdog de 900 s ⇒ **1.8× de margen**. *La intuición apuntaba a transcribir
+porque es el que se paga; el que se muere es el que nadie cronometró.*
+
+**Los tres cambios:**
+1. **El tope de resultados por cuenta avisa** (ADR-016 §Enmienda). Era mudo: escribir 200 en la
+   pantalla guardaba 200 y el motor usaba 50, sin un log. Medido: el ajuste vivo estaba en **50** y el
+   tope en **50**, o sea el equipo apoyado contra el techo sin saberlo. `cap_resultados_referente` pasa
+   de 50 a **500** — de techo de operación a red contra un 5000 de dedo (~USD 137 de Apify).
+2. **`processed_items` guarda lo resuelto, no lo intentado** (ADR-084). El POST corría **antes** de
+   `Transcribir`: marcaba "ya visto" lo que nadie había mirado. La del 26/08 perdió así **144 de 250
+   (58%)**. Ahora `_tx_resuelta` separa "Supadata contestó" de "no llegué a preguntar" y **el
+   presupuesto posterga en vez de quemar**.
+3. **Pool + presupuesto en el Gate** (ADR-044 §Enmienda), cross-proyecto, sin el `sleep(1000)`.
+
+**🔒 Dos redes ajenas atajaron errores míos, y las dos valen más que el código que escribí.**
+`auditar-workflows.mjs` rechazó la primera versión —el registro colgado como **rama hermana** dejaba a
+`$('POST processed_items')` sin ser ancestro de `Resumen del run`, o sea la verificación de la memoria
+leyendo un nodo que puede no haber corrido, *la misma clase de bug que dejó el dedup de ADR-029 sin
+efecto 3 corridas*—; se rehízo en cadena. Y el `--borrar` de `n8n:push` frenó el push hasta que se
+nombraron los 3 nodos que cambian su cableado de salida.
+
+**🩸 `n8n:diff` cerraba diciendo *"[topologia] NO va por push: re-import (ADR-053)"*, y es falso desde
+el 30/08** (ADR-053 §Enmienda le dio topología al push). *La herramienta mandaba al ritual que ella
+misma había matado.* Corregido. **Un obstáculo escrito se re-mide, y el peor lugar donde envejece es
+en la salida del comando que lo desmiente.**
+
+**Además:** los dos botones de Operar se renombraron a *▶ Buscar contenido* y *▶ Buscar referentes*
+(con `WORKFLOW_LEGIBLE` y el aviso de Sugeridos alineados, que citaban los nombres viejos). 477 tests
+del dashboard verdes. ⚠️ **Sin deployar**, se suma a lo que ya esperaba del cierre 126.
+
+**Qué sigue:** **una corrida de fuego, y mirar tres números antes de subir nada** — el Gate (492.7 s
+⇒ debería caer a ~60), `metricas.gate_sin_presupuesto` (tiene que dar **0**) y que `processed_items`
+crezca **menos** por corrida (esa es la señal de que ADR-084 anda; la contracara es que algunos
+videos vuelvan, y eso es lo buscado, no un dedup roto). Recién con eso, subir *Resultados por cuenta
+de referente* **un escalón por vez**. Después quedan los pasos 3 y 4 del plan, los dos silenciosos:
+**chunkear el pre-trim** (hoy es 1 llamada por proyecto con TODOS sus captions y `max_tokens: 1000`
+para la respuesta ⇒ a más volumen la lista de ids no entra, el JSON sale truncado y el fail-open no
+descarta nada) y **paginar `Leer feed vivo`** (sin paginación contra el `max-rows` de 1.000 de
+PostgREST — la advertencia que ADR-029 §Enmienda dejó escrita, hoy en 274 filas).
+
+**Skills para la próxima:** `/diagnose` si la corrida de fuego no baja el Gate; `/tdd` para los pasos
+3 y 4 (los dos tienen su harness ya montado en `test-nodos.mjs`).
 
 **2026-08-31 (cierre 126) — Las corridas dejan de ser una línea, y el feed se puede leer por corrida (Claude, con Mani).**
 

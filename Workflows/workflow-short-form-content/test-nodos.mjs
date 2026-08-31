@@ -148,6 +148,30 @@ seccion('C.1 — N por proyecto (ADR-024)');
   check('el knob global murió: un ajuste con esa clave ya no mueve la N (ADR-042)', plan.projects.p1.n === 100, String(plan.projects.p1.n));
 }
 
+seccion('El tope de resultados por cuenta AVISA cuando recorta (era mudo)');
+{
+  // El 31/08 el ajuste estaba en 50 y `cap_resultados_referente` también: el equipo ya estaba
+  // apoyado contra el techo sin enterarse, porque escribir 200 en la pantalla guardaba 200 en la
+  // base y el motor usaba 50 sin decir nada. El tope se queda (es la red contra un 5000 de dedo);
+  // lo que se arregla es el silencio.
+  const { plan, logs } = runPlan({
+    proyectos: [P('p1', 'x', ['v1'])], vocesActivas: [V('v1', 'V')],
+    ajustes: [{ id: 'a1', fields: { clave: 'Resultados por cuenta de referente', valor: 200 } }],
+    cfg: { cap_resultados_referente: 50 },
+  });
+  check('sigue recortando al tope (la red no se tocó)', plan.resultados_referente === 50, String(plan.resultados_referente));
+  check('🔊 y ahora lo dice: el aviso nombra los DOS números', plan.avisos.length === 1 && plan.avisos[0].includes('200') && plan.avisos[0].includes('50'), JSON.stringify(plan.avisos));
+  check('y también queda en el log del nodo', logs.some((l) => l.includes('Resultados por cuenta')), JSON.stringify(logs));
+}
+{
+  const { plan } = runPlan({
+    proyectos: [P('p1', 'x', ['v1'])], vocesActivas: [V('v1', 'V')],
+    ajustes: [{ id: 'a1', fields: { clave: 'Resultados por cuenta de referente', valor: 30 } }],
+    cfg: { cap_resultados_referente: 500 },
+  });
+  check('bajo el tope no avisa nada (un aviso que sale siempre no es un aviso)', plan.resultados_referente === 30 && plan.avisos.length === 0, `rr=${plan.resultados_referente} avisos=${JSON.stringify(plan.avisos)}`);
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Armar candidato — el corte final por proyecto (C.1) + dedup (ADR-018) + piso (ADR-017)
 // ════════════════════════════════════════════════════════════════════════════
@@ -339,9 +363,10 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrenci
     if (n === 'Heat-score v1') return { all: () => items.map((j) => ({ json: j })) };
     throw new Error('nodo no mockeado: ' + n);
   };
-  // Desde el cierre 70 la memoria se graba EN SERIE antes de transcribir (ADR-029), así que el input
-  // real de este nodo es la respuesta de `POST processed_items`, no los videos. El mock lo refleja:
-  // si alguien revierte a `$input.all()`, los 8 casos de abajo se quedan sin videos y fallan fuerte.
+  // El nodo lee sus videos POR NOMBRE (`$('Heat-score v1')`), nunca por `$input`. Eso importa más
+  // que antes: desde ADR-029 §Enmienda la memoria se graba DESPUÉS de transcribir, así que este nodo
+  // volvió a colgar directo de Heat-score. El mock deja `$input` vacío a propósito — si alguien lo
+  // cambia por `$input.all()`, los casos de abajo se quedan sin videos y fallan fuerte.
   const $input = { all: () => [{ json: {} }] };
   const logs = [];
   const out = await new AsyncFn('$', '$input', 'console', jsCode('Transcribir (Supadata)'))
@@ -459,6 +484,30 @@ await (async () => {
     const { llamadas } = await runTranscribir(items, { presupuesto: 0.05, delayMs: 25, concurrencia: 2, falla: true, backoff: 200 });
     check('con el presupuesto agotado el backoff no reintenta (no se cuelga el nodo)', llamadas.length < 12 * 5, llamadas.length + ' llamadas de 60 posibles');
   }
+
+  // ── `_tx_resuelta`: la bandera con la que se decide QUÉ se quema (ADR-029 §Enmienda) ──
+  // Es la línea entre "Supadata contestó" y "no llegué a preguntar". Antes no existía y el
+  // presupuesto quemaba: la corrida del 26/08 perdió 144 videos de 250 por una caída de Supadata.
+  {
+    const { out } = await runTranscribir([tvid('r1')]);
+    check('con guion ⇒ resuelta (se quema: no hay que volver a pagarla)', out[0]._tx_resuelta === true, String(out[0]._tx_resuelta));
+  }
+  {
+    const { out } = await runTranscribir([tvid('r2')], { respuesta: { error: 'transcript-unavailable' } });
+    check('sin voz (definitivo) ⇒ resuelta igual (reintentarlo mil veces da lo mismo)', out[0]._tx_resuelta === true, String(out[0]._tx_resuelta));
+  }
+  {
+    const { out } = await runTranscribir([tvid('r3')], { falla: true, backoff: 0 });
+    check('🔴 429/timeout que agota los reintentos ⇒ NO resuelta (vuelve la próxima corrida)', out[0]._tx_resuelta === false, String(out[0]._tx_resuelta));
+  }
+  {
+    // El caso que da nombre al arreglo: el presupuesto deja videos sin arrancar siquiera.
+    const items = []; for (let i = 0; i < 30; i++) items.push(tvid('p' + i));
+    const { out } = await runTranscribir(items, { presupuesto: 0.04, delayMs: 25, concurrencia: 2 });
+    const sinResolver = out.filter((o) => o._tx_resuelta !== true).length;
+    check('🔴 los que el presupuesto dejó afuera NO quedan resueltos (antes se quemaban)', sinResolver > 0, sinResolver + ' de 30 sin resolver');
+    check('y los que sí alcanzó a mirar quedan resueltos', out.some((o) => o._tx_resuelta === true), 'ninguno resuelto');
+  }
 })();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -482,9 +531,13 @@ const runTraducir = async (items, { presupuesto = 0, concurrencia, delayMs = 5, 
   } } };
   const $ = (n) => {
     if (n === 'Config') return { first: () => ({ json: { presupuesto_traducir_s: presupuesto, concurrencia_traducir: concurrencia } }) };
+    if (n === 'Transcribir (Supadata)') return { all: () => items.map((j) => ({ json: j })) };
     throw new Error('nodo no mockeado: ' + n);
   };
-  const $input = { all: () => items.map((j) => ({ json: j })) };
+  // Espejo del mock de Transcribir, y por la misma razón: desde ADR-029 §Enmienda entre los dos se
+  // intercaló `Preparar procesados` → `POST processed_items`, así que el input directo de este nodo
+  // es la respuesta del POST y los videos entran por nombre.
+  const $input = { all: () => [{ json: {} }] };
   const logs = [];
   const out = await new AsyncFn('$', '$input', 'console', jsCode('Traducir (Claude Haiku)'))
     .call(thisMock, $, $input, { log: (m) => logs.push(m) });
@@ -639,7 +692,7 @@ const runPreparar = ({ videos, runId, abrirRunFalla = false }) => {
   const out = new Function('$', '$input', jsCode('Preparar procesados'))($, $input);
   return out[0].json.batch;
 };
-const pvid = (id, extra = {}) => Object.assign({ external_id: id, plataforma: 'instagram', url: 'https://v/' + id }, extra);
+const pvid = (id, extra = {}) => Object.assign({ external_id: id, plataforma: 'instagram', url: 'https://v/' + id, _tx_resuelta: true }, extra);
 
 seccion('Preparar procesados — atribuir la memoria a su corrida (H3, cierre 70)');
 {
@@ -670,14 +723,48 @@ seccion('Preparar procesados — atribuir la memoria a su corrida (H3, cierre 70
     cols === 'external_id,instance_id,platform,run_id', cols);
 }
 
+seccion('Preparar procesados — solo se quema lo que Supadata RESOLVIÓ (ADR-029 §Enmienda)');
+{
+  // El arreglo entero, en un test: el video sin respuesta definitiva no entra a la memoria del
+  // dedup, así que la próxima corrida lo vuelve a mirar. Antes este nodo colgaba de `Heat-score v1`
+  // y corría ANTES de transcribir, o sea que marcaba "ya visto" lo que nadie había mirado todavía.
+  const batch = runPreparar({ videos: [pvid('ok'), pvid('ppto', { _tx_resuelta: false })], runId: 'r-1' });
+  check('🔴 el que no se resolvió NO se quema', batch.length === 1 && batch[0].external_id === 'ok', JSON.stringify(batch.map((r) => r.external_id)));
+}
+{
+  const batch = runPreparar({ videos: [pvid('a'), pvid('b')], runId: 'r-1' });
+  check('y el resuelto se quema igual que siempre (el camino normal no cambió)', batch.length === 2, 'quedaron ' + batch.length);
+}
+{
+  const batch = runPreparar({ videos: [pvid('x', { _tx_resuelta: false })], runId: 'r-1' });
+  check('si NINGUNO se resolvió, el batch va vacío y no rompe', batch.length === 0, JSON.stringify(batch));
+}
+{
+  // El guard del cableado. Sin él, colgar este nodo del lugar equivocado deja al motor sin memoria
+  // de dedup y la corrida siguiente re-trae y re-paga TODO, en verde. ADR-029 ya eligió abortar
+  // ruidoso antes que re-pagar callado: es el mismo criterio de los dos guards de `Heat-score v1`.
+  let msg = '';
+  try { runPreparar({ videos: [{ external_id: 'z', plataforma: 'instagram' }], runId: 'r-1' }); }
+  catch (e) { msg = e.message; }
+  check('🔒 sin la bandera aborta ruidoso (mal cableado ⇒ corrida verde sin dedup)', msg.includes('_tx_resuelta'), msg || 'no tiró');
+}
+{
+  const batch = runPreparar({ videos: [], runId: 'r-1' });
+  check('pero una entrada VACÍA no es un cableado roto: batch vacío, sin abortar', batch.length === 0, JSON.stringify(batch));
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Gate de relevancia — descarte duro de sin-guion (ADR-030): sin transcript = _descarte, sin gastar
 // Haiku ni consumir N; el juicio de los con-guion sigue fail-open. (async, this.helpers.httpRequest)
 // ════════════════════════════════════════════════════════════════════════════
-const runGate = async ({ items = [], projects = {}, cfg = {}, haikuFalla = false, juicioFn } = {}) => {
+const runGate = async ({ items = [], projects = {}, cfg = {}, haikuFalla = false, juicioFn, delayMs = 0 } = {}) => {
   const llamadas = [];
+  let enVuelo = 0, maxEnVuelo = 0;
   const thisMock = { helpers: { httpRequest: async (opts) => {
     llamadas.push(opts);
+    enVuelo++; maxEnVuelo = Math.max(maxEnVuelo, enVuelo);
+    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+    enVuelo--;
     if (haikuFalla) throw new Error('haiku caído (mock)');
     const usr = (((opts.body || {}).messages || [])[0] || {}).content || '';
     let ids = [];
@@ -693,7 +780,7 @@ const runGate = async ({ items = [], projects = {}, cfg = {}, haikuFalla = false
   const $input = { all: () => items.map((j) => ({ json: j })) };
   const logs = [];
   const out = await new AsyncFn('$', '$input', 'console', jsCode('Gate de relevancia')).call(thisMock, $, $input, { log: (m) => logs.push(m) });
-  return { out: out.map((i) => i.json), logs, llamadas };
+  return { out: out.map((i) => i.json), logs, llamadas, maxEnVuelo: () => maxEnVuelo };
 };
 const gvid = (id, pid = 'P1', extra = {}) => Object.assign({ external_id: id, proyecto_id: pid, heat_score: 0.5, descripcion: 'caption ' + id, script: 'guion de ' + id, username: 'ref' }, extra);
 
@@ -726,6 +813,54 @@ await (async () => {
     const bordG = out.find((o) => o.external_id === 'g' && o._descarte);
     check('el sin-guion se marca por sin_guion, no por el gate', sinG && sinG.descarte_razon === 'sin_guion', JSON.stringify(sinG));
     check('el con-guion rechazado sí es descarte de auditoría (razón ≠ sin_guion)', !!bordG && bordG.descarte_razon !== 'sin_guion', JSON.stringify(bordG && bordG.descarte_razon));
+  }
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// Gate de relevancia — pool + presupuesto (el nodo más lento de la corrida)
+// ════════════════════════════════════════════════════════════════════════════
+// Era el último caro que quedaba SERIAL: chunks de 25 uno atrás del otro con `sleep(1000)` entre
+// medio. Medido en la ejecución 150 (31/08) fue el nodo MÁS LENTO de todos —492.7s sobre 26 chunks,
+// más que Apify (456.8s) y el doble que Transcribir (239.0s)—, así que a ~1.8x del volumen de hoy el
+// watchdog del task runner (900s) mata el nodo y la corrida no entrega NADA después de haber pagado
+// Apify, Supadata y las traducciones. El mismo modo de falla que Traducir tenía antes del cierre 31.
+seccion('Gate — pool + presupuesto (a 1.8x del volumen de hoy, el serial moría)');
+await (async () => {
+  const muchos = (n, pid = 'P1') => { const a = []; for (let i = 0; i < n; i++) a.push(gvid(pid + '-v' + i, pid)); return a; };
+  const P1 = { P1: { nombre: 'P1', criterios: 'trading' } };
+  {
+    // 200 videos = 8 chunks de 25. Serial serían 8 llamadas en fila; con el pool van todas juntas.
+    const { llamadas, maxEnVuelo } = await runGate({ items: muchos(200), projects: P1, delayMs: 15 });
+    check('los chunks van EN PARALELO (antes: 1, serial con sleep de 1s)', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
+    check('y se sigue mandando un chunk por cada 25 videos', llamadas.length === 8, llamadas.length + ' llamadas');
+  }
+  {
+    // El pool es CROSS-PROYECTO: un proyecto con 1 chunk no puede dejar 7 workers parados mientras
+    // el de al lado tiene 7. Con la versión por-proyecto el máximo en vuelo habría sido 1.
+    const items = muchos(25, 'P1').concat(muchos(175, 'P2'));
+    const projects = { P1: { nombre: 'P1', criterios: 'trading' }, P2: { nombre: 'P2', criterios: 'psico' } };
+    const { maxEnVuelo, llamadas } = await runGate({ items, projects, delayMs: 15 });
+    check('el pool cruza proyectos (1 chunk + 7 chunks corren juntos)', maxEnVuelo() === 8, 'max en vuelo = ' + maxEnVuelo());
+    check('y cada chunk se juzga con la rúbrica de SU proyecto', llamadas.some((l) => l.body.messages[0].content.includes('TEMA: P1')) && llamadas.some((l) => l.body.messages[0].content.includes('TEMA: P2')), 'faltó una de las dos rúbricas');
+  }
+  {
+    const { llamadas, maxEnVuelo } = await runGate({ items: muchos(100), projects: P1, cfg: { concurrencia_gate: 2 }, delayMs: 15 });
+    check('la concurrencia sale de Config (se tunea sin re-importar)', maxEnVuelo() === 2, 'max en vuelo = ' + maxEnVuelo());
+    check('y no cambia cuántos chunks se mandan, solo cuándo', llamadas.length === 4, llamadas.length + ' llamadas');
+  }
+  {
+    // El presupuesto acá DEGRADA, no pierde: el chunk que no corre deja a sus videos sin juicio y
+    // pasan igual, ordenados por prescore métrico. Lo que no puede pasar es que sea invisible.
+    const { out, llamadas, logs } = await runGate({ items: muchos(500), projects: P1, cfg: { presupuesto_gate_s: 0.04, concurrencia_gate: 2 }, delayMs: 25 });
+    check('el presupuesto corta: no se mandan los 20 chunks', llamadas.length < 20, llamadas.length + ' llamadas de 20');
+    const sinPpto = out.filter((o) => o._gate_sin_presupuesto === true);
+    check('🔴 los que quedaron sin juzgar PASAN igual (fail-open, no se pierden)', sinPpto.length > 0 && sinPpto.every((o) => !o._descarte), sinPpto.length + ' marcados');
+    check('y quedan marcados para que el Resumen lo pueda avisar', sinPpto.every((o) => o.relevancia_score == null), 'alguno salió con score');
+    check('el nodo lo grita en el log', logs.some((l) => l.includes('PRESUPUESTO agotado')), JSON.stringify(logs.slice(-2)));
+  }
+  {
+    const { out } = await runGate({ items: muchos(50), projects: P1 });
+    check('sin presupuesto configurado nadie queda marcado (0 = sin techo)', out.filter((o) => o._gate_sin_presupuesto === true).length === 0, 'hay marcados de más');
   }
 })();
 
