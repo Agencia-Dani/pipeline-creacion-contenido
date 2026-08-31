@@ -10,6 +10,18 @@ import {
   haceCuanto,
   hayCorridaViva,
   ultimoEmbudo,
+  admiteVeredictoIA,
+  conUnidad,
+  cuentasSinAporte,
+  disparoLegible,
+  ejecucionN8n,
+  fallo,
+  lineasPorProyecto,
+  pasosDe,
+  resumenCorto,
+  veredicto,
+  veredictoIA,
+  workflowDe,
   VENTANA_CORRIDA_MIN,
   type Corrida,
 } from "./corrida.ts";
@@ -129,6 +141,7 @@ const corrida = (extra: Partial<Corrida>): Corrida => ({
   trigger_type: "cron",
   metricas: null,
   error: null,
+  params: { workflow: "motor" },
   ...extra,
 });
 
@@ -272,5 +285,257 @@ describe("armarVistaOperar + techo", () => {
         ["Sin cuentas", 0, 0],
       ],
     );
+  });
+});
+
+// ── La pantalla de corridas ───────────────────────────────────────────────────
+//
+// Los fixtures son **payloads reales de prod** (medidos el 2026-08-31 contra `public.runs`), no
+// inventados: la corrida `ok` del motor del 31/08 04:30, la que falló el 21/08 y las de las otras
+// tres máquinas. Es lo que hace que estos tests digan algo — la forma de `metricas` no está
+// declarada en ningún schema (es jsonb libre), así que un fixture inventado testearía la forma que
+// yo imaginé y no la que el motor escribe.
+
+const METRICAS_MOTOR_31_08 = {
+  gate: 63,
+  avisos: [],
+  outputs: 32,
+  pretrim: 1682,
+  apify_ig: 520,
+  apify_tt: 1,
+  llamadas: { supadata: 90, haiku_lotes_gate: 15, haiku_traducciones: 69, haiku_lotes_pretrim: 4 },
+  asignados: 1737,
+  filtrados: 336,
+  sin_guion: 18,
+  colectados: 520,
+  por_proyecto: {
+    a: { nombre: "Ansiedad", evaluados: 90, gate_pass: 8, sin_guion: 18, tasa_gate: 0.11, entregados: 1, n_objetivo: 20, razon_faltante: "mixta" },
+    b: { nombre: "Psicología", evaluados: 70, gate_pass: 32, sin_guion: 13, tasa_gate: 0.56, entregados: 20, n_objetivo: 20, razon_faltante: null },
+  },
+  por_referente: {
+    "the.holistic.psychologist": { evaluados: 10, gate_pass: 9 },
+    "modern.day.psychologist": { evaluados: 15, gate_pass: 0 },
+    jenniferanncounseling: { evaluados: 10, gate_pass: 0 },
+  },
+  registro_dedup: "ok",
+  descartes_expuestos: 10,
+  transcripciones_vacias: 18,
+};
+
+const corridaOk = corrida({
+  id: "r-ok",
+  estado: "ok",
+  fin: "2026-08-31T04:43:11Z",
+  trigger_type: "on_demand",
+  metricas: METRICAS_MOTOR_31_08,
+  params: { workflow: "motor", execution_id: "151" },
+});
+
+describe("workflowDe / ejecucionN8n", () => {
+  it("saca la máquina y la ejecución de params", () => {
+    assert.equal(workflowDe(corridaOk), "motor");
+    assert.equal(ejecucionN8n(corridaOk), "151");
+  });
+
+  it("una corrida vieja sin execution_id no inventa una", () => {
+    const vieja = corrida({ params: { workflow: "motor" } });
+    assert.equal(ejecucionN8n(vieja), null);
+  });
+
+  it("un workflow que no es de los cuatro no pasa por workflow válido", () => {
+    assert.equal(workflowDe(corrida({ params: { workflow: "inventado" } })), null);
+    assert.equal(workflowDe(corrida({ params: null })), null);
+  });
+});
+
+describe("pasosDe", () => {
+  it("el motor cuenta videos y revisiones, y lo DICE", () => {
+    const pasos = pasosDe("motor", corridaOk);
+    const bajo = pasos.find((p) => p.etiqueta.startsWith("Bajó"));
+    const reparto = pasos.find((p) => p.etiqueta.startsWith("Los repartió"));
+    // Es el corazón de por qué el embudo global se veía "de dev": 1.682 sale de 520 sin que
+    // nadie haya bajado más videos, porque un video se evalúa en cada proyecto que lo reclama.
+    assert.deepEqual([bajo?.valor, bajo?.unidad], [520, "videos"]);
+    assert.deepEqual([reparto?.valor, reparto?.unidad], [1682, "revisiones"]);
+  });
+
+  it("marca las transcripciones vacías como nota del paso que las produjo", () => {
+    const escuchar = pasosDe("motor", corridaOk).find((p) => p.etiqueta.startsWith("Alcanzó"));
+    assert.equal(escuchar?.valor, 90);
+    assert.match(escuchar?.nota ?? "", /18/);
+  });
+
+  it("cada máquina tiene sus propios pasos, no una plantilla común", () => {
+    const arch = pasosDe("archivado", corrida({ metricas: { archivados: 67 } }));
+    assert.deepEqual(arch.map((p) => [p.etiqueta, p.valor]), [["Mandó a Históricos", 67]]);
+
+    const desc = pasosDe(
+      "descubrimiento",
+      corrida({ metricas: { semillas: 8, sugeridos_unicos: 71, detalle: 20, propuestos: 7, promovidos: 0 } }),
+    );
+    assert.deepEqual(desc.map((p) => p.valor), [8, 71, 20, 7, 0]);
+  });
+
+  it("una corrida sin métricas no dibuja pasos inventados", () => {
+    assert.deepEqual(pasosDe("motor", corrida({ metricas: null })), []);
+  });
+
+  it("un paso que la corrida no registró no aparece, y no aparece como cero", () => {
+    // "no se registró" y "fue cero" son cosas distintas: un cero fabricado se lee como un hecho.
+    const parcial = pasosDe("motor", corrida({ metricas: { colectados: 100 } }));
+    assert.deepEqual(parcial.map((p) => p.etiqueta), ["Bajó de las cuentas"]);
+  });
+});
+
+describe("lineasPorProyecto", () => {
+  it("redacta el diagnóstico a partir de razon_faltante, sin re-diagnosticar", () => {
+    const lineas = lineasPorProyecto(corridaOk);
+    const ansiedad = lineas.find((l) => l.nombre === "Ansiedad");
+    assert.deepEqual([ansiedad?.miro, ansiedad?.gustaron, ansiedad?.entrego, ansiedad?.pide], [90, 8, 1, 20]);
+    assert.match(ansiedad?.diagnostico ?? "", /Faltan cuentas y además el criterio/);
+    assert.equal(ansiedad?.tono, "aviso");
+  });
+
+  it("el que llenó su pedido queda en bien y sin sermón", () => {
+    const psico = lineasPorProyecto(corridaOk).find((l) => l.nombre === "Psicología");
+    assert.equal(psico?.tono, "bien");
+    assert.equal(psico?.diagnostico, "Completo.");
+  });
+
+  it("entregar CERO es peor que entregar poco, y se pinta distinto", () => {
+    const enCero = corrida({
+      metricas: {
+        por_proyecto: {
+          x: { nombre: "Depresión", evaluados: 87, gate_pass: 4, entregados: 0, n_objetivo: 20, razon_faltante: "mixta" },
+        },
+      },
+    });
+    assert.equal(lineasPorProyecto(enCero)[0].tono, "malo");
+  });
+});
+
+describe("cuentasSinAporte", () => {
+  it("nombra las cuentas que miró y de las que no le sirvió nada, la peor primero", () => {
+    assert.deepEqual(cuentasSinAporte(corridaOk), [
+      { handle: "modern.day.psychologist", miro: 15 },
+      { handle: "jenniferanncounseling", miro: 10 },
+    ]);
+  });
+
+  it("una cuenta con cero videos evaluados NO es una cuenta que no aportó", () => {
+    // No aportó porque la corrida ni llegó a mirarla: es otro problema y otra palanca.
+    const c = corrida({ metricas: { por_referente: { nadie: { evaluados: 0, gate_pass: 0 } } } });
+    assert.deepEqual(cuentasSinAporte(c), []);
+  });
+});
+
+describe("fallo", () => {
+  // El string real que escribió el error handler el 2026-08-21, tal cual está en prod.
+  const CRUDO =
+    "[Workflow - Shortform Content] Bad request - please check your parameters · nodo: POST Candidatos · https://ejemplo.app/workflow/K7T1/executions/136";
+
+  it("desarma el string del error handler en sus tres partes", () => {
+    const f = fallo(corrida({ estado: "fallo", error: CRUDO }));
+    assert.equal(f?.nodo, "POST Candidatos");
+    assert.equal(f?.url, "https://ejemplo.app/workflow/K7T1/executions/136");
+    assert.equal(f?.mensaje, "[Workflow - Shortform Content] Bad request - please check your parameters");
+  });
+
+  it("un error del barrido de zombies no tiene nodo ni URL, y no se los inventa", () => {
+    const f = fallo(
+      corrida({ estado: "fallo", error: "run de motor sin cerrar (fallo antes de Cerrar run); barrido por corrida posterior" }),
+    );
+    assert.equal(f?.nodo, null);
+    assert.equal(f?.url, null);
+    assert.match(f?.mensaje ?? "", /sin cerrar/);
+  });
+
+  it("un fallo sin mensaje lo dice en vez de dibujar un vacío", () => {
+    assert.equal(fallo(corrida({ estado: "fallo", error: null }))?.mensaje, "Se cayó sin dejar mensaje.");
+  });
+
+  it("una corrida que salió bien no tiene fallo", () => {
+    assert.equal(fallo(corridaOk), null);
+  });
+});
+
+describe("veredicto", () => {
+  it("nombra el cuello cuando el corte lo puso la transcripción y no el criterio", () => {
+    // 336 calientes → 90 escuchados es 27%: por debajo de la mitad, así que la palanca no es
+    // aflojar criterios. Es la lectura que la pantalla vieja no daba.
+    const frases = veredicto("motor", corridaOk).join(" ");
+    assert.match(frases, /Entregó 32 de 40 pedidos/);
+    assert.match(frases, /solo alcanzó a escuchar 90/);
+    assert.match(frases, /2 de las cuentas/);
+  });
+
+  it("una corrida fallida dice que no queda registro, en vez de dibujar ceros", () => {
+    // 🩸 Las 12 corridas fallidas de prod tienen `metricas` en NULL, las 12: `Resumen del run` es
+    // el último nodo, así que morir antes es no anotar nada.
+    const frases = veredicto("motor", corrida({ estado: "fallo", metricas: null }));
+    assert.match(frases.join(" "), /se cayó antes de poder anotar/i);
+  });
+
+  it("arrastra los avisos que el propio motor se dejó escritos", () => {
+    const c = corrida({ estado: "ok", metricas: { outputs: 1, avisos: ["posible caida de Supadata"] } });
+    assert.ok(veredicto("motor", c).some((f) => f.includes("Supadata")));
+  });
+});
+
+describe("veredictoIA", () => {
+  it("lee el texto guardado dentro de metricas", () => {
+    const c = corrida({ estado: "ok", metricas: { veredicto_ia: { texto: "Le fue bien.", cuando: "2026-08-31T10:00:00Z" } } });
+    assert.equal(veredictoIA(c)?.texto, "Le fue bien.");
+  });
+
+  it("un texto vacío es lo mismo que no tenerlo", () => {
+    assert.equal(veredictoIA(corrida({ metricas: { veredicto_ia: { texto: "   " } } })), null);
+    assert.equal(veredictoIA(corridaOk), null);
+  });
+
+  it("no se le pide veredicto a una corrida viva: su metricas todavía la escribe el motor", () => {
+    assert.equal(admiteVeredictoIA(corrida({ estado: "en_curso" })), false);
+    assert.equal(admiteVeredictoIA(corridaOk), true);
+    assert.equal(admiteVeredictoIA(corrida({ estado: "fallo" })), true);
+  });
+});
+
+describe("resumenCorto", () => {
+  it("cada máquina resume con su propia unidad", () => {
+    assert.equal(resumenCorto("motor", corridaOk), "32 al feed");
+    assert.equal(resumenCorto("archivado", corrida({ metricas: { archivados: 67 } })), "67 archivados");
+    assert.equal(resumenCorto("descubrimiento", corrida({ metricas: { propuestos: 7 } })), "7 propuestas");
+    assert.equal(resumenCorto("transcriptor", corrida({ metricas: { listos: 1 } })), "1 guion");
+  });
+
+  it("sin métricas no resume nada, en vez de decir cero", () => {
+    assert.equal(resumenCorto("motor", corrida({ metricas: null })), null);
+  });
+});
+
+describe("conUnidad / disparoLegible", () => {
+  it("una unidad en singular cuando hay uno solo", () => {
+    assert.equal(conUnidad(1, "enlaces"), "1 enlace");
+    assert.equal(conUnidad(2, "enlaces"), "2 enlaces");
+    assert.equal(conUnidad(1, "videos"), "1 video");
+    assert.equal(conUnidad(0, "videos"), "0 videos");
+    assert.equal(conUnidad(5, null), "5");
+  });
+
+  it("🩸 el transcriptor NO corre en n8n, así que no puede decir 'manual (n8n)'", () => {
+    // `DISPARO_LEGIBLE` nació cuando toda corrida era de n8n. El transcriptor corre en el propio
+    // cockpit (ADR-062): la etiqueta correcta depende de qué máquina es.
+    assert.equal(disparoLegible("transcriptor", "manual"), "pegando enlaces");
+    assert.equal(disparoLegible("motor", "manual"), "manual (n8n)");
+    assert.equal(disparoLegible("motor", "cron"), "cron semanal");
+  });
+
+  it("un disparo desconocido se muestra crudo en vez de desaparecer", () => {
+    assert.equal(disparoLegible("motor", "inventado"), "inventado");
+  });
+
+  it("un guion es un guion, no 'guiones'", () => {
+    assert.equal(resumenCorto("transcriptor", corrida({ metricas: { listos: 1 } })), "1 guion");
+    assert.equal(resumenCorto("transcriptor", corrida({ metricas: { listos: 3 } })), "3 guiones");
   });
 });

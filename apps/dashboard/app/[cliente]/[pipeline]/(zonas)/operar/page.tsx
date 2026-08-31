@@ -18,6 +18,7 @@ import {
   armarVistaOperar,
   duracionLegible,
   entregaLegible,
+  fallo as falloDe,
   haceCuanto,
   hayCorridaViva,
   pideMasQueElTecho,
@@ -279,7 +280,12 @@ export default async function OperarPage({
         <CardHeader>
           <CardTitle>Corridas recientes</CardTitle>
           <CardDescription>
-            La de cada lunes 08:00 es el cron; las del botón aparecen al toque.
+            La de cada lunes 08:00 es el cron; las del botón aparecen al toque. Acá va solo el
+            titular del motor:{" "}
+            <Link href={rutaDe(base, "operar/corridas")} className="underline">
+              abrí Corridas
+            </Link>{" "}
+            para ver qué hizo cada una y por qué, y las de las otras tres máquinas.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -305,8 +311,13 @@ export default async function OperarPage({
                     {duracionLegible(corrida.inicio, corrida.fin, ahora)}
                     {entregaLegible(corrida) && <> · {entregaLegible(corrida)}</>}
                   </span>
-                  {corrida.estado === "fallo" && corrida.error && (
-                    <span className="w-full text-xs text-destructive">{corrida.error}</span>
+                  {/* El error crudo ya no se vuelca acá: es una tira ilegible con el nodo, el
+                      mensaje y una URL de n8n pegados. Esta línea dice el paso donde murió —que
+                      es lo accionable de un vistazo— y el resto vive en Corridas, desarmado. */}
+                  {corrida.estado === "fallo" && falloDe(corrida)?.nodo && (
+                    <span className="text-xs text-destructive">
+                      se cayó en <span className="font-mono">{falloDe(corrida)!.nodo}</span>
+                    </span>
                   )}
                 </li>
               ))}
