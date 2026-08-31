@@ -91,8 +91,8 @@ ADR-009); el "link" es la URL del video original.
   procesados`. Los 3 del segmento de dedup lo tienen + retry ×3 (dev-doc §2.1).
 - 🩸 **`Leer procesados` PAGINA, y no es un detalle de implementación: sin eso el dedup miente.**
   PostgREST tiene **`max-rows` en 1.000**, así que el viejo `&limit=50000` devolvía 1.000 filas de
-  1.547 — sin error, sin aviso — y el motor quedaba **ciego al 35% de su memoria** re-colectando y
-  re-transcribiendo lo ya visto. Peor: el guard fail-closed de ADR-029 comparaba contra `>= 50000`,
+  1.547 — sin error, sin aviso — y el motor quedaba **ciego al 35% de su memoria**. Peor: el guard
+  fail-closed de ADR-029 comparaba contra `>= 50000`,
   un número que la lectura no podía alcanzar, así que **nunca disparó**. Hoy el nodo pagina por
   `offset` (1.000 × 50 páginas) y hay **dos** guards en `Heat-score v1`: el de 50.000 (que recién
   ahora es el techo real, **acoplado a `maxRequestsPerPage`** — si movés uno, mové el otro) y el de
@@ -100,6 +100,14 @@ ADR-009); el "link" es la URL del video original.
   [ADR-029 §Enmienda 2026-08-31](../../docs/adr/ADR-029-dedup-blindado-fail-closed-y-feed.md).
   ⚠️ **`processed_items` NO se barre nunca** (el archivado borra `candidatos`), así que la tabla
   crece sin techo: cualquier lectura entera de esa tabla necesita paginar, hoy y siempre.
+- 🩸 **Y lo que la ceguera destapó, que es peor: las dos líneas del dedup se habían dado vuelta.**
+  Medido sobre la corrida del 31/08, con 465 videos en el corte: la línea **fail-closed**
+  (`processed_items`) mató **0** y la **fail-open** (`Leer feed vivo`) mató **95** — y los 95 ciegos
+  son ese mismo conjunto, o sea que la fuga real fue **cero** y **la secundaria hacía el 100% del
+  trabajo**. ADR-029 eligió a propósito cuál aborta el run y cuál puede caerse sin drama; los roles
+  se invirtieron solos y **un fail-open de único guardia se ve igual que un sistema sano**.
+  ⚠️ **`Leer feed vivo` también se corta en 1.000** (`app.candidatos` va por 274) y **no tiene guard
+  propio**: el día que pase esa marca caen las dos líneas a la vez, en silencio.
 - **`heat_score` es composite** (ADR-010): `peso_relevancia·score_haiku + (1-peso)·percentil(prescore
   métrico)`. El gate también guarda `relevancia_score`/`relevancia_razon` (se escriben en `app.candidatos`). El
   substring de tema **no existe** (salió en el refactor de relevancia).

@@ -238,12 +238,38 @@ exacto, y **el contraejemplo de 999 y 1.001 que NO abortan**, sin el cual "abort
 filas" pasaría el test igual—, `auditar-workflows.mjs` sin hallazgos, `n8n:push` de los 2 nodos con
 el workflow **activo**, `n8n:diff` verde en los 5, y la config leída de vuelta de la API del live.
 
+### 🩸 Y lo que la medición final desmintió: las dos líneas se habían INVERTIDO de rol
+
+El primer borrador de esta enmienda decía *"el costo era plata: re-colectar y re-transcribir lo ya
+visto"*. **Se midió sobre la corrida del 31/08 y es falso ahí: la fuga fue CERO.** Los números, sobre
+los 465 videos distintos que llegaron al corte:
+
+| | |
+|---|---|
+| muertos por `processed_items` (la línea **fail-closed**, primaria) | **0** |
+| muertos por `Leer feed vivo` (la línea **fail-open**, secundaria) | **95** |
+| ciegos: en la memoria pero invisibles al nodo | **95** |
+| ¿son el mismo conjunto? | **sí, idéntico** |
+| ciegos que el feed vivo **no** tapaba (la fuga real) | **0** |
+
+**La primaria aportó nada y la secundaria hizo el 100% del trabajo.** No es coincidencia: un
+candidato vivo está en las dos tablas, así que los 95 que la truncadura escondía de
+`processed_items` seguían estando en `candidatos`. La red de abajo atajó todo.
+
+**Ese es el hallazgo, y es peor que la plata.** Este ADR eligió a propósito qué línea es
+fail-closed *(la memoria: sin ella el run aborta)* y cuál es best-effort *(el feed vivo: si se cae,
+la corrida sigue)*. **Los roles se habían dado vuelta en silencio**: la que sostenía el dedup era la
+que puede fallar sin abortar nada. Un fail-open haciendo de único guardia se ve idéntico a un
+sistema sano — hasta que se cae.
+
+⚠️ **Y las dos se cortan en el mismo 1.000.** `Leer feed vivo` va contra `app.candidatos`, que hoy
+tiene **274 filas**. El día que pase de 1.000 se trunca igual, **con la misma falla muda y sin guard
+propio**, y ahí caen las dos líneas a la vez. Queda anotado, no resuelto acá.
+
 ### Lo que NO cambia
 
-- **No hay duplicados visibles hoy**, y se midió: 0 `external_id` repetidos en el feed y 0 videos
-  vivos que ya estuvieran archivados. La segunda línea de este mismo ADR —`Leer feed vivo`, 274
-  filas— tapaba el agujero para los candidatos vivos. ⚠️ **Pero esa red también se corta en 1.000**:
-  el día que el feed pase esa marca, la defensa secundaria cae con la misma falla silenciosa. Queda
-  anotado, no resuelto acá (hoy son 274).
-- **El costo era plata, no corrección**: re-colectar y re-transcribir videos ya vistos. Por eso nunca
-  hubo un síntoma que mirara nadie.
+- **No hay duplicados visibles**, y se midió: 0 `external_id` repetidos en el feed y 0 videos vivos
+  que ya estuvieran archivados. Ahora se sabe **por qué**: la secundaria los atajó a todos.
+- **El costo en plata no está medido y no se afirma.** En la corrida del 31/08 fue 0. Podría no serlo
+  en otras —un video **archivado** sale de `candidatos` y queda solo en `processed_items`, o sea sin
+  red de abajo— pero eso no se midió y no se escribe como si sí.

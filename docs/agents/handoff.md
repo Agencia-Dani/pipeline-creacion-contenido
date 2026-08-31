@@ -30,7 +30,9 @@
 >
 > ✅ **El dedup del motor ya no está ciego** (cierre 125): `Leer procesados` devolvía 1.000 filas de
 > 1.547 y el guard fail-closed nunca disparaba. Paginado y empujado al live, `n8n:diff` verde en los
-> 5. Y el umbral de vistas bajó a 100.000 (lo movió Mani por la UI), que sobre el último lote lleva
+> 5. 🩸 **Y midiendo eso apareció algo peor que la ceguera: la línea primaria (fail-closed) aportaba
+> 0 al dedup y la secundaria (fail-open) hacía el 100%** — los roles que ADR-029 eligió se habían
+> dado vuelta solos, y las dos se cortan en el mismo 1.000. Y el umbral de vistas bajó a 100.000 (lo movió Mani por la UI), que sobre el último lote lleva
 > de 189 a 286 videos por encima del corte.
 >
 > ✅ **El rescate del cierre 124 ya corrió entero:** 337 huérfanos soltados, corrida disparada y
@@ -224,13 +226,36 @@
 > filas"* pasaría el test igual—, `auditar-workflows.mjs` sin hallazgos, `n8n:push` de los 2 nodos
 > con el workflow **activo**, `n8n:diff` **verde en los 5**, y la config releída de la API del live.
 >
+> ### 🩸 La medición final desmintió lo que este mismo cierre había escrito
+>
+> Al cerrar escribí *"el costo era plata: re-colectaba y re-transcribía lo ya visto"*. **Lo medí y en
+> la corrida del 31/08 es falso: la fuga fue CERO.** Sobre los 465 videos que llegaron al corte:
+>
+> | | |
+> |---|---|
+> | muertos por `processed_items` (la línea **fail-closed**) | **0** |
+> | muertos por `Leer feed vivo` (la línea **fail-open**) | **95** |
+> | ciegos: en la memoria pero invisibles al nodo | **95** |
+> | ¿mismo conjunto? | **sí, idéntico** |
+> | ciegos que el feed vivo no tapaba (la fuga real) | **0** |
+>
+> **La primaria aportó nada y la secundaria hizo todo el trabajo**, porque un candidato vivo está en
+> las dos tablas. **Y ese es el hallazgo, más grave que la plata:** ADR-029 eligió a propósito cuál
+> línea aborta el run (la memoria) y cuál puede caerse sin drama (el feed vivo). **Los roles se
+> dieron vuelta en silencio.** Un fail-open haciendo de único guardia se ve idéntico a un sistema
+> sano hasta el día que se cae.
+>
+> *Escribí la conclusión antes de medirla y la medición la dio vuelta. Queda la corrección al lado y
+> no encima — el commit `7167101` todavía dice la versión vieja.*
+>
 > ### 📌 Lo que queda anotado y no se resolvió
 >
-> - ⚠️ **`Leer feed vivo` tapaba el agujero y se corta en el mismo 1.000.** Medido: 0 duplicados en el
->   feed y 0 videos vivos ya archivados, porque esa segunda línea (274 filas) alcanzaba. **El día que
->   el feed pase de 1.000, la defensa secundaria cae con la misma falla silenciosa.** Hoy no urge.
-> - **El costo era plata, no corrección.** Re-colectar y re-transcribir lo ya visto no produce ningún
->   síntoma que alguien mire: sale en la factura. Por eso vivió meses.
+> - ⚠️ **Las dos líneas se cortan en el mismo 1.000.** `Leer feed vivo` va contra `app.candidatos`,
+>   hoy **274 filas**. El día que pase de 1.000 se trunca igual, **con la misma falla muda y sin
+>   guard propio**, y caen las dos a la vez. Hoy no urge; conviene no olvidarlo.
+> - **El costo en plata no está medido y no se afirma.** En esa corrida fue 0. Podría no serlo en
+>   otras (un video **archivado** sale de `candidatos` y queda solo en `processed_items`, o sea sin
+>   red de abajo), pero eso no se midió.
 > - 🔎 **Un cambio de perilla del 28/08 no tiene autor:** los eventos muestran *Mínimo de vistas*
 >   `0 → 600.000` y después `600.000 → 100.000`, pero el paso intermedio a **200.000 no dejó evento**,
 >   o sea que se escribió por script y no por la app. Es el mismo modo de falla que casi repito hoy:
