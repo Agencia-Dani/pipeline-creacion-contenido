@@ -25,7 +25,9 @@
 > # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
 > ⚠️ **Al 31/08 espera UNA sola cosa, y no frena una corrida:** deployar el dashboard (la `034` ya
-> está aplicada y el motor ya empujado, cierre 123). El otro bloqueo, el ⛔ de abajo, sigue siendo de
+> está aplicada y el motor ya empujado, cierre 123). **Y ahora hay más para deployar que entonces:**
+> el cierre 126 sumó la pantalla `operar/corridas` y el toggle *Agrupar por corrida* del Feed
+> (ADR-083 + ADR-081 §Enmienda), verificados contra la base de prod pero todavía sin pushear. El otro bloqueo, el ⛔ de abajo, sigue siendo de
 > producto y no de código.
 >
 > ✅ **El dedup del motor ya no está ciego** (cierre 125): `Leer procesados` devolvía 1.000 filas de
@@ -74,6 +76,8 @@
 > | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
 | ~~El repo quedó atrás del live en 2 nodos del motor~~ | — | ✅ **CERRADO el 31/08 por el merge** (`68b79df`). No hacía falta ningún porqué nuevo: los dos nodos eran los cambios de la otra sesión, ya argumentados en `491aa39` y ADR-030 §Enmienda. `n8n:diff` verde en los 5, y el live confirmado por lectura directa de la API (`RETRIES=4`, corte en sin-voz, jitter, `run_id`) |
 | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
+| **La tanda 2 de ADR-083: que las corridas registren más** | quien tome la sesión | 📌 Decidido con Mani el 31/08 y **aplazado a propósito**. Son tres cosas: `descartes.run_id` (migración + ADR, para contestar *"qué videos mató esta corrida"*), **checkpoints parciales en el motor** (hoy un fallo deja `metricas` en NULL, medido: las 12), y los `Cerrar run` de archivado y descubrimiento enriquecidos. **Va después de la pantalla y no antes**: sin ella, verificar un checkpoint obliga a entrar a n8n a mano, que es lo que la pantalla elimina |
+| **Cargar `N8N_BASE_URL` + `N8N_WF_*` en Vercel** (opcional) | Mani | 📌 Sin ellas el link *"ver en n8n"* de una corrida **que salió bien** no aparece (solo lo ve `dev`). El de una corrida **fallida** funciona igual, sin configurar nada. Están en el `.env` de la raíz; el `.env.example` del dashboard ya las documenta |
 > | ~~La topología de n8n sigue siendo ritual manual~~ | — | ✅ **CERRADO el 30/08** (ADR-053 §Enmienda). `n8n:push` empuja nodos y conexiones; el re-import queda solo para crear un workflow de cero. El bloqueo no eran las credenciales sino que `cuerpoPut` mandaba las conexiones del live |
 > | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ **DESBLOQUEADO el 30/08** (ADR-074 §Enmienda): `guardarLimpio` ya no manda `creado_por` al rehacer, así que *Rehacer 25* **se puede apretar**. Verificado en prod con una colección de un video: la fila se reescribió (huella `97ff9195`→`72210da7`, voz derivada) y el conteo quedó **igual, Majo 58 · Mani 7** |
 
@@ -4541,6 +4545,79 @@ limpio. Sigue abierto, aparte: si un **referente** puede cruzar voces — [mapa-
   parcial **por diseño**. No lo leas como veredicto.
 
 ## Log de avance (más reciente arriba)
+
+**2026-08-31 (cierre 126) — Las corridas dejan de ser una línea, y el feed se puede leer por corrida (Claude, con Mani).**
+
+**Qué se hizo:** [ADR-083](../adr/ADR-083-una-corrida-cuenta-lo-que-anoto-no-lo-que-hizo.md) — la
+pantalla `operar/corridas` con 4 tabs, master/detail y lenguaje del equipo — y la
+[enmienda de ADR-081](../adr/ADR-081-el-candidato-sabe-de-que-corrida-salio.md#enmienda-2026-08-31--filtrar-por-corrida-no-es-agruparlas-van-las-dos)
+— el toggle *Agrupar por corrida* en el Feed. **Cero migraciones, cero n8n, cero `core/`.** 477 tests
+verdes, `tsc` y `build` limpios, y las dos features vistas andar en el navegador contra la base de
+producción.
+
+**🩸 El hallazgo que reencuadra el pedido: una corrida `ok` ya registra muchísimo y una `fallo` no
+registra NADA.** Mani pidió la pantalla porque *"si falló no te dice en qué nodo"*. Medido contra
+prod: **las 12 corridas fallidas tienen `metricas` en NULL, las 12** — `Resumen del run` es el
+último nodo del motor, así que morir antes es no anotar ni un contador. Al mismo tiempo, la corrida
+`ok` del 31/08 traía el embudo completo, `por_proyecto` con el diagnóstico ya calculado y
+`por_referente` handle por handle, **y la card dibujaba un solo número** (`outputs`). O sea: para
+las que salen bien el problema era la pantalla; para las que fallan, el registro. *La pantalla no
+puede mostrar lo que nadie guardó.*
+
+**🔑 Y la razón por la que el embudo "se veía de dev" no era el vocabulario: eran las unidades.**
+`colectados` cuenta **videos** y `pretrim`/`gate` cuentan **video × proyecto**, por eso `1.682` sale
+de `520` sin que nadie haya bajado más videos. Eso no se arregla con mejores palabras: se arregla
+poniendo primero el **por-proyecto** —la única vista dedupeada por `external_id`, o sea donde los
+números se pueden restar sin mentir— y dejando el embudo global abajo **diciendo la unidad de cada
+paso**. La primera versión del diseño no lo veía; salió de que Mani dijera *"no es fácil que los de
+redes entiendan"*.
+
+**🩸 Una carta del boceto tenía números inventados, y la encontró la medición y no la relectura.**
+El mockup del fallo mostraba un bloque *"alcanzó a hacer: bajó 520, escuchó 112"*. Esos números **no
+existen** — es el mismo `metricas` NULL de arriba. Lo que queda en la pantalla real es contar las
+filas que la corrida sí escribió (`candidatos.run_id`, ADR-081), que dice *"quedan N de esa
+corrida"* y no *"entregó N"*, porque un candidato archivado se borra (ADR-036).
+
+**🩸 Instalé `@anthropic-ai/sdk` y hubo que revertirlo: el repo ya tenía la convención escrita.**
+`lib/limpiar.ts` la declara como invariante — *"fetch a mano sin SDK, los 7 call-sites del sistema
+arman el suyo"*. El SDK habría dejado dos formas de llamar a la misma API en el mismo repo, más una
+dependencia en el deploy. `lib/ia.ts` quedó con `fetch` + `x-api-key` + `anthropic-version`, igual
+que `limpiar` y `traducir`. *El modelo sí es distinto a propósito (`claude-opus-5` contra
+`claude-haiku-4-5`): aquéllos transforman un texto ya escrito, esto lee un embudo y lo cruza contra
+tres corridas.* **Verificado con una llamada real antes de escribir el código**, no asumido: 97
+tokens de entrada, 331 de salida ⇒ **~US$ 0,009 por corrida**, una sola vez en su vida.
+
+**🟢 El veredicto de la IA se generó, se guardó y se releyó sin pisar el embudo.** Es el riesgo real
+del diseño (guardar en `metricas.veredicto_ia` es un read-modify-write sobre el jsonb que escribe
+n8n), así que se verificó contra prod: después de guardar, `outputs 32`, `colectados 520` y los 4
+proyectos siguen ahí. Por eso además **solo se le pide veredicto a una corrida cerrada**: con la
+corrida viva hay otro escritor.
+
+**🔒 El link a n8n se gatea por rol, no se borra.** Mani: *"los de redes no tienen acceso"*. Va
+detrás de `veCostos` (`dev`) y **el gate vive en el servidor**: decidirlo en el JSX habría mandado la
+URL al browser de todo el equipo igual. ⚠️ Para una corrida `ok` necesita `N8N_BASE_URL` +
+`N8N_WF_<MÁQUINA>` en Vercel (hoy solo están en el `.env` de la raíz), así que **en prod arranca
+apagado**; el del fallo funciona sin configurar nada porque el error handler lo escribe pegado al
+mensaje.
+
+**🩸 Tres cosas que solo se vieron con datos reales, no en el diseño:** *"1 guiones"*, *"1 enlaces"*
+y que el transcriptor decía **"manual (n8n)"** cuando no corre en n8n (corre en el cockpit, ADR-062).
+Las tres arregladas y clavadas en tests. *`DISPARO_LEGIBLE` nació cuando toda corrida era de n8n; la
+pantalla nueva fue la primera en mostrarlo al lado de una máquina que no lo es.*
+
+**📌 Del feed: el toggle nace correcto y casi vacío, y está medido.** 242 de 274 candidatos vivos
+(88%) no tienen `run_id` porque ADR-081 entró sin backfill, así que hoy el modo muestra un grupo real
+y un cajón *Sin corrida* enorme. Se dibuja igual —esconderlo dejaría el feed pareciendo vacío sin
+decir por qué— y el barrido de 20 días lo cura solo. **Y obligó a mandar el ISO además de la
+etiqueta**: ordenar grupos por `"31 ago, 04:30"` pone *"1 sep"* antes de *"31 ago"*, y el feed queda
+mezclado sin que nada falle.
+
+**Qué sigue (la tanda 2, decidida con Mani y aplazada a propósito):** que las corridas registren más
+— `descartes.run_id` con su migración y su ADR, checkpoints parciales en el motor para que un fallo
+deje rastro, y los `Cerrar run` de archivado y descubrimiento enriquecidos. **Va después y no antes
+por una razón concreta:** sin esta pantalla, la única forma de comprobar que un checkpoint escribe
+bien es entrar a n8n a mirar la ejecución a mano, que es justo lo que esto elimina.
+
 
 **2026-08-26 (cierre 116) — Orden y filtro en las 4 pantallas de video, y un orden que no se podía leer (Claude, con Mani).**
 
