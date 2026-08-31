@@ -188,6 +188,28 @@ podía contestar la primera.
 peor caso de pasarse pasó de *perder videos para siempre* a *demorarlos una corrida*. Y el contador
 nuevo hace que la próxima corrida conteste sola si 12 es demasiado.
 
+### 3. El arranque escalonado, que es lo que realmente destraba subirla
+
+🩸 **Y subir a 12 así nomás habría sido un 429 auto-infligido.** Lo cazó Mani preguntando *"¿no
+entra en conflicto con los límites del plan?"*. El pool hacía
+`Promise.all(Array.from({ length: N }, _worker))`: **los N workers arrancan en el MISMO tick**, o sea
+N pedidos en el mismo milisegundo. Con el plan de Supadata en 10 req/s, **la concurrencia estaba
+topada en 10 por el ARRANQUE, no por el trabajo** — a 8 la ráfaga inicial entraba (8 < 10) y a 12 no.
+
+Es la misma trampa que costó media cosecha con 24 en vuelo, un orden de magnitud más chica, y la
+§Enmienda de arriba ya la había nombrado: *el límite se cobra en el PICO*. **El pico de este nodo es
+su primer instante**, y eso no estaba escrito en ningún lado.
+
+**En régimen nunca hubo problema y nunca lo va a haber:** N en vuelo a ~19 s de latencia son N/19
+req/s ⇒ **0,62 req/s a 12 en vuelo**, contra un techo de 10. Lo único que hacía falta era no largarlos
+juntos. `arranque_transcribir_ms` (120 ms entre workers ⇒ ~8,3 req/s de pico) sale de `Config` porque
+el número correcto es `1000 / rate-limit del plan`, y el plan puede cambiar.
+
+🔑 **Con esto la concurrencia deja de estar acoplada al rate limit**, que era el techo real y nadie
+lo había nombrado: se puede subir por capacidad, no por ráfaga. Probado en `test-nodos.mjs` con
+sellos de tiempo por llamada (5 casos, incluido el que demuestra el bug: **sin escalonar los 12 salen
+en menos de 50 ms**, y escalonado siguen llegando a estar los 12 en vuelo).
+
 **Toca:** `Transcribir (Supadata)` (contador + clasificación del error), `Resumen del run` (2 métricas
 + aviso), `Config` (`concurrencia_transcribir` 12). Probado en `test-nodos.mjs` (6 casos, incluido el
 que importa: **un 429 recuperado se cuenta igual**). **No toca `core/`, sin migración.**

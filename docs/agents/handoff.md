@@ -4595,6 +4595,13 @@ y termina registrada como `fallo`**. `Heat-score v1` devuelve 0 ⇒ `Resumen del
 nunca corren ⇒ el barredor la marca a los 60 min, mientras en n8n figura `success`. Le pasó a la
 ejecución 155. En el tablero.
 
+**🩸 Y subir a 12 así nomás habría sido un 429 auto-infligido — lo cazó Mani preguntando.** El pool
+hacía `Promise.all(Array.from({length: N}, _worker))`: **los N workers arrancan en el mismo tick**, o
+sea N pedidos en el mismo milisegundo, contra un plan de **10 req/s**. A 8 la ráfaga inicial entraba
+(8 < 10); a 12 no. *La concurrencia estaba topada por el ARRANQUE, no por el trabajo* — en régimen
+son 0,62 req/s a 12 en vuelo. Con `arranque_transcribir_ms` (120 ms entre workers) **la concurrencia
+queda desacoplada del rate limit**, que era el techo real que nadie había nombrado.
+
 **Qué sigue:** empujar estos 3 nodos (`Config`, `Transcribir`, `Resumen del run` — sin topología),
 correr una vez a concurrencia 12 y **leer `rechazos_supadata` antes de tocar el volumen otra vez**. El
 margen está en 3%: 288 videos en 695,5 s ⇒ el presupuesto de 870 s da para ~360 contra un cap de 350,

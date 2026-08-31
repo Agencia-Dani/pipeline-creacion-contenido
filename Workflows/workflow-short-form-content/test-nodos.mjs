@@ -339,11 +339,14 @@ seccion('Invariantes que no se tocan');
 // `this` mockeado; el mock cuenta llamadas y concurrencia en vuelo)
 // ════════════════════════════════════════════════════════════════════════════
 const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
-const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia, backoff = 1 } = {}) => {
+const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia, backoff = 1, arranque = 0 } = {}) => {
   const llamadas = [];
   let enVuelo = 0, maxEnVuelo = 0;
+  const t0Mock = Date.now();
+  const sellos = [];
   const thisMock = { helpers: { httpRequest: async (opts) => {
     llamadas.push(opts.url);
+    sellos.push(Date.now() - t0Mock);
     enVuelo++; maxEnVuelo = Math.max(maxEnVuelo, enVuelo);
     await new Promise((r) => setTimeout(r, delayMs));
     enVuelo--;
@@ -359,7 +362,7 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrenci
     return respuesta || { content: 'transcript de prueba', lang: 'en' };
   } } };
   const $ = (n) => {
-    if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto, concurrencia_transcribir: concurrencia, backoff_transcribir_ms: backoff } }) };
+    if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto, concurrencia_transcribir: concurrencia, backoff_transcribir_ms: backoff, arranque_transcribir_ms: arranque } }) };
     if (n === 'Heat-score v1') return { all: () => items.map((j) => ({ json: j })) };
     throw new Error('nodo no mockeado: ' + n);
   };
@@ -371,7 +374,7 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrenci
   const logs = [];
   const out = await new AsyncFn('$', '$input', 'console', jsCode('Transcribir (Supadata)'))
     .call(thisMock, $, $input, { log: (m) => logs.push(m) });
-  return { out: out.map((i) => i.json), logs, llamadas, maxEnVuelo: () => maxEnVuelo };
+  return { out: out.map((i) => i.json), logs, llamadas, maxEnVuelo: () => maxEnVuelo, sellos: () => sellos };
 };
 const tvid = (id, extra = {}) => Object.assign({ external_id: id, video_url: 'https://v/' + id, idioma_guess: 'es' }, extra);
 
@@ -535,6 +538,38 @@ await (async () => {
   {
     const { logs } = await runTranscribir([tvid('a6')]);
     check('sin rechazos el log dice que hay aire', logs.some((l) => /0 rechazos por limite/.test(l)), JSON.stringify(logs.slice(-1)));
+  }
+
+  // ── Arranque escalonado: lo que desacopla la concurrencia del rate limit ──
+  // 🩸 `Promise.all(Array.from({length:N}, _worker))` largaba los N workers en el MISMO tick: N
+  // pedidos en el mismo milisegundo. Con el plan de Supadata en 10 req/s, la concurrencia estaba
+  // topada en 10 por el ARRANQUE y no por el trabajo — a 8 la ráfaga entraba (8 < 10) y a 12 no.
+  // En régimen nunca hubo problema: 12 en vuelo a ~19 s de latencia son 0,62 req/s contra un techo
+  // de 10. Lo único que hacía falta era no largarlos juntos. Lo cazó Mani preguntando.
+  {
+    const items = []; for (let i = 0; i < 12; i++) items.push(tvid('s' + i));
+    const { sellos } = await runTranscribir(items, { concurrencia: 12, delayMs: 200, arranque: 0 });
+    const primeros = sellos().slice(0, 12);
+    check('🩸 sin escalonar, los 12 salen juntos (la ráfaga que se come el 429)', primeros[11] - primeros[0] < 50, `${primeros[11] - primeros[0]}ms entre el 1º y el 12º`);
+  }
+  {
+    const items = []; for (let i = 0; i < 12; i++) items.push(tvid('e' + i));
+    const { sellos, maxEnVuelo } = await runTranscribir(items, { concurrencia: 12, delayMs: 400, arranque: 30 });
+    const primeros = sellos().slice(0, 12);
+    const brecha = primeros[11] - primeros[0];
+    check('🔑 escalonado, los 12 se reparten en el tiempo', brecha >= 11 * 30 * 0.7, `${brecha}ms entre el 1º y el 12º (esperado ~${11 * 30})`);
+    check('y siguen llegando a estar los 12 en vuelo (no baja la concurrencia real)', maxEnVuelo() === 12, 'max en vuelo = ' + maxEnVuelo());
+  }
+  {
+    // El escalonado NO puede costar una llamada ni un video: solo mueve CUÁNDO arranca cada worker.
+    const items = []; for (let i = 0; i < 9; i++) items.push(tvid('f' + i));
+    const { out, llamadas } = await runTranscribir(items, { concurrencia: 4, arranque: 10 });
+    check('no cambia cuántas llamadas se hacen ni cuántos videos salen', llamadas.length === 9 && out.length === 9, `llamadas=${llamadas.length} out=${out.length}`);
+  }
+  {
+    const items = []; for (let i = 0; i < 6; i++) items.push(tvid('g' + i));
+    const { llamadas } = await runTranscribir(items, { concurrencia: 3, arranque: 0 });
+    check('con arranque en 0 se comporta como antes (el knob apagado no hace nada)', llamadas.length === 6, llamadas.length + ' llamadas');
   }
   {
     // El caso que da nombre al arreglo: el presupuesto deja videos sin arrancar siquiera.
