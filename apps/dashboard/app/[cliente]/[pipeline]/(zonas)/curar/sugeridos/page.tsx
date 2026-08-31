@@ -73,7 +73,7 @@ export default async function SugeridosPage({
       {pendientes.length === 0 ? (
         <Alert>
           <AlertDescription>
-            No hay propuestas pendientes. Apretá &laquo;Buscar cuentas nuevas&raquo; cuando quieras
+            No hay propuestas pendientes. Apretá &laquo;▶ Buscar referentes&raquo; cuando quieras
             más: el buscador ya no corre solo los lunes.
           </AlertDescription>
         </Alert>

@@ -43,7 +43,7 @@ export function BotonCorrer({ deshabilitado }: { deshabilitado: boolean }) {
         </div>
       ) : (
         <Button onClick={() => setConfirmando(true)} disabled={enviando}>
-          {enviando ? "Enviando señal…" : "▶ Correr ahora"}
+          {enviando ? "Enviando señal…" : "▶ Buscar contenido"}
         </Button>
       )}
       {resultado && (

@@ -58,7 +58,7 @@ export function BotonBuscar({ pendientes }: { pendientes: number }) {
         // como dos jerarquías. El empujón a resolver las propuestas pendientes no se perdió —
         // vive en el paso de confirmación de abajo y en la línea que la card pone al pie.
         <Button onClick={() => setConfirmando(true)} disabled={enviando}>
-          {enviando ? "Enviando señal…" : "Buscar cuentas nuevas"}
+          {enviando ? "Enviando señal…" : "▶ Buscar referentes"}
         </Button>
       )}
       {resultado && (

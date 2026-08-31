@@ -303,14 +303,14 @@ export const esWorkflow = (v: unknown): v is Workflow =>
  * Cómo se llama cada máquina **para el equipo**, no para un dev.
  *
  * Son verbos, igual que las zonas del cockpit: lo que el equipo reconoce es la acción que apretó
- * (`Correr`, `Buscar cuentas nuevas`, `Archivar lo calificado` en Operar), no el nombre del
+ * (`Buscar contenido`, `Buscar referentes`, `Archivar lo calificado` en Operar), no el nombre del
  * workflow en n8n. `transcriptor` no tiene botón en Operar porque se dispara solo al pegar enlaces
  * en la zona Transcribir — de ahí su nombre.
  */
 export const WORKFLOW_LEGIBLE: Record<Workflow, string> = {
-  motor: "Traer videos",
+  motor: "Buscar contenido",
   archivado: "Archivar",
-  descubrimiento: "Buscar cuentas",
+  descubrimiento: "Buscar referentes",
   transcriptor: "Transcribir a mano",
 };
 
