@@ -24,10 +24,15 @@
 
 > # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
-> ⚠️ **Al 31/08 espera DOS cosas, y ninguna frena una corrida:** deployar el dashboard (la `034` ya
-> está aplicada y el motor ya empujado, cierre 123) y **decidir el porqué de los 2 drifts del motor
-> que vienen de otra sesión** (`Config` y `Transcribir`). El otro bloqueo, el ⛔ de abajo, sigue
+> ⚠️ **Al 31/08 espera UNA sola cosa, y no frena una corrida:** deployar el dashboard (la `034` ya
+> está aplicada y el motor ya empujado, cierre 123). El otro bloqueo, el ⛔ de abajo, sigue
 > siendo de producto y no de código.
+>
+> ✅ **Los "2 drifts ajenos del motor" ya no existen, y nunca fueron drift:** eran los cambios de la
+> OTRA sesión, que trabajó sobre `main` mientras ésta corría en un worktree. Al mergear las dos
+> (`68b79df`, 31/08) el repo se puso al día solo y `n8n:diff` da **verde en los 5**. El porqué que
+> "faltaba" estaba escrito todo el tiempo: es el cuerpo del commit `491aa39` + ADR-030 §Enmienda.
+> *Un drift contra un repo incompleto no es drift: es la mitad del repo que todavía no se leyó.*
 >
 > *Este renglón decía "nada espera a Mani para la próxima corrida" el 29/08 y dejó de ser cierto al
 > día siguiente. Un estado se re-mide, no se cita.*
@@ -51,7 +56,7 @@
 > | ~~El badge de `degradaria` nunca se pintó~~ | — | ✅ **CERRADO el 30/08** (ADR-080 §Enmienda): no era "sin ver", era un bug — se pintaba como texto gris atenuado, indistinguible del `"limpio"` de al lado. Ahora es un badge `outline`, visto andar con su único caso |
 > | Los otros ⬜ de [verificaciones-humanas](../verificaciones-humanas.md) | §3 Jero · §4-bis 2 sesiones · §4-ter/§4-quater Majo · §10 Alejandro | Ninguno es de código |
 > | ~~Aplicar la `034` + push del motor~~ | — | ✅ **CERRADO el 31/08** (ADR-081). Migración aplicada por Mani y verificada por su efecto (`23503` de la FK), nodo empujado al live, y la faceta vista filtrar en el navegador con 6 candidatos de prueba **creados y borrados**. Solo queda deployar el dashboard |
-| **El repo quedó atrás del live en 2 nodos del motor** — `Config` (`concurrencia_transcribir`: repo 24, live 8) y `Transcribir (Supadata)` | **Mani** | Son cambios **de otra sesión** y por eso el live gana. Falta el **porqué** para escribirlos en el JSON: un número sin argumento reabre lo que ADR-044 cerró. Hasta entonces `n8n:diff` va a estar rojo a propósito |
+| ~~El repo quedó atrás del live en 2 nodos del motor~~ | — | ✅ **CERRADO el 31/08 por el merge** (`68b79df`). No hacía falta ningún porqué nuevo: los dos nodos eran los cambios de la otra sesión, ya argumentados en `491aa39` y ADR-030 §Enmienda. `n8n:diff` verde en los 5, y el live confirmado por lectura directa de la API (`RETRIES=4`, corte en sin-voz, jitter, `run_id`) |
 | Los **4 canarios** | — | A re-mirar el **2026-09-04** ([plan-modo-seleccion §Fase 4](./plan-modo-seleccion.md)) |
 > | ~~La topología de n8n sigue siendo ritual manual~~ | — | ✅ **CERRADO el 30/08** (ADR-053 §Enmienda). `n8n:push` empuja nodos y conexiones; el re-import queda solo para crear un workflow de cero. El bloqueo no eran las credenciales sino que `cuerpoPut` mandaba las conexiones del live |
 > | Los **25 guiones viejos** de la colección + **2 fuera de toda colección** | Mani | ✅ **DESBLOQUEADO el 30/08** (ADR-074 §Enmienda): `guardarLimpio` ya no manda `creado_por` al rehacer, así que *Rehacer 25* **se puede apretar**. Verificado en prod con una colección de un video: la fila se reescribió (huella `97ff9195`→`72210da7`, voz derivada) y el conteo quedó **igual, Majo 58 · Mani 7** |
@@ -260,7 +265,13 @@
 >
 > 🔴 **Y creció mientras esta sesión corría:** a las 00:37 el live decía `6`, a las 00:57 decía **`8`**,
 > y apareció **un drift nuevo en `Transcribir (Supadata) · jsCode`** que antes no estaba. Al 31/08 el
-> motor tiene **2 drifts ajenos** (`Config` y `Transcribir`) más el mío ya empujado.
+> motor tenía **2 drifts ajenos** (`Config` y `Transcribir`) más el mío ya empujado.
+>
+> ✅ **Se disolvieron en el merge, sin tocar n8n** (`68b79df`, 31/08). Los dos eran la otra sesión
+> escribiendo sobre `main`; este worktree salió de `a6b1f87` y por eso los veía como ajenos. Las dos
+> ramas tocaron nodos distintos (`Config`+`Transcribir` una, `Preparar candidatos` la otra), el merge
+> dio limpio y el repo alcanzó al live. **Moraleja para el próximo worktree: antes de leer un diff
+> contra el live, mirá si el repo está completo** — `n8n:diff` compara contra tu rama, no contra `main`.
 >
 > ✅ **Mi push NO pisó nada, y se puede probar:** el snapshot que tomó *antes* de escribir ya traía
 > `concurrencia_transcribir = 8` y `Transcribir` en 9036 bytes — **idénticos a lo que el live tiene
