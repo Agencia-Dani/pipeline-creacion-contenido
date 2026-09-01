@@ -376,6 +376,20 @@ describe("pasosDe", () => {
     assert.deepEqual(desc.map((p) => p.valor), [8, 71, 20, 7]);
   });
 
+  it("🔑 `parcial` sin métricas NO se le cuenta al equipo como una falla", () => {
+    // Medido el 2026-08-31: las 12 corridas del transcriptor en `fallo` eran las 12 que existían y
+    // NINGUNA era un error — todas decían "cerraron la pestaña". Sobre 24 corridas, un 50% de
+    // "falla" que era ciclo de vida del navegador. Decirle "falló" al equipo por eso les enseña a
+    // desconfiar de una herramienta que anduvo bien.
+    const cortada = veredicto("transcriptor", corrida({ estado: "parcial", metricas: null }));
+    assert.ok(cortada.some((f) => f.includes("quedó guardado")), "dice que lo hecho no se perdió");
+    assert.ok(!cortada.some((f) => /fall|se cayó/i.test(f)), "no habla de falla");
+
+    // Y un fallo de verdad sigue diciendo lo suyo.
+    const rota = veredicto("motor", corrida({ estado: "fallo", metricas: null }));
+    assert.ok(rota.some((f) => f.includes("Se cayó")));
+  });
+
   it("🩸 una corrida vieja con `promovidos: 0` guardado NO dibuja el paso fantasma", () => {
     // El fixture de este test fijaba `promovidos: 0` como si fuera un valor con sentido. No lo era:
     // medía un nodo que no existe desde ADR-020, así que valía 0 SIEMPRE y el paso salía pintado

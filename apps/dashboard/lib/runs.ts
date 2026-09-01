@@ -92,8 +92,19 @@ export async function cerrarRunTranscriptor(
  * 🩸 **El agujero que tapa, y es de ADR-062:** `procesarPendientes` abre el run al empezar y lo
  * cierra al final. Si la pasada muere en el medio —la función de Vercel se corta a los 60 s, o la
  * persona cierra la pestaña— el cierre **nunca corre** y el run queda `en_curso` de por vida. Medido
- * en prod el 2026-08-07, a la hora de deployar: **5 de 10 runs quedaron colgados**. No rompe nada
- * (nadie los lee todavía), pero ensucia Operar y hace contar mal a la primera métrica que los mire.
+ * en prod el 2026-08-07, a la hora de deployar: **5 de 10 runs quedaron colgados**.
+ *
+ * 🔑 **Cierra en `parcial`, NO en `fallo`, y el matiz no es cosmético.** Medido el 2026-08-31: las
+ * **12** corridas del transcriptor en estado `fallo` eran las 12 que existían, y **ninguna era un
+ * error** — todas decían "la función se cortó o cerraron la pestaña". Sobre 24 corridas eso es un
+ * 50% de "falla" que en realidad es el ciclo de vida del navegador, y la pantalla `operar/corridas`
+ * se lo iba a mostrar al equipo como si la herramienta se rompiera una vez de cada dos.
+ *
+ * `parcial` ya existía en el enum y en el check de la tabla (no hace falta migración), significa
+ * exactamente lo que pasó —la pasada transcribió algo y se cortó antes de anotar— y como los
+ * contadores de la pantalla cuentan `estado = 'fallo'`, dejan de inflarse solos. Los barredores de
+ * n8n **siguen escribiendo `fallo`** a propósito: después del arreglo de la corrida vacía, un run
+ * del motor que queda colgado sí murió de verdad.
  *
  * Es el mismo barrido que el nodo `Barrer runs zombie` del motor, con su misma forma (`fallo` + `fin`
  * + un `error` que dice por qué), y corre **antes** de abrir el run nuevo por la misma razón que
@@ -112,9 +123,11 @@ export async function barrerRunsZombieTranscriptor(ctx: TenantContext): Promise<
 
   const { error } = await (await scoped(ctx))
     .update("public.runs", {
-      estado: "fallo",
+      estado: "parcial",
       fin: new Date().toISOString(),
-      error: "pasada del transcriptor sin cerrar (la función se cortó o cerraron la pestaña); barrida por una posterior",
+      error:
+        "pasada del transcriptor sin cerrar (la función se cortó o cerraron la pestaña); " +
+        "barrida por una posterior. NO es un error de la herramienta: lo que alcanzó a transcribir quedó guardado.",
     })
     .eq("params->>workflow", "transcriptor")
     .eq("estado", "en_curso")

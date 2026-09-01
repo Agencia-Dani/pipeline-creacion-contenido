@@ -624,6 +624,15 @@ export const QUE_HACE_EL_NODO: Record<string, string> = {
 export function veredicto(workflow: Workflow, corrida: Corrida): string[] {
   if (corrida.estado === "en_curso") return ["Todavía está corriendo."];
   if (!corrida.metricas) {
+    // `parcial` NO es un error: es una pasada que hizo parte del trabajo y se cortó antes de
+    // anotarlo (la función de Vercel se corta a los 60 s, o alguien cerró la pestaña). Decirle
+    // "falló" al equipo por eso les enseña a desconfiar de una herramienta que anduvo bien.
+    if (corrida.estado === "parcial") {
+      return [
+        "Se cortó antes de terminar, así que no alcanzó a anotar lo que hizo.",
+        "Lo que sí alcanzó a procesar quedó guardado: no hay que rehacerlo.",
+      ];
+    }
     return corrida.estado === "fallo"
       ? ["Se cayó antes de poder anotar lo que había hecho, así que de esta corrida solo queda el error."]
       : ["Esta corrida no dejó registro de lo que hizo."];
