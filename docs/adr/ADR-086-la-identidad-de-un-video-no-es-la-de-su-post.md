@@ -1,7 +1,7 @@
 # ADR-086 — La identidad de un video no es la de su post
 
 - **Fecha:** 2026-09-01
-- **Estado:** aceptada (rung 1 aplicada; rung 2 escrita, pendiente de la `036`)
+- **Estado:** aceptada (rung 1 en el repo; **migración `036` aplicada y verificada el 01/09**, falta que el motor escriba las columnas)
 - **Enmienda a:** [ADR-029](ADR-029-dedup-por-processed-items.md) (el dedup del motor)
 
 ## Contexto
@@ -113,11 +113,17 @@ parámetro: dos fuentes, una sola implementación de la regla — el error que A
   cita: *¿cuántos pares nuevos aparecen por corrida?* — el mismo cálculo de Jaccard sobre
   `app.candidatos`, corrido después de la próxima corrida real.
 
-## Rung 2 (escrita, no aplicada)
+## Rung 2 — la `036` está aplicada, y todavía no mide nada
 
 [`core/schema/036_candidatos_huella.sql`](../../core/schema/036_candidatos_huella.sql) agrega
-`app.candidatos.huella_guion` y `app.candidatos.duracion_seg`. Ninguna de las dos se usa todavía:
-**existen para poder medir**. Con una corrida real guardándolas se puede contestar lo que hoy no se
-puede — si la duración colisiona entre videos distintos del mismo creador, y cuántos pares caza la
+`app.candidatos.huella_guion` y `app.candidatos.duracion_seg`. Aplicada y verificada el 2026-09-01 con cuatro señales
+(las columnas contestan sobre las 422 filas · `con_huella = 0` y `con_duracion = 0`, o sea que el
+sin-backfill es un hecho medido · el índice parcial existe · PostgREST devuelve 200 y no
+`PGRST204`). Ninguna de las dos se usa todavía: **existen para poder medir**.
+
+🔴 **Y todavía no miden nada, porque nadie las escribe.** `Normalizar IG` ya tiene la duración
+(`duracion_video`) y la sigue tirando; `Preparar candidatos` no manda ninguna de las dos. Ese es el
+siguiente paso, y sin él las columnas se quedan en null para siempre. Con una corrida real
+guardándolas se puede contestar lo que hoy no se puede — si la duración colisiona entre videos distintos del mismo creador, y cuántos pares caza la
 huella del guion original — y **recién ahí** se decide si alguna aguanta un bloqueo pre-pago en
 `Heat-score v1`. Medir el martes no autoriza a bloquear el jueves.

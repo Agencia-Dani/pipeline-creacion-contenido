@@ -80,14 +80,25 @@
 > - **Se sigue pagando la transcripción del duplicado** (~0,014 USD c/u, ~0,5 USD sobre los 35
 >   medidos). El aviso salva a la persona y la doble grabación, no la plata.
 >
-> ### 🔴 PENDIENTE DE MANI — la migración `036`
+> ### ✅ La migración `036` está APLICADA (Mani, 01/09)
 >
-> [`core/schema/036_candidatos_huella.sql`](../../core/schema/036_candidatos_huella.sql) está
-> escrita y **sin aplicar**. Agrega `huella_guion` y `duracion_seg`, y **no las usa nadie todavía:
+> Verificada **por su efecto y con cuatro señales**, no por haberse corrido: las dos columnas
+> contestan en SQL sobre las 422 filas · **`con_huella = 0` y `con_duracion = 0`**, o sea que el
+> *sin backfill* es un hecho medido · el índice parcial `candidatos_huella_idx` existe con su
+> `where huella_guion is not null` · y **PostgREST las devuelve con 200, no `PGRST204`**, que es el
+> camino real del cockpit.
+>
+> [`core/schema/036_candidatos_huella.sql`](../../core/schema/036_candidatos_huella.sql) agrega `huella_guion` y `duracion_seg`, y **no las usa nadie todavía:
 > existen para poder medir**. La duración llega gratis desde `Normalizar IG` y hoy **se tira**, así
 > que su tasa de colisión —el único motivo por el que no es ya la llave del bloqueo pre-pago— **no
-> se puede cuantificar**. Aplicarla, dejar correr una corrida real, y recién ahí decidir si alguna
-> aguanta un filtro duro en `Heat-score v1`. La verificación esperada está en su §2.
+> se puede cuantificar todavía**.
+>
+> 🔴 **LO QUE FALTA AHORA es que el motor las ESCRIBA.** La migración abrió el lugar; `Armar
+> candidato` / `Preparar candidatos` todavía no mandan ni `duracion_seg` (que `Normalizar IG` ya
+> tiene como `duracion_video` y sigue tirando) ni `huella_guion`. Sin eso las columnas se quedan en
+> null para siempre y la medición no llega nunca. Después de una corrida real con las dos adentro
+> se mide la colisión de la duración y la cobertura de la huella, y **recién ahí** se decide si
+> alguna aguanta un filtro duro en `Heat-score v1`.
 >
 > 🐤 **Y la pregunta que se re-mide, no se cita:** *¿cuántos pares nuevos aparecen por corrida?* Es
 > el mismo Jaccard sobre `app.candidatos`, corrido después de la próxima corrida real. Hoy son 17.

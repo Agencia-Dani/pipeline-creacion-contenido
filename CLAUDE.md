@@ -168,8 +168,13 @@ en §Agent skills; acá solo se ubican.
   Majo entró esa misma noche. Después dijo **"una: Majo, 20 y 21"** y también envejeció en 8 días.
   Un canario se re-mide, no se cita — y **uno mal consultado miente igual que uno mal escrito**: el
   29/08 `videos_meta` se contó en 4 por pedirle una columna que no existe, y son 5.*
-  🕓 **La [`036`](core/schema/036_candidatos_huella.sql) (ADR-086) está ESCRITA y SIN APLICAR** —
-  agrega `app.candidatos.huella_guion` y `duracion_seg`. **No las usa nadie todavía: existen para
+  ✅ **La [`036`](core/schema/036_candidatos_huella.sql) (ADR-086) está APLICADA** (Mani, 01/09) —
+  agrega `app.candidatos.huella_guion` y `duracion_seg`. Verificada por su efecto y con **cuatro
+  señales**: las dos columnas contestan en SQL sobre las 422 filas · **`con_huella = 0` y
+  `con_duracion = 0`**, o sea que el *sin backfill* es un hecho medido y no una intención · el
+  índice parcial `candidatos_huella_idx` existe con su `where huella_guion is not null` · y
+  **PostgREST las devuelve con 200 y no `PGRST204`**, que es el camino por el que las va a leer el
+  cockpit. **No las usa nadie todavía: existen para
   poder medir.** El dedup del motor recuerda el *id del post* y no el video, así que una re-subida
   del mismo reel entra como nueva (medido el 01/09: **17 pares** en `app.candidatos`, **18 más** en
   `app.descartes`, **11 en el Feed con el gemelo ya calificado y 3 de esos con el gemelo ya
