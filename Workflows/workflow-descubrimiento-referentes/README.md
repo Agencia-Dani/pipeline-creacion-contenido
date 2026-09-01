@@ -8,10 +8,12 @@ funcionan* y el equipo decide cuáles entran. El porqué de cada decisión está
 
 ## Cómo funciona (una corrida)
 
-1. **Promoción** — las filas de `Referentes propuestos` que el equipo marcó `aprobado` se crean
-   como `Referentes` (activo ✓, con la razón en `notas`) y pasan a `promovido`. El equipo nunca
-   copia a mano.
-2. **Semillas** — referentes IG activos de proyectos activos, rankeados por `v_senal_seleccion`
+> ℹ️ **La promoción NO es un paso de este workflow, y hasta el 2026-08-31 este doc decía que sí.**
+> Salió con ADR-020 y aprobar una propuesta es un acto humano en `curar/sugeridos` del cockpit.
+> El `Cerrar run` seguía midiéndola contra un nodo inexistente, así que `promovidos` valía 0 en
+> todas las corridas y el cockpit lo pintaba como alarma. Ver el cierre 130.
+
+1. **Semillas** — referentes IG activos de proyectos activos, rankeados por `v_senal_seleccion`
    (tasa de selección del equipo); sin señal entran todos. Tope `cap_semillas` (8).
    ✅ **Desde [ADR-079](../../docs/adr/ADR-079-el-descubrimiento-obedece-a-la-voz.md) (2026-08-29)
    este workflow SÍ gatea por `Voces.activo`**, con la misma semántica que el motor: un proyecto
@@ -21,21 +23,21 @@ funcionan* y el equipo decide cuáles entran. El porqué de cada decisión está
    🔑 **El gate vive acá, en el nodo, y NO en el ámbito del run-plan.** Este workflow sigue pidiendo
    `?ambito=completo` a propósito: `?ambito=motor` también filtra los **referentes** por `activo`, y
    el dedup del paso 4 necesita los inactivos para no re-proponer una cuenta ya conocida.
-3. **Sugeridos** — Apify `instagram-profile-scraper` trae el perfil de cada semilla con sus
+2. **Sugeridos** — Apify `instagram-profile-scraper` trae el perfil de cada semilla con sus
    `relatedProfiles` (las cuentas "sugeridas" del propio algoritmo de IG, ~20 por semilla).
-4. **Dedup + ranking** — fuera privados, fuera handles ya en `Referentes` (activos o no) o en
+3. **Dedup + ranking** — fuera privados, fuera handles ya en `Referentes` (activos o no) o en
    `Referentes propuestos` (cualquier estado: lo descartado no re-surge). El resto se rankea por
    frecuencia (sugerido por varias semillas > por una) y se corta a `cap_perfiles_detalle` (20).
-5. **Detalle + vetting** — segunda pasada Apify (bio, seguidores, captions de últimos posts) y
+4. **Detalle + vetting** — segunda pasada Apify (bio, seguidores, captions de últimos posts) y
    juicio Haiku contra los criterios Proyecto⊕Voz (mismo jurado del gate del motor, ADR-010).
    **FAIL-CLOSED**: si Haiku falla o el proyecto no tiene criterios, no se propone nada (acá el
    riesgo es inundar al equipo de ruido, no perder contenido).
-6. **Propuestas** — las cuentas con afinidad ≥ `Afinidad mínima de propuesta` (0.6), cap
+5. **Propuestas** — las cuentas con afinidad ≥ `Afinidad mínima de propuesta` (0.6), cap
    `Propuestas por corrida` (10), entran a `Referentes propuestos` con `estado=propuesto`,
    afinidad, razón en español, bio, seguidores y qué semillas la sugirieron.
 
 El run se registra en Supabase (`params.workflow='descubrimiento'`, barredor de zombies propio,
-métricas `{semillas, sugeridos_unicos, detalle, vetteados, propuestos, promovidos}`). Todo el
+métricas `{semillas, sugeridos_unicos, detalle, vetteados, propuestos}`). Todo el
 workflow es **fail-soft**: cualquier pata externa que falle deja la corrida cerrar en `ok` con
 menos resultados (los errores quedan en `console.log`).
 
@@ -71,9 +73,10 @@ TT a juzgar sobre contenido como IG. Un piso de seguidores sería un knob de una
 
 ## Qué toca y qué no
 
-- **Lee:** Proyectos/Voces/Referentes/Ajustes/`Referentes propuestos` (Airtable),
-  `v_senal_seleccion` y `runs` (Supabase).
-- **Escribe:** `Referentes propuestos`, `Referentes` (solo promoción de aprobados), `runs`.
+- **Lee:** Proyectos/Voces/Referentes/Ajustes/`Referentes propuestos` por la fachada
+  `run-plan` (ADR-028), y `v_senal_seleccion` y `runs` de Supabase. *(Decía «(Airtable)», que se
+  purgó el 2026-08-03.)*
+- **Escribe:** `Referentes propuestos`, `runs`. **No toca `Referentes`**: promover es del cockpit.
 - **NO toca el motor de reels** ni la tabla `Candidatos`: nada entra al stream de candidatos sin
   aprobación humana.
 - **Instagram + TikTok** (ADR-020 §8). IG expande vía `relatedProfiles`; TikTok con el actor
@@ -100,6 +103,7 @@ existen: el tenant viaja en el payload del webhook (ADR-048) y Airtable murió e
 el dispatcher solo tiene los del motor y el archivado. El resto del runbook (test incluido) está en
 [workflow.yaml](./workflow.yaml).
 
-**Flujo del equipo (no-code):** revisar la vista de `Referentes propuestos` → marcar `estado`
-`aprobado` o `descartado` → a la corrida siguiente los aprobados aparecen en `Referentes` y el
-motor los empieza a rastrear.
+**Flujo del equipo (no-code):** en `curar/sugeridos` del cockpit, revisar cada propuesta y
+aprobarla o descartarla. **Aprobar crea el `Referente` en el momento** (evento
+`sugeridos.aprobar`), y el motor lo empieza a rastrear en su próxima corrida. *No hay que
+re-ejecutar este workflow para que eso pase: la promoción es del cockpit, no de la máquina.*

@@ -413,10 +413,6 @@ export function Descubrimiento({ filas }: { filas: FilaDescubrimiento[] }) {
           <p className="text-2xl font-semibold">{num(s.propuestos)}</p>
           <p className="text-muted-foreground">propuestas al equipo</p>
         </div>
-        <div>
-          <p className="text-2xl font-semibold">{num(s.promovidos)}</p>
-          <p className="text-muted-foreground">aprobadas al banco</p>
-        </div>
       </div>
       {s.runs_fallo > 0 && (
         <p className="text-sm text-muted-foreground">

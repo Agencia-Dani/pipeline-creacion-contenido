@@ -14,6 +14,8 @@
 //   1. Conexiones rotas      — todo destino existe como nodo.
 //   2. Inalcanzables         — todo nodo se alcanza desde algún trigger.
 //   3. Refs a no-ancestros   — todo `$('X')` apunta a un nodo que puede haber corrido antes.
+//                              Incluye las refs INDIRECTAS (`g('Nodo', fn)` con `g` llamando a
+//                              `$(nombre)`): ese hueco dejó pasar un nodo muerto 1 mes (cierre 130).
 //   4. Code nodes            — compilan como AsyncFunction (los `await` de nivel superior hacen
 //                              que un `new Function()` pelado dé falsos positivos).
 //   5. Placeholders          — inventario de lo que hay que rellenar tras cada re-import (informativo).
@@ -83,6 +85,44 @@ const esTrigger = (n) =>
   /Trigger$/.test(n.type) || n.type === "n8n-nodes-base.webhook" || n.type === "n8n-nodes-base.formTrigger";
 
 /** Nodos alcanzables desde `desde`, siguiendo las aristas en la dirección dada. */
+/**
+ * Nombres de nodo que llegan a `$()` de forma INDIRECTA, por un helper.
+ *
+ * 🩸 El punto ciego que esto tapa, medido el 2026-08-31: `Cerrar run en el registro` del
+ * descubrimiento hace `g('Preparar promoción', fn)` donde `g(nombre, fn)` llama a `$(nombre)`
+ * adentro. Ese nodo no existe desde que la promoción salió del workflow (ADR-020), pero el literal
+ * nunca aparece pegado a `$(`, así que el regex del chequeo #3 no lo veía: el audit decía
+ * "✓ Sin hallazgos" mientras la métrica `promovidos` valía 0 en todas las corridas y el cockpit
+ * la pintaba como una alarma permanente.
+ *
+ * Se resuelve en dos pasos y a propósito NO con heurística de "string que parece nombre de nodo":
+ * eso daría falsos positivos con cada `console.log`. Acá se exige la evidencia estructural —
+ * que exista un helper cuyo cuerpo llame `$(<su primer parámetro>)`.
+ */
+function refsIndirectas(js) {
+  const out = new Set();
+  if (typeof js !== "string" || !js.includes("$(")) return out;
+
+  // Helpers cuyo primer parámetro termina adentro de un `$(...)`:
+  //   function g(nombre, ...) {...}  ·  const g = (nombre, ...) => {...}  ·  var g = function(nombre, ...)
+  const defs = /(?:function\s+([A-Za-z_$][\w$]*)\s*\(\s*([A-Za-z_$][\w$]*)|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function\s*)?\(\s*([A-Za-z_$][\w$]*))/g;
+  const indirectos = new Set();
+  for (const m of js.matchAll(defs)) {
+    const nombre = m[1] ?? m[3];
+    const param = m[2] ?? m[4];
+    if (!nombre || !param) continue;
+    if (new RegExp("\\$\\(\\s*" + param + "\\s*\\)").test(js)) indirectos.add(nombre);
+  }
+
+  // Y las llamadas a esos helpers con un string literal como primer argumento.
+  for (const h of indirectos) {
+    for (const m of js.matchAll(new RegExp("\\b" + h + "\\s*\\(\\s*['\"]([^'\"]+)['\"]", "g"))) {
+      out.add(m[1]);
+    }
+  }
+  return out;
+}
+
 function alcanzables(desde, adyacencia) {
   const visto = new Set(desde);
   const pila = [...desde];
@@ -124,6 +164,11 @@ function auditar(dir) {
   for (const nodo of wf.nodes) {
     const texto = JSON.stringify(nodo.parameters ?? {});
     const refs = new Set([...texto.matchAll(/\$\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]));
+    // Las que pasan por un helper (ver refsIndirectas): mismo trato, el nodo tiene que existir
+    // y tiene que ser ancestro. Se miran los dos campos donde vive JS en n8n.
+    for (const js of [nodo.parameters?.jsCode, nodo.parameters?.jsonBody]) {
+      for (const r of refsIndirectas(js)) refs.add(r);
+    }
     if (!refs.size) continue;
     const ancestros = alcanzables([nodo.name], predecesores);
     for (const ref of refs) {

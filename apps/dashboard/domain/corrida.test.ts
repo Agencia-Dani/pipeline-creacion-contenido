@@ -371,9 +371,27 @@ describe("pasosDe", () => {
 
     const desc = pasosDe(
       "descubrimiento",
+      corrida({ metricas: { semillas: 8, sugeridos_unicos: 71, detalle: 20, propuestos: 7 } }),
+    );
+    assert.deepEqual(desc.map((p) => p.valor), [8, 71, 20, 7]);
+  });
+
+  it("🩸 una corrida vieja con `promovidos: 0` guardado NO dibuja el paso fantasma", () => {
+    // El fixture de este test fijaba `promovidos: 0` como si fuera un valor con sentido. No lo era:
+    // medía un nodo que no existe desde ADR-020, así que valía 0 SIEMPRE y el paso salía pintado
+    // como `aviso` en todas las corridas del descubrimiento. Las 4 corridas que ya están en la base
+    // siguen teniendo ese 0 guardado, y este test es el que garantiza que no vuelva a la pantalla.
+    const vieja = pasosDe(
+      "descubrimiento",
       corrida({ metricas: { semillas: 8, sugeridos_unicos: 71, detalle: 20, propuestos: 7, promovidos: 0 } }),
     );
-    assert.deepEqual(desc.map((p) => p.valor), [8, 71, 20, 7, 0]);
+    assert.deepEqual(vieja.map((p) => p.etiqueta), [
+      "Partió de las cuentas que ya seguís",
+      "Encontró parecidas",
+      "Revisó a fondo",
+      "Te propuso",
+    ]);
+    assert.ok(!vieja.some((p) => p.tono === "aviso"), "ningún paso queda en tono aviso");
   });
 
   it("una corrida sin métricas no dibuja pasos inventados", () => {

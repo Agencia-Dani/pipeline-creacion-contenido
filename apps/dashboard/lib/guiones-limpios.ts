@@ -2,6 +2,7 @@ import { z } from "zod";
 import { claveDe, type Plataforma } from "@/domain/enlace";
 import type { TenantContext } from "@/domain/tenant";
 import { scoped } from "@/lib/supabase/scoped";
+import { abortarSiTruncado } from "@/lib/supabase/tope";
 
 // IO del guion limpio (ADR-074, migración `032`).
 //
@@ -45,6 +46,7 @@ const ARBITER = "instance_id,plataforma,external_id";
 export async function leerLimpios(ctx: TenantContext): Promise<Map<string, GuionLimpio>> {
   const { data, error } = await (await scoped(ctx)).select("app.guiones_limpios", COLUMNAS);
   if (error) throw new Error(`Supabase respondió con error leyendo los limpios: ${error.message}`);
+  abortarSiTruncado((data ?? []).length, "los guiones limpios (app.guiones_limpios)");
 
   const mapa = new Map<string, GuionLimpio>();
   for (const f of z.array(fila).parse(data ?? [])) {

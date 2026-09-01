@@ -3,6 +3,7 @@ import { claveDe, type EnlaceVideo, type Plataforma } from "@/domain/enlace";
 import type { MarcaGrabado } from "@/domain/grabados";
 import type { TenantContext } from "@/domain/tenant";
 import { scoped } from "@/lib/supabase/scoped";
+import { abortarSiTruncado } from "@/lib/supabase/tope";
 
 // IO de la marca "ya se grabó" (ADR-070, migración `029`).
 //
@@ -49,6 +50,7 @@ export async function leerMarcas(ctx: TenantContext): Promise<Map<string, MarcaG
   const { data, error } = await (await scoped(ctx)).select("app.grabados", COLUMNAS);
   if (error)
     throw new Error(`Supabase respondió con error leyendo las marcas de grabado: ${error.message}`);
+  abortarSiTruncado((data ?? []).length, "las marcas de grabado (app.grabados)");
 
   const marcas = new Map<string, MarcaGrabado>();
   for (const f of z.array(filaGrabado).parse(data ?? [])) {

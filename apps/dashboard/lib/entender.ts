@@ -66,7 +66,10 @@ const filaDescubrimiento = z.object({
   semillas: z.number().nullable(),
   sugeridos_unicos: z.number().nullable(),
   propuestos: z.number().nullable(),
-  promovidos: z.number().nullable(),
+  // `promovidos` NO se lee: la vista lo suma de `metricas->>'promovidos'`, que el workflow
+  // dejó de emitir porque medía un nodo inexistente desde ADR-020 (ver domain/corrida.ts).
+  // La columna sigue en la vista; el día que se quiera el número de verdad sale de
+  // `app.eventos` (tipo `sugeridos.aprobar`), que sí registra quién aprobó y cuándo.
 });
 export type FilaDescubrimiento = z.infer<typeof filaDescubrimiento>;
 

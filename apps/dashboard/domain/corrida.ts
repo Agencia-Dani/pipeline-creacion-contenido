@@ -420,19 +420,18 @@ export function pasosDe(workflow: Workflow, corrida: Corrida): Paso[] {
   }
 
   if (workflow === "descubrimiento") {
-    const promovidos = num(m, "promovidos");
+    // 🩸 Acá vivía un paso "Se sembraron solas" que pintaba `aviso` cuando `promovidos` era 0.
+    // Estaba MAL de raíz: la promoción automática salió del workflow con ADR-020 y el nodo que la
+    // medía no existe desde entonces, así que `promovidos` valía 0 en TODAS las corridas y el paso
+    // era una alarma permanente sobre una función que nadie removió por error. Aprobar una
+    // propuesta es un acto humano en `curar/sugeridos`, no un paso de la máquina, y por eso no va
+    // en el recorrido de la corrida. Las corridas viejas siguen teniendo `promovidos: 0` guardado
+    // en `metricas`: se ignora a propósito, no se lee más.
     return [
       paso("Partió de las cuentas que ya seguís", num(m, "semillas"), "cuentas"),
       paso("Encontró parecidas", num(m, "sugeridos_unicos"), "cuentas"),
       paso("Revisó a fondo", num(m, "detalle"), "cuentas"),
       paso("Te propuso", num(m, "propuestos"), "propuestas"),
-      paso(
-        "Se sembraron solas",
-        promovidos,
-        "cuentas",
-        null,
-        promovidos === 0 ? "aviso" : "normal",
-      ),
     ].filter((p): p is Paso => p !== null);
   }
 
@@ -669,11 +668,7 @@ export function veredicto(workflow: Workflow, corrida: Corrida): string[] {
 
   if (workflow === "descubrimiento") {
     const propuestos = num(corrida.metricas, "propuestos") ?? 0;
-    const promovidos = num(corrida.metricas, "promovidos") ?? 0;
     frases.push(`Te dejó ${propuestos} cuenta${propuestos === 1 ? "" : "s"} para aprobar.`);
-    if (promovidos === 0 && propuestos > 0) {
-      frases.push("Ninguna se sembró sola: todas esperan que alguien las mire.");
-    }
   }
 
   if (workflow === "archivado") {

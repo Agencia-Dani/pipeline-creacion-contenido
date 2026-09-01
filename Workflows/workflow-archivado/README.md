@@ -77,7 +77,7 @@ Cerrar run en el registro ─┬─► Barrer candidatos sin calificar   (higien
   `$('Disparo por instancia (webhook)').first().json.body.instancia`
   ([ADR-048](../../docs/adr/ADR-048-run-plan-v2-motor-por-instancia.md)). En corrida manual queda
   vacía — el `Ejecutar manual` sirve para probar el cableado, no para archivar de verdad.
-- **Lee** `app.candidatos` por PostgREST: `estado=neq.nuevo`, scoped por `instance_id`, `limit=5000`.
+- **Lee** `app.candidatos` por PostgREST: `estado=neq.nuevo`, scoped por `instance_id`, **paginado de a 1.000** (el tope real de PostgREST, medido).
   Los estados vivos son tres (`nuevo` · `aprobado` · `descartado`): **`publicado` ya no existe**, y
   `Armar filas archivado` colapsa a `descartado` todo lo que no sea literalmente `aprobado`.
 - **Sin split: `outputs` y el borrado toman TODOS los calificados.** Los `descartado` se registran
@@ -220,10 +220,17 @@ intentos fallidos el 03/08).
 
 ## Limitaciones conocidas (MVP)
 
-- **Techo de 5.000 por corrida**: `Leer Candidatos calificados` va con `limit=5000` y sin paginar.
-  Con el cron semanal sobra de lejos (una corrida del motor entrega ≈100), pero el techo es mudo: si
-  alguna vez se pasa, archiva 5.000 y el resto espera al domingo siguiente sin avisar. *(El límite de
-  100 de la era Airtable se fue con ella.)*
+- ~~**Techo de 5.000 por corrida**~~ ✅ **CERRADO el 2026-08-31.** `Leer Candidatos calificados`
+  ahora **pagina** de a 1.000, con el mismo patrón que `Leer procesados` y `Leer feed vivo` del motor
+  ([ADR-029 §Enmienda 2](../../docs/adr/ADR-029-dedup-blindado-fail-closed-y-feed.md)).
+  🩸 **El techo que este renglón declaraba nunca fue 5.000: era 1.000.** `limit=5000` no sube nada
+  porque PostgREST corta antes — medido contra prod ese día sobre una tabla de 1.936 filas,
+  `limit=1500`, `limit=5000`, `limit=50000` y *sin* `limit` devuelven **las mismas 1.000**. O sea que
+  la limitación estaba documentada **5× más lejos de lo que estaba**, y era muda: archivaba 1.000 y
+  el resto esperaba al domingo siguiente sin avisar.
+  📌 Y el error no era de este doc solo: `curar/feed/actions.ts` y `handoff.md` afirmaban los dos que
+  *"no hay `db-max-rows` puesto, se verificó pidiendo sin limit"*. Una medición del 03/08 copiada a
+  tres lugares, que se desmintió con un `curl`. *Un techo medido se re-mide, igual que un canario.*
 - **El motor deja una fila `outputs` "draft"** por candidato producido (sin `calificado_en`); este
   workflow crea la fila **archivada** (con `calificado_en`). Las vistas del histórico filtran por
   `calificado_en is not null`, así que solo aparece la archivada. Las draft quedan como rastro de

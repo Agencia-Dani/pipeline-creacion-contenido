@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { abortarSiTruncado } from "@/lib/supabase/tope";
 import { claveDe, type Plataforma } from "@/domain/enlace";
 import type { TenantContext } from "@/domain/tenant";
 import type { ParteVideo } from "@/domain/video";
@@ -40,6 +41,7 @@ const ARBITER = "instance_id,plataforma,external_id";
 export async function leerMeta(ctx: TenantContext): Promise<ParteVideo[]> {
   const { data, error } = await (await scoped(ctx)).select("app.videos_meta", COLUMNAS);
   if (error) throw new Error(`Supabase respondió con error leyendo la metadata: ${error.message}`);
+  abortarSiTruncado((data ?? []).length, "la metadata de videos (app.videos_meta)");
 
   return z.array(filaMeta).parse(data ?? []).map((f) => ({
     plataforma: f.plataforma as Plataforma,

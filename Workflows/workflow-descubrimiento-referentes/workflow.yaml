@@ -74,7 +74,7 @@ stages:                           # las 8 etapas canónicas; acá la "pieza" es 
   enriquecer: n/a
   generar: n/a
   calidad: n/a
-  entregar: "POST a la tabla 'Referentes propuestos' (estado=propuesto) + rama de promoción: aprobado → crea Referente activo y marca promovido."
+  entregar: "POST a la tabla 'Referentes propuestos' (estado=propuesto). La promoción a Referente NO es de este workflow: la hace una persona en curar/sugeridos del cockpit (salió con ADR-020)."
   notificar: n/a
 
 outputs:
@@ -86,7 +86,7 @@ runbook:
   setup: "Importar workflow.json en n8n → completar nodo Config (base_id, supabase_url, instance_id) y <ANTHROPIC_API_KEY> en AMBOS code de vetting ('Vetting relevancia (Haiku)' y 'Vetting TikTok (Haiku)') → mapear credenciales (Airtable PAT, Supabase Registro, apifyApi — la misma cred apifyApi sirve para el actor TikTok dataovercoffee). Requiere la tabla 'Referentes propuestos' + 2 filas de Ajustes en la base (contrato airtable-cockpit.md)."
   start: "Activar el workflow en n8n (cron lunes 9am, validar timezone America/Bogota)."
   stop: "Desactivar el workflow en n8n."
-  test: "Execute Workflow manual → verificar: run 'descubrimiento' cerrado ok en Supabase con metricas {semillas, sugeridos_unicos, detalle, vetteados, propuestos, promovidos}; filas nuevas estado=propuesto en 'Referentes propuestos' sin repetir handles de Referentes/Propuestos; marcar una propuesta como aprobado y re-ejecutar → aparece en Referentes (activo) y la fila queda promovido."
+  test: "Execute Workflow manual → verificar: run 'descubrimiento' cerrado ok en Supabase con metricas {semillas, sugeridos_unicos, detalle, vetteados, propuestos}; filas nuevas estado=propuesto en 'Referentes propuestos' sin repetir handles de Referentes/Propuestos. Aprobar una propuesta se verifica en el cockpit (curar/sugeridos), no re-ejecutando el workflow."
   docs:
     - README.md
     - ../../docs/adr/ADR-020-motor-descubrimiento-referentes.md

@@ -148,9 +148,15 @@ export async function guardarNotasCandidato(
  * Lo que se borró con la paginación: el cursor keyset (`Cursor`/`despuesDe`/`cursorDe`), su
  * validación zod, `POR_PAGINA` y el `hayMas`. Nada de eso tenía otro consumidor.
  *
- * 📏 El techo, medido contra prod y no supuesto: la respuesta entera son **175 filas = 103,7 KB**
- * (06/08), y PostgREST las devuelve todas — no hay `db-max-rows` puesto, se verificó pidiéndolas
- * sin `limit`. Con un archivado que barre cada domingo el estado estacionario es una semana de
+ * 📏 El techo: la respuesta entera son **175 filas = 103,7 KB** (06/08).
+ * 🩸 **Este párrafo decía «no hay `db-max-rows` puesto, se verificó pidiéndolas sin `limit`», y es
+ * FALSO.** Medido contra prod el 2026-08-31 sobre una tabla de 1.936 filas: `limit=1500`,
+ * `limit=5000`, `limit=50000` y *sin* `limit` devuelven **las mismas 1.000**. El tope existe y es
+ * 1.000. La verificación del 06/08 se hizo contra un conjunto de 175 filas, que está por debajo del
+ * tope y por eso no lo podía detectar: *no probaba que no hubiera techo, probaba que no lo tocaba.*
+ * Hoy el feed sigue muy por debajo (~408 candidatos vivos) así que el número está bien; lo que
+ * estaba mal era el motivo, y el motivo es lo que sostiene la decisión de no paginar. Con un
+ * archivado que barre cada domingo el estado estacionario es una semana de
  * supply (~145–175). El corte que hace que esto sea barato ya estaba hecho y es el que importa:
  * `CandidatoFeed` no lleva `script` ni las dos razones, que eran **240 KB de los 337**. Si algún
  * día el barrido se apaga o el supply se multiplica, el número a mirar es ese, no el de filas.
