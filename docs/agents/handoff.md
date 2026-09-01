@@ -41,6 +41,35 @@
 > 🧹 **Sobran 3 huérfanas más, inofensivas y sin apuro:** `GOOGLE_SHEET_ID` y `GOOGLE_SHEET_PESTANA`
 > (Google murió con ADR-057 el 05/08) y `DESCUBRIMIENTO_WEBHOOK_PATH`. No las lee nadie.
 >
+> ### 🔥 LA CORRIDA DE FUEGO — 2026-09-01, y la rama vacía corrió por primera vez
+>
+> Dos corridas baratas (topes a 10 y 25 desde `/curar/ajustes`, restaurados a 150/350 al terminar)
+> para probar los dos caminos del arreglo. **Costaron US$ 0,57 las dos**, contra 6,54 de una normal.
+>
+> | | Ejecución 157 · 10:37 | Ejecución 158 · 10:51 |
+> |---|---|---|
+> | Qué probó | el camino **normal** | la **rama vacía** (el arreglo del bug #1) |
+> | `Heat-score v1` | 3 items | **1 item centinela** (0 videos nuevos) |
+> | `IF — hay videos nuevos` | true=3 · false=0 | true=0 · **false=1** |
+> | `Transcribir` | corrió con 3 | **no ejecutó** |
+> | `Cerrar run (sin novedades)` | no ejecutó ✅ | **ejecutó** ✅ |
+> | Cierre | `ok`, 5,5 min, 1 candidato | **`ok`**, 4,7 min, `sin_novedades: true` |
+> | Costo | 0,31 USD | **0,26 USD · CERO de Supadata** |
+>
+> 🔑 **El `[0]=1` de `Heat-score v1` en la 158 es la prueba de que `alwaysOutputData` era
+> imprescindible.** Sin él no hay item, sin item no corre el `IF`, y sin `IF` la corrida vuelve a
+> quedar `en_curso` hasta que el barredor la marque `fallo` tres horas después — exactamente lo que
+> le pasó a la corrida `f0ad3c99` del 31/08, que estuvo **191,9 minutos** colgada.
+>
+> El aviso que dejó escrito: *"sin novedades: se miraron 164 videos y ninguno era nuevo. No se
+> transcribió ni se pagó nada."* Y `registro_dedup: "no_corrio"`, que es correcto: no había nada
+> nuevo que anotar.
+>
+> ⚠️ **`rechazos_supadata` se emite por primera vez y da 0 en las dos — y eso NO dice que haya aire.**
+> Fueron 2 llamadas y 0 llamadas: ningún techo se pone a prueba con eso. El handoff pedía leer esta
+> métrica antes de subir volumen; lo que se puede afirmar hoy es que **ya existe**, no que sobre
+> margen. Medirla de verdad es parte del audit de costo anotado abajo.
+>
 > ### Lo que sí quedó hecho (con su medición, no con su intención)
 >
 > - 🔴 **Una corrida que no encontraba nada se registraba como `fallo`.** `Heat-score v1` devolvía 0
