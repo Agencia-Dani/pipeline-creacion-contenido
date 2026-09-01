@@ -1,7 +1,7 @@
 # ADR-086 — La identidad de un video no es la de su post
 
 - **Fecha:** 2026-09-01
-- **Estado:** aceptada (rung 1 en el repo; **migración `036` aplicada y verificada el 01/09**, falta que el motor escriba las columnas)
+- **Estado:** aceptada · rung 1 en producción · **`036` aplicada y el motor ya la escribe** (01/09) · **falta la medición**, que la hace la primera corrida de redes
 - **Enmienda a:** [ADR-029](ADR-029-dedup-por-processed-items.md) (el dedup del motor)
 
 ## Contexto
@@ -121,9 +121,29 @@ parámetro: dos fuentes, una sola implementación de la regla — el error que A
 sin-backfill es un hecho medido · el índice parcial existe · PostgREST devuelve 200 y no
 `PGRST204`). Ninguna de las dos se usa todavía: **existen para poder medir**.
 
-🔴 **Y todavía no miden nada, porque nadie las escribe.** `Normalizar IG` ya tiene la duración
-(`duracion_video`) y la sigue tirando; `Preparar candidatos` no manda ninguna de las dos. Ese es el
-siguiente paso, y sin él las columnas se quedan en null para siempre. Con una corrida real
-guardándolas se puede contestar lo que hoy no se puede — si la duración colisiona entre videos distintos del mismo creador, y cuántos pares caza la
+✅ **El motor ya las escribe** (01/09): `Armar candidato` las calcula y `Preparar candidatos` las
+manda, empujados al live con `n8n:push` (`n8n:diff` verde en los 5 después). Dos hallazgos del
+camino, los dos ordenadores:
+
+- 🔑 **La huella sale de `d.transcripcion`, el transcript ORIGINAL de Supadata, y no hizo falta
+  tocar `Transcribir` ni `Traducir`.** `Traducir` hace `Object.assign({}, d, {script})`, así que el
+  original **sobrevive al lado del traducido**. Es la señal que esta ADR quería y creía costosa: el
+  ASR sobre el mismo audio es determinista, la traducción de Haiku no.
+- 🔑 **`Armar candidato` es el único nodo de la cadena que reconstruye el objeto desde cero** (los
+  demás hacen `Object.assign`). O sea que los dos datos existían y se morían siempre en la misma
+  línea. Por eso el cambio es de dos nodos y no de seis.
+
+Y se guarda **prefijo normalizado de 200 chars, no un hash**: la columna existe para MEDIR, y un
+hash solo contesta sí/no. Con el texto se puede mirar POR QUÉ dos guiones no matchearon y elegir el
+umbral con evidencia; cambiarlo por un hash después, con el umbral decidido, es una línea.
+
+🩸 **Y un bug que cazó el test y no producción:** `normalize('NFD')` separa la tilde de la vocal, así
+que mandar el resto a espacio partía las palabras — *"como estas"* salía *"co mo esta s"* y dos
+guiones del mismo audio no matcheaban **nunca**. Los diacríticos se borran a `''` **antes** del
+filtro. Es el modo de falla más caro que tiene esto: una llave que no matchea nunca se ve idéntica a
+"no había repetidos".
+
+🔴 **Lo que falta ahora es LA MEDICIÓN, y la hace la primera corrida real de redes.** Con una corrida
+guardando las dos columnas se puede contestar lo que hoy no se puede — si la duración colisiona entre videos distintos del mismo creador, y cuántos pares caza la
 huella del guion original — y **recién ahí** se decide si alguna aguanta un bloqueo pre-pago en
 `Heat-score v1`. Medir el martes no autoriza a bloquear el jueves.

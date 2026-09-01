@@ -93,12 +93,56 @@
 > que su tasa de colisión —el único motivo por el que no es ya la llave del bloqueo pre-pago— **no
 > se puede cuantificar todavía**.
 >
-> 🔴 **LO QUE FALTA AHORA es que el motor las ESCRIBA.** La migración abrió el lugar; `Armar
-> candidato` / `Preparar candidatos` todavía no mandan ni `duracion_seg` (que `Normalizar IG` ya
-> tiene como `duracion_video` y sigue tirando) ni `huella_guion`. Sin eso las columnas se quedan en
-> null para siempre y la medición no llega nunca. Después de una corrida real con las dos adentro
-> se mide la colisión de la duración y la cobertura de la huella, y **recién ahí** se decide si
-> alguna aguanta un filtro duro en `Heat-score v1`.
+> ✅ **Y el motor ya las escribe** (01/09). `Armar candidato` las calcula, `Preparar candidatos` las
+> manda, empujados al live con `n8n:push --apply` sobre esos 2 nodos; **`n8n:diff` quedó verde en
+> los 5**, `auditar-workflows.mjs` sin hallazgos y `test-nodos.mjs` en **172 checks**, con 8 nuevos
+> para esto. Snapshot de rollback en `.n8n-snapshots/motor-2026-09-01T16-59-04-254Z.json`.
+>
+> Dos hallazgos del camino, los dos ordenadores:
+>
+> - 🔑 **La huella sale de `d.transcripcion`, el transcript ORIGINAL de Supadata, y NO hizo falta
+>   tocar `Transcribir` ni `Traducir`.** `Traducir` hace `Object.assign({}, d, {script})`, o sea que
+>   el original **sobrevive al lado del traducido**. Era la señal que la ADR quería y creía cara: el
+>   ASR sobre el mismo audio es determinista, la traducción de Haiku no (por eso el hash del
+>   traducido caza 1 de 17).
+> - 🔑 **`Armar candidato` es el ÚNICO nodo de la cadena que reconstruye el objeto desde cero**; los
+>   demás hacen `Object.assign`. Los dos datos existían desde el normalizador y se morían siempre en
+>   la misma línea. Por eso el cambio es de 2 nodos y no de 6.
+>
+> 🩸 **Un bug que cazó el test y no producción:** `normalize('NFD')` separa la tilde de la vocal, así
+> que mandar el resto a espacio partía las palabras — *"como estas"* salía *"co mo esta s"* y dos
+> guiones del mismo audio no matcheaban **nunca**. Es el peor modo de falla de esto: una llave que no
+> matchea nunca **se ve idéntica a "no había repetidos"**.
+>
+> ### 🔴 PENDIENTE — la medición, y la hace la primera corrida de redes
+>
+> **No se ejecutó una corrida a propósito** (decisión de Mani, 01/09): se mide cuando el equipo de
+> redes corra el motor normalmente, así el dato es de uso real y no de una corrida de prueba. Al
+> 01/09 las dos columnas están en **0 de 422**, que es lo esperado.
+>
+> Cuando haya corrido, correr **estas tres** y anotar el resultado acá:
+>
+> ```sql
+> -- 1) ¿el motor escribió? (si esto da 0, algo se rompió en el push, no en la medición)
+> select count(*) filas, count(huella_guion) con_huella, count(duracion_seg) con_duracion
+> from app.candidatos where creado_en > '2026-09-01';
+>
+> -- 2) ¿la DURACIÓN colisiona entre videos DISTINTOS del mismo creador? (lo único que decide si
+> --    sirve como filtro pre-pago; si colisiona, se descarta y no se toca `Heat-score v1`)
+> select referente, duracion_seg, count(*) n, count(distinct huella_guion) guiones_distintos
+> from app.candidatos where duracion_seg is not null
+> group by 1,2 having count(*) > 1 order by n desc;
+>
+> -- 3) ¿la HUELLA caza los pares que el Jaccard encontró? (hoy son 17; el número se re-mide, no se cita)
+> select referente, huella_guion, count(*) n, array_agg(external_id) posts
+> from app.candidatos where huella_guion is not null
+> group by 1,2 having count(*) > 1;
+> ```
+>
+> **Recién con eso** se decide (a) si el aviso del Feed cambia de fuente —caption → huella, que lo
+> lleva de ~7/17 a ~17/17 y es un cambio chico en `lib/candidatos.ts` porque el dominio recibe la
+> huella como dato— y (b) si alguna llave aguanta un filtro duro en `Heat-score v1`, que es lo único
+> que ahorraría la transcripción y lo único que sacaría los 18 pares de `descartes`.
 >
 > 🐤 **Y la pregunta que se re-mide, no se cita:** *¿cuántos pares nuevos aparecen por corrida?* Es
 > el mismo Jaccard sobre `app.candidatos`, corrido después de la próxima corrida real. Hoy son 17.

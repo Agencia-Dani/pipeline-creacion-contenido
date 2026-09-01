@@ -181,7 +181,10 @@ en §Agent skills; acá solo se ubican.
   grabado**). El Feed ya **avisa** con lo que tiene (caption + referente, ~7 de cada 17); lo que la
   `036` habilita es la pregunta que hoy no se puede contestar: *¿la duración colisiona entre videos
   distintos del mismo creador?* — **no se puede cuantificar porque el dato hoy se tira**, y por eso
-  se guarda antes de decidir. ⚠️ *Guardarla no autoriza a bloquear con ella.*
+  se guarda antes de decidir. ✅ **El motor ya las escribe** desde el 01/09 (`Armar candidato` +
+  `Preparar candidatos`, empujados al live). ⚠️ *Escribir no es leer, y guardar no autoriza a
+  bloquear: **falta la medición**, que la hace la primera corrida de redes.* Las tres consultas que
+  hay que correr después de esa corrida están en el handoff.
   ✅ **La [`035`](core/schema/035_search_path_triggers.sql) (ADR-085) está APLICADA** (Mani, 01/09),
   verificada por efecto: `proconfig` fijo en las dos y **`get_advisors` bajó de 9 avisos a 7**. Le fija `search_path` a los dos triggers del esquema, que hoy resuelven `clients` y
   `runs` contra el camino de quien los dispare. Son los **2 avisos reales** de los 9 de

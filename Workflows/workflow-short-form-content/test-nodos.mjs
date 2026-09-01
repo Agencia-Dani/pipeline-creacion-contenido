@@ -1159,6 +1159,53 @@ seccion('Preparar candidatos — la corrida de origen viaja en cada fila (ADR-08
   check('un id vacío viaja como null, no como "" (la FK lo rechazaría)', vacio[0].run_id === null, JSON.stringify(vacio[0].run_id));
 }
 
+seccion('Armar candidato — la huella de contenido y la duración (ADR-086)');
+{
+  // 🩸 Dani, 2026-09-01: *"me están apareciendo en el feed videos que ya había calificado y que
+  // grabamos ayer"*. Tenía razón: el dedup compara el pk del POST, y una re-subida del mismo reel
+  // trae un pk nuevo. Estos dos campos son lo único con lo que se puede reconocer el contenido, y
+  // hasta hoy `Armar candidato` los tiraba — es el único nodo de la cadena que reconstruye el
+  // objeto desde cero.
+  const { out } = runCorte(
+    [vid('h1', 'P1', 0.9, { transcripcion: 'Hola, ¿cómo estás?  Muy bien.', duracion_video: 47.8 })],
+    { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } },
+  );
+  check('la duración de Apify por fin llega a la fila', out[0].duracion_seg === 47.8, String(out[0].duracion_seg));
+  check('la huella normaliza (minúsculas, sin acentos ni puntuación, espacios colapsados)', out[0].huella_guion === 'hola como estas muy bien', JSON.stringify(out[0].huella_guion));
+
+  // 🔑 EL check que decide si esto sirve: la huella sale del transcript ORIGINAL de Supadata, no
+  // del `script` que ya pasó por Haiku. Haiku traduce el MISMO audio distinto cada vez ("cuando
+  // llega el estrés" / "cuando golpea el estrés"), y por eso el hash del traducido caza 1 de 17
+  // pares. Si alguien cambia `d.transcripcion` por `d.script`, esto se rompe acá y no en producción
+  // tres semanas después.
+  const a = runCorte([vid('h2', 'P1', 0.9, { transcripcion: 'same audio here', script: 'cuando llega el estres' })], { top_n: 100, projects: { P1: { n: 5 } } });
+  const b = runCorte([vid('h3', 'P1', 0.9, { transcripcion: 'same audio here', script: 'cuando golpea el estres' })], { top_n: 100, projects: { P1: { n: 5 } } });
+  check('dos traducciones distintas del mismo audio dan LA MISMA huella', a.out[0].huella_guion === b.out[0].huella_guion && a.out[0].huella_guion === 'same audio here', `${a.out[0].huella_guion} | ${b.out[0].huella_guion}`);
+}
+{
+  // Los dos son datos de MEDICIÓN, así que su ausencia viaja como null y no como '' ni 0: una
+  // huella '' haría match con cualquier otra huella vacía y el aviso marcaría videos al azar.
+  const { out } = runCorte([vid('h4', 'P1', 0.9)], { top_n: 100, projects: { P1: { n: 5 } } });
+  check('sin transcripción la huella va null, no "" (una huella vacía matchea con cualquiera)', out[0].huella_guion === null, JSON.stringify(out[0].huella_guion));
+  check('sin duración va null, no 0 (0 sería una duración que colisiona con todo)', out[0].duracion_seg === null, JSON.stringify(out[0].duracion_seg));
+}
+{
+  const { out } = runCorte([vid('h5', 'P1', 0.9, { transcripcion: 'x'.repeat(500) })], { top_n: 100, projects: { P1: { n: 5 } } });
+  check('la huella se corta a 200: es una llave, no una copia del guion', out[0].huella_guion.length === 200, String(out[0].huella_guion.length));
+}
+
+seccion('Preparar candidatos — los dos datos de medición llegan a la fila (ADR-086)');
+{
+  const filas = runPrepCandidatos([cvid('m1', { duracion_seg: 47.8, huella_guion: 'hola como estas' })]);
+  check('la huella y la duración viajan a PostgREST', filas[0].huella_guion === 'hola como estas' && filas[0].duracion_seg === 47.8, JSON.stringify([filas[0].huella_guion, filas[0].duracion_seg]));
+}
+{
+  // Sin ellos la fila sale igual: son datos para medir, no pueden tumbar una entrega ya pagada
+  // (invariante #1 de PLAN §2.5). Misma forma que `run_id`.
+  const filas = runPrepCandidatos([cvid('m2')]);
+  check('sin ellos la fila sale igual, con null (no tumban la entrega)', filas.length === 1 && filas[0].huella_guion === null && filas[0].duracion_seg === null, JSON.stringify([filas[0].huella_guion, filas[0].duracion_seg]));
+}
+
 seccion('Preparar descartes — misma regla, misma instancia');
 {
   const items = [

@@ -4,7 +4,9 @@
 -- Ejecuta el rung 2 de [ADR-086](../../docs/adr/ADR-086-la-identidad-de-un-video-no-es-la-de-su-post.md).
 --
 -- ─────────────────────────────────────────────────────────────────────────────────────────────
--- 🔑 ESTAS DOS COLUMNAS NO LAS USA NADIE TODAVÍA. EXISTEN PARA PODER MEDIR.
+-- 🔑 ESTAS DOS COLUMNAS NO LAS LEE NADIE TODAVÍA. EXISTEN PARA PODER MEDIR.
+-- (El motor SÍ las escribe desde el 01/09: `Armar candidato` + `Preparar candidatos`, empujados al
+--  live. Escribir no es leer — nada decide nada con ellas hasta que estén medidas.)
 --
 -- El problema, medido contra prod el 2026-09-01 sobre 422 candidatos: el dedup del motor recuerda
 -- el **id del post**, no el video, así que una re-subida del mismo reel entra como nueva. Son **17
@@ -14,13 +16,18 @@
 -- La pregunta que esta migración habilita, y que HOY NO SE PUEDE CONTESTAR, es cuál llave aguanta
 -- un bloqueo pre-pago:
 --
---   · `duracion_seg` llega GRATIS desde `Normalizar IG` (`item.videoDuration`) y hoy se TIRA: no la
---     guarda ninguna tabla. Es la única señal disponible ANTES de pagar Supadata. Su riesgo es la
+--   · `duracion_seg` llega GRATIS desde `Normalizar IG` (`item.videoDuration`) y hasta el 01/09 se
+--     TIRABA en `Armar candidato`, el único nodo de la cadena que reconstruye el objeto desde cero.
+--     Es la única señal disponible ANTES de pagar Supadata. Su riesgo es la
 --     colisión — con ~100 posts por perfil, dos videos distintos del mismo creador pueden durar lo
 --     mismo — y ese riesgo **no se puede cuantificar sin el dato**. Por eso se guarda antes de
 --     decidir nada, y no al revés.
 --
---   · `huella_guion` es el hash del guion **de Supadata, el original**, no el traducido. La
+--   · `huella_guion` es el **prefijo normalizado (200 chars)** del guion **de Supadata, el
+--     original**, no el traducido. **Texto y no un hash a propósito**: esta columna existe para
+--     MEDIR y un hash solo contesta sí/no, mientras que con el texto se puede mirar POR QUÉ dos
+--     guiones no matchearon y elegir el umbral con evidencia. Cambiarlo por un hash después, con el
+--     umbral ya decidido, es una línea. La
 --     traducción de Haiku NO sirve como llave: el mismo audio sale con palabras distintas cada vez
 --     (medido — el hash exacto del guion traducido caza 1 de 17 pares), mientras que el ASR sobre
 --     el mismo archivo es determinista. Es post-pago, así que no ahorra la transcripción: ahorra
@@ -35,6 +42,12 @@
 -- ─────────────────────────────────────────────────────────────────────────────────────────────
 --
 -- Idempotente: `add column if not exists`. No toca datos, no hay backfill.
+--
+-- 📝 **Editada DESPUÉS de aplicarse (01/09), y solo el `comment on column` de `huella_guion`**: decía
+-- *"hash"* y la implementación guarda un prefijo normalizado, por la razón de arriba. El archivo es
+-- la fuente de verdad del modelo, así que se corrige acá y no con un `comment on` suelto fuera de
+-- migración. **Re-correr el archivo entero es seguro y opcional** (todo es `if not exists`); lo único
+-- que cambia es ese comentario dentro de la base.
 --
 -- 🔴 SIN BACKFILL, a propósito: las dos columnas se llenan cuando el motor las escriba. Las filas
 -- viejas quedan en null y el barrido de 20 días las cura solo, igual que hizo la `034`.
@@ -57,8 +70,10 @@ alter table app.candidatos
   add column if not exists duracion_seg numeric;
 
 comment on column app.candidatos.huella_guion is
-  'Hash del guion ORIGINAL de Supadata (no el traducido por Haiku, que no es determinista). '
-  'Sirve para reconocer una re-subida del mismo reel, que trae otro external_id. ADR-086.';
+  'Prefijo normalizado (200 chars) del guion ORIGINAL de Supadata, no del traducido por Haiku, que '
+  'no es determinista. Sirve para reconocer una re-subida del mismo reel, que trae otro '
+  'external_id. Es texto y no un hash a proposito: esta columna existe para MEDIR, y un hash solo '
+  'contesta si/no. ADR-086.';
 
 comment on column app.candidatos.duracion_seg is
   'Duración del video en segundos, tal como la da Apify. Única señal de contenido disponible ANTES '
