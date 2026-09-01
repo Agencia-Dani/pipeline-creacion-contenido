@@ -1,7 +1,7 @@
 # ADR-077 — El `.env` es la segunda fuente de los placeholders (y el idioma desconocido se traduce)
 
 - **Estado:** aceptada · **construida** — 2026-08-26 (con Mani). Extiende
-  [ADR-053](./ADR-053-cambiar-un-workflow-es-un-push-no-un-re-import.md) (el push por API) y
+  [ADR-053](./ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md) (el push por API) y
   arregla un fallo mudo del nodo `Transcribir` que venía de
   [ADR-031](./ADR-031-transcriptor-a-pedido.md). **Toca `core/`:** `core/scripts/n8n-sync.mjs`.
 

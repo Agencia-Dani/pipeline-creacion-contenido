@@ -18,8 +18,8 @@ Lo que existe hoy en el repo:
 | Pieza | Qué es | Estado |
 |---|---|---|
 | `README.md` | Visión del sistema central | ✅ Escrito |
-| `Workflows/workflow-short-form-content/` | **Máquina**: motor de reels n8n (30 nodos, JSON importable; ADR-009 + ADR-010 + ADR-011 + ADR-019). Cron (dispatcher) + webhook on-demand → lee la config por la fachada del cockpit (`run-plan`, ADR-028) → Apify (solo por referentes: IG + TikTok, 2 llamadas) → pre-trim Haiku + heat-score métrico + dedup → Supadata transcribe + Claude Haiku traduce literal → Gate Haiku (CALIDAD) → candidatos a `app.candidatos` por PostgREST (ADR-035) + registro Supabase. Sin Google en el motor. | ✅ Corrió manual (V1) · ❌ **cron sin activar** · placeholders `<<...>>` por cliente |
-| `Workflows/workflow-descubrimiento-referentes/` | **Máquina**: descubrimiento de referentes n8n (27 nodos; ADR-020). Cron semanal → semillas = referentes que mejor convierten (`v_senal_seleccion`) → IG: sugeridos del propio IG (Apify `relatedProfiles`); TikTok: lookalikes (Apify dataovercoffee, rama paralela — ADR-020 §8) → dedup → vetting Haiku contra criterios → propuestas a la tabla `Referentes propuestos` + promoción de aprobados a `Referentes`. No toca el motor de reels. | ✅ Construido · ❌ **sin importar en n8n** · placeholders `<<...>>` por cliente |
+| `Workflows/workflow-short-form-content/` | **Máquina**: motor de reels n8n (36 nodos, JSON importable; ADR-009 + ADR-010 + ADR-011 + ADR-019). Cron (dispatcher) + webhook on-demand → lee la config por la fachada del cockpit (`run-plan`, ADR-028) → Apify (solo por referentes: IG + TikTok, 2 llamadas) → pre-trim Haiku + heat-score métrico + dedup → Supadata transcribe + Claude Haiku traduce literal → Gate Haiku (CALIDAD) → candidatos a `app.candidatos` por PostgREST (ADR-035) + registro Supabase. Sin Google en el motor. | ✅ **Activo y corriendo por cron** (dispatcher). *Este renglón decía «❌ cron sin activar» y era falso hacía ~2 meses: hay 43 corridas registradas.* |
+| `Workflows/workflow-descubrimiento-referentes/` | **Máquina**: descubrimiento de referentes n8n (22 nodos; ADR-020). Cron semanal → semillas = referentes que mejor convierten (`v_senal_seleccion`) → IG: sugeridos del propio IG (Apify `relatedProfiles`); TikTok: lookalikes (Apify dataovercoffee, rama paralela — ADR-020 §8) → dedup → vetting Haiku contra criterios → propuestas a la tabla `Referentes propuestos`. *(La promoción a `Referentes` NO es del workflow: la hace una persona en `curar/sugeridos`.)* No toca el motor de reels. | ✅ **Importado y activo.** Corrió en prod el 24/08 (`ok`, 1 m 46 s). *Decía «❌ sin importar en n8n», falso desde julio.* Sin cron: lo dispara el botón del cockpit. |
 | `Workflows/workflow-substack/` | **Procedimiento**: kit de 16 plantillas + guía de 14 fases que configura un bot OpenClaw (Telegram) → research diario con scoring → Notion (2 DBs) → borradores → publicación manual a Substack | ✅ Probado en producción real (mar–abr 2026, *AI for Executives*) · ❌ **hoy inactivo** — se re-monta en F3 |
 
 > **Estado operativo (2026-06-11):** ninguno de los dos workflows está sirviendo hoy. La puesta
@@ -109,11 +109,11 @@ pipeline-creacion-contenido/
 │   └── one-pager-reels-mvp.md ← la visión del MVP en una página (no técnica)
 ├── core/                      ← EL NÚCLEO: solo cambia con ADR
 │   ├── contracts/             ← contrato del manifest · ingesta · run-plan · schemas de datos
-│   ├── schema/                ← SQL de Supabase, versionado (001–022)
+│   ├── schema/                ← SQL de Supabase, versionado (001–034)
 │   ├── scripts/               ← validate.mjs · n8n-sync.mjs · deploy.mjs (deprecado)
 │   ├── n8n/                   ← piezas n8n del núcleo (error workflow del registro)
 │   ├── sync/                  ← (se crea en F3) sync Notion → registro
-│   └── templates/             ← (se crea en F5) scaffolding de workflow/cliente nuevo
+│   └── templates/             ← scaffolding de workflow/cliente nuevo (YA EXISTE, se creó el 06/08)
 ├── clients/
 │   └── <cliente>/<wf>.yaml    ← config por cliente (sin secretos)
 └── Workflows/                 ← un subfolder autocontenido por workflow (+ workflow.yaml)

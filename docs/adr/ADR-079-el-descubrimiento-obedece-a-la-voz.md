@@ -2,8 +2,8 @@
 
 - **Estado:** aceptada — 2026-08-29 (pedido del onboarding a Dani del 28/08: *"cuando alguien
   presiona buscar referentes no hay manera de delimitar para quién quiero que traiga"*, Majo).
-  **Enmienda [ADR-020](./ADR-020-descubrimiento-de-referentes.md)** (el plan de descubrimiento gana
-  el gate por voz que nunca tuvo). **No toca** [ADR-028](./ADR-028-fachada-run-plan.md): el ámbito
+  **Enmienda [ADR-020](./ADR-020-motor-descubrimiento-referentes.md)** (el plan de descubrimiento gana
+  el gate por voz que nunca tuvo). **No toca** [ADR-028](./ADR-028-contrato-motor-run-plan.md): el ámbito
   del run-plan se queda en `completo` y el porqué está en la decisión #2.
 
 - **Contexto:** el reclamo se leía como *"falta un selector"*, y la auditoría del 29/08 encontró que

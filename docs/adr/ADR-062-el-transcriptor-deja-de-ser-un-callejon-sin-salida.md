@@ -1,6 +1,6 @@
 # ADR-062 — El transcriptor deja de ser un callejón sin salida
 
-- **Estado:** aceptada — 2026-08-07. **Enmienda [ADR-014](./ADR-014-outputs-es-el-historico-canonico.md)**
+- **Estado:** aceptada — 2026-08-07. **Enmienda [ADR-014](./ADR-014-outputs-historico-canonico-archivado.md)**
   (el archivado deja de ser el único escritor de `outputs`) y **[ADR-031](./ADR-031-transcriptor-a-pedido.md)**
   (la transcripción a pedido tiene un estado más y una salida). Toca `core/`: una migración nueva.
   Sale de un grill con Mani.

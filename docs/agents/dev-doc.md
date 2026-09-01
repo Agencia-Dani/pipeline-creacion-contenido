@@ -478,6 +478,17 @@ perfiles), TT 1 Apify (≤15 lookalikes, $0.20 c/u; $0 sin semillas TT), 1 Haiku
 
 ## 4. Archivado (`archivado`) — 17 nodos
 
+> 🛑 **AVISO DE VIGENCIA (2026-08-31): tres nodos de esta sección YA NO EXISTEN.**
+> `Preparar filas Sheet` (13), `Append al Sheet Histórico` (14) y `Reconvergir tras Sheet` (15) se
+> borraron a mano el **2026-08-05** con [ADR-057](../adr/ADR-057-el-sheet-historico-por-instancia-o-ninguno.md),
+> y con ellos se fue **la última dependencia de Google del pipeline**. El diagrama y la tabla de
+> abajo todavía los dibujan. Su reemplazo es el botón *Descargar* de `/curar/historicos`, que baja
+> `.xlsx` (no CSV: cambió con ADR-071).
+>
+> El conteo de nodos de este encabezado decía **20** y son **17** — la diferencia son exactamente
+> esos tres. *Este archivo se editó el 30/08, o sea que parecía mantenido mientras describía un
+> sistema muerto: es la clase de doc más peligrosa que hay.*
+
 > **Validado para producción (cierre 19).** Corrió end-to-end con calificados reales (run `687027e2`):
 > idempotencia, paginación, split de estados, barrido de zombies, cierre robusto y curación completa. El
 > cron sigue sin activar (D1 del ROADMAP). Fuente de verdad = `workflow.json`.
@@ -573,9 +584,9 @@ Referentes salud** escribe la salud por referente.
 | 10 | Armar filas archivado | code | Por cada decidido arma `{record_id, output, sheet}`. Normaliza `estado` (aprobado/descartado, default descartado), resuelve proyecto/voz por nombre, `calificado_en = fecha_calificacion`. **`output.external_id = r.id`** (el id del record de Airtable, ver §8). `metadata` lleva `calificacion` **+ `relevancia_score`/`relevancia_razon`** (ADR-021) **+ `notas_equipo`/`viral_por_tamano`** (D.3(b), 2026-07-16 — el porqué del equipo y la marca viral dejan de morir con el record; construyen el corpus para decidir si entran al destilado). Las lecturas vestigiales `tema`/`link_doc` (no existían en `Candidatos`, archivaban `''` desde siempre) **se podaron** (D.4). El Sheet gana las keys `RELEVANCIA SCORE`/`RELEVANCIA RAZON` (pueblan solo si el Sheet tiene esas columnas — autoMap ignora las que falten). |
 | 11 | Preparar outputs Supabase | code | Extrae `outputs[]` (TODOS los decididos) del nodo 10. |
 | 12 | Registrar outputs (Supabase) | http POST | `POST outputs?on_conflict=external_id`, `Prefer: resolution=ignore-duplicates,return=minimal` → **idempotente** (re-correr no duplica). Sale a **2 ramas**: Preparar filas Sheet + Reconvergir (input 1). continue-on-fail. |
-| 13 | Preparar filas Sheet | code | Extrae `sheet[]` del nodo 10 **filtrando a `aprobado`** (los descartados NO van al Sheet). |
-| 14 | Append al Sheet Histórico | googleSheets | `append`, `autoMapInputData` → las keys de la fila deben **coincidir exacto** con los encabezados del Sheet. Credencial **OAuth2** (única dependencia de Google del pipeline). **stop-on-fail** (a propósito). **retry 3× / 30s** (503 de Google). |
-| 15 | Reconvergir tras Sheet | merge | Une la rama Sheet (input 0) con la rama directa de Registrar outputs (input 1) → el borrado corre aun con 0 aprobados, pero espera al Append. |
+| ~~13~~ | 🪦 ~~Preparar filas Sheet~~ **(borrado el 2026-08-05, ADR-057)** | code | Extrae `sheet[]` del nodo 10 **filtrando a `aprobado`** (los descartados NO van al Sheet). |
+| ~~14~~ | 🪦 ~~Append al Sheet Histórico~~ **(borrado el 2026-08-05, ADR-057)** | googleSheets | `append`, `autoMapInputData` → las keys de la fila deben **coincidir exacto** con los encabezados del Sheet. Credencial **OAuth2** (única dependencia de Google del pipeline). **stop-on-fail** (a propósito). **retry 3× / 30s** (503 de Google). |
+| ~~15~~ | 🪦 ~~Reconvergir tras Sheet~~ **(borrado el 2026-08-05, ADR-057)** | merge | Une la rama Sheet (input 0) con la rama directa de Registrar outputs (input 1) → el borrado corre aun con 0 aprobados, pero espera al Append. |
 | 16 | Preparar borrado Airtable | code | Arma URLs `DELETE` en **batches de 10** (`records[]=…`) con TODOS los decididos. |
 | 17 | Borrar de Airtable | http DELETE | Borra los decididos de `Candidatos`. **retry 3× / 2s.** Sale a `Leer runs de la semana` (la cadena de métricas, ADR-021). |
 | 17b | Leer runs de la semana | http GET | Supabase `runs` del motor de los últimos 7 días (`params->>workflow=eq.motor` + `inicio=gte.<now-7d>`, timestamp URL-encodeado), `select=id,estado,inicio,fin,metricas`. **Fail-soft** (`alwaysOutputData` + continue). Lo leen 17d (métricas) y 22 (salud por referente). |
@@ -701,7 +712,7 @@ vistas de señal/histórico leen de acá.
 
 ## 7. El Sheet "Histórico" (sumidero exportable)
 
-Lo escribe **solo el archivado** (`Append al Sheet Histórico`, `autoMapInputData`). Columnas (las keys
+🪦 **Sección histórica: el Sheet murió el 2026-08-05 (ADR-057) y nada de esto corre.** Lo escribía **solo el archivado** (`Append al Sheet Histórico`, `autoMapInputData`). Columnas (las keys
 de `Preparar filas Sheet` deben matchear **exacto** los encabezados, mayúsculas incluidas):
 
 `FECHA CALIFICACION` · `PROYECTO` · `VOZ` · `TITULO` · `URL ORIGINAL` · `SCRIPT` · `IDIOMA` · `VIEWS` ·

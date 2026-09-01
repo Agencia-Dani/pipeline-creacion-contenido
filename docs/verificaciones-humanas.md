@@ -449,10 +449,20 @@ a Haiku, aunque peguen 300 links.
 que *"el cockpit de Retia lleva 11 días sin un solo evento humano"*, y **el botón nuevo movió el
 número solo**: Majo entró el 20/08 y cargó 288 links.
 
-🟢 **La forma de la adopción se midió de nuevo el 2026-08-29, y este párrafo estaba viejo.** Decía
-*"nadie volvió un segundo día"*. **Volvieron dos:** Majo Duarte **3 días** (20/08 · 21/08 · 26/08,
-123 eventos) y Manuel 30X **2** (07/08 · 20/08). Sobre los **374** eventos de la tabla, con la suma
-por persona dando 374 exacto.
+🟢 **La forma de la adopción NO se transcribe acá, y ésa es la corrección.** Este párrafo tuvo el
+número tres veces (*"nadie volvió"* → *"volvieron dos"* → y ya iba por cuatro el 31/08), y estaba
+copiado igual en `CLAUDE.md` y en `plan-modo-seleccion.md`: **tres copias que vencían juntas cada
+vez que alguien usaba el cockpit.** Se mide, no se cita:
+
+```sql
+select coalesce(u.nombre, e.usuario_id::text) as persona, count(*) as eventos,
+       count(distinct (e.creado_en at time zone 'America/Bogota')::date) as dias
+from app.eventos e left join app.usuarios u on u.id = e.usuario_id
+group by 1 order by dias desc, eventos desc;
+```
+
+Lo que sí es durable: **se cuentan DÍAS DISTINTOS por persona, no eventos**, y la suma por persona
+tiene que dar el total de la tabla — eso es lo que prueba que no quedó nadie afuera.
 
 🔴 **Lo que sigue siendo el problema es Jero: 81 eventos el 07/08 —el día más productivo de
 cualquiera— y no volvió nunca.** Juan José igual: 23 ese mismo día, nunca más. *La pregunta ya no es

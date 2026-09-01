@@ -63,7 +63,7 @@ Los tres argumentos, en orden de peso:
    paga de más es la transcripción, que es exactamente lo que se quiere pagar.
 2. **Llegan al feed por el camino de siempre** — asignar proyecto y voz, heat, transcribir, gate —
    sin una segunda implementación de nada. El scoring, el gate y el corte siguen viviendo donde
-   dice [ADR-028](./ADR-028-el-cockpit-es-la-fachada-del-plan-de-corrida.md).
+   dice [ADR-028](./ADR-028-contrato-motor-run-plan.md).
 3. **Es reversible en lo que importa.** La evidencia guarda los ids: re-insertarlos restaura la
    memoria del dedup.
 

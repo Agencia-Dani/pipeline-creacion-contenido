@@ -2,7 +2,7 @@
 
 - **Estado:** aceptada — 2026-08-07, **escrita después de ejecutar** (`c267980`), porque el bug ya
   estaba en producción y arreglarlo no podía esperar a un documento. Completa
-  [ADR-047](./ADR-047-dos-capas-de-aislamiento.md) (es su Capa 1, un escalón más arriba) y cierra
+  [ADR-047](./ADR-047-aislamiento-en-dos-capas.md) (es su Capa 1, un escalón más arriba) y cierra
   por construcción el modo de falla mudo que [ADR-051](./ADR-051-el-acceso-es-membresia-explicita.md)
   aceptó "una vuelta más". **No toca `core/`.**
 

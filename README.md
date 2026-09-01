@@ -36,13 +36,28 @@ sistema crece sumando piezas iguales por fuera, sin tocar el centro.
 ## Cómo está organizado
 
 ```
-content-pipeline/
-├── README.md          ← este archivo (la orientación)
-└── Workflows/         ← un subfolder por flujo de contenido
-    ├── workflow-short-form-content/
-    ├── workflow-descubrimiento-referentes/
-    └── workflow-substack/
+pipeline-creacion-contenido/
+├── README.md      ← este archivo (la orientación)
+├── CLAUDE.md      ← el mapa completo de docs. Si buscás algo puntual, empezá por ahí
+├── ROADMAP.md     ← el norte y el checklist del MVP (gana sobre cualquier otro doc)
+├── PLAN.md        ← arquitectura, invariantes y fases
+├── apps/
+│   └── dashboard/ ← el COCKPIT: la app Next.js que usa el equipo de redes (en Vercel)
+├── core/          ← el núcleo: contratos, migraciones SQL, scripts de sync con n8n
+├── docs/          ← ADRs (84), runbooks, y las 4 docs de trabajo con agentes
+└── Workflows/     ← un subfolder por flujo de contenido, 5 activos en n8n
+    ├── workflow-short-form-content/        ← el motor de reels
+    ├── workflow-descubrimiento-referentes/ ← propone cuentas nuevas
+    ├── workflow-archivado/                 ← manda lo calificado al histórico y barre
+    ├── workflow-dispatcher/                ← 1 workflow parametrizado → N corridas
+    ├── workflow-registro-fallos/           ← el error handler global
+    ├── workflow-linkedin/                  ← esqueleto, NO corre
+    └── workflow-substack/                  ← parqueado (otro motor, no n8n)
 ```
+
+> ⚠️ **Este árbol listaba 3 de los 7 workflows y no mencionaba `apps/dashboard/` en ninguna parte**
+> — o sea que el producto entero, el cockpit, no existía en el documento que hace de puerta de
+> entrada. Corregido el 2026-08-31.
 
 La unidad es el **workflow**: una carpeta autocontenida dentro de `Workflows/` con todo lo
 necesario para entenderlo, configurarlo y correrlo. El objetivo de la reestructuración es que
@@ -92,10 +107,17 @@ No son reglas técnicas — son las decisiones de fondo que mantienen el sistema
 
 ## Estado actual y qué sigue
 
-**Dónde estamos (2026-06-12):** diseño aprobado, decisiones formalizadas (9 ADRs), y el MVP del
-workflow de reels con **visto bueno del jefe** — es la prioridad y se ejecuta entre 3 devs según
-el [ROADMAP](./ROADMAP.md). El pipeline general (Substack, capa del jefe, templatización) sigue
-después, por fases ([PLAN.md §5](./PLAN.md)).
+**Dónde estamos (2026-08-31): el MVP de reels está DECLARADO** (ROADMAP §4) y en uso real. El
+motor, el archivado, el descubrimiento, el dispatcher y el error handler **corren en n8n**; el
+cockpit está en Vercel y el equipo de redes lo usa. 84 ADRs, 34 migraciones aplicadas.
+
+La última condición del MVP —*el equipo usa el sistema un día completo sin un dev*— se cerró **por
+medición y no por demo**: pasó el 26/08. Lo que sigue abierto no es técnico sino de adopción, y el
+estado vivo está en [docs/agents/handoff.md](./docs/agents/handoff.md).
+
+> ⚠️ **Este párrafo decía «Dónde estamos (2026-06-12): diseño aprobado… 9 ADRs» durante 2 meses y
+> medio**, en el archivo que `CLAUDE.md` designa como puerta de entrada. Un doc congelado que no
+> dice que lo está se lee como el estado actual.
 
 > **Importante:** la estandarización y el refactor se hacen **planeados y por partes**, no de un
 > golpe. Un esqueleto que camina antes que una pieza perfecta y desconectada.

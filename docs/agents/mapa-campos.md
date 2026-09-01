@@ -1,5 +1,16 @@
 # Mapa del cockpit: campos y páginas (A.2 + A.3 del refactor)
 
+> 🛑 **AVISO DE VIGENCIA (2026-08-31).** Este documento mapea la base de **Airtable** (`Reels
+> Cockpit`, leída por MCP), que se purgó el **2026-08-03**. Su encabezado dice *"✅ COMPLETO — A.2
+> (9 tablas) · A.3 (12 páginas + 1 form)"*, y hoy el cockpit son **17 pantallas** sobre ~24 tablas
+> de Postgres. **Sirve como registro de qué campo servía para qué y por qué**, que es información
+> que no está en otro lado; **no sirve para saber qué existe hoy**. Para eso: `core/schema/` (las
+> migraciones son el modelo) y el código de `apps/dashboard/`.
+>
+> *Se editó el 30/08 para agregarle una fila de la era Postgres dentro de una tabla cuya columna
+> todavía se titula «MOTOR (Preparar batch Airtable)». Parece mantenido; describe un sistema
+> muerto.*
+
 > **Qué es:** el mapa de la superficie del equipo por sus dos ejes — **campo** (§4: quién lo llena,
 > quién lo lee, si tiene propósito) y **página** (§5: qué tabla lee, qué edita, para qué sirve). Responde
 > las 4 preguntas de Mani: *¿cada campo cómo se maneja? ¿cómo influye en el workflow? ¿es necesario?

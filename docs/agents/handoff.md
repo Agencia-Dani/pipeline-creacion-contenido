@@ -79,7 +79,7 @@
 > | ~~**La corrida de fuego**~~ | — | ✅ **CORRIDA Y MEDIDA el 31/08** (ejecución 156, cierre 129). **El Gate pasó de 492.7 s a 85.6 s con MÁS carga** (26 → 36 chunks): por chunk, de 18.95 s a 2.38 s = **7.97×**, o sea exactamente la concurrencia de 8 — el pool entró sin pérdida. `gate_sin_presupuesto` **0**, `pretrim_sin_juicio` **0**, `avisos` **vacío**, `registro_dedup` ok. Y **las 4 pantallas entregaron 20/20 con `razon_faltante: null`, por primera vez**: 80 candidatos contra 54 y 32 de las dos corridas previas |
 > | **Volumen: el siguiente escalón necesita UNA corrida primero** | Mani | 📌 *Resultados por cuenta de referente* está en **150** (era 50) y funcionó: 1.088 crudos, ~US$ 2,72 de Apify. La concurrencia ya está en **12 con arranque escalonado**, empujado. **Antes de ir a 300: correr una vez y leer `metricas.rechazos_supadata`** — 0 = hay aire para seguir subiendo, ≠0 = ése es el techo de Supadata. El presupuesto de 870 s **no puede subir** (roza el watchdog de 900), así que la única palanca real es la concurrencia, y ahora se puede medir |
 > | ~~**Pasos 3 y 4 del plan del 31/08**~~ | — | ✅ **HECHOS el 31/08** (cierre 128, ADR-044 §Enmienda + [ADR-029 §Enmienda 2](../adr/ADR-029-dedup-blindado-fail-closed-y-feed.md)). El pre-trim va en chunks de 100 con pool y `max_tokens` 2.000 (medido: el peor proyecto usaba el **47%** del techo de 1.000, a 2× el 94%, a 4× truncaba), y `Leer feed vivo` **pagina** con guard propio. 🔊 Y los dos fail-open dejaron de ser invisibles: `metricas.pretrim_sin_juicio` + `metricas.gate_sin_presupuesto`, cada uno con su aviso. ⚠️ **Falta empujarlos al live** — el push del cierre 127 fue antes de esto |
-> | **Subir el volumen: el clic que falta** | Mani | 📌 **El techo se movió, el pedido no.** `cap_resultados_referente` pasó a 500 en el `Config`, pero el ajuste vivo *"Resultados por cuenta de referente"* **sigue en 50** ⇒ la corrida colecta exactamente lo mismo que antes. Subirlo es un clic en `/curar/ajustes`, y va **después** de la corrida de fuego y de empujar el cierre 128. Un escalón por vez |
+> | ~~**Subir el volumen: el clic que falta**~~ | — | ✅ **YA ESTABA HECHO, y esta fila lo negaba.** Decía que *"Resultados por cuenta de referente"* **sigue en 50**; medido contra `app.ajustes` el 31/08 está en **150**, y lo movieron el **21/08**. La fila de arriba de esta misma tabla decía 150 al mismo tiempo: **el handoff se contradecía consigo mismo en dos renglones contiguos.** *Un valor de config no va en prosa: el dueño es `app.ajustes`.* |
 > | ~~**Punto ciego de `n8n:diff`**~~ | — | ✅ **CERRADO el 31/08** por la sesión del worktree ([ADR-053 §Enmienda 2](../adr/ADR-053-el-repo-es-la-forma-el-live-es-el-estado.md), commit `f6e2065`, mergeado a `main`). Lo benigno se decide por **clave + VALOR** contra una lista cerrada de 6 pares, y lo que no está grita en un balde propio `sin-empujar`. *Una lista de nombres de clave habría reproducido el bug un escalón más abajo: un `method: 'POST'` sin empujar contra un live en GET sería "benigno" por llamarse `method`* |
 > | **Una corrida que no encuentra nada nuevo se registra como `fallo`** | quien tome la sesión | 🐛 **Visto dos veces el 31/08.** `Heat-score v1` devuelve 0 items ⇒ nada río abajo corre, incluidos `Resumen del run` y `Cerrar run en el registro` ⇒ la fila queda `en_curso` y **el barredor de zombies la marca `fallo` a los 60 min**. En n8n la ejecución figura **success**. Pasó con la ejecución 155, que hizo exactamente lo correcto (miró 530 videos, ninguno era nuevo). Es pre-existente y ensucia las métricas de todo lo demás |
 > | **Soltar los 1.029 huérfanos restantes** por tandas | quien tome la sesión | Cuesta una corrida del script; lo que vuelva es upside. ⚠️ **Los 255 del primer lote que no volvieron NO cuentan**: están fuera del alcance del método, correr el motor otra vez colecta los mismos 520 |
@@ -161,7 +161,7 @@
 >   workflow que arranca. El plan sigue trayendo las filas `archivo` (filtradas por `activo`, con el
 >   `carril` resuelto — ese filtro es de la fachada y no se duplica en un code node) y `colectar` trae
 >   **sólo los textos de esos ids** por PostgREST.
-> - ✅ **Verificado que eso no contradice [ADR-035](../adr/ADR-035-n8n-lee-por-la-fachada-escribe-por-postgrest.md):** su regla es sobre **config**. El motor de reels ya lee
+> - ✅ **Verificado que eso no contradice [ADR-035](../adr/ADR-035-contrato-de-escritura-por-postgrest.md):** su regla es sobre **config**. El motor de reels ya lee
 >   *datos* por PostgREST en `Leer procesados` y `Leer feed vivo`. **Config por la fachada, datos por
 >   PostgREST.**
 > - ✅ **La colisión que este renglón anticipaba OCURRIÓ el 2026-08-18, y no por donde se esperaba:**
@@ -646,7 +646,7 @@
 >
 > 📏 **Van seis plurales rotos en dos días** (`"1 limpiados"` ×3, `"1 agregados"`, `"Otros 1"`,
 > `"1 se limpiaron"`/`"recuperarlos"`), **todos encontrados con una pantalla de n=1 y ninguno por un
-> test**. Con 442 tests en verde. *No hay assert que cace un plural; hay una pantalla con un solo
+> test**. Con 484 tests en verde. *No hay assert que cace un plural; hay una pantalla con un solo
 > elemento.*
 >
 > ### Qué sigue
@@ -1728,7 +1728,7 @@
 > propósito) en vez de `t.grabado_en`. Mismo patrón —ajustar estado durante el render, más barato
 > que un efecto—, apuntado a la fuente que se movió. Nada del diseño original del PR cambió.
 >
-> **Verde sobre el merge real:** `typecheck` limpio · **320 tests** · `build` · `validate`
+> **Verde sobre el merge real:** `typecheck` limpio · **484 tests** · `build` · `validate`
 > **2317 checks** · Vercel preview OK. Rama remota borrada, worktree local (`.claude/worktrees/
 > fix-reintentar-abandonar`) removido.
 >
@@ -4775,7 +4775,7 @@ misma había matado.* Corregido. **Un obstáculo escrito se re-mide, y el peor l
 en la salida del comando que lo desmiente.**
 
 **Además:** los dos botones de Operar se renombraron a *▶ Buscar contenido* y *▶ Buscar referentes*
-(con `WORKFLOW_LEGIBLE` y el aviso de Sugeridos alineados, que citaban los nombres viejos). 477 tests
+(con `WORKFLOW_LEGIBLE` y el aviso de Sugeridos alineados, que citaban los nombres viejos). 484 tests
 del dashboard verdes. ⚠️ **Sin deployar**, se suma a lo que ya esperaba del cierre 126.
 
 **Qué sigue:** **una corrida de fuego, y mirar tres números antes de subir nada** — el Gate (492.7 s
@@ -4796,7 +4796,7 @@ PostgREST — la advertencia que ADR-029 §Enmienda dejó escrita, hoy en 274 fi
 **Qué se hizo:** [ADR-083](../adr/ADR-083-una-corrida-cuenta-lo-que-anoto-no-lo-que-hizo.md) — la
 pantalla `operar/corridas` con 4 tabs, master/detail y lenguaje del equipo — y la
 [enmienda de ADR-081](../adr/ADR-081-el-candidato-sabe-de-que-corrida-salio.md#enmienda-2026-08-31--filtrar-por-corrida-no-es-agruparlas-van-las-dos)
-— el toggle *Agrupar por corrida* en el Feed. **Cero migraciones, cero n8n, cero `core/`.** 477 tests
+— el toggle *Agrupar por corrida* en el Feed. **Cero migraciones, cero n8n, cero `core/`.** 484 tests
 verdes, `tsc` y `build` limpios, y las dos features vistas andar en el navegador contra la base de
 producción.
 

@@ -225,18 +225,14 @@ select count(*) from app.colecciones;   -- <- ya no distingue adopcion de "hoy h
 | `colecciones` | *"hoy CERO"* | **1** — pero Majo ya las usó, así que el `count(*)` dejó de medir adopción |
 
 **Y la pregunta que ninguno de los cuatro contesta —*¿alguien volvió un segundo día?*— se lee de
-`app.eventos` contando DÍAS DISTINTOS por persona.** Medido el 29/08 sobre los **374** eventos de la
-tabla (la suma por persona da 374, que es lo que prueba que no quedó nadie afuera):
+`app.eventos` contando DÍAS DISTINTOS por persona.**
 
-| Persona | Días | Eventos | Cuáles |
-|---|---|---|---|
-| Manuel Mejia | 15 | 118 | 29/07 → 29/08 |
-| **Majo Duarte** | **3** | **123** | 20/08 · 21/08 · **26/08** |
-| **Manuel 30X** | **2** | 24 | 07/08 · 20/08 |
-| Jero | 1 | 81 | 07/08 |
-| Juan José Gaitán | 1 | 23 | 07/08 |
-| Alejo Carvajal | 1 | 2 | 01/08 |
-| Alejandro Dávila | 1 | 1 | 05/08 |
+⚠️ **Acá vivía la tabla con los números, y se borró a propósito el 2026-08-31.** Estaba copiada
+igual en `CLAUDE.md` y en `verificaciones-humanas.md`, y las tres vencían juntas cada vez que
+alguien usaba el cockpit: decían *"374 eventos, volvieron dos"* cuando ya eran 613 y cuatro. **El
+dueño de este dato es `app.eventos`**; la consulta está en
+[verificaciones-humanas.md](../verificaciones-humanas.md). Un canario se re-mide, no se cita — y
+copiarlo a tres lugares es garantizar que dos estén mal.
 
 🔑 **Son DOS los que volvieron, no una.** Majo (3 días) y Manuel 30X (2). Y el más productivo en un
 solo día sigue siendo **Jero, con 81 eventos el 07/08 — y no volvió nunca.** *Ésa es la pregunta

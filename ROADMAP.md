@@ -414,7 +414,7 @@ agendada: ver **D3** arriba.
    Opcional, aparte: scoring semántico de temas si el substring-matching se queda corto.
 
    🔴 **Lo que sigue sin poder medirse es el GATE, no el orden: nadie audita los descartes.** De los
-   **82** descartados por la máquina, **80 no tienen `veredicto` humano** — y de los 2 revisados,
+   **142** descartados por la máquina (eran 82 el 29/08), **140 no tienen `veredicto` humano** — y de los 2 revisados,
    **uno dice *"era bueno"***. Sin ese dato no hay forma de saber cuánto se tira de más. La pantalla
    existe (`/curar/descartes`); falta que alguien la use. **Ése es el trabajo pendiente de este
    punto, y no es de código.**

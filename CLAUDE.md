@@ -19,7 +19,11 @@ en §Agent skills; acá solo se ubican.
 - [docs/agents/handoff.md](docs/agents/handoff.md) — estado vivo del repo (leelo al empezar la sesión).
 - [docs/agents/context.md](docs/agents/context.md) — glosario de dominio (lenguaje ubicuo).
 - [docs/agents/dev-doc.md](docs/agents/dev-doc.md) — los 3 workflows nodo por nodo + mapa de datos (por tabla).
-- [docs/agents/mapa-campos.md](docs/agents/mapa-campos.md) — mapa del cockpit: **por campo** (9 tablas) y **por página** (12 + 1 form), con huérfanos, hallazgos y reconciliación repo↔live (A.2 + A.3 del refactor, cerrados).
+- [docs/agents/mapa-campos.md](docs/agents/mapa-campos.md) — 🪦 **HISTÓRICO, no vigente.** Mapea la
+  base de **Airtable**, purgada el 2026-08-03: sus "9 tablas" y "12 páginas" son de ese mundo (hoy
+  son 17 pantallas sobre Postgres). Sirve para saber **qué campo servía para qué y por qué** —
+  información que no está en otro lado—, **no** para saber qué existe hoy. Para eso, `core/schema/`
+  y el código. *Este renglón lo citaba como "el mapa del cockpit", sin salvedad.*
 
 - [docs/agents/plan-cockpit-propio.md](docs/agents/plan-cockpit-propio.md) — el plan del **cockpit propio**
   que reemplazó a Airtable (ADR-025..028): componentes, stack y roadmap D0–D8.
@@ -33,7 +37,7 @@ en §Agent skills; acá solo se ubican.
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–083, una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–084 (84 archivos), una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -110,8 +114,8 @@ en §Agent skills; acá solo se ubican.
   hora del rescate y no la de la corrida. *La derivación no falla ruidosa: le diría "sin corrida" al
   40% del feed teniendo la corrida en la tabla.* Las viejas quedan en `null` y el barrido de 20 días
   lo cura solo.
-  🐤 **Su canario nace limpio y por eso sirve: `select count(*) from app.candidatos where run_id is
-  not null` daba CERO el 31/08** — las 6 filas de la verificación en navegador se crearon y se
+  🐤 **Su canario YA SE DESPERTÓ: `select count(*) from app.candidatos where run_id is not null` da
+  **166 de 408** (medido el 31/08 por la tarde). Daba CERO esa misma mañana** — las 6 filas de la verificación en navegador se crearon y se
   borraron. **La primera fila con corrida la escribe el motor**, así que la primera es uso real, no
   una prueba. A mirar junto con los otros cuatro el **2026-09-04**.
   🟢 **El canario de ADR-069/070 SE DESPERTÓ el 20/08, y es el primer uso real del sistema por
@@ -123,11 +127,17 @@ en §Agent skills; acá solo se ubican.
   Se redefine por fecha — `select count(*) from app.grabados where grabado_en > '2026-08-21'` — y la
   pregunta que ninguno de los canarios contesta se lee de `app.eventos`: *¿alguien volvió un segundo
   día?*
-  ✅ **Re-medido el 2026-08-29 sobre los 374 eventos de la tabla: volvieron DOS, no una.** **Majo
-  Duarte, 3 días** (20/08 · 21/08 · **26/08**, 123 eventos) y **Manuel 30X, 2** (07/08 · 20/08, 24).
-  Los demás siguen en uno: **Jero 81 eventos el 07/08 y no volvió nunca** —el más productivo en un
-  día del sistema entero—, Juan José 23 ese mismo día, Alejo 2, Alejandro Dávila 1. *La suma por
-  persona da 374 exacto: eso es lo que prueba que no quedó nadie afuera, y no "mirar de nuevo".*
+  ✅ **Re-medido el 2026-08-31 sobre los 613 eventos de la tabla: volvieron CUATRO, no dos.**
+  **Majo Duarte, 6 días** (177 eventos, hasta el 31/08), **Manuel Mejia 15**, **Manuel 30X 3**
+  (07/08 · 20/08 · 29/08) y **Juan José Gaitán 2** — que este archivo daba por no-vuelto.
+  🆕 **Y apareció una persona que no figura en ningún doc del repo: [Dani Rodríguez] hizo 165
+  eventos en un solo día, el 30/08** — el segundo día más productivo de la historia del sistema,
+  después de los 81 de Jero. Entró como operadora principal y nadie lo anotó.
+  Siguen en un día: **Jero, 81 eventos el 07/08 y no volvió nunca**, Alejo 2, Alejandro Dávila 1.
+  ⚠️ *Este bloque decía **"374 eventos, volvieron DOS"** y estaba copiado igual en
+  `verificaciones-humanas.md` y `plan-modo-seleccion.md`: **tres copias que vencieron juntas** el
+  día que alguien usó el cockpit. El número no va en prosa — se cuenta en `app.eventos` por DÍAS
+  DISTINTOS por persona, y por eso la consulta va escrita y el resultado no.*
   🟢 **Y el canario de ADR-074 (guion limpio) también SE DESPERTÓ, el 26/08.** Este archivo y
   `plan-modo-seleccion` decían *"las 4 que hay son de Mani, adopción = la fila 5"*: hay **65 filas y
   61 son de Majo**, hechas ese día — **34 con voz y 27 sin voz**, o sea que el camino "solo criterios
@@ -217,7 +227,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..083).
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..084). *El número sale de `ls docs/adr`, no de acá: este renglón dijo 083 con 84 archivos en disco.*
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

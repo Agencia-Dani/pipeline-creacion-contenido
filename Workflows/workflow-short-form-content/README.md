@@ -1,8 +1,18 @@
-# Motor de reels — short-form-content
+# Motor de reels — detector de referentes virales → guiones
+
+> 🛑 **AVISO DE VIGENCIA (2026-08-31).** Este documento describía la arquitectura de **Airtable**
+> como si fuera la actual, y Airtable se purgó el **2026-08-03** con su PAT revocado. Decía que la
+> config se lee de Airtable, que los candidatos se entregan a Airtable, listaba la credencial
+> `airtableTokenApi` como dependencia viva, le pedía al operador llenar `airtable_base_id` y llamaba
+> al trigger *"el botón de Airtable"*. Su archivo hermano [CLAUDE.md](./CLAUDE.md) decía lo
+> contrario **en la misma carpeta** desde D7, y `CLAUDE.md` de la raíz ya mandaba a leer ése.
+>
+> Corregido acá. **La fuente de verdad es `workflow.json`**, y `npm run n8n:diff` dice si el live
+> corre lo que ese archivo declara: si algo de este README lo contradice, gana el JSON.
 
 Workflow de **n8n** que es el motor del MVP de reels: lee la config del equipo de redes en
-**Airtable**, descubre reels de IG + TikTok, los ordena por relevancia y viralidad, transcribe y
-**traduce literal al español**, y entrega **candidatos a Airtable** para que el equipo (Majo, Jero)
+**Supabase**, descubre reels de IG + TikTok, los ordena por relevancia y viralidad, transcribe y
+**traduce literal al español**, y entrega **candidatos a `app.candidatos`** (PostgREST, ADR-035) para que el equipo (Majo, Jero)
 los califique. El estado de producto vive en [ROADMAP §3](../../ROADMAP.md); el porqué de las
 decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-en-scoring.md) +
 [ADR-010](../../docs/adr/ADR-010-scoring-semantico-y-etapa-calidad.md); el contrato del manifest en
@@ -32,7 +42,7 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 
-1. **COLECTAR** — `Config` → abre el run en el registro (Supabase) → lee Airtable (Proyectos, Voces,
+1. **COLECTAR** — `Config` → abre el run en el registro (Supabase) → lee la config por la fachada `run-plan` (Proyectos, Voces,
    Referentes, **Ajustes**) → `Armar plan de corrida` arma la búsqueda por referentes → **2 nodos
    Apify** (IG por cuenta-referente + TikTok por perfil-referente): **solo referentes** (ADR-019).
 2. **NORMALIZAR** — `Normalizar IG`/`Normalizar TT` mapean el shape crudo de cada API al mismo
@@ -50,7 +60,7 @@ Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
    `heat_score = peso_relevancia·score_haiku + (1-peso)·percentil(prescore)`. Los descartes con score
    **borderline** (banda 0.35–0.6, cap ~10/corrida) no mueren en silencio: se suben a la tabla
    **`Descartes del gate`** del cockpit para auditar falsos negativos (ADR-021).
-6. **ENTREGAR** — `Armar candidato` → `Preparar batch Airtable` → POST a `Candidatos` (estado `nuevo`,
+6. **ENTREGAR** — `Armar candidato` → `Preparar candidatos` → POST a `Candidatos` (estado `nuevo`,
    con script, idioma, thumbnail, `relevancia_score`/`relevancia_razon`) + registro en Supabase
    (`runs` con las métricas completas del embudo: `sin_guion`, llamadas por servicio y desglose por
    referente — nodo `Resumen del run`, ADR-021; continue-on-fail).
@@ -79,7 +89,7 @@ nada, fail-open) y tener su toggle de `Ajustes` en 1.
 
 ## Knobs
 
-Los del **scoring y el volumen viven en la tabla `Ajustes`** de Airtable (clave→valor, ADR-011), en
+Los del **scoring y el volumen viven en la tabla `app.ajustes`** de Supabase (clave→valor, ADR-011), en
 **español claro** → el equipo los edita sin tocar n8n: *Peso de vistas/likes/interacción* (prescore
 métrico) · *Peso de relevancia* (0.7, IA vs métricas en el orden) · *Bonus idioma extranjero* ·
 *Seguidores para marcar viral* (700k) · *Candidatos por proyecto* · *Mínimo de vistas/likes* (**piso
@@ -99,10 +109,10 @@ y los 2 toggles de plataforma de `Ajustes`; `criterios_relevancia` en `Proyectos
 | Apify | Scrape IG (`apify/instagram-scraper`) + TikTok (`clockworks/free-tiktok-scraper`) | community node `@apify/n8n-nodes-apify`, credencial `apifyApi` |
 | Anthropic | Pre-trim + Gate + traducción (Claude Haiku) | placeholder `<ANTHROPIC_API_KEY>` en **3** Code nodes |
 | Supadata | Transcripción | placeholder `<SUPADATA_API_KEY>` en `Transcribir (Supadata)` |
-| Airtable | Cockpit (lee config, escribe candidatos) | credencial nativa `airtableTokenApi` "Airtable PAT" |
+| Supabase | Cockpit (lee config por `run-plan`, escribe candidatos por PostgREST) | credencial nativa `supabaseApi` "Supabase account" |
 | Supabase | Registro (dedup + histórico + señal) | credencial nativa `supabaseApi` "Supabase Registro" |
 
-`AIRTABLE_BASE_ID` / `SUPABASE_URL` / `INSTANCE_ID` no son secretos pero son IDs → se editan en el
+`SUPABASE_URL` / `INSTANCE_ID` no son secretos pero son IDs → se editan en el
 nodo `Config` al importar (placeholders `<<...>>`), no se commitean.
 
 ---
@@ -110,17 +120,17 @@ nodo `Config` al importar (placeholders `<<...>>`), no se commitean.
 ## Cómo correrlo
 
 1. Importá `workflow.json` en n8n.
-2. Asigná las credenciales nativas (Apify, Airtable PAT, Supabase Registro).
-3. Llená en el nodo `Config`: `airtable_base_id`, `supabase_url`, `instance_id`.
+2. Asigná las credenciales nativas (Apify, Supabase account, Supabase Registro).
+3. Llená en el nodo `Config`: `instance_id`, `supabase_url`, `instance_id`.
 4. Reemplazá `<<WEBHOOK_PATH_MOTOR>>` en el nodo `Disparo on-demand (webhook)` por un path aleatorio
    largo. La URL de Producción resultante dispara corridas **pagas**: va al gestor de contraseñas y a
-   la automation de Airtable (ADR-023), jamás a git.
+   el cockpit (ADR-023), jamás a git.
 5. Pegá las API keys: 3× `<ANTHROPIC_API_KEY>` (pre-trim, gate, traductor) + 1× `<SUPADATA_API_KEY>`.
 6. **Execute Workflow** para una corrida manual (la primera con `dias_recencia` alto = backfill),
-   dejá el cron semanal, o disparo on-demand por el botón de Airtable (webhook).
+   dejá el cron semanal, o disparo on-demand por el botón ▶ del cockpit (webhook).
 
 > El registro a Supabase (`Abrir run` / `Cerrar run`) es **continue-on-fail**: sin Supabase el motor
-> entrega igual a Airtable, solo no reporta — y el guard single-flight **deja pasar** (fail-open).
+> entrega igual, solo no reporta — y el guard single-flight **deja pasar** (fail-open).
 > El arranque va **en serie**: `Config → Barrer runs zombie → Leer corridas vivas → Guard
 > single-flight → Abrir run → Leer plan (fachada)`. El guard (ADR-023) bloquea si hay una corrida viva
 > (`en_curso` más joven que `ventana_corrida_min` — el valor vigente vive en

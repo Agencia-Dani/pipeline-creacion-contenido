@@ -35,7 +35,7 @@ registrado y mejora solo**.
    botón para copiarlo, junto al link del video original y sus métricas.
 5. **El equipo elige los que sirven** *(Majo y Jero califican en el tablero)*. El mapa de calor
    **se rehace solo con los elegidos**, y el sistema **aprende qué priorizar** la próxima vez.
-6. **Todo queda en un histórico descargable** *(un botón «Descargar CSV» que abre en Excel)*: qué se
+6. **Todo queda en un histórico descargable** *(un botón «Descargar» (baja un `.xlsx`, ADR-071 — decía CSV y cambió el 20/08) que abre en Excel)*: qué se
    seleccionó, cuándo, para qué voz — con sus links y métricas. Se puede medir efectividad de verdad.
 
 ## Qué te da a ti

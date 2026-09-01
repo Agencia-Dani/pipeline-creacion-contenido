@@ -77,7 +77,7 @@ chequeo, la palanca es de configuración y ya existe: *Secure password change* e
 ### 5. Lo que hay que cerrar en Supabase, que no es código
 
 - **Password Requirements** al mismo mínimo que valida la app (§2).
-- **Cerrar el signup** del provider Email: el alta es manual desde [ADR-051](./ADR-051-el-acceso-es-por-empresa.md) y hoy `disable_signup` es `false`, así que cualquiera puede crear una fila en `auth.users` pegándole a la API. No da acceso a datos —cae en `/sin-rol` y RLS le da cero— pero no debería poder entrar.
+- **Cerrar el signup** del provider Email: el alta es manual desde [ADR-051](./ADR-051-el-acceso-es-membresia-explicita.md) y hoy `disable_signup` es `false`, así que cualquiera puede crear una fila en `auth.users` pegándole a la API. No da acceso a datos —cae en `/sin-rol` y RLS le da cero— pero no debería poder entrar.
 - **Confirmar que no hay session timebox ni inactivity timeout** (Auth → Sessions). Si estuvieran prendidos, explican el re-login y **nada de esta ADR lo evita**.
 
 ## Lo que se descartó
