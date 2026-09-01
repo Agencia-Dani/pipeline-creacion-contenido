@@ -1,3 +1,4 @@
+import { leerClave } from "@/lib/env";
 // Las dos llamadas externas del transcriptor (ADR-031): Supadata para el transcript, Haiku para
 // traducirlo. Viven acá y solo acá — el BFF es el único portador de secretos (plan-cockpit C2).
 //
@@ -14,11 +15,6 @@ export type Transcripcion = {
   idioma: string; // código de 2 letras; "" si no se pudo detectar
 };
 
-function leerClave(nombre: string): string {
-  const valor = process.env[nombre];
-  if (!valor) throw new Error(`Falta ${nombre} en las env vars (gestor de contraseñas).`);
-  return valor;
-}
 
 export async function transcribir(url: string): Promise<Transcripcion> {
   const res = await fetch(

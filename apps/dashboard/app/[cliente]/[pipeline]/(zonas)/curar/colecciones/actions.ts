@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { enElOrdenPedido, queFaltaEnriquecer, validarNombre } from "@/domain/colecciones";
-import type { GuionParaDocumento } from "@/domain/docx";
+import type { GuionParaDocumento } from "@/domain/formatos/docx";
 import { clasificarLimpios, huellaDeCriterios } from "@/domain/limpieza";
 import { parsearEnlaces, type EnlaceVideo } from "@/domain/enlace";
 import { comoRuta, rutaDe, type CockpitEnRuta } from "@/domain/rutas";

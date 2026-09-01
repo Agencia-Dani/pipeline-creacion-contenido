@@ -138,10 +138,6 @@ export async function cockpitsDe(usuario: Alcance): Promise<Instancia[]> {
   return instanciasVisibles(usuario, await leerInstancias());
 }
 
-/** Las empresas que alcanza, para las pantallas que necesitan enumerarlas. */
-export async function empresasDe(usuario: Alcance): Promise<string[]> {
-  return usuario.esDueno ? leerEmpresas() : usuario.membresias.map((m) => m.clientId);
-}
 
 /**
  * Lo que puede salir mal al resolver el tenant de la fachada. Cada caso tiene su status.

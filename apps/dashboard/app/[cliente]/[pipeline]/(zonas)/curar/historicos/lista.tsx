@@ -18,7 +18,7 @@ import { agrupar, SIN_PROYECTO } from "@/domain/feed";
 // 🔴 `ordenar` sale del dominio, NO del componente: `orden.tsx` no lo re-exporta.
 import { ordenar, type CriterioOrden, type Faceta } from "@/domain/orden";
 import { fusionar, type ParteVideo, type Video } from "@/domain/video";
-import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
+import { aXlsx, TIPO_XLSX } from "@/domain/formatos/xlsx";
 import { parsearEnlaces } from "@/domain/enlace";
 import {
   armarRegistro,

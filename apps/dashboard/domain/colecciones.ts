@@ -7,7 +7,7 @@
 // Y desde el 2026-08-24, la tercera: la **tabla** de la colección, o sea la mitad planilla de lo
 // que el `.docx` cuenta en prosa.
 
-import type { GuionParaDocumento } from "./docx.ts";
+import type { GuionParaDocumento } from "./formatos/docx.ts";
 import type { Video } from "./video.ts";
 
 export const NOMBRE_MIN = 1;

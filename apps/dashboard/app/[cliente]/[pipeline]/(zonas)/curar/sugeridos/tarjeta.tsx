@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { usarCockpit } from "../../usar-cockpit";
 import { aprobar, descartar, type Resultado } from "./actions";
+import type { Sugerido } from "@/lib/sugeridos";
 
 // Una propuesta = una fila compacta. Antes cada una desplegaba razón + bio + semillas + una
 // grilla de checkboxes con TODOS los proyectos, y con 8 propuestas la pantalla era un muro donde
@@ -19,18 +20,16 @@ import { aprobar, descartar, type Resultado } from "./actions";
 
 export type ProyectoOpcion = { id: string; nombre: string; activo: boolean };
 
-export type PropuestaVista = {
-  id: string;
-  handle: string;
-  plataforma: string;
-  url: string | null;
-  afinidad: number | null;
-  razon: string | null;
-  bio: string | null;
-  seguidores: number | null;
-  semillas: string | null;
-  proyectoIdsSugeridos: string[];
-};
+/**
+ * Lo mismo que un `Sugerido`, con los proyectos ya resueltos para la pantalla.
+ *
+ * 🔑 **Se DERIVA de `Sugerido`, no se re-declara.** Antes repetía a mano sus 9 campos, y el
+ * compilador no tenía forma de saber que los dos tipos hablaban del mismo objeto: agregarle una
+ * columna a `Sugerido` dejaba esta tarjeta muda, sin un solo error. Duplicación que deriva en
+ * silencio, que es la peor clase. Con `Omit` el vínculo es explícito y el día que cambie el origen,
+ * esto no compila.
+ */
+export type PropuestaVista = Omit<Sugerido, "proyectoIds"> & { proyectoIdsSugeridos: string[] };
 
 const miles = (n: number) => new Intl.NumberFormat("es-AR").format(n);
 

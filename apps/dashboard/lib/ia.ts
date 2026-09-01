@@ -10,6 +10,7 @@ import {
   type Corrida,
   type Workflow,
 } from "@/domain/corrida";
+import { leerClave } from "@/lib/env";
 
 // El veredicto de la IA sobre una corrida (la capa 2 del veredicto).
 //
@@ -55,11 +56,6 @@ export function hayIA(): boolean {
 // escribir esto, no asumido.
 export const MODELO = "claude-opus-5";
 
-function leerClave(nombre: string): string {
-  const valor = process.env[nombre];
-  if (!valor) throw new Error(`Falta ${nombre} en las env vars (gestor de contraseñas).`);
-  return valor;
-}
 
 const SISTEMA = `Sos el que le explica al equipo de redes de una agencia de contenido cómo le fue a una corrida automática que busca videos virales para inspirar guiones.
 

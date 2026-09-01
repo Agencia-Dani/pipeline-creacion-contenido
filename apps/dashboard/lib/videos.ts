@@ -55,19 +55,6 @@ export async function leerMeta(ctx: TenantContext): Promise<ParteVideo[]> {
   }));
 }
 
-/** Las claves que YA tienen metadata comprada. Es lo que evita pagar dos veces. */
-export async function clavesConMeta(ctx: TenantContext): Promise<Set<string>> {
-  const { data, error } = await (await scoped(ctx)).select(
-    "app.videos_meta",
-    "plataforma, external_id",
-  );
-  if (error) throw new Error(`Supabase respondió con error: ${error.message}`);
-  const claves = new Set<string>();
-  for (const f of z.array(filaMeta.pick({ plataforma: true, external_id: true })).parse(data ?? [])) {
-    claves.add(claveDe({ plataforma: f.plataforma as Plataforma, external_id: f.external_id }));
-  }
-  return claves;
-}
 
 /**
  * Guarda lo que volvió del scrape.

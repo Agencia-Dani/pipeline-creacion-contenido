@@ -9,7 +9,7 @@ import {
   tablaDeColeccion,
   validarNombre,
 } from "./colecciones.ts";
-import type { GuionParaDocumento } from "./docx.ts";
+import type { GuionParaDocumento } from "./formatos/docx.ts";
 import type { Video } from "./video.ts";
 
 const video = (p: Partial<Video> = {}): Video => ({

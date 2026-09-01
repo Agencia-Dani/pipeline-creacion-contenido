@@ -1,4 +1,5 @@
 import { armarPrompt } from "@/domain/limpieza";
+import { leerClave } from "@/lib/env";
 
 // La llamada que pule un guion (ADR-074). El BFF es el único portador de secretos.
 //
@@ -72,8 +73,3 @@ export async function limpiar(
   }
 }
 
-function leerClave(nombre: string): string {
-  const valor = process.env[nombre];
-  if (!valor) throw new Error(`Falta ${nombre} en las env vars (gestor de contraseñas).`);
-  return valor;
-}

@@ -18,7 +18,7 @@ import {
   tablaDeColeccion,
 } from "@/domain/colecciones";
 import { BASE } from "@/domain/limpieza";
-import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/docx";
+import { aDocx, documentoDeGuiones, TIPO_DOCX } from "@/domain/formatos/docx";
 import {
   contarPorGrabado,
   FILTROS_REGISTRO,
@@ -27,7 +27,7 @@ import {
 } from "@/domain/grabados";
 import type { CriterioOrden, Faceta } from "@/domain/orden";
 import { nombreDeArchivo, type Video } from "@/domain/video";
-import { aXlsx, TIPO_XLSX } from "@/domain/xlsx";
+import { aXlsx, TIPO_XLSX } from "@/domain/formatos/xlsx";
 import { rutaDe } from "@/domain/rutas";
 import { cn } from "@/lib/utils";
 import { usarCockpit } from "../../../usar-cockpit";
