@@ -14,7 +14,21 @@ decisiones en [ADR-009](../../docs/adr/ADR-009-scripts-literales-y-aprendizaje-e
 
 ---
 
-## Qué hace (35 nodos, 3 entradas: cron + manual + webhook on-demand)
+## Qué hace (36 nodos, 3 entradas: cron + manual + webhook on-demand)
+
+> 🆕 **Dos nodos nuevos el 2026-08-31: `IF — hay videos nuevos` y `Cerrar run (sin novedades)`.**
+> Una corrida que miraba todo y no encontraba nada nuevo **se registraba como `fallo`**, y era el
+> defecto más caro del sistema por lo que arrastraba: `Heat-score v1` devolvía 0 items ⇒ en n8n nada
+> río abajo corre ⇒ `Cerrar run` nunca se ejecutaba ⇒ la fila quedaba `en_curso` ⇒ el barredor de
+> zombies de la corrida siguiente la marcaba `fallo`. En n8n la ejecución figuraba **success**.
+> Medido: **26 de 87 corridas decían `fallo` y solo ~2 eran errores de verdad**. Y como las 26
+> quedaban con `metricas` en NULL, y `app.v_costos_semana` filtra por `unidades > 0`, **el 26% de
+> las corridas del motor no sumaba nada al costo** — incluidas las que se cayeron *después* de
+> pagarle a Apify y a Supadata.
+> Ahora `Heat-score v1` lleva `alwaysOutputData` (sin eso la cadena se corta y no hay IF que valga),
+> el IF separa *"hay algo nuevo"* de *"miré y no había nada"*, y la rama vacía cierra en `ok` con
+> `sin_novedades: true` y un aviso que dice cuántos videos se miraron. **No encontrar nada es un
+> éxito, no un fallo.**
 
 Cron semanal (lunes 8am) o **Execute manual** → ambos entran a `Config`.
 

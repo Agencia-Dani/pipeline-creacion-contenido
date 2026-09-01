@@ -155,7 +155,7 @@ motor trae la tanda nueva. Los dos horarios los guarda ahora el **dispatcher**, 
 
 ---
 
-## 2. Motor (`short-form-content`) — 35 nodos
+## 2. Motor (`short-form-content`) — 36 nodos
 
 ### 2.1 Orden de ejecución (topología real)
 
@@ -476,7 +476,7 @@ perfiles), TT 1 Apify (≤15 lookalikes, $0.20 c/u; $0 sin semillas TT), 1 Haiku
 
 ---
 
-## 4. Archivado (`archivado`) — 20 nodos
+## 4. Archivado (`archivado`) — 17 nodos
 
 > **Validado para producción (cierre 19).** Corrió end-to-end con calificados reales (run `687027e2`):
 > idempotencia, paginación, split de estados, barrido de zombies, cierre robusto y curación completa. El

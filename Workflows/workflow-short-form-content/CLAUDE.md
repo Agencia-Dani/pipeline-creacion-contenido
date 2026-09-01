@@ -7,7 +7,7 @@ el contrato en [workflow.yaml](./workflow.yaml), el uso en [README.md](./README.
 
 ## Qué es
 
-Un único workflow de **n8n** (`workflow.json`, 34 nodos, 2 entradas: Execute manual + webhook
+Un único workflow de **n8n** (`workflow.json`, 36 nodos, 2 entradas: Execute manual + webhook
 on-demand con guard single-flight **por instancia** — ADR-023 + ADR-050; el cron semanal se mudó al
 [dispatcher](../workflow-dispatcher/) en la Fase 4)
 que es el **motor de reels** del MVP. Lee la config del equipo por la **fachada del cockpit**

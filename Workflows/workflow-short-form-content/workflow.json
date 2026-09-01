@@ -459,7 +459,9 @@
       "position": [
         4200,
         400
-      ]
+      ],
+      "alwaysOutputData": true,
+      "notes": "alwaysOutputData: sin esto, 0 items cortaban la cadena entera y `Cerrar run` nunca corria — la fila quedaba en_curso y el barredor la marcaba `fallo` (ver IF — hay videos nuevos)."
     },
     {
       "parameters": {
@@ -959,6 +961,79 @@
       "maxTries": 3,
       "waitBetweenTries": 2000,
       "notes": "La config del cockpit (ADR-028): reemplaza a Leer Proyectos/Voces/Referentes/Ajustes. FAIL-CLOSED a proposito: sin onError, cualquier respuesta !=200 tras 3 intentos aborta el run (una corrida sin config entrega ruido). execute-once: es un lookup de corrida, no de item (cierre 67)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.external_id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-hay-videos-nuevos",
+      "name": "IF — hay videos nuevos",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4340,
+        400
+      ],
+      "notes": "Separa 'hay videos nuevos' de 'mire y no habia nada nuevo'. El segundo es un exito, no un fallo, y hasta el 2026-08-31 se registraba como fallo."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.supabase_url + '/rest/v1/runs?id=eq.' + ($('Abrir run en el registro').first().json.id || '00000000-0000-0000-0000-000000000000') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (function(){\nvar g = function(n){ try { return $(n).all().length; } catch (e) { return 0; } };\nvar mirados = g('Pre-trim relevancia');\nreturn { fin: $now.toISO(), estado: 'ok', metricas: {\n  colectados: g('Merge scrapes'), apify_ig: g('Apify — IG Reels'), apify_tt: g('Apify — TikTok Perfil'),\n  asignados: g('Asignar proyecto+voz'), pretrim: mirados,\n  filtrados: 0, gate: 0, outputs: 0, sin_guion: 0, transcripciones_vacias: 0,\n  descartes_expuestos: 0, gate_sin_presupuesto: 0, pretrim_sin_juicio: 0,\n  rechazos_supadata: 0, videos_con_rechazo: 0,\n  llamadas: { supadata: 0, haiku_lotes_pretrim: 0, haiku_lotes_gate: 0, haiku_traducciones: 0 },\n  por_referente: {}, por_proyecto: {}, registro_dedup: 'no_corrio',\n  sin_novedades: true,\n  avisos: ['sin novedades: se miraron ' + mirados + ' videos y ninguno era nuevo. No se transcribio ni se pago nada.']\n} };\n})() }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "cerrar-run-sin-novedades",
+      "name": "Cerrar run (sin novedades)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4480,
+        620
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase account"
+        }
+      },
+      "executeOnce": true,
+      "notes": "Cierra en `ok` la corrida que miro y no encontro nada nuevo. Sin esto la fila quedaba en_curso y el barredor de zombies de la corrida siguiente la marcaba `fallo`, con metricas en NULL — y `v_costos_semana` filtra por unidades>0, asi que ademas se perdia el costo. 26 de 87 corridas decian `fallo` y solo ~2 eran errores de verdad."
     }
   ],
   "pinData": {},
@@ -1093,7 +1168,7 @@
       "main": [
         [
           {
-            "node": "Transcribir (Supadata)",
+            "node": "IF — hay videos nuevos",
             "type": "main",
             "index": 0
           }
@@ -1309,6 +1384,24 @@
         [
           {
             "node": "Traducir (Claude Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — hay videos nuevos": {
+      "main": [
+        [
+          {
+            "node": "Transcribir (Supadata)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cerrar run (sin novedades)",
             "type": "main",
             "index": 0
           }
