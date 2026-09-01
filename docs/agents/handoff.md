@@ -22,6 +22,62 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🔎 CIERRE 130 (2026-08-31) — revisión completa del pipeline, y lo que quedó a mano
+>
+> Mani pidió una revisión de las tres superficies (workflows · cockpit en Vercel · repo y docs)
+> buscando over-engineering, código muerto, bugs silenciosos, pendientes sin atender y limpieza.
+> **Todo lo de código está aplicado, empujado al live y pusheado.** Quedan 3 cosas que no puedo
+> hacer yo:
+>
+> | Qué falta | Quién | Por qué no lo hice |
+> |---|---|---|
+> | **Correr la migración [`035`](../../core/schema/035_search_path_triggers.sql)** en el SQL Editor | Mani | Gate humano, como todas. Verificar por efecto: `proconfig` pasa de `null` a `search_path=...`, y `get_advisors` baja de 9 avisos a 7 |
+> | **Corregir 12 filas de `public.runs`** mal clasificadas | Mani | El clasificador de permisos bloqueó el UPDATE a datos de prod, y no lo rodeé. Es: `update public.runs set estado='parcial' where estado='fallo' and error like 'pasada del transcriptor sin cerrar%';` — verificado que son exactamente 12 y todas del transcriptor |
+> | **Decidir sobre 4 env vars huérfanas** del `.env` de la raíz | Mani | `GOOGLE_SHEET_ID` y `GOOGLE_SHEET_PESTANA` son de Google, que murió con ADR-057 el 05/08. `DESCUBRIMIENTO_WEBHOOK_PATH` no lo lee nadie. ⚠️ **`COCKPIT_PASSWORD` es una credencial viva que ningún código usa**: si no la usás a mano, revocala. No toqué tu `.env` |
+>
+> ### Lo que sí quedó hecho (con su medición, no con su intención)
+>
+> - 🔴 **Una corrida que no encontraba nada se registraba como `fallo`.** `Heat-score v1` devolvía 0
+>   items ⇒ en n8n nada río abajo corre ⇒ `Cerrar run` nunca corría ⇒ el barredor la marcaba
+>   `fallo`. **26 de 87 corridas decían `fallo` y solo ~2 eran errores.** Y como quedaban con
+>   `metricas` en NULL y `v_costos_semana` filtra por `unidades>0`, **el 26% de las corridas del
+>   motor no sumaba nada al costo**. Arreglado con `alwaysOutputData` + `IF — hay videos nuevos` +
+>   `Cerrar run (sin novedades)`. **El motor tiene 36 nodos.**
+> - 🔴 **Un nodo que no existe pintaba una alarma permanente en el cockpit.** `Cerrar run` del
+>   descubrimiento medía `promovidos` contra `$('Preparar promoción')`, borrado con ADR-020. Valía 0
+>   siempre, y tenía **tres** consumidores: el paso "Se sembraron solas" en tono `aviso`, la frase
+>   del resumen, y la tarjeta "aprobadas al banco" de Entender vía `v_embudo_descubrimiento`.
+> - 🕳️ **Y `auditar-workflows.mjs` no podía verlo**, porque su regex solo mira `$('literal')` y ahí
+>   el nombre viajaba como parámetro de un helper. **Ese fue el primer arreglo**, antes que el bug:
+>   ahora resuelve refs indirectas por evidencia estructural. Cero falsos positivos en los 6.
+> - 🔴 **El techo del archivado nunca fue 5.000: es 1.000.** Medido contra prod sobre 1.936 filas:
+>   `limit=5000`, `limit=50000` y sin `limit` devuelven **las mismas 1.000**. La creencia *"no hay
+>   `db-max-rows`"* estaba escrita en **tres** lugares y salía de una medición del 03/08 hecha sobre
+>   175 filas: *no probaba que no hubiera techo, probaba que no lo tocaba.* `Leer Candidatos
+>   calificados` pagina, y los 3 lectores sin límite de `lib/` abortan ruidoso (`lib/supabase/tope.ts`).
+> - 🟠 **El clic más usado podía mentir sobre si guardó.** `exigirTenant` va fuera del `try` (y tiene
+>   que ir: adentro se traga el `redirect()` de Next), así que un parpadeo de infra hacía que la
+>   action **rechazara** y la UI optimista nunca revirtiera. `lib/accion.ts` lo cubre en los 6 sitios.
+> - 🟠 **8 plurales rotos nuevos** (la clase que ya les costó 6 en dos días), ahora con
+>   `domain/plural.ts` y tests. Y `Destilar criterios` dejó de tener el `catch` vacío.
+> - 🟠 **Cerrar la pestaña dejó de contar como falla**: el barrido del transcriptor cierra en
+>   `parcial`. Las 12 que estaban en `fallo` eran las 12 que existían y **ninguna era un error**.
+>
+> ### 📌 ANOTADO — audit aparte de performance y costo de los workflows (pedido de Mani, 31/08)
+>
+> **No es parte de este cierre y no se ejecutó.** Es otra pregunta: ésta fue *"¿qué está mal?"*; ésa
+> es **"¿esto es lo más eficiente para traer guiones?"**. Alcance que definió Mani: revisar la
+> lógica del programa contra el objetivo real · **qué debe ser knob y qué no** (medido: de las **18
+> perillas de `app.ajustes`, 11 no se tocaron nunca** desde que se sembraron el 31/07, y dos están
+> en 0) · influencia y rol de cada etapa (la corrida del 31/08 fue **1.088 colectados → 451 al gate
+> → 80 entregados**, y el techo del scoring actual es **AUC ≈ 0.71**, ROADMAP §5.2) · **si los
+> actores de Apify son los adecuados** o si hay otros que complementen · y **el costo por guion
+> entregado**, que hoy no existe como número.
+>
+> 🔗 **Va DESPUÉS de que corra una corrida con los arreglos de este cierre adentro.** Un audit de
+> costo sobre datos que perdían el 26% de las corridas mide mal.
+
+
 > # 🟢 ESTADO AL 2026-08-29 — el MVP quedó DECLARADO
 >
 > ⚠️ **Al 31/08 espera UNA sola cosa, y no frena una corrida:** deployar el dashboard (la `034` ya

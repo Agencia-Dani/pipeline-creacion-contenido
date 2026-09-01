@@ -37,7 +37,7 @@ en §Agent skills; acá solo se ubican.
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–084 (84 archivos), una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–085 (85 archivos), una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -168,6 +168,14 @@ en §Agent skills; acá solo se ubican.
   Majo entró esa misma noche. Después dijo **"una: Majo, 20 y 21"** y también envejeció en 8 días.
   Un canario se re-mide, no se cita — y **uno mal consultado miente igual que uno mal escrito**: el
   29/08 `videos_meta` se contó en 4 por pedirle una columna que no existe, y son 5.*
+  ⏳ **La [`035`](core/schema/035_search_path_triggers.sql) (ADR-085) está ESCRITA y ESPERA el Run
+  de Mani.** Le fija `search_path` a los dos triggers del esquema, que hoy resuelven `clients` y
+  `runs` contra el camino de quien los dispare. Son los **2 avisos reales** de los 9 de
+  `get_advisors`; los otros 6 son falsos positivos y ADR-085 escribe por qué, para que el ruido no
+  tape la próxima señal de verdad. Verificar por efecto: `pg_proc.proconfig` pasa de `null` a
+  `search_path=app, public, pg_temp`, el trigger de ciclos sigue rebotando, y los avisos bajan de
+  9 a 7.
+
   *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)
   vive en sus ADRs, en [handoff.md](docs/agents/handoff.md) y en git — acá no se duplica.*
 
@@ -227,7 +235,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..084). *El número sale de `ls docs/adr`, no de acá: este renglón dijo 083 con 84 archivos en disco.*
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..085). *El número sale de `ls docs/adr`, no de acá: este renglón dijo 083 con 84 archivos en disco.*
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del
