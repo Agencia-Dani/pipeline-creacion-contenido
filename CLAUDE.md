@@ -168,13 +168,11 @@ en §Agent skills; acá solo se ubican.
   Majo entró esa misma noche. Después dijo **"una: Majo, 20 y 21"** y también envejeció en 8 días.
   Un canario se re-mide, no se cita — y **uno mal consultado miente igual que uno mal escrito**: el
   29/08 `videos_meta` se contó en 4 por pedirle una columna que no existe, y son 5.*
-  ⏳ **La [`035`](core/schema/035_search_path_triggers.sql) (ADR-085) está ESCRITA y ESPERA el Run
-  de Mani.** Le fija `search_path` a los dos triggers del esquema, que hoy resuelven `clients` y
+  ✅ **La [`035`](core/schema/035_search_path_triggers.sql) (ADR-085) está APLICADA** (Mani, 01/09),
+  verificada por efecto: `proconfig` fijo en las dos y **`get_advisors` bajó de 9 avisos a 7**. Le fija `search_path` a los dos triggers del esquema, que hoy resuelven `clients` y
   `runs` contra el camino de quien los dispare. Son los **2 avisos reales** de los 9 de
   `get_advisors`; los otros 6 son falsos positivos y ADR-085 escribe por qué, para que el ruido no
-  tape la próxima señal de verdad. Verificar por efecto: `pg_proc.proconfig` pasa de `null` a
-  `search_path=app, public, pg_temp`, el trigger de ciclos sigue rebotando, y los avisos bajan de
-  9 a 7.
+  tape la próxima señal de verdad. Los 7 que quedan son los 6 falsos positivos que ADR-085 documenta más el toggle de Auth.
 
   *El historial migración por migración (qué midió cada una, sus modos de falla, sus verificaciones)
   vive en sus ADRs, en [handoff.md](docs/agents/handoff.md) y en git — acá no se duplica.*

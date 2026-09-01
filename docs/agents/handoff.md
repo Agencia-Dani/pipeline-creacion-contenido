@@ -29,11 +29,17 @@
 > **Todo lo de código está aplicado, empujado al live y pusheado.** Quedan 3 cosas que no puedo
 > hacer yo:
 >
-> | Qué falta | Quién | Por qué no lo hice |
+> ✅ **Las tres se cerraron el 2026-09-01.** Quedan escritas con su verificación porque el *cómo se
+> comprobó* es lo reusable:
+>
+> | Qué | Estado | Cómo se verificó |
 > |---|---|---|
-> | **Correr la migración [`035`](../../core/schema/035_search_path_triggers.sql)** en el SQL Editor | Mani | Gate humano, como todas. Verificar por efecto: `proconfig` pasa de `null` a `search_path=...`, y `get_advisors` baja de 9 avisos a 7 |
-> | **Corregir 12 filas de `public.runs`** mal clasificadas | Mani | El clasificador de permisos bloqueó el UPDATE a datos de prod, y no lo rodeé. Es: `update public.runs set estado='parcial' where estado='fallo' and error like 'pasada del transcriptor sin cerrar%';` — verificado que son exactamente 12 y todas del transcriptor |
-> | **Decidir sobre 4 env vars huérfanas** del `.env` de la raíz | Mani | `GOOGLE_SHEET_ID` y `GOOGLE_SHEET_PESTANA` son de Google, que murió con ADR-057 el 05/08. `DESCUBRIMIENTO_WEBHOOK_PATH` no lo lee nadie. ⚠️ **`COCKPIT_PASSWORD` es una credencial viva que ningún código usa**: si no la usás a mano, revocala. No toqué tu `.env` |
+> | Migración [`035`](../../core/schema/035_search_path_triggers.sql) | ✅ **APLICADA** (Mani, 01/09) | **Por efecto y con tres señales, no porque se haya corrido:** `pg_proc.proconfig` pasó de `null` a `search_path=app, public, pg_temp` en las dos · `get_advisors` bajó de **9 avisos a 7**, y los que se fueron son exactamente los dos de `search_path` · las dos califican su tabla (`public.clients`, `public.runs`) con la lógica intacta |
+> | 12 filas de `public.runs` mal clasificadas | ✅ **CORREGIDAS** (01/09) | El transcriptor quedó **12 `ok` + 12 `parcial` y CERO `fallo`**. El total de `fallo` del sistema bajó de **26 a 14**, y los 14 que quedan son de máquinas que sí se cayeron |
+> | `COCKPIT_MAIL` / `COCKPIT_PASSWORD` | ✅ **FUERA del `.env`** (Mani, 01/09) | `n8n:diff` sigue verde en los 5, o sea que ningún script dependía de ellas — que era la medición que decía que se podían sacar |
+>
+> 🧹 **Sobran 3 huérfanas más, inofensivas y sin apuro:** `GOOGLE_SHEET_ID` y `GOOGLE_SHEET_PESTANA`
+> (Google murió con ADR-057 el 05/08) y `DESCUBRIMIENTO_WEBHOOK_PATH`. No las lee nadie.
 >
 > ### Lo que sí quedó hecho (con su medición, no con su intención)
 >

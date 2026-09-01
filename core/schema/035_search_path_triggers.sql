@@ -1,4 +1,7 @@
 -- 035_search_path_triggers.sql — Los dos triggers resuelven sus tablas contra un search_path fijo.
+-- ✅ APLICADA por Mani el 2026-09-01, y VERIFICADA POR EFECTO con tres señales: `proconfig` pasó
+--    de null a `search_path=app, public, pg_temp` en las dos · `get_advisors` bajó de 9 avisos a
+--    7, y los que se fueron son exactamente los dos de search_path · las dos califican su tabla.
 -- Aplicar DESPUÉS de la `034`. SQL Editor de Supabase → pegar → Run.
 --
 -- Ejecuta [ADR-085](../../docs/adr/ADR-085-un-trigger-resuelve-sus-tablas-contra-un-camino-fijo.md).
