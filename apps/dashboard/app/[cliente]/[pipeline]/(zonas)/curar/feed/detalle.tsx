@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { intentar } from "@/lib/accion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
@@ -89,7 +90,12 @@ function Contenido({ candidato }: { candidato: CandidatoFeed }) {
   // rápido: sin él, una respuesta que llega tarde escribiría estado de un modal ya desmontado.
   useEffect(() => {
     let vivo = true;
-    textosDeCandidato({ cliente, pipeline }, candidato.id).then((r) => {
+    // `intentar` y no la llamada pelada: un rechazo dejaba `textos` y `error` los dos en null, o
+    // sea el esqueleto de carga para siempre, sin forma de salir salvo cerrar el modal.
+    intentar(
+      () => textosDeCandidato({ cliente, pipeline }, candidato.id),
+      "No se pudo traer el guion de este candidato.",
+    ).then((r) => {
       if (!vivo) return;
       if (r.ok) setTextos(r.textos);
       else setError(r.mensaje);

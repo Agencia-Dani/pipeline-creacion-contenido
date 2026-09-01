@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { plural } from "@/domain/plural";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CALIFICACIONES } from "@/domain/feed";
@@ -107,7 +108,7 @@ function Tarjeta({ candidato: c }: { candidato: CandidatoLinkedin }) {
             {` · carril ${c.carril}`}
             {c.autor && ` · ${c.autor}`}
             {c.idioma && ` · ${c.idioma}`}
-            {c.reacciones !== null && ` · ${c.reacciones} reacciones`}
+            {c.reacciones !== null && ` · ${c.reacciones} ${plural(c.reacciones, "reacción", "reacciones")}`}
           </p>
         </div>
         <div className="flex items-center gap-1">

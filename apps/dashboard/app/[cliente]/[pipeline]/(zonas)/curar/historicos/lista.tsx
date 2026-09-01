@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { plural } from "@/domain/plural";
+import { intentar } from "@/lib/accion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copiar } from "@/components/ui/copiar";
@@ -299,7 +301,7 @@ export function Lista({
     });
     setError(null);
 
-    void marcarGrabado(cockpit, enlace.enlace, quiero).then((r) => {
+    void intentar(() => marcarGrabado(cockpit, enlace.enlace, quiero)).then((r) => {
       if (!r.ok) {
         setMarcas(antes);
         setError(r.mensaje);
@@ -647,12 +649,21 @@ function RevisarYMarcar({
       // El desglose que faltaba: cuántos cayeron sobre un guion y cuántos quedaron cargados a mano.
       const conGuion = faltan.filter((f) => f.guion !== null).length;
       const sinGuion = faltan.length - conGuion;
-      const lineas = [`✅ ${faltan.length} marcados como grabados.`];
-      if (conGuion > 0) lineas.push(`   · ${conGuion} ya tenían su guion en la herramienta.`);
+      const n = faltan.length;
+      const lineas = [`✅ ${n} ${plural(n, "marcado", "marcados")} como ${plural(n, "grabado", "grabados")}.`];
+      if (conGuion > 0)
+        lineas.push(`   · ${conGuion} ya ${plural(conGuion, "tenía", "tenían")} su guion en la herramienta.`);
       if (sinGuion > 0)
-        lineas.push(`   · ${sinGuion} quedaron como «cargado a mano» (no tienen guion acá).`);
+        lineas.push(
+          `   · ${sinGuion} ${plural(sinGuion, "quedó", "quedaron")} como «cargado a mano» ` +
+            `(no ${plural(sinGuion, "tiene", "tienen")} guion acá).`,
+        );
       if (cuentas && cuentas.grabado > 0)
-        lineas.push(`↩︎ ${cuentas.grabado} ya estaban marcados de antes — no se tocaron.`);
+        lineas.push(
+          `↩︎ ${cuentas.grabado} ya ${plural(cuentas.grabado, "estaba", "estaban")} ` +
+            `${plural(cuentas.grabado, "marcado", "marcados")} de antes — no se ` +
+            `${plural(cuentas.grabado, "tocó", "tocaron")}.`,
+        );
       setResultado(lineas);
       setRevisados(null);
       setTexto("");
@@ -774,7 +785,7 @@ function RevisarYMarcar({
             {marcando
               ? "Guardando…"
               : revisados
-                ? `Marcar ${faltan.length} como grabados`
+                ? `Marcar ${faltan.length} como ${plural(faltan.length, "grabado", "grabados")}`
                 : "Marcar como grabados"}
           </Button>
         </div>
@@ -859,7 +870,10 @@ function Contenido({ fila }: { fila: Extract<FilaRegistro<Historico>, { tipo: "g
   // escribiría estado de un modal ya desmontado.
   useEffect(() => {
     let vivo = true;
-    verGuion(cockpit, h.id).then((r) => {
+    // `intentar` y no un `.catch()` suelto: sin él un rechazo dejaba `setTrayendo(false)` sin
+    // correr —vive adentro del `.then`— y el modal se quedaba con el esqueleto de carga PARA
+    // SIEMPRE, sin más salida que cerrarlo (y reabrirlo repetía la misma llamada rota).
+    intentar(() => verGuion(cockpit, h.id), "No se pudo traer el guion.").then((r) => {
       if (!vivo) return;
       if (r.ok) setScript(r.script);
       else setErrorScript(r.mensaje);

@@ -1,6 +1,8 @@
 "use client";
 
 import { rutaDe } from "@/domain/rutas";
+import { plural } from "@/domain/plural";
+import { intentar } from "@/lib/accion";
 import { usarCockpit } from "../../usar-cockpit";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -169,7 +171,7 @@ export function Mazo({
     setEnviando((e) => new Set(e).add(c.id));
 
     startTransition(async () => {
-      const r = await calificarCandidato(cockpit, c.id, calificacion);
+      const r = await intentar(() => calificarCandidato(cockpit, c.id, calificacion));
       setEnviando((e) => {
         const s = new Set(e);
         s.delete(c.id);
@@ -199,7 +201,10 @@ export function Mazo({
     if (ids.length === 0) return;
     if (
       calificacion === "👎" &&
-      !confirm(`Vas a descartar ${ids.length} videos. Deshacerlo es calificarlos de a uno.`)
+      !confirm(
+        `Vas a descartar ${ids.length} ${plural(ids.length, "video", "videos")}. ` +
+          `Deshacerlo es ${plural(ids.length, "calificarlo", "calificarlos de a uno")}.`,
+      )
     ) {
       return;
     }
@@ -221,7 +226,10 @@ export function Mazo({
     seleccion.limpiar();
 
     startTransition(async () => {
-      const r = await calificarSeleccion(cockpit, ids, calificacion);
+      const r = await intentar(
+        () => calificarSeleccion(cockpit, ids, calificacion),
+        "No se pudo calificar la selección. Se vuelve a pedir el mazo al servidor.",
+      );
       setAvisoSeleccion(r.mensaje);
       // Fail-loud y sin revertir a medias: en lote no se sabe **cuáles** fallaron, así que
       // inventar un rollback parcial pintaría una mentira distinta. Se le vuelve a pedir el mazo al
@@ -435,8 +443,8 @@ export function Mazo({
         >
           <p className="font-medium">
             {pendientes === 0
-              ? `Terminaste el feed. Quedan ${descartesPendientes} descartes por auditar.`
-              : `Y quedan ${descartesPendientes} descartes por auditar.`}
+              ? `Terminaste el feed. ${plural(descartesPendientes, "Queda", "Quedan")} ${descartesPendientes} ${plural(descartesPendientes, "descarte", "descartes")} por auditar.`
+              : `Y ${plural(descartesPendientes, "queda", "quedan")} ${descartesPendientes} ${plural(descartesPendientes, "descarte", "descartes")} por auditar.`}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Son los videos que el filtro mató por poco. Decir cuáles eran buenos es lo que corrige

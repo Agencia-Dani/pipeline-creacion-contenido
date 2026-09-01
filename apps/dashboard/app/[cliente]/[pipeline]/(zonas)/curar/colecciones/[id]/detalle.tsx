@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { plural } from "@/domain/plural";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { BotonBorrar } from "@/components/borrar";
 import { Badge } from "@/components/ui/badge";
@@ -158,7 +159,16 @@ export function Detalle({
   // no se nota en pantalla y le pega al servidor sin parar.
   const { cliente, pipeline } = cockpit;
   useEffect(() => {
-    vocesParaLimpiar({ cliente, pipeline }).then(setVoces);
+    // 🩸 El `.catch()` no es decorativo: `vocesParaLimpiar` devuelve el array pelado (no un
+    // `{ok}`), así que un rechazo dejaba `voces` en `[]` **sin decir nada**, y la pantalla lo
+    // dibuja igual que "esta empresa no tiene voces". Limpiar con criterios de la casa es la mitad
+    // del uso real de esta pantalla, así que una lista vacía por error se lee como una decisión.
+    vocesParaLimpiar({ cliente, pipeline })
+      .then(setVoces)
+      .catch((e) => {
+        console.error("[colección] no se pudieron traer las voces:", e);
+        setAviso({ ok: false, mensaje: "No se pudieron cargar las voces. Recargá la página." });
+      });
   }, [cliente, pipeline]);
 
   function pegar() {
@@ -347,7 +357,7 @@ export function Detalle({
             ? "Ninguno de esos videos se pudo bajar. ¿Son de TikTok, o el creador ya los bajó?"
             : `${bajados} ${bajados === 1 ? "video bajado" : "videos bajados"}.` +
               (fallados > 0
-                ? ` ${fallados} no se pudieron (¿TikTok, o el post ya no está?).`
+                ? ` ${fallados} no se ${plural(fallados, "pudo", "pudieron")} (¿TikTok, o el post ya no está?).`
                 : "") +
               (r.recortado ? " La selección era muy grande: se tomaron los primeros 50." : ""),
       });
@@ -428,7 +438,9 @@ export function Detalle({
           </Button>
           {sinIdentificar > 0 && (
             <Button variant="outline" onClick={identificar} disabled={trabajando}>
-              {trabajando ? "Buscando…" : `Reintentar los ${sinIdentificar} que faltan`}
+              {trabajando
+                ? "Buscando…"
+                : plural(sinIdentificar, "Reintentar el que falta", `Reintentar los ${sinIdentificar} que faltan`)}
             </Button>
           )}
           {videos.length > 0 && (
@@ -478,7 +490,7 @@ export function Detalle({
               limpia solo con los criterios de la casa — correcto, pero no suena a nadie. */}
           {sinPerfil.length > 0 && (
             <p className="w-full text-sm text-muted-foreground">
-              {sinPerfil.length === voces.length ? "Ninguna voz tiene" : `${sinPerfil.length} de ${voces.length} voces no tienen`}{" "}
+              {sinPerfil.length === voces.length ? "Ninguna voz tiene" : `${sinPerfil.length} de ${voces.length} voces no ${plural(sinPerfil.length, "tiene", "tienen")}`}{" "}
               cargado cómo habla ({sinPerfil.map((v) => v.nombre).join(", ")}), así que sus guiones
               van a salir correctos pero neutros. Se carga en{" "}
               <em>Curar → Voces y proyectos → Ver detalle</em>.
