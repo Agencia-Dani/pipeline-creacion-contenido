@@ -85,10 +85,19 @@ export function Mazo({
   inicial,
   cuentas,
   descartesPendientes,
+  repetidos,
 }: {
   inicial: CandidatoFeed[];
   cuentas: Record<Filtro, number>;
   descartesPendientes: number;
+  /**
+   * Id del candidato → el gemelo ya calificado que es el MISMO video (ADR-086).
+   *
+   * Viaja como objeto y no como `Map` porque cruza la frontera server/cliente. Lo calcula el
+   * server sobre la tabla entera, así que **no se recalcula al cambiar de filtro**: un gemelo no
+   * aparece ni desaparece por mirar otro chip.
+   */
+  repetidos: Record<string, { id: string; calificacion: string }>;
 }) {
   const cockpit = usarCockpit();
   const seleccion = usarSeleccion();
@@ -338,6 +347,7 @@ export function Mazo({
                   error={errores[c.id] ?? null}
                   onCalificar={(cal) => calificar(c, cal)}
                   onAbrir={() => setAbiertoId(c.id)}
+                  repetidoDe={repetidos[c.id] ?? null}
                   seleccion={
                     seleccion.activo
                       ? { marcado: seleccion.marcado(c.id), onAlternar: () => seleccion.alternar(c.id) }

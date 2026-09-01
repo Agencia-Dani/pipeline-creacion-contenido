@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FILTRO_INICIAL } from "@/domain/feed";
 import { exigirPantallaDeCurar } from "@/lib/auth";
-import { contarFeed, leerFeed } from "@/lib/candidatos";
+import { contarFeed, leerFeed, leerRepetidos } from "@/lib/candidatos";
 import { contarDescartesPendientes } from "@/lib/descartes";
 import { leerFeedLinkedin, TECHO } from "@/lib/candidatos-linkedin";
 import { Mazo } from "./mazo";
@@ -50,10 +50,14 @@ export default async function FeedPage({
 
   // Los conteos van aparte de las filas a propósito: son cuatro `head` counts sobre la tabla
   // entera, y es lo que deja que los chips digan el avance de CADA filtro y no solo del abierto.
-  const [candidatos, cuentas, descartesPendientes] = await Promise.all([
+  // `leerRepetidos` va acá y no adentro de `leerFeed` porque mira la tabla ENTERA: el gemelo de un
+  // sin-calificar está del lado calificado, o sea fuera del filtro con el que abre el feed
+  // (ADR-086). Por eso tampoco se recalcula al cambiar de filtro — el mapa ya los cubre a todos.
+  const [candidatos, cuentas, descartesPendientes, repetidos] = await Promise.all([
     leerFeed(ctx, FILTRO_INICIAL),
     contarFeed(ctx),
     contarDescartesPendientes(ctx),
+    leerRepetidos(ctx),
   ]);
 
   return (
@@ -87,6 +91,7 @@ export default async function FeedPage({
           inicial={candidatos}
           cuentas={cuentas}
           descartesPendientes={descartesPendientes}
+          repetidos={Object.fromEntries(repetidos)}
         />
       )}
     </div>

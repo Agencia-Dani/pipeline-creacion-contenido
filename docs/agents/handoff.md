@@ -22,6 +22,77 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🔁 CIERRE 131 (2026-09-01) — Dani tenía razón: el dedup recuerda el post, no el video
+>
+> Dani Rodríguez avisó mientras sacaba guiones para la voz nueva (María José Sánchez):
+> *"me están apareciendo en el feed videos que ya había calificado y que grabamos ayer"*.
+>
+> 🔴 **Tenía razón, y NO era ninguno de los bugs que ya arreglamos.** Los cinco sospechosos se
+> descartaron uno por uno, cada uno con su medición contra prod: **0** duplicados por
+> `(instance_id, external_id)` · de los **147** candidatos distintos que calificó, 147 existen y
+> **0** volvieron a `nuevo` · `POST Candidatos` manda `ignore-duplicates` y nunca pisa una nota ·
+> **0** candidatos vivos que ya estuvieran en `outputs` · `n8n:diff` verde en los 5, y por corrida
+> la fuga de la paginación aparece **solo** en la del 31/08 04:30 (4 videos) y **0** de las 13:00
+> en adelante.
+>
+> 🔑 **La causa es de modelo: el dedup compara el ID DEL POST.** Cuando un creador vuelve a subir el
+> mismo reel, Instagram le da un pk nuevo ⇒ para el motor es un video que nunca vio: lo
+> re-transcribe, lo re-paga y lo deja en el Feed como nuevo.
+>
+> **Medido el 01/09 con dos señales independientes** (caption idéntico + guion casi idéntico por
+> solapamiento de palabras), sobre 422 candidatos:
+>
+> | | |
+> |---|---|
+> | Pares "mismo video" en `app.candidatos` | **17** (parecido 0,58–0,93) |
+> | Pares en `app.descartes` (154 filas) | **18** más |
+> | En el Feed sin calificar con el gemelo ya calificado | **11** |
+> | …de esos, con el gemelo **ya grabado** | **3** (ese mismo día, 14:47–14:56, por Dani) |
+> | Juzgados **dos veces** | **4 pares**, y **2 con nota distinta** (🔥 una, 👍 la otra) |
+>
+> Los 2 con nota distinta son lo que envenena a `Destilar criterios` (ADR-022), que aprende de los 🔥.
+> Y lo último que hizo Dani antes de escribir fue **calificar 👍 a las 15:43:20 un video cuyo gemelo
+> ya había 👍 el 31/08**: esa es la tarjeta que disparó el mensaje.
+>
+> 📈 **No es una regresión, es un umbral.** Dani sumó 12 referentes el 30/08 y los `colectados`
+> pasaron de **524 → 1.088 → 1.178** por corrida: a ~100 posts de profundidad por perfil es donde
+> viven las re-subidas. Con más referentes, empeora.
+>
+> ### Lo que quedó hecho
+>
+> - ✅ **Los 11 del Feed, corregidos en prod.** Se les puso la nota de su gemelo (los 🔥 bajados a 👍
+>   para no contarle dos veces el mismo ejemplo al destilado) y una `notas_equipo` que dice de qué
+>   post son repetidos. **Verificado por efecto:** el feed pasó de **222 a 211** sin calificar y
+>   quedaron **0** repetidos adentro. Queda el rastro en `app.eventos` como
+>   `candidatos.marcar_repetidos`, con **`usuario_id` en null a propósito: no fue una persona**.
+> - ✅ **El Feed avisa** (ADR-086): la tarjeta cuyo `referente + caption` coincide con uno ya
+>   calificado muestra *"🔁 ya lo calificaste 👍"*. `domain/repetidos.ts` + **10 tests**,
+>   `lib/candidatos.ts::leerRepetidos` (lee la tabla **entera**, no el filtro abierto — el gemelo
+>   está por definición del lado calificado; es sumidero), y `TarjetaVideo` gana una ranura `aviso`
+>   **fuera del `truncate`**. `npm run typecheck` limpio, **494 tests verdes**, `npm run build` OK.
+> - ✅ **ADR-086** con el porqué de avisar y no bloquear: el caption exacto caza 7 de 17 y **se
+>   equivoca en la mitad** (los creadores repiten caption en una serie). *Un aviso con 50% de
+>   precisión cuesta una mirada; un bloqueo con 50% cuesta un video bueno que nadie vuelve a ver.*
+>
+> ### ⚠️ Lo que NO está arreglado, dicho sin eufemismo
+>
+> - **La detección de hoy caza ~7 de cada 17.** El Feed avisa a medias. No leerlo como cerrado.
+> - **Se sigue pagando la transcripción del duplicado** (~0,014 USD c/u, ~0,5 USD sobre los 35
+>   medidos). El aviso salva a la persona y la doble grabación, no la plata.
+>
+> ### 🔴 PENDIENTE DE MANI — la migración `036`
+>
+> [`core/schema/036_candidatos_huella.sql`](../../core/schema/036_candidatos_huella.sql) está
+> escrita y **sin aplicar**. Agrega `huella_guion` y `duracion_seg`, y **no las usa nadie todavía:
+> existen para poder medir**. La duración llega gratis desde `Normalizar IG` y hoy **se tira**, así
+> que su tasa de colisión —el único motivo por el que no es ya la llave del bloqueo pre-pago— **no
+> se puede cuantificar**. Aplicarla, dejar correr una corrida real, y recién ahí decidir si alguna
+> aguanta un filtro duro en `Heat-score v1`. La verificación esperada está en su §2.
+>
+> 🐤 **Y la pregunta que se re-mide, no se cita:** *¿cuántos pares nuevos aparecen por corrida?* Es
+> el mismo Jaccard sobre `app.candidatos`, corrido después de la próxima corrida real. Hoy son 17.
+
+
 > # 🔎 CIERRE 130 (2026-08-31) — revisión completa del pipeline, y lo que quedó a mano
 >
 > Mani pidió una revisión de las tres superficies (workflows · cockpit en Vercel · repo y docs)

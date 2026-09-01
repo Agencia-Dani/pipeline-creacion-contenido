@@ -11,9 +11,11 @@ import {
   type Filtro,
   type TextosCandidato,
 } from "@/domain/feed";
+import { detectarRepetidos, type Gemelo } from "@/domain/repetidos";
 import type { TenantContext } from "@/domain/tenant";
 import { fechaHora } from "@/lib/fechas";
 import { scoped } from "@/lib/supabase/scoped";
+import { abortarSiTruncado } from "@/lib/supabase/tope";
 
 // El feed de calificación. Desde D7 los candidatos viven **en Postgres**: los escribe el motor por
 // PostgREST (ADR-035) y los lee el archivado por el mismo canal. Airtable ya no participa.
@@ -171,6 +173,58 @@ function conFiltro<Q extends {
   if (cond.op === "eq") return q.eq("calificacion", cond.valor);
   return q.in("calificacion", [...cond.valor]);
 }
+
+/**
+ * Quiénes del feed son **el mismo video que uno ya calificado** (ADR-086).
+ *
+ * 🩸 Dani lo reportó el 2026-09-01: *"me están apareciendo en el feed videos que ya había
+ * calificado y que grabamos ayer"*. Tenía razón, y no era ninguno de los bugs ya arreglados — el
+ * dedup del motor recuerda el **id del post** y el creador re-sube el mismo reel con un id nuevo.
+ * El porqué, la medición y por qué esto avisa en vez de bloquear están en `domain/repetidos.ts`.
+ *
+ * 🔑 **Va aparte de `leerFeed` y lee la tabla ENTERA, no el filtro abierto.** El gemelo de un
+ * candidato sin calificar está, por definición, del lado calificado — o sea fuera del filtro con el
+ * que abre el feed. Leerlo con el filtro puesto sería garantizar que nunca se encuentre.
+ *
+ * Son 4 columnas cortas (~150 bytes por fila), no los `script`: el mismo criterio de payload que
+ * `COLUMNAS` ya toma, por la misma razón medida.
+ *
+ * **Es sumidero: si falla, devuelve el mapa vacío y el feed se dibuja sin avisos.** Saber que un
+ * video está repetido no puede impedir calificarlo, que es a lo que la pantalla existe (invariante
+ * #1 de PLAN §2.5) — mismo criterio que `etiquetasDeCorrida`.
+ */
+export async function leerRepetidos(ctx: TenantContext): Promise<Map<string, Gemelo>> {
+  try {
+    const { data, error } = await (await scoped(ctx))
+      .select("app.candidatos", "id, referente, titulo, calificacion");
+    if (error) throw new Error(error.message);
+
+    const filas = z.array(filaHuella).parse(data ?? []);
+    // El barrido de 20 días mantiene esta tabla en cientos de filas, así que hoy no puede
+    // dispararse. Cuando dispare, truncar sería indistinguible de "no había gemelo" y el aviso
+    // desaparecería en silencio: exactamente el modo de falla que `tope.ts` existe para evitar.
+    abortarSiTruncado(filas.length, "los candidatos para detectar repetidos");
+
+    return detectarRepetidos(
+      filas.map((f) => ({
+        id: f.id,
+        referente: f.referente,
+        texto: f.titulo,
+        calificacion: esCalificacion(f.calificacion) ? f.calificacion : null,
+      })),
+    );
+  } catch (e) {
+    console.error("[candidatos] no se pudieron detectar los repetidos (ADR-086):", e);
+    return new Map();
+  }
+}
+
+const filaHuella = z.object({
+  id: z.string(),
+  referente: z.string().nullable(),
+  titulo: z.string(),
+  calificacion: z.string().nullable(),
+});
 
 /**
  * Los cuatro contadores de los chips, sobre la tabla entera y no sobre la página.

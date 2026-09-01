@@ -71,6 +71,7 @@ export function TarjetaVideo({
   video,
   badge,
   subtitulo,
+  aviso,
   pie,
   atenuada = false,
   error = null,
@@ -82,6 +83,14 @@ export function TarjetaVideo({
   badge?: ReactNode;
   /** Reemplaza la línea de referente + vistas. Sin esto se dibuja la de por defecto. */
   subtitulo?: ReactNode;
+  /**
+   * Una advertencia sobre el video, debajo del subtítulo y **fuera del `truncate`**.
+   *
+   * Va en su propia ranura y no dentro de `subtitulo` porque esa línea se corta a una sola con
+   * ellipsis: un aviso truncado es un aviso que nadie lee. El primer caso es "esto es el mismo
+   * video que uno que ya calificaste" (ADR-086).
+   */
+  aviso?: ReactNode;
   /** El pie de la tarjeta: las acciones de cada pantalla. Sin esto no se dibuja el borde. */
   pie?: ReactNode;
   /** Ya se despachó: se atenúa y se queda en su lugar (no se va de la grilla). */
@@ -148,6 +157,7 @@ export function TarjetaVideo({
               </>
             )}
           </p>
+          {aviso && <div className="pt-1">{aviso}</div>}
         </div>
       </button>
 

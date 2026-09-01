@@ -37,7 +37,7 @@ en §Agent skills; acá solo se ubican.
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–085 (85 archivos), una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–086 (86 archivos), una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -168,6 +168,15 @@ en §Agent skills; acá solo se ubican.
   Majo entró esa misma noche. Después dijo **"una: Majo, 20 y 21"** y también envejeció en 8 días.
   Un canario se re-mide, no se cita — y **uno mal consultado miente igual que uno mal escrito**: el
   29/08 `videos_meta` se contó en 4 por pedirle una columna que no existe, y son 5.*
+  🕓 **La [`036`](core/schema/036_candidatos_huella.sql) (ADR-086) está ESCRITA y SIN APLICAR** —
+  agrega `app.candidatos.huella_guion` y `duracion_seg`. **No las usa nadie todavía: existen para
+  poder medir.** El dedup del motor recuerda el *id del post* y no el video, así que una re-subida
+  del mismo reel entra como nueva (medido el 01/09: **17 pares** en `app.candidatos`, **18 más** en
+  `app.descartes`, **11 en el Feed con el gemelo ya calificado y 3 de esos con el gemelo ya
+  grabado**). El Feed ya **avisa** con lo que tiene (caption + referente, ~7 de cada 17); lo que la
+  `036` habilita es la pregunta que hoy no se puede contestar: *¿la duración colisiona entre videos
+  distintos del mismo creador?* — **no se puede cuantificar porque el dato hoy se tira**, y por eso
+  se guarda antes de decidir. ⚠️ *Guardarla no autoriza a bloquear con ella.*
   ✅ **La [`035`](core/schema/035_search_path_triggers.sql) (ADR-085) está APLICADA** (Mani, 01/09),
   verificada por efecto: `proconfig` fijo en las dos y **`get_advisors` bajó de 9 avisos a 7**. Le fija `search_path` a los dos triggers del esquema, que hoy resuelven `clients` y
   `runs` contra el camino de quien los dispare. Son los **2 avisos reales** de los 9 de
@@ -233,7 +242,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..085). *El número sale de `ls docs/adr`, no de acá: este renglón dijo 083 con 84 archivos en disco.*
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..086). *El número sale de `ls docs/adr`, no de acá: este renglón dijo 083 con 84 archivos en disco.*
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

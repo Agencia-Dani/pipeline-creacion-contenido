@@ -68,6 +68,7 @@ export function Tarjeta({
   error,
   onCalificar,
   onAbrir,
+  repetidoDe,
   seleccion,
 }: {
   candidato: CandidatoFeed;
@@ -76,6 +77,15 @@ export function Tarjeta({
   error: string | null;
   onCalificar: (c: Calificacion) => void;
   onAbrir: () => void;
+  /**
+   * El gemelo ya calificado que es el MISMO video, o `null` (ADR-086).
+   *
+   * ⚠️ **Es un aviso, no un bloqueo, y la tarjeta se sigue pudiendo calificar igual.** La detección
+   * se equivoca en ~la mitad de lo que marca (un creador puede repetir el caption en una serie de
+   * videos distintos), así que la que decide es la persona. Esconder la tarjeta con esa precisión
+   * perdería videos buenos en silencio.
+   */
+  repetidoDe?: { id: string; calificacion: string } | null;
   /** Modo selección prendido: la tarjeta marca en vez de abrir. Ver `components/video/seleccion`. */
   seleccion?: { marcado: boolean; onAlternar: () => void };
 }) {
@@ -87,6 +97,20 @@ export function Tarjeta({
       error={error}
       onAbrir={onAbrir}
       seleccion={seleccion}
+      aviso={
+        repetidoDe && puesta === null ? (
+          <span
+            className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[11px] leading-tight text-amber-700 dark:text-amber-400"
+            title={
+              "Este video parece ser el mismo que uno que ya calificaste como " +
+              repetidoDe.calificacion +
+              ". Pasa cuando el creador vuelve a subir el mismo reel: Instagram le da otro id y el motor lo trae como nuevo. Revisá antes de calificar."
+            }
+          >
+            🔁 ya lo calificaste {repetidoDe.calificacion}
+          </span>
+        ) : null
+      }
       // `high-end` va en el subtítulo y no como badge sobre la miniatura: lo tiene buena parte del
       // feed, así que flotando era ruido en vez de señal. Es una marca, no cambia el orden.
       subtitulo={
