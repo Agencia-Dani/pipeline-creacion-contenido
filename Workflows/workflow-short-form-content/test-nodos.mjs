@@ -935,6 +935,48 @@ const runHeat = ({ items = [], procesados = [], feed = [], senal = [], cfg = {},
 const feedPage = (...ids) => ids.map((id) => ({ external_id: id }));
 const hvid = (id, pid = 'P1', extra = {}) => Object.assign({ external_id: id, proyecto_id: pid, reproducciones: 100, likes: 10, engagement_rate: 0.1, descripcion: 'hola ' + id, username: 'ref' }, extra);
 
+seccion('Heat-score v1 — el desglose de por qué murió cada video (pendiente #9 del audit)');
+{
+  // Hasta hoy los 3 filtros compartían `metricas.filtrados`, un solo número. Medido el 01/09: la
+  // corrida de las 14:17 pasó de 3.306 pares a 42 acá (98,7%) y era imposible decidir si sobraba
+  // memoria o si el piso estaba muy alto. Un número que no distingue causas no habilita ninguna
+  // decisión.
+  const items = [
+    hvid('vivo', 'P1', { reproducciones: 500000, likes: 900 }),
+    hvid('ya-visto', 'P1', { reproducciones: 500000, likes: 900 }),
+    hvid('pocas-vistas', 'P1', { reproducciones: 50, likes: 900 }),
+    hvid('pocos-likes', 'P1', { reproducciones: 500000, likes: 1 }),
+  ];
+  const { out, logs } = runHeat({
+    items, procesados: [{ external_id: 'ya-visto' }],
+    cfg: { min_views: 100000, min_likes: 10 },
+  });
+  const m = out[0] && out[0]._muertos;
+  check('solo pasa el que sobrevive los tres filtros', out.length === 1 && out[0].external_id === 'vivo', JSON.stringify(out.map((o) => o.external_id)));
+  check('y cada motivo se cuenta por separado (era UN número para TRES filtros)',
+    m && m.dedup === 1 && m.min_views === 1 && m.min_likes === 1, JSON.stringify(m));
+  check('los pisos vigentes viajan con el número (sin ellos no se puede interpretar después)',
+    m && m.piso_views === 100000 && m.piso_likes === 10, JSON.stringify(m));
+  check('y sale por log', logs.some((l) => /\[Filtros\] muertos por motivo/.test(l)), JSON.stringify(logs));
+}
+{
+  // El orden importa: un video que está ya visto Y bajo el piso cuenta UNA vez, como dedup. Si
+  // contara en los dos, la suma pasaría el total y nadie podría sumar el embudo.
+  const items = [hvid('ambos', 'P1', { reproducciones: 5, likes: 0 })];
+  const { out } = runHeat({ items, procesados: [{ external_id: 'ambos' }], cfg: { min_views: 100000, min_likes: 10 } });
+  const { out: o2 } = runHeat({ items: [hvid('x', 'P1', { reproducciones: 500000, likes: 900 })], procesados: [{ external_id: 'ambos' }], cfg: { min_views: 100000 } });
+  check('un video que cae por dos motivos cuenta una sola vez (la memoria manda)',
+    out.length === 0 && o2[0]._muertos.dedup === 0 && o2[0]._muertos.min_views === 0, JSON.stringify(o2[0]._muertos));
+}
+{
+  // El fan-out repite el mismo video una vez por proyecto: si se contaran FILAS, los tres números
+  // se inflarían por igual y el desglose diría 3 donde hay 1.
+  const items = [hvid('dup', 'P1', { reproducciones: 5 }), hvid('dup', 'P2', { reproducciones: 5 }), hvid('dup', 'P3', { reproducciones: 5 }),
+                 hvid('ok', 'P1', { reproducciones: 500000, likes: 900 })];
+  const { out } = runHeat({ items, cfg: { min_views: 100000 } });
+  check('cuenta VIDEOS distintos, no filas del fan-out', out[0]._muertos.min_views === 1, JSON.stringify(out[0]._muertos));
+}
+
 seccion('Heat-score v1 — dedup blindado (ADR-029)');
 {
   const { out } = runHeat({ items: [hvid('a'), hvid('b')], procesados: [{ external_id: 'a', platform: 'instagram' }] });

@@ -122,6 +122,30 @@ Sobre los 3 (corrida × proyecto) **100% calificados**, si el cupo hubiera sido 
   ADR-088 se negó a tocar el prompt.
 - **Tocar `Heat-score v1`.** Es pre-transcript. Ver arriba.
 
+## 🩸 Corrección del mismo día — el cambio al `Config` NO estaba vigente
+
+**Se aplicó al `Config` y no hacía nada.** El gate arma su config así:
+
+```js
+const cfg = Object.assign({}, $('Config').first().json, (plan.ajustes || {}));
+```
+
+**Los ajustes del cockpit PISAN al `Config`**, y `app.ajustes` tenía `Peso de relevancia = 0.7`. O
+sea que el push llegó al live, `n8n:diff` cerró verde en los 5, y **el valor que corría seguía siendo
+0,7**.
+
+🔑 **La lección, que vale más que el bug: `n8n:diff` verde prueba que el live corre el WORKFLOW del
+repo, no que un VALOR esté vigente.** Hay una capa de configuración encima que el diff **no mira y no
+puede mirar** — vive en Postgres, no en n8n. Todo knob con fila en `app.ajustes` tiene el mismo punto
+ciego. *Verificar la capa equivocada se ve idéntico a verificar.*
+
+✅ **Corregido:** `update app.ajustes set valor='1' where clave='Peso de relevancia'`, y **verificado
+por el camino real del motor** (no releyendo la tabla recién escrita): `GET /api/engine/run-plan
+?ambito=motor&instancia=<reels>` devuelve **200** con `{clave: 'Peso de relevancia', valor: 1}`.
+
+📌 **El `Config` queda en 1 igual**, que es lo correcto: es el default para una instancia nueva que
+no tenga la fila. Los dos lados dicen lo mismo.
+
 ## Hecho cuando
 
 📏 **Se juzga por el norte de ADR-089** (`aprobados / N pedido`, por proyecto y corrida), en las
