@@ -22,6 +22,74 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🪜 CIERRE 134 (2026-09-01) — El escalón 5 dejó de disparar antes de tiempo
+>
+> El **#1 del pendiente** de [plan-cascada-de-entrega.md](./plan-cascada-de-entrega.md), cobrado.
+> ADR-088 (cierre 133) hizo lo correcto en el momento equivocado: los bajo-umbral entraban
+> **siempre**, no sólo cuando N quedaba corto. Mani, al verlo: *"eso de entregar los 6 rechazados no
+> debe ser"*.
+>
+> 🔑 **Y la razón estructural es la que ordena el arreglo: `Gate de relevancia` NO SABE cuánto falta
+> para N.** Ese número es `_nDe(pid)` y sólo existe en `Armar candidato`, dos nodos más abajo — así
+> que **el condicional nunca pudo vivir en el gate.** El cambio es de un solo nodo.
+>
+> ## Lo que quedó hecho
+>
+> - ✅ **El corte de `Armar candidato` tiene dos escalones.** Cada proyecto llena su N con los
+>   aprobados (PISO primero, después heat, como siempre) y **recién si quedó corto** completa con los
+>   `_bajo_umbral`, por heat y **sólo por lo que falta**. Lo que sobra no se entrega y **no se quema**
+>   (ADR-087), así que vuelve gratis.
+> - ✅ **[ADR-088 §Enmienda](../adr/ADR-088-el-gate-ordena-no-veta.md)** reescrita de PENDIENTE a
+>   APLICADA, con las dos puertas de atrás y lo que supersede.
+> - ✅ **En el live** (01/09): `n8n:push --apply` sobre 2 nodos, **`n8n:diff` verde en los 5**, 40
+>   nodos, workflow activo. Rollback: `.n8n-snapshots/motor-2026-09-02T02-02-36-217Z.json`.
+> - ✅ `test-nodos.mjs` **207 checks** (eran 199), `auditar-workflows.mjs` sin hallazgos, validador
+>   **2605/0**.
+>
+> ## 🔑 Dos puertas de atrás por las que la prioridad se anulaba sola
+>
+> Ninguna de las dos era obvia, y las dos habrían dejado el arreglo pareciendo hecho:
+>
+> 1. **El dedup del fan-out.** Haiku devuelve `relevante` y `score` **por separado**, así que un
+>    `relevante:false` con score 0,7 **existe** — y le ganaba la copia a un `relevante:true` con 0,5.
+>    Con eso el video caía en la **reserva** de P1 en vez del **cupo** de P2, que sí lo quería, y el
+>    escalón 5 lo entregaba sólo si P1 quedaba corto. *El dedup podía anular la prioridad un paso
+>    antes de que existiera.* Ahora el orden es *(1) aprobado, (2) relevancia, (3) heat*.
+> 2. **El spillover.** Dos sobrantes peleando el último cupo de otro proyecto se ordenaban sólo por
+>    heat, así que un bajo-umbral viral le sacaba el asiento a un aprobado por la puerta de atrás.
+>
+> **El PISO (ADR-017) NO re-aplica sobre la reserva**, con la misma frase con la que ya no re-aplica
+> en el spillover: *es relleno marginal, no redistribución.*
+>
+> ## 📏 La métrica que el cambio de forma habría dejado mintiendo
+>
+> `metricas.bajo_umbral` cuenta lo **ADMITIDO** por el gate, que hasta el cierre 133 era lo mismo que
+> lo entregado. **Ya no**: el gate admite todo y el corte usa la reserva sólo si hace falta. Sin
+> arreglarlo, `bajo_umbral: 40` se seguiría leyendo como *"40 dudosos en el Feed"* cuando pueden ser
+> 2 — el **mismo modo de falla** que el cierre 129 le encontró a `haiku_lotes_pretrim`. Se agrega
+> **`metricas.bajo_umbral_entregados`**; la marca viaja hasta la salida de `Armar candidato` y **no
+> llega a la base** (`Preparar candidatos` elige campo por campo, igual que con `_entregado`).
+>
+> 🔑 **Y ese contador es el que dice si este escalón importa:** si sale **0 en varias corridas**, el
+> escalón 5 es una red que nadie usa y el cuello está donde dice el §5 del plan — en el supply.
+>
+> ## 🩸 Los tests se corrieron contra el código VIEJO a propósito
+>
+> **7 de los 8 nuevos se ponen ROJOS contra el `workflow.json` de HEAD.** El octavo es una
+> no-regresión (un proyecto sin ningún aprobado entrega su reserva entera y no se queda en cero).
+> *Un test que no puede fallar no prueba nada*, y el primer intento tenía uno así: con la reserva
+> siempre por debajo en heat, el corte viejo daba el mismo resultado. Se corrigió bajándole el heat a
+> un aprobado, que es el caso que de verdad discrimina.
+>
+> ## ⚠️ Lo que este cierre NO resuelve
+>
+> - **Faltan los escalones 2 y 4**, que son los que le dan trabajo a los de arriba **antes** de que
+>   el 5 tenga que actuar. El 5 sin ellos es una red de último recurso que se va a usar más de lo que
+>   debería. El #1 del pendiente ahora es el **escalón 2** (segunda oportunidad cross-proyecto), y
+>   **pide ADR nueva**.
+> - **Sigue sin medirse nada**: 0 corridas desde el push, y las 4 voces en `activo = false`.
+> - **El cuello del §5 sigue intacto**: esto reparte mejor lo que hay, no crea oferta.
+
 > # ⚖️ CIERRE 133 (2026-09-01) — El gate ordena, no veta
 >
 > Segundo movimiento del mismo audit, y **sólo era posible después del cierre 132**: hasta ayer lo

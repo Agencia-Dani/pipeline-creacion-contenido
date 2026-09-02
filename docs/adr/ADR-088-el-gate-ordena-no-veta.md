@@ -93,8 +93,10 @@ con las 422 filas históricas** justo cuando hay que medir si el cambio sirvió.
 
 ## Alternativas descartadas
 
-- **Forzar que los bajo-umbral queden siempre debajo de los aprobados.** Suena obvio y **la medición
-  lo desaconseja**: con `relevancia_score` correlacionando 0,218 y las métricas 0,493, forzar el
+- **Forzar que los bajo-umbral queden siempre debajo de los aprobados.** ⚠️ **Superseded en parte
+  por la §Enmienda de abajo, y conviene leer las dos:** lo que sigue en pie es el **orden** (nada
+  re-rankea el Feed); lo que cambió es la **elegibilidad** (un bajo-umbral no consume un cupo que un
+  aprobado podía usar). Suena obvio y **la medición lo desaconseja**: con `relevancia_score` correlacionando 0,218 y las métricas 0,493, forzar el
   grupo **privilegia la señal más débil**. Un video viral que Haiku creyó off-topic puede ser mejor
   apuesta que un on-topic con 20 mil vistas. El `composite` ya mezcla las dos en la proporción que
   ADR-030 fijó; que decida él.
@@ -111,39 +113,82 @@ con las 422 filas históricas** justo cuando hay que medir si el cambio sirvió.
 ## Toca
 
 `Gate de relevancia` (el filtro `kept` + la marca `_bajo_umbral`) y `Resumen del run`
-(`metricas.bajo_umbral`). **Nada más**: `Armar candidato` ya cortaba a N por `composite`, y
-`Preparar descartes` ya filtraba por `_descarte`. Probado en `test-nodos.mjs` (**199 checks**, 7
-nuevos: que el rechazado entra, que va marcado, que el aprobado no, que el score sigue ordenando, y
-las dos puntas de `MIN_REL`).
+(`metricas.bajo_umbral`). Probado en `test-nodos.mjs` (**199 checks**, 7 nuevos: que el rechazado
+entra, que va marcado, que el aprobado no, que el score sigue ordenando, y las dos puntas de
+`MIN_REL`).
 
-## 🔴 Enmienda PENDIENTE (2026-09-01, mismo día) — el escalón dispara antes de tiempo
+⚠️ *Este párrafo decía **"nada más: `Armar candidato` ya cortaba a N por `composite`"** y era el
+error del ADR, no una imprecisión: **ahí** estaba el nodo que faltaba tocar. Ver la §Enmienda.*
 
-Mani, al ver la implementación: *"eso de entregar los 6 rechazados no debe ser"*. Tiene razón, y el
-error es de **momento**, no de dirección.
+## ✅ Enmienda APLICADA (2026-09-01, mismo día) — el escalón sólo dispara si N quedó corto
+
+Mani, al ver la implementación: *"eso de entregar los 6 rechazados no debe ser"*. Tenía razón, y el
+error era de **momento**, no de dirección.
 
 Este ADR es **el último escalón de una cascada de cinco** ([plan-cascada-de-entrega.md](../agents/plan-cascada-de-entrega.md)),
-y hoy dispara **siempre** en vez de sólo cuando N quedó corto. Faltan los escalones de arriba:
-ofrecerle el video a los demás proyectos (escalón 2) y rellenar con lo ya transcrito (escalón 4).
+y disparaba **siempre** en vez de sólo cuando N quedaba corto.
 
-🔑 **Y hay una razón estructural por la que salió así: `Gate de relevancia` no sabe cuánto falta
-para N.** Ese corte vive en `Armar candidato`, dos nodos más abajo. Un gate no puede decidir *"dejo
-pasar para rellenar"* porque no tiene el número. **El condicional pertenece a `Armar candidato`:**
+🔑 **La razón estructural por la que salió así: `Gate de relevancia` no sabe cuánto falta para N.**
+Ese número es `_nDe(pid)` y sólo existe en `Armar candidato`, dos nodos más abajo. Un gate no puede
+decidir *"dejo pasar para rellenar"* porque no tiene el número — **el condicional nunca pudo vivir
+en el gate.**
 
-1. llenar N con los aprobados (`_bajo_umbral !== true`), por `composite` — lo de siempre;
-2. ¿quedó corto? recién ahí, completar con los `_bajo_umbral`;
-3. lo que sobra no se entrega **y no se quema** (ADR-087).
+**Lo que cambia, y es todo en `Armar candidato`:** el corte por proyecto pasa a tener **dos
+escalones**. Cada proyecto llena su N con los aprobados (PISO primero, después heat, como siempre) y
+**recién si quedó corto** completa con los `_bajo_umbral`, por heat y **sólo por lo que falta**. Lo
+que sobra no se entrega y **no se quema** (ADR-087), así que vuelve gratis la próxima corrida.
 
-La marca `_bajo_umbral` **ya existe y ya viaja**, así que son ~10 líneas y **ninguna migración**.
+**Y hay dos puertas de atrás por las que la prioridad se anulaba sola**, las dos cerradas acá:
 
-**Mientras tanto la válvula es un knob, no un rollback:** `Relevancia mínima` en ~0,55 restaura el
-veto viejo, porque este ADR la convirtió en el único veto. ⚠️ Al 01/09 está en **0**.
+1. **El dedup.** Haiku devuelve `relevante` y `score` **por separado**, así que un `relevante:false`
+   con score 0,7 existe y le ganaba el fan-out a un `relevante:true` con 0,5. Con eso el video caía
+   en la **reserva** de P1 en vez del **cupo** de P2 —que sí lo quería— y el escalón 5 lo entregaba
+   sólo si P1 quedaba corto. Ahora la prioridad del fan-out es *(1) aprobado, (2) relevancia, (3)
+   heat*.
+2. **El spillover.** Si dos sobrantes se pelean el último cupo de otro proyecto, primero el
+   aprobado. Ordenar sólo por heat le regalaba el cupo al escalón 5 por la puerta de atrás.
 
-📌 **Nada de esto llegó a producir un video todavía: 0 corridas desde el push.** Los canarios siguen
-en cero, así que no hay nada que limpiar — sólo que ordenar antes de la primera corrida real.
+**El PISO (ADR-017) NO re-aplica sobre la reserva**, por el mismo motivo por el que no re-aplica en
+el spillover y con la misma frase: *es relleno marginal, no redistribución.*
+
+### ⚠️ Esto SUPERSEDE una de las alternativas descartadas de arriba
+
+*"Forzar que los bajo-umbral queden siempre debajo de los aprobados"* se descartó el mismo día
+porque **privilegia la señal más débil** (0,218 contra 0,493). Ese argumento sigue en pie **para el
+orden**: nada acá re-ordena el Feed, el `composite` sigue siendo el único que rankea y el equipo ve
+lo entregado en ese orden. Lo que cambia es la **elegibilidad**: quién tiene derecho a un cupo de N.
+*Un bajo-umbral no ordena peor que un aprobado; simplemente no le saca el asiento a uno.*
+
+### 📏 Y la métrica que el cambio de forma habría dejado mintiendo
+
+`metricas.bajo_umbral` cuenta lo **ADMITIDO** por el gate, que hasta hoy era lo mismo que lo
+entregado. Con el escalón 5 dejan de ser el mismo número: el gate admite todo y `Armar candidato` usa
+la reserva sólo si hace falta. Sin arreglar eso, `bajo_umbral: 40` se seguiría leyendo como *"40
+dudosos en el Feed"* cuando pueden ser 2 — el mismo modo de falla que el cierre 129 le encontró a
+`haiku_lotes_pretrim`. Se agrega **`metricas.bajo_umbral_entregados`** (videos distintos con
+`_bajo_umbral` en la salida de `Armar candidato`), y la marca viaja hasta ahí. **No llega a la base:**
+`Preparar candidatos` elige campo por campo, igual que con `_entregado`.
+
+**Verificado:** `test-nodos.mjs` en **207 checks** (8 nuevos), y **7 de los 8 se ponen ROJOS contra
+el `workflow.json` de HEAD** — corridos contra el código viejo a propósito, porque un test que no
+puede fallar no prueba nada. El octavo es una no-regresión (un proyecto sin ningún aprobado entrega
+su reserva entera y no se queda en cero). `auditar-workflows.mjs` sin hallazgos, validador 2605/0.
+
+📌 **Nada de esto llegó a producir un video: 0 corridas desde el push de ADR-088.** Los canarios
+siguen en cero, así que no hubo nada que limpiar.
+
+**Sigue en pie la válvula:** `Relevancia mínima` en ~0,55 restaura el veto viejo sin tocar código,
+porque este ADR la convirtió en el único veto. ⚠️ Al 01/09 está en **0**, y ahora eso es lo correcto:
+con el escalón 5 en su lugar, el bajo-umbral ya no entra si no hace falta.
+
 
 ## Hecho cuando
 
-1. Una corrida real reporta `metricas.bajo_umbral > 0` y **entrega más que su gate anterior**.
+1. Una corrida real **entrega más que su gate anterior**. El número a leer es
+   **`metricas.bajo_umbral_entregados`** y no `bajo_umbral`: desde la §Enmienda el segundo cuenta lo
+   ADMITIDO por el gate (que es casi todo) y el primero lo que de verdad hizo falta para llenar N.
+   🔑 **Si `bajo_umbral_entregados` sale 0 en varias corridas, el escalón 5 no es la palanca** — es
+   una red que nadie está usando, y el cuello está en el supply (§5 del plan de la cascada).
 2. 📏 **La medición que decide si el veto servía**, cruzando lo que ya se persiste:
    ```sql
    select (relevancia_score < 0.55) as habria_sido_vetado,

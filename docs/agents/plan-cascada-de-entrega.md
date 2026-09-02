@@ -1,9 +1,9 @@
 # Plan — La cascada de entrega: agotar lo bueno antes de aflojar
 
-> **Estado: 2 de 5 escalones puestos, y el que está puesto dispara antes de tiempo.**
-> Este doc es el pendiente vivo del audit del 2026-09-01 (cierres 132 y 133). Leerlo entero antes de
-> tocar el motor: hay tres cosas ya aplicadas en producción y una que **hace lo correcto en el
-> momento equivocado**.
+> **Estado: 3 de 5 escalones puestos, y el que disparaba antes de tiempo ya está en su lugar.**
+> Este doc es el pendiente vivo del audit del 2026-09-01 (cierres 132, 133 y 134). Leerlo entero
+> antes de tocar el motor. **Lo que falta son los escalones 2 y 4**, que son los que le dan trabajo
+> a los de arriba antes de que el 5 tenga que actuar.
 
 ---
 
@@ -18,13 +18,13 @@ Mani lo dijo así el 01/09, corrigiendo la implementación de ADR-088:
 > o, en últimas, dejar pasar los siguientes N mejores para completar."*
 
 **Llenar N no es una decisión, es una cascada de cinco**, y el orden es todo el diseño: cada
-escalón sólo corre si el anterior no alcanzó. Lo que está mal hoy no es *qué* hace el motor sino
-*cuándo*: **el escalón 5 dispara de una, sin haber intentado el 2, el 3 y el 4.**
+escalón sólo corre si el anterior no alcanzó. Lo que estaba mal no era *qué* hacía el motor sino
+*cuándo*: **el escalón 5 disparaba de una, sin haber intentado el 2, el 3 y el 4.**
 
-🔑 **Y hay una razón estructural por la que salió así, que conviene entender antes de arreglarlo:
+🔑 **Y hubo una razón estructural por la que salió así, que sigue explicando el diseño de hoy:
 `Gate de relevancia` NO SABE cuánto falta para N.** El corte por N vive en `Armar candidato`, dos
 nodos más abajo. Un gate no puede decidir "dejo pasar para rellenar" porque no tiene el número.
-**El escalón 5 pertenece a `Armar candidato`, no al gate.**
+**El escalón 5 pertenece a `Armar candidato`, no al gate** — y ahí quedó (cierre 134).
 
 ---
 
@@ -118,19 +118,19 @@ un puñado, este escalón no vale una tabla nueva. **Es una pregunta que hoy no 
 
 ---
 
-### 🟠 Escalón 5 — Dejar pasar los siguientes N mejores · **APLICADO, PERO DISPARA ANTES DE TIEMPO**
+### 🟢 Escalón 5 — Dejar pasar los siguientes N mejores · **APLICADO, Y AHORA EN SU LUGAR**
 
 **Qué es.** Como último recurso, completar N con los que el gate habría vetado.
 
-**Qué se hizo** ([ADR-088](../adr/ADR-088-el-gate-ordena-no-veta.md), cierre 133, **en producción**):
-`relevante: false` dejó de descartar. El `composite` sigue ordenando y `sin_guion` sigue vetando.
+**Qué se hizo, en dos movimientos del mismo día:**
 
-**Por qué está mal como está.** Sin los escalones 2 y 4, **el 5 dispara siempre**: los bajo-umbral
-entran aunque no hicieran falta, en vez de sólo cuando N quedó corto. Es lo que Mani señaló:
-*"eso de entregar los 6 rechazados no debe ser"*.
-
-🔑 **El arreglo es chico y va en `Armar candidato`, no en el gate.** El gate no sabe cuánto falta
-para N —ese corte vive dos nodos más abajo— así que **nunca pudo condicionar**. Lo correcto:
+1. [ADR-088](../adr/ADR-088-el-gate-ordena-no-veta.md) (cierre 133): `relevante: false` dejó de
+   descartar. El `composite` sigue ordenando y `sin_guion` sigue vetando.
+2. [ADR-088 §Enmienda](../adr/ADR-088-el-gate-ordena-no-veta.md) (cierre 134): **el corte de
+   `Armar candidato` pasa a tener dos escalones.** Cada proyecto llena su N con los aprobados (PISO
+   primero, después heat) y **recién si quedó corto** completa con los `_bajo_umbral`, por heat y
+   **sólo por lo que falta**. Es lo que Mani señaló: *"eso de entregar los 6 rechazados no debe
+   ser"*.
 
 ```
 Armar candidato:
@@ -139,12 +139,31 @@ Armar candidato:
   3. lo que sobra   → no se entrega y NO se quema (escalón 1)
 ```
 
-**La marca ya existe y ya viaja:** `_bajo_umbral` (ADR-088). No hace falta migración ni columna
-nueva. Son ~10 líneas en el corte de `Armar candidato` y una enmienda a ADR-088.
+🔑 **Dos puertas de atrás por las que la prioridad se anulaba sola, y no eran obvias:**
 
-**Mientras tanto, la válvula de escape es un knob y no un rollback:** poner
-**`Relevancia mínima` en ~0,55** restaura el veto viejo sin tocar código, porque ADR-088 la convirtió
-en el único veto. ⚠️ **Hoy está en 0.**
+- **El dedup del fan-out.** Haiku devuelve `relevante` y `score` **por separado**, así que un
+  `relevante:false` con score 0,7 existe y le ganaba la copia a un `relevante:true` con 0,5 — con lo
+  cual el video caía en la **reserva** de P1 en vez del **cupo** de P2, que sí lo quería. La
+  prioridad del fan-out ahora es *(1) aprobado, (2) relevancia, (3) heat*.
+- **El spillover.** Dos sobrantes peleando el último cupo de otro proyecto se ordenaban sólo por
+  heat, así que un bajo-umbral viral le ganaba el asiento a un aprobado por la puerta de atrás.
+
+**El PISO (ADR-017) NO re-aplica sobre la reserva**, con la misma frase con la que ya no re-aplica
+en el spillover: *es relleno marginal, no redistribución.*
+
+📏 **Y la métrica que el cambio de forma habría dejado mintiendo:** `metricas.bajo_umbral` cuenta lo
+**ADMITIDO** por el gate, que hasta el cierre 133 era lo mismo que lo entregado. Ya no: el gate
+admite todo y el corte usa la reserva sólo si hace falta. Se agrega
+**`metricas.bajo_umbral_entregados`**. Sin eso, `bajo_umbral: 40` se seguiría leyendo como *"40
+dudosos en el Feed"* cuando pueden ser 2 — el mismo modo de falla que el cierre 129 le encontró a
+`haiku_lotes_pretrim`.
+
+🔑 **Y ese contador es el que dice si este escalón importa:** si sale **0 en varias corridas**, el
+escalón 5 es una red que nadie usa y el cuello está donde dice el §5 — en el supply, no en el corte.
+
+**La válvula sigue siendo un knob y no un rollback:** `Relevancia mínima` en ~0,55 restaura el veto
+viejo sin tocar código. Al 01/09 está en **0**, y con el escalón en su lugar **eso ya es lo
+correcto**: el bajo-umbral no entra si no hace falta.
 
 ---
 
@@ -160,24 +179,25 @@ en el único veto. ⚠️ **Hoy está en 0.**
 | **`app.descartes.external_id`** | ya no hay que decodificar el shortcode desde la URL |
 | **Motor en el live** | 40 nodos, activo, `n8n:diff` **verde en los 5** |
 | **App: 5 filtros `origen='manual'`** | typecheck · 494 tests · build · pusheado |
-| **ADR-088 (gate ordena)** | en el live · `test-nodos.mjs` **199 checks** · ⚠️ ver §1 escalón 5 |
+| **ADR-088 (gate ordena)** | en el live · `test-nodos.mjs` **199 checks** |
+| **ADR-088 §Enmienda (escalón 5 en su lugar)** | `test-nodos.mjs` **207 checks**, y **7 de los 8 nuevos se ponen ROJOS contra el `workflow.json` de HEAD** (corridos contra el código viejo a propósito) · auditor sin hallazgos · validador 2605/0 |
 
 ### 🔴 Pendiente, en orden de retorno
 
 | # | Qué | Dónde | ¿ADR? |
 |---|---|---|---|
-| 1 | **Escalón 5 al lugar correcto** (`Armar candidato` prioriza aprobados) | motor | enmienda a ADR-088 |
-| 2 | **Escalón 2** (segunda oportunidad cross-proyecto) | motor | **sí, nueva** |
-| 3 | **Medir el escalón 4** (¿cuántos pagados se caen de la ventana?) | SQL | no |
-| 4 | **Las dos mediciones que ya están escritas** (§4) | SQL, tras una corrida real | no |
-| 5 | **T0 del audit: knobs y datos, cero código** | cockpit | no |
-| 6 | **T2a: partir las 4 responsabilidades de `Heat-score v1`** | motor | no |
-| 7 | **T2b: pisos como insumo del score + repartir `cap_top_n` por proyecto** | motor | **sí** (ADR-044 lo dice literal) |
-| 8 | **T3: Grado 2 de ADR-013** (dedup por proyecto para lo ENTREGADO) | `core/` | **sí** |
-| 9 | **T1: publicar la anatomía** en `dev-doc.md` | docs | no |
-| 10 | **Instrumentación del §9 del audit** | motor + app | parcial |
+| ~~1~~ | ~~**Escalón 5 al lugar correcto**~~ | ✅ **hecho** (cierre 134, ADR-088 §Enmienda) | — |
+| 1 | **Escalón 2** (segunda oportunidad cross-proyecto) | motor | **sí, nueva** |
+| 2 | **Medir el escalón 4** (¿cuántos pagados se caen de la ventana?) | SQL | no |
+| 3 | **Las mediciones que ya están escritas** (§4) | SQL, tras una corrida real | no |
+| 4 | **T0 del audit: knobs y datos, cero código** | cockpit | no |
+| 5 | **T2a: partir las 4 responsabilidades de `Heat-score v1`** | motor | no |
+| 6 | **T2b: pisos como insumo del score + repartir `cap_top_n` por proyecto** | motor | **sí** (ADR-044 lo dice literal) |
+| 7 | **T3: Grado 2 de ADR-013** (dedup por proyecto para lo ENTREGADO) | `core/` | **sí** |
+| 8 | **T1: publicar la anatomía** en `dev-doc.md` | docs | no |
+| 9 | **Instrumentación del §9 del audit** | motor + app | parcial |
 
-**Detalle del #5 (T0), que es lo único que se puede hacer sin escribir una línea:**
+**Detalle del #4 (T0), que es lo único que se puede hacer sin escribir una línea:**
 - Bajar **`Afinidad mínima de propuesta` de 0,60 a 0,45** y correr *Buscar cuentas nuevas*.
   Las 8 propuestas de toda la historia van de 0,60 a 0,75 ⇒ **el piso muerde exacto**, y hay
   **cero propuestas desde el 20/07**. 🕳️ **No se midió** si el buscador no encuentra o si el piso se
@@ -187,7 +207,7 @@ en el único veto. ⚠️ **Hoy está en 0.**
   `nicholascrown` **0 candidatos y 21 descartes**, `abeteddymaruta` 1 de 8.
   ⚠️ ADR-022 fija que **la poda es del equipo**, no automática ⇒ va con Dani, no por SQL.
 
-**Detalle del #10 (instrumentación):**
+**Detalle del #9 (instrumentación):**
 - Partir el contador del paso pre-trim→heat-score: hoy `filtrados` mezcla **dedup + `min_views` +
   `min_likes`** en un solo número, y de los **3.264 muertos** ahí no se sabe cuál filtro los mató.
   *Sale gratis si se hace el #6.*
@@ -240,6 +260,11 @@ from app.candidatos where creado_en > '<primera corrida con ADR-088>'
 group by 1;
 ```
 
+**Y una cuarta, que no necesita SQL y sale de `runs.metricas` de la primera corrida:**
+**`bajo_umbral_entregados`** (cierre 134). Es la que dice si el escalón 5 sirve de algo: cuenta lo
+que hizo falta para llenar N, no lo que el gate admitió. 🔑 **Si sale 0 en varias corridas, el
+escalón 5 es una red que nadie usa** y el cuello está donde dice el §5 — en el supply.
+
 > **La métrica de éxito NO es la obvia.** No *"cuántos entregó"* sino **cuántos 🔥/👍 ABSOLUTOS por
 > corrida**. Medir precisión premiaría al sistema por entregar menos.
 
@@ -274,10 +299,12 @@ videos» mejor que la ráfaga**. Anotado, no resuelto acá."* Sigue anotado y si
    node ../../Workflows/workflow-short-form-content/test-nodos.mjs   # 199 checks
    ```
 3. ⚠️ **Antes de correr el motor:** las **4 voces están en `activo = false`** (al 01/09), así que el
-   plan sale con **0 proyectos**. Y si se va a correr con ADR-088 vivo sin el escalón 5 arreglado,
-   **poner `Relevancia mínima` en ~0,55 primero**.
-4. Empezar por el **#1 de §2** (escalón 5 al lugar correcto): es el más chico, arregla lo que está
-   mal hoy, y no pide ADR nueva.
+   plan sale con **0 proyectos**. *(El aviso de "poner `Relevancia mínima` en ~0,55 primero" ya no
+   aplica: el escalón 5 está en su lugar desde el cierre 134, así que el bajo-umbral no entra si no
+   hace falta. El knob sigue siendo la válvula si el Feed queda ruidoso igual.)*
+4. Empezar por el **#1 de §2**, que ahora es el **escalón 2** (segunda oportunidad cross-proyecto).
+   ⚠️ **Pide ADR nueva** y su §1 trae lo que hay que mirar antes de escribir código — incluida la
+   medición que falta: **cuántos videos quedan sin dueño por corrida**, que hoy nadie contó.
 
 ---
 

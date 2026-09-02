@@ -309,6 +309,84 @@ seccion('Spillover (enmienda ADR-024, decisión Mani 2026-07-17): los sobrantes 
   check('proyecto sin ganadores propios igual recibe spillover', p2.length === 1 && p2[0].external_id === 'y2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
 }
 
+seccion('Escalón 5 (ADR-088 §Enmienda): el bajo-umbral rellena, no compite');
+// El bug que arregla: ADR-088 dejó de vetar en `Gate de relevancia`, pero el gate NO SABE cuánto
+// falta para N —ese número vive acá— así que los bajo-umbral entraban SIEMPRE. Mani: "eso de
+// entregar los 6 rechazados no debe ser". Acá se prueba el "sólo si N quedó corto".
+{
+  const items = [
+    vid('a1', 'P1', 0.30), vid('a2', 'P1', 0.20), vid('a3', 'P1', 0.10),
+    vid('b1', 'P1', 0.99, { _bajo_umbral: true }), // heat altísimo y NO debe entrar
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 } } });
+  check('con aprobados de sobra, el bajo-umbral NO entra aunque tenga más heat',
+    out.length === 2 && !out.some((o) => o.external_id === 'b1'), JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  const items = [
+    // a2 tiene MENOS heat que la reserva a propósito: sin la prioridad, el corte por heat se
+    // llevaba b1 y b2 y dejaba afuera un aprobado. Con ella, a2 entra y sólo se rellena 1.
+    vid('a1', 'P1', 0.90), vid('a2', 'P1', 0.40),
+    vid('b1', 'P1', 0.70, { _bajo_umbral: true }),
+    vid('b2', 'P1', 0.60, { _bajo_umbral: true }),
+    vid('b3', 'P1', 0.50, { _bajo_umbral: true }),
+  ];
+  const { out, logs } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 } } });
+  const bu = out.filter((o) => o.external_id[0] === 'b');
+  check('si N queda corto, entra SÓLO lo que falta (1 de 3), y el mejor por heat',
+    out.length === 3 && bu.length === 1 && bu[0].external_id === 'b1', JSON.stringify(out.map((o) => o.external_id)));
+  check('y el log dice que rellenó bajo umbral (sin eso, un Feed ruidoso no tiene explicación)',
+    logs.some((l) => /\[Corte\].*1 BAJO UMBRAL/.test(l)), JSON.stringify(logs));
+  check('la marca viaja a la salida (es lo que cuenta `metricas.bajo_umbral_entregados`)',
+    bu[0]._bajo_umbral === true && out.filter((o) => o.external_id === 'a1')[0]._bajo_umbral === false,
+    JSON.stringify(out.map((o) => [o.external_id, o._bajo_umbral])));
+}
+{
+  const items = [vid('b1', 'P1', 0.9, { _bajo_umbral: true }), vid('b2', 'P1', 0.8, { _bajo_umbral: true })];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
+  check('un proyecto sin NINGÚN aprobado entrega su reserva entera (no se queda en cero)',
+    out.length === 2, JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  // La puerta de atrás del dedup: `relevante` y `score` los devuelve Haiku POR SEPARADO, así que un
+  // bajo-umbral con score alto existe. Si ganara el fan-out, el video caería en la RESERVA de P1 en
+  // vez del cupo de P2 —que sí lo quería— y la prioridad del corte quedaba anulada un paso antes.
+  const items = [
+    vid('v1', 'P1', 0.9, { relevancia_score: 0.9, _bajo_umbral: true }),
+    vid('v1', 'P2', 0.9, { relevancia_score: 0.5 }),
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 }, P2: { nombre: 'P2', n: 5 } } });
+  check('del fan-out gana el proyecto que lo APROBÓ, aunque el otro le puso más score',
+    out.length === 1 && out[0].proyecto_id === 'P2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
+}
+{
+  // Y la misma prioridad en el spillover: si dos sobrantes se pelean el último cupo de otro
+  // proyecto, primero el aprobado. Sin esto el escalón 5 gana un cupo por la puerta de atrás.
+  const items = [
+    vid('t1', 'TFT', 1.00, { relevancia_score: 0.9 }),
+    vid('t2', 'TFT', 0.90, { relevancia_score: 0.9 }),
+    vid('t2', 'TP', 0.90, { relevancia_score: 0.5 }),
+    vid('t3', 'TFT', 0.99, { relevancia_score: 0.95, _bajo_umbral: true }),
+    vid('t3', 'TP', 0.99, { relevancia_score: 0.5, _bajo_umbral: true }),
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { TFT: { nombre: 'TfT', n: 1 }, TP: { nombre: 'TP', n: 1 } } });
+  const tp = out.filter((o) => o.proyecto_id === 'TP');
+  check('el spillover también prefiere al aprobado (t2) sobre el bajo-umbral de más heat (t3)',
+    tp.length === 1 && tp[0].external_id === 't2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
+}
+{
+  // El PISO no re-aplica sobre la reserva, mismo criterio que el spillover: es relleno marginal.
+  // Lo que sí tiene que seguir valiendo es que el PISO reparta los APROBADOS.
+  const items = [
+    vid('h1', 'P1', 0.90, { username: 'hog' }), vid('h2', 'P1', 0.85, { username: 'hog' }),
+    vid('o1', 'P1', 0.50, { username: 'otra' }),
+    vid('b1', 'P1', 0.99, { username: 'hog', _bajo_umbral: true }),
+  ];
+  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 } } }, { piso_referente: 1 });
+  check('el PISO sigue repartiendo los aprobados y la reserva no se cuela en su lugar',
+    out.length === 3 && !out.some((o) => o.external_id === 'b1'), JSON.stringify(out.map((o) => o.external_id)));
+}
+
 seccion('Invariantes que no se tocan');
 {
   const items = [];

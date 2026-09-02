@@ -34,10 +34,11 @@ en §Agent skills; acá solo se ubican.
   dos implementaciones de cada una.
 - [docs/agents/plan-cascada-de-entrega.md](docs/agents/plan-cascada-de-entrega.md) — **el pendiente
   vivo del audit del 01/09**: llenar N no es una decisión sino una **cascada de cinco escalones**, y
-  el orden es todo el diseño. **2 de 5 puestos, y el que está puesto dispara antes de tiempo.** Su
+  el orden es todo el diseño. **3 de 5 puestos; lo que falta son el 2 y el 4**, que son los que le
+  dan trabajo a los de arriba antes de que el 5 tenga que actuar. Su
   hallazgo ordenador: *`Gate de relevancia` NO SABE cuánto falta para N* —ese corte vive dos nodos
   más abajo, en `Armar candidato`— así que el escalón "dejar pasar para rellenar" **nunca pudo vivir
-  en el gate**. Trae el estado de todo lo aplicado, lo pendiente en orden de retorno, las
+  en el gate**, y desde el cierre 134 vive donde corresponde. Trae el estado de todo lo aplicado, lo pendiente en orden de retorno, las
   mediciones escritas antes de mirarlas, y los invariantes que no hay que re-litigar.
 - [docs/agents/plan-motor-linkedin.md](docs/agents/plan-motor-linkedin.md) — de **esqueleto a motor**:
   las fases 0–4 para que el pipeline de LinkedIn corra. Su hallazgo ordenador: **los dos carriles no
