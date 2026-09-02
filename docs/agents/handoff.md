@@ -46,7 +46,7 @@
 > | …Depresión | | 20 | 20 | 20 | 12 | **60%** |
 >
 > 🔑 **Cuando la cobertura llega a N y el equipo califica, la precisión es 60–90% ⇒ el norte NO está
-> limitado por la precisión, está limitado por la cobertura.** En **15 de 21** (proyecto × corrida)
+> limitado por la precisión, está limitado por la cobertura.** En **14 de 21** (proyecto × corrida)
 > `razon_faltante` es `supply` o `mixta`: el motor ni junta para llenar N. **~30 videos crudos por
 > cada aprobado.**
 >

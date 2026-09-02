@@ -268,7 +268,7 @@ group by 1;
 `aprobados / N pedido`, por proyecto y por corrida**, con `calificados/entregados` al lado para saber
 si el número es resultado o piso. Las de abajo son **diagnóstico de por qué el norte da lo que da**,
 no evidencia de que un cambio sirvió. 📏 Línea base medida el 01/09 sobre las 5 corridas con
-`run_id`: el techo es **45% del pedido** (31/08 17:22 — Ansiedad 90%, Depresión 60%) y en **15 de 21**
+`run_id`: el techo es **45% del pedido** (31/08 17:22 — Ansiedad 90%, Depresión 60%) y en **14 de 21**
 proyecto × corrida el motor **ni llena N**.
 
 **Y una cuarta de diagnóstico, que no necesita SQL y sale de `runs.metricas` de la primera corrida:**

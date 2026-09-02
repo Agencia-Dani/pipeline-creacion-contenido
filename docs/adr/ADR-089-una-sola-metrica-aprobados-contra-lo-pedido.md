@@ -78,7 +78,7 @@ N completo (`razon_faltante: null` en los 4). Por proyecto, donde el equipo sí 
 | Psicología | 20 | 20 | 2 | 2 | ≥10% (18 sin calificar) |
 
 🔑 **Cuando la cobertura llega a N y el equipo califica, la precisión es 60–90%.** O sea que **el
-norte no está limitado por la precisión: está limitado por la cobertura.** En 15 de los 21
+norte no está limitado por la precisión: está limitado por la cobertura.** En 14 de los 21
 (proyecto × corrida) medidos, `razon_faltante` es `supply` o `mixta` — el motor no junta ni para
 llenar N. **1.088 colectados dieron 36 aprobados: ~30 videos crudos por cada aprobado.**
 
@@ -87,7 +87,7 @@ llenar N. **1.088 colectados dieron 36 aprobados: ~30 videos crudos por cada apr
 - **Ordena los pendientes por su efecto en el norte.** El escalón 2 (segunda oportunidad
   cross-proyecto) y el catálogo de referentes atacan **cobertura**, que es el factor que muerde. Las
   peleas de ordenamiento dentro de N atacan **precisión**, que hoy no es el cuello — y sólo muerden
-  cuando hay más candidatos que N, que pasó en **6 de 21** (proyecto × corrida).
+  cuando hay más candidatos que N, que pasó en **7 de 21** (proyecto × corrida).
 - **Un cambio que sube la entrega y baja la precisión no es una mejora hasta que el producto sube.**
   Eso mata la trampa de las dos direcciones: ni "entregué más" ni "fui más preciso" son defensa.
 - **Enmienda ADR-088.** Su métrica de éxito era *"cuántos 🔥/👍 ABSOLUTOS por corrida"*, que era la

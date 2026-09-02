@@ -248,7 +248,7 @@ de `log(views)` ⇒ el filtro caro decide peor que un dato que llega gratis"*. E
 - ⚠️ **Pero el balance cambia de forma:** con el #2 dado vuelta, dejar entrar lo bajo-umbral cuesta
   **más precisión de la que este ADR supuso**. Lo que lo hace tolerable es la §Enmienda 1: entran
   **sólo si N quedó corto**, y hoy N queda corto casi siempre (ADR-089: `razon_faltante` es `supply`
-  o `mixta` en **15 de 21** proyecto × corrida).
+  o `mixta` en **14 de 21** proyecto × corrida).
 
 ### ⚠️ Lo que esto NO autoriza todavía
 
