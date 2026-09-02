@@ -24,13 +24,20 @@
 
 > # 🎁 CIERRE 137 (2026-09-02) — La segunda oportunidad, y el heat vuelve como etiqueta
 >
-> ## 🔴 LO PRIMERO, PORQUE BLOQUEA: falta aplicar la `038`
+> ## ✅ La `038` está APLICADA (Mani, 02/09) y el motor está entero en el live
 >
-> **[`core/schema/038_candidatos_prescore.sql`](../../core/schema/038_candidatos_prescore.sql) está
-> ESCRITA y SIN APLICAR**, y por eso **`Preparar candidatos` quedó SIN EMPUJAR a propósito** — manda
-> la columna nueva y sin ella PostgREST responde `PGRST204` y **tumba el POST del lote entero**: la
-> corrida paga Apify + Supadata + Haiku y no entrega nada. `n8n:diff` lo muestra como el único
-> `[drift]` del motor, que es el estado honesto. **Orden: migración → push de ese nodo.**
+> Verificada **por efecto y con cuatro señales**: la columna existe (`numeric`) · **`con_prescore = 0`
+> sobre 422 filas**, o sea que el *sin backfill* es un hecho medido y no una intención · el `comment`
+> quedó puesto · y **PostgREST la devuelve con 200 y no `PGRST204`**, que era la pata capaz de fallar
+> sola (cache de esquema vieja) y es el camino exacto por el que escribe el motor.
+>
+> ✅ **`Preparar candidatos` empujado** (era el nodo retenido a propósito, porque manda la columna
+> nueva y sin ella PostgREST tumba el POST del lote ENTERO: la corrida paga Apify + Supadata + Haiku
+> y no entrega nada). **`n8n:diff` verde en los 5.**
+>
+> 🐤 **No se insertó ninguna fila de prueba, a propósito:** el canario de ADR-092 nace en cero y la
+> primera fila la escribe el motor. Verificar escribiendo lo habría contaminado — el error que este
+> repo ya pagó con `videos_meta` (5 filas, las 5 de verificaciones).
 >
 > ## ✅ [ADR-091](../adr/ADR-091-la-segunda-oportunidad-cross-proyecto.md) — escalón 2, en el live
 >

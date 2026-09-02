@@ -194,6 +194,15 @@ en §Agent skills; acá solo se ubican.
   `Preparar candidatos`, empujados al live). ⚠️ *Escribir no es leer, y guardar no autoriza a
   bloquear: **falta la medición**, que la hace la primera corrida de redes.* Las tres consultas que
   hay que correr después de esa corrida están en el handoff.
+  ✅ **La [`038`](core/schema/038_candidatos_prescore.sql) (ADR-092) está APLICADA** (Mani, 02/09) —
+  crea `app.candidatos.prescore_metrico`, la **etiqueta métrica** del video. Verificada por su efecto
+  y con **cuatro señales**: la columna existe (`numeric`) · **`con_prescore = 0` sobre 422 filas** (el
+  *sin backfill* como hecho medido) · el `comment` puesto · y **PostgREST la devuelve con 200 y no
+  `PGRST204`**, la pata capaz de fallar sola por cache de esquema vieja. 🔑 **Existe porque el número
+  no se puede recomputar**: es un percentil relativo al pool de SU corrida y se pierde con ella —
+  mismo caso que `run_id` en ADR-081. Hasta hoy la métrica se moría en el gate, que pisa `heat_score`
+  con su veredicto. **Desempata pasivo y no vota** (ADR-090). 🐤 Su canario nace en cero **sin
+  contaminar**: no se insertó ninguna fila de prueba, así que la primera la escribe el motor.
   ✅ **La [`037`](core/schema/037_origen_transcripciones_y_descartes_id.sql) (ADR-087) está
   APLICADA** (Mani, 01/09), verificada **por su efecto y con cuatro señales**: `transcripciones =
   manual = 130` y **`motor = 0`** · **`descartes_con_id = 0`** (los dos ceros prueban que el *sin

@@ -81,9 +81,25 @@ entran en la misma corrida.*
 - **Desempatar por `engagement`** (0,674 dentro del proyecto). Sería el mismo efecto de cuenta con
   otro nombre, y `prescore_metrico` ya lo incluye ponderado.
 
+## ✅ Aplicada y verificada (Mani, 2026-09-02)
+
+La **`038` está APLICADA**, verificada **por su efecto y con cuatro señales**, no por haberse
+corrido:
+
+| señal | resultado |
+|---|---|
+| La columna existe | `prescore_metrico` · `numeric` |
+| **`con_prescore = 0` sobre 422 filas** | el *sin backfill* como **hecho medido**, no como intención |
+| El `comment` quedó puesto | dice que es de cuenta y que no se recomputa |
+| **PostgREST la devuelve con 200, no `PGRST204`** | la pata que podía fallar sola (cache de esquema vieja) y **el camino exacto por el que escribe el motor** |
+
+✅ **Y `Preparar candidatos` ya está empujado** (el nodo que se había retenido a propósito):
+`n8n:diff` **verde en los 5**.
+
 ## Hecho cuando
 
-1. La `038` está aplicada y **verificada por efecto**: `count(prescore_metrico) = 0` sobre filas > 0
-   (el *sin backfill* como hecho medido) y PostgREST la devuelve con 200, no `PGRST204`.
-2. 🐤 **Canario:** `select count(*) from app.candidatos where prescore_metrico is not null` nace en
-   **cero** y **la primera fila la escribe el motor**, así que la primera ya es uso real.
+🐤 **Canario:** `select count(*) from app.candidatos where prescore_metrico is not null` nace en
+**cero** y **la primera fila la escribe el motor**, así que la primera ya es uso real y no una
+verificación. *No se insertó ninguna fila de prueba justamente para no contaminarlo* — es el error
+que este repo ya pagó con `videos_meta` (5 filas, las 5 de verificaciones) y con el canario de
+ADR-074.
