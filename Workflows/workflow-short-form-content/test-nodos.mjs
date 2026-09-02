@@ -65,7 +65,28 @@ seccion('C.2 — el gate por Voces.activo');
   });
   check('proyecto con voz ENCENDIDA corre', !!plan.projects.p1, JSON.stringify(Object.keys(plan.projects)));
   check('proyecto con voz APAGADA no corre (aunque el proyecto esté activo)', !plan.projects.p2, JSON.stringify(Object.keys(plan.projects)));
-  check('lo dice en el log, no lo hace en silencio', logs.some((l) => /salteado \(voz apagada\): Muere/.test(l)), JSON.stringify(logs));
+  // ⬆️ Esto pedía que saliera por `console.log`, que no lo ve NADIE: el log vive en n8n y el equipo
+  // mira Corridas. Ahora se exige que sea un AVISO de verdad, que es lo que llega a
+  // `runs.metricas.avisos`. Un log no es un aviso.
+  check('el proyecto salteado sale como AVISO, no como log (el log no lo ve el equipo)',
+    plan.avisos.some((a) => /voz está apagada/.test(a) && /Muere/.test(a)), JSON.stringify(plan.avisos));
+  check('y nombra dónde se arregla, no solo qué pasó', plan.avisos.some((a) => /Curar → Voces/.test(a)), JSON.stringify(plan.avisos));
+}
+{
+  // El caso que hoy sale MUDO en producción y es el peor: las 4 voces apagadas ⇒ 0 proyectos ⇒ el
+  // equipo aprieta Ejecutar, no recibe un solo video, y la corrida cierra en verde sin explicación.
+  const { plan } = runPlan({ proyectos: [P('p1', 'A', ['v1']), P('p2', 'B', ['v2'])], vocesActivas: [] });
+  check('con TODAS las voces apagadas el plan sale con 0 proyectos', Object.keys(plan.projects).length === 0, JSON.stringify(Object.keys(plan.projects)));
+  check('y lo AVISA nombrando la causa, no el síntoma', plan.avisos.some((a) => /NINGÚN proyecto corrió/.test(a)), JSON.stringify(plan.avisos));
+  check('con los números que permiten diagnosticarlo (proyectos vistos y voces activas)',
+    plan.avisos.some((a) => /2 proyecto\(s\) en la fachada y 0 voz/.test(a)), JSON.stringify(plan.avisos));
+  check('no scrapea nada: con 0 proyectos no se le pide un solo perfil a Apify (no se paga)',
+    plan.ig_urls.length === 0 && plan.tt_profiles.length === 0, `ig=${plan.ig_urls.length} tt=${plan.tt_profiles.length}`);
+}
+{
+  const { plan } = runPlan({ proyectos: [P('p1', 'A', ['v1'])], vocesActivas: [V('v1', 'ON')] });
+  check('y con todo prendido NO avisa nada (un aviso que sale siempre no es un aviso)',
+    plan.avisos.length === 0, JSON.stringify(plan.avisos));
   check('active_project_ids refleja el gate', JSON.stringify(plan.active_project_ids) === '["p1"]', JSON.stringify(plan.active_project_ids));
 }
 {

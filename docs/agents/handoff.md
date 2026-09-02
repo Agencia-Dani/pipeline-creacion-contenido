@@ -22,6 +22,81 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🔇 CIERRE 138 (2026-09-02) — Cuando el equipo no recibe nada, la herramienta le mentía
+>
+> Auditoría del repo contra el objetivo de Mani: *"cubrir las solicitudes de videos del equipo de
+> redes"*. **El hallazgo no fue un escalón que falta: fue que el motor no dice por qué no entregó.**
+>
+> ## 🩸 El bug, y es de los caros porque MIENTE
+>
+> Le pregunté a la fachada qué haría el motor **si el equipo aprieta Ejecutar ahora**:
+> **0 voces, 0 proyectos, 40 referentes.** No entrega ni un video.
+>
+> Y `Cerrar run (sin novedades)` escribía, siempre, el mismo aviso fijo:
+>
+> > *"sin novedades: se miraron **0** videos y ninguno era nuevo. No se transcribió ni se pagó nada."*
+>
+> 🔑 **Eso se lee como "no hay contenido nuevo" (⇒ esperar) cuando la verdad es "no miré nada porque
+> está apagado" (⇒ prender las voces). Diagnósticos opuestos, acciones opuestas.** Y ese camino
+> **tiraba los `avisos` del plan**: sólo los reenviaba `Resumen del run`, que en una corrida sin
+> novedades **nunca llega a ejecutarse**.
+>
+> Encima, *"proyecto salteado (voz apagada)"* era un **`console.log`** — vive en n8n, y el equipo mira
+> Corridas. **Un log no es un aviso.**
+>
+> ## ✅ Arreglado y en el live
+>
+> - `Armar plan de corrida` emite **dos avisos de verdad**: los proyectos salteados por voz apagada
+>   (nombrándolos y diciendo *dónde* se arregla: Curar → Voces) y el caso **0 proyectos**, con los
+>   números que lo diagnostican (cuántos proyectos vio y cuántas voces activas).
+> - `Cerrar run (sin novedades)` **distingue las dos causas** y **reenvía los avisos del plan**.
+> - `test-nodos.mjs` **242 checks** (eran 236). Un test viejo se puso rojo **con razón**: pedía que
+>   saliera por `console.log`, y ahora se exige que sea aviso. *El test pedía lo débil.*
+> - `n8n:diff` **verde en los 5**. Rollback: `.n8n-snapshots/motor-2026-09-02T06-08-15-959Z.json`.
+>
+> 💰 **Lo que NO pasa, verificado leyendo el código:** con 0 proyectos **no se paga nada**. `ig_urls`
+> y `tt_profiles` se arman **desde `projects`**, así que Apify no recibe un solo perfil. El fallo era
+> puro silencio, no gasto.
+>
+> ## 📏 La palanca de cobertura más grande no es código: son 6 cuentas
+>
+> Medido el 02/09, **separando "lo rechazaron" de "nadie lo miró"** — que es la diferencia que hace
+> honesto al número:
+>
+> | referente | entregados | calificados | rechazados | aprobados |
+> |---|---|---|---|---|
+> | `thejessicaweiss` | 36 | **26** | **26** | **0** |
+> | `jen_gottlieb` | 17 | 5 | 5 | 0 |
+> | `jenniferanncounseling` | 8 | 5 | 5 | 0 |
+> | `jefferson_fisher` | 8 | 4 | 4 | 0 |
+> | `susieinthiran` | 8 | 4 | 4 | 0 |
+> | `nedratawwab` | 9 | 2 | 2 | 0 |
+> | **6 cuentas** | **86** | **46** | **46 (100%)** | **0** |
+>
+> *(`wordsofrizdom` 13 y `sakeembradley` 7 quedan aparte a propósito: **0 calificados**, o sea "nadie
+> los miró", que no es lo mismo que "no sirven".)*
+>
+> **86 lugares del cupo del equipo gastados en cuentas que nunca produjeron un aprobado**, y
+> `thejessicaweiss` sola se llevó 36 con **26 de 26 rechazados**. ⚠️ **ADR-022 fija que la poda es
+> del EQUIPO, no automática** ⇒ va con Dani, no por SQL. Y hay **5 propuestas de referentes en
+> `propuesto`** esperando un clic: supply parado.
+>
+> 📌 *Los docs decían `thejessicaweiss` "0 de 26" y `jen_gottlieb` "0 de 5": eran los **calificados**,
+> y los entregados ya son 36 y 17. El número crece solo mientras nadie pode.*
+>
+> ## 🔴 Lo que queda pendiente, en orden de efecto sobre el norte
+>
+> | # | Qué | Cuesta | Bloquea |
+> |---|---|---|---|
+> | 1 | **Prender las voces** (las 4 en `activo=false`) | 4 clics | **TODO**: sin esto no hay corrida |
+> | 2 | **Podar las 6 cuentas y decidir las 5 propuestas** | clics, cero código | cobertura |
+> | 3 | **Leer `filtrados_por_motivo`** de la 1ª corrida: si `Mínimo de vistas` (100.000) mata más que el dedup, bajarlo es **cero código** | 1 consulta | cobertura |
+> | 4 | **Pasarle la métrica a Haiku** (*"que la conozca"*, ADR-092 §🕳️) | ADR + prompt | precisión |
+> | 5 | **Escalón 4** (rescatar lo pagado que se cayó de la ventana) | medir primero | cobertura |
+> | 6 | **El norte en la pantalla Entender** (hoy muestra `entregados/pedidos`, no aprobados contra pedido) | app | visibilidad |
+>
+> 🔑 **El 1 y el 2 no son código y valen más que todo lo que se construyó hoy.**
+
 > # 🎁 CIERRE 137 (2026-09-02) — La segunda oportunidad, y el heat vuelve como etiqueta
 >
 > ## ✅ La `038` está APLICADA (Mani, 02/09) y el motor está entero en el live
