@@ -22,6 +22,106 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🧠 CIERRE 132 (2026-09-01) — La memoria recordaba lo evaluado, no lo entregado
+>
+> Auditoría de por qué la corrida del 01/09 09:17 entregó **13 de 100** pedidos. La hipótesis de
+> entrada (*"el filtro descarta demasiado"*) resultó **falsa**: el motor ya lo decía solo, los 5
+> proyectos salieron con `razon_faltante: "supply"`.
+>
+> ## 📏 Lo medido contra prod (01/09)
+>
+> | | |
+> |---|---|
+> | Filas en `public.processed_items` | **1.952** |
+> | Videos que llegaron al Feed alguna vez | 866 |
+> | **Quemados que NUNCA vio nadie** | **1.401 — el 71,8%** |
+>
+> Y el embudo de esa corrida: **1.178 colectados → 14 nuevos → 13 entregados**. Los 14 salieron de
+> **una sola cuenta** (`thesabrinazoharshow`).
+>
+> 🔑 **La causa es de modelo, no un bug:** la memoria contesta *"¿ya lo evalué?"* cuando el dedup
+> necesita *"¿ya se lo mostré al equipo?"*. Dos preguntas distintas con la misma llave.
+>
+> 🩸 **Verificar la premisa corrigió el alcance, y conviene no perderlo:** los pisos duros
+> (`min_views`), el heat-score y la recencia matan **antes** de transcribir ⇒ **no entran a la
+> memoria y ya vuelven en cada corrida**. Lo que se pierde para siempre es lo que muere **después**
+> de pagar: el gate, el `sin_guion` y el corte por N. La intuición apuntaba al lugar equivocado.
+>
+> ## Lo que quedó hecho
+>
+> - ✅ **[ADR-087](../adr/ADR-087-la-memoria-recuerda-lo-que-se-entrego-no-lo-que-se-evaluo.md)** —
+>   tres preguntas, tres memorias. `app.transcripciones` = *"¿ya pagué el ASR?"*, `processed_items`
+>   = *"¿ya se lo mostré?"*, `estado='sin_transcript'` = *"¿tiene audio?"*.
+> - ✅ **Migración [`037`](../../core/schema/037_origen_transcripciones_y_descartes_id.sql)
+>   ESCRITA** — `app.transcripciones.origen`, `app.descartes.external_id`, y la RPC
+>   `app.cache_transcripts`. **🔴 PENDIENTE DE APLICAR** (gate humano, SQL Editor).
+> - ✅ **Motor: 36 → 40 nodos.** Nuevos: `Pedir caché de transcripts`, `Leer caché de transcripts`,
+>   `Preparar transcripciones`, `POST Transcripciones`. Movidos: `Preparar procesados` y
+>   `POST processed_items` pasan a colgar de `Armar candidato`.
+>   `auditar-workflows.mjs` **sin hallazgos**, `test-nodos.mjs` en **193 checks** (eran 172).
+> - ✅ **App: las 5 lecturas de `lib/transcripciones.ts` filtran `origen = 'manual'`.**
+>   typecheck limpio · **494 tests** · `npm run build` OK.
+>
+> ## 🔑 Los cuatro hallazgos que valen más que el código
+>
+> 1. **El orden de los cambios ES la decisión.** ADR-084 había rechazado por escrito mover la
+>    memoria río abajo porque *"alarga la ventana de re-compra"*. **Ese argumento se cae con la
+>    caché**: si la corrida muere entre transcribir y entregar, la próxima encuentra el transcript y
+>    no le paga a Supadata. Regla que queda: *una memoria se puede mover río abajo cuando lo que
+>    protegía ya está protegido por otra.* Al revés se cambia una pérdida de videos por una fuga de
+>    plata.
+> 2. **El motor nunca guardó sus transcripts.** `app.transcripciones` tiene 130 filas y **las 130
+>    tienen `tanda_id`**, o sea que son del transcriptor manual del cockpit. El motor escribió
+>    **cero**: su único caché era un `const cache = {}` intra-corrida. Sin arreglar eso, dejar de
+>    quemar habría sido re-pagar en cada corrida, para siempre.
+> 3. **`leerFallidas()` era una bomba de tiempo.** Trae SIN LÍMITE los `fallo`/`sin_transcript`
+>    porque *"son pocas por definición"*. ADR-082 midió que el **34%** de lo que el motor manda a
+>    Supadata vuelve vacío ⇒ sin el filtro `origen='manual'`, cientos de filas de máquina caían en
+>    la pantalla del equipo con un botón `Reintentar` inútil.
+> 4. 🩸 **Un bug que cazó el test y no yo.** Escribí el guard de `Preparar procesados` mirando el
+>    **valor** de `_entregado` en vez de su **presencia**, y con eso *"me cablearon mal"* y *"esta
+>    corrida no entregó nada"* se volvían indistinguibles — el segundo es legítimo. El guard viejo
+>    de ADR-084 usaba `'_tx_resuelta' in json` justamente por eso. **El test que ya existía lo cazó
+>    en el primer intento.**
+>
+> ## 🔴 PENDIENTE — en este orden, y el orden importa
+>
+> 1. **Aplicar la `037`** en el SQL Editor. Su §4 trae las consultas de verificación, incluida
+>    `has_function_privilege` para el grant de la RPC — **cuyo fallo sería mudo**: un `42501` lo
+>    traga el `onError: continue` y la corrida cierra en verde, sin caché, re-pagando.
+> 2. **Empujar el motor al live**: `npm run n8n:push -- motor --nodos "..."`. Es **topología**
+>    (4 nodos nuevos), así que `--nodos` es obligatorio. Después `npm run n8n:diff` verde en los 5.
+> 3. **Deployar la app** — ⚠️ **nunca antes del paso 1**: sin la columna `origen`, PostgREST
+>    responde `42703` y las 5 consultas mueren.
+> 4. **Medir en la primera corrida real:** `llamadas.supadata` contra videos distintos entrados (el
+>    ahorro de la caché), y que `processed_items` deje de crecer más rápido que
+>    `candidatos + outputs`.
+>
+> ## Lo que este cierre NO resuelve, dicho sin eufemismo
+>
+> - 🔴 **El cuello #1 sigue vivo y es de catálogo, no de código.** ~40 referentes publicando ~1
+>   reel/día son ~40 videos nuevos/día como techo, contra una demanda de **265** (11 proyectos × su
+>   N). Eso no lo arregla ningún umbral. La palanca es podar y sumar cuentas — y hay varianza
+>   brutal: `the.pocket.psychologist` 43 aprobados de 43, `thejessicaweiss` **0 de 26**.
+>   Es lo mismo que [ADR-082](../adr/ADR-082-un-video-quemado-se-rescata-borrandole-la-memoria.md)
+>   ya había anotado y nadie ejecutó.
+> - 🟠 **El volumen que entra a `Transcribir` va a subir** (los no entregados vuelven), así que el
+>   freno pasa a ser `cap_top_n` — que **corta global y puede vaciar proyectos enteros**
+>   (ADR-044 lo midió: con el techo en 10, un proyecto se llevó los 10 y cuatro quedaron en
+>   `evaluados: 0`). **Repartirlo por proyecto es otro ADR** y esta decisión lo acerca.
+> - 🟡 **`Relevancia mínima` está en 0 y es INERTE**: el descarte del gate es un booleano de Haiku,
+>   no un umbral. Quien mueva ese knob creyendo que afloja el filtro, no afloja nada.
+> - 🟡 **`Afinidad mínima de propuesta` = 0,60 muerde exacto**: las 8 propuestas de la historia van
+>   de 0,60 a 0,75, y hay **cero propuestas desde el 20/07** con 5 esperando decisión.
+>   **No se midió** si el buscador no encuentra o si el piso se come todo.
+> - 🟡 **Las 5 voces están hoy en `activo = false`.** Si el cron dispara, el plan sale con **0
+>   proyectos**, y eso sólo se ve en Operar — no llega a `runs.metricas.avisos`.
+> - 🕳️ **Sin medir:** cuánto de los 3.264 muertos en el paso pre-trim→heat-score fue dedup y cuánto
+>   `min_views`. Comparten una sola línea y un solo contador. Es el próximo cambio con más retorno.
+> - 📄 Nota de doc: la fila de **ADR-085 en `docs/adr/README.md` tiene texto de ADR-084 pegado
+>   adentro** (dice *"es el ADR nuevo sobre compensar la memoria"*, que no es suyo). Pre-existente,
+>   no lo toqué.
+
 > # 🔁 CIERRE 131 (2026-09-01) — Dani tenía razón: el dedup recuerda el post, no el video
 >
 > Dani Rodríguez avisó mientras sacaba guiones para la voz nueva (María José Sánchez):

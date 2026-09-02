@@ -8,6 +8,22 @@ import { scoped } from "@/lib/supabase/scoped";
 // usuario y las policies de la `021` se evalúan. El filtro de tenant sigue haciendo falta igual —
 // RLS acota a las empresas del usuario, `scoped()` al cockpit abierto.
 //
+// 🔴 **LAS 5 CONSULTAS DE ABAJO FILTRAN `origen = 'manual'`, Y NO ES COSMÉTICO** (ADR-087).
+// Desde la migración `037` esta tabla tiene DOS dueños: el transcriptor del cockpit (`manual`, con
+// tanda, reintento y abandono — lo que estas pantallas operan) y el motor de reels (`motor`), que
+// la usa como CACHÉ para no pagarle dos veces a Supadata por el mismo video.
+//
+// Sin el filtro, las filas de máquina se meten en la pantalla del equipo. El caso más caro es
+// `leerFallidas`, que trae SIN LÍMITE los `fallo`/`sin_transcript` porque *"son pocas por
+// definición"*: ADR-082 midió que **el 34% de lo que el motor manda a Supadata vuelve vacío (593 de
+// 1.755)**, o sea cientos de filas con un botón `Reintentar` que no tiene nada que reintentar.
+// Y `leerSueltas` es un canario documentado (*"tiene que dar siempre cero"*) que el motor —que
+// escribe sin tanda— apagaría sin este filtro.
+//
+// ⚠️ **Este archivo no se puede deployar antes de aplicar la `037`**: sin la columna, PostgREST
+// responde `42703` y las cinco consultas mueren. Es el mismo orden que ya exigieron la `014` y la
+// `016` — ver el comentario de acá abajo.
+//
 // 🚨 **Los dos `onConflict` de este archivo cambiaron con la migración `016`, y no es cosmético.**
 // PostgREST exige que el arbiter del upsert coincida con un unique existente: si no, tira `42P10` y
 // el insert muere entero. La `016` reemplazó `unique (plataforma, external_id)` de
@@ -74,6 +90,7 @@ export async function leerFilasDeTanda(
 export async function leerSueltas(ctx: TenantContext): Promise<Transcripcion[]> {
   const { data, error } = await (await scoped(ctx))
     .select("app.transcripciones", COLUMNAS)
+    .eq("origen", "manual")
     .is("tanda_id", null)
     .order("creado_en", { ascending: false });
   if (error)
@@ -98,6 +115,7 @@ export async function leerSueltas(ctx: TenantContext): Promise<Transcripcion[]> 
 export async function leerFallidas(ctx: TenantContext): Promise<Transcripcion[]> {
   const { data, error } = await (await scoped(ctx))
     .select("app.transcripciones", COLUMNAS)
+    .eq("origen", "manual")
     .in("estado", [...ESTADOS_FALLIDOS])
     .order("creado_en", { ascending: false });
   if (error)
@@ -282,9 +300,13 @@ async function clavesConocidas(
   const claves = new Set<string>();
 
   for (let i = 0; i < externalIds.length; i += 200) {
-    const { data, error } = await s
-      .select(tabla, columnas)
-      .in("external_id", externalIds.slice(i, i + 200));
+    // El filtro solo aplica a `app.transcripciones`: `processed_items` no tiene `origen` y es toda
+    // del motor por definición. `cualesEnCola` contesta *"¿está en la cola del transcriptor?"* y la
+    // respuesta correcta sigue siendo sobre las manuales — para lo del motor está
+    // `cualesVistosPorElMotor`, que lee la otra tabla.
+    let q = s.select(tabla, columnas).in("external_id", externalIds.slice(i, i + 200));
+    if (tabla === "app.transcripciones") q = q.eq("origen", "manual");
+    const { data, error } = await q;
     if (error)
       throw new Error(`Supabase respondió con error consultando ${tabla}: ${error.message}`);
     for (const fila of z.array(filaClave).parse(data ?? [])) {
@@ -313,6 +335,7 @@ export async function cualesFallidas(ctx: TenantContext, ids: string[]): Promise
   for (let i = 0; i < ids.length; i += 200) {
     const { data, error } = await s
       .select("app.transcripciones", "plataforma, external_id")
+      .eq("origen", "manual")
       .in("external_id", ids.slice(i, i + 200))
       .in("estado", [...ESTADOS_FALLIDOS]);
     if (error)
@@ -341,6 +364,7 @@ export async function cualesVistosPorElMotor(
 export async function contarPendientes(ctx: TenantContext): Promise<number> {
   const { count, error } = await (await scoped(ctx))
     .select("app.transcripciones", "id", { count: "exact", head: true })
+    .eq("origen", "manual")
     .eq("estado", "pendiente");
   if (error)
     throw new Error(`Supabase respondió con error contando la cola: ${error.message}`);

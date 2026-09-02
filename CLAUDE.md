@@ -37,7 +37,7 @@ en §Agent skills; acá solo se ubican.
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.
 
 **Decisiones**
-- [docs/adr/](docs/adr/) — ADRs 001–086 (86 archivos), una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
+- [docs/adr/](docs/adr/) — ADRs 001–087 (87 archivos), una decisión por archivo con su porqué ([índice](docs/adr/README.md)).
 
 **Contratos del núcleo (`core/`, solo cambia con ADR)**
 - [core/contracts/workflow-manifest.md](core/contracts/workflow-manifest.md) — contrato del manifest (lo valida `npm run validate`).
@@ -185,6 +185,22 @@ en §Agent skills; acá solo se ubican.
   `Preparar candidatos`, empujados al live). ⚠️ *Escribir no es leer, y guardar no autoriza a
   bloquear: **falta la medición**, que la hace la primera corrida de redes.* Las tres consultas que
   hay que correr después de esa corrida están en el handoff.
+  🔴 **La [`037`](core/schema/037_origen_transcripciones_y_descartes_id.sql) (ADR-087) está
+  ESCRITA y PENDIENTE de aplicar** (01/09). Agrega `app.transcripciones.origen`
+  (`manual` | `motor`), `app.descartes.external_id` y la RPC `app.cache_transcripts`. Ejecuta el
+  cambio de modelo que ataca el desperdicio más grande medido del sistema: **`processed_items`
+  tiene 1.952 filas y solo 866 videos llegaron alguna vez al Feed ⇒ 1.401 (71,8%) se pagaron, se
+  quemaron para siempre, y nadie los vio.** La memoria contestaba *"¿ya lo evalué?"* cuando el
+  dedup necesita *"¿ya se lo mostré al equipo?"*.
+  ⚠️ **ORDEN OBLIGATORIO: la migración va ANTES del deploy de la app.** Las 5 lecturas de
+  `apps/dashboard/lib/transcripciones.ts` filtran `origen = 'manual'`, y sin la columna PostgREST
+  responde `42703` y las cinco mueren. Mismo orden que exigieron la `014` y la `016`.
+  🧩 **La RPC no es un capricho:** los Code nodes de n8n **no pueden usar credenciales**, y un GET
+  con ~350 ids da **414** (el límite que ya hizo trocear de a 200 a la app) ⇒ los ids viajan en el
+  body. Y su `grant` va **explícito**: `alter default privileges` de la `011` cubre tablas y
+  secuencias, **no funciones** — una función nueva no nace accesible, y su fallo sería mudo
+  (`42501` tragado por el `onError: continue` del nodo, corrida en verde sin caché).
+  🐤 Su canario nace en cero: `select count(*) from app.transcripciones where origen = 'motor'`.
   ✅ **La [`035`](core/schema/035_search_path_triggers.sql) (ADR-085) está APLICADA** (Mani, 01/09),
   verificada por efecto: `proconfig` fijo en las dos y **`get_advisors` bajó de 9 avisos a 7**. Le fija `search_path` a los dos triggers del esquema, que hoy resuelven `clients` y
   `runs` contra el camino de quien los dispare. Son los **2 avisos reales** de los 9 de
@@ -250,7 +266,7 @@ Este repo está preparado para ingeniería con agentes. Leé esto antes de traba
 - **Dev-doc** ([docs/agents/dev-doc.md](docs/agents/dev-doc.md)) — referencia técnica nodo-por-nodo de
   los tres workflows (orden de ejecución, qué tabla de Postgres lee/escribe cada nodo, esquema Supabase y
   trazabilidad de campos). Leela antes de tocar un `workflow.json`; la fuente de verdad sigue siendo el JSON.
-- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..086). *El número sale de `ls docs/adr`, no de acá: este renglón dijo 083 con 84 archivos en disco.*
+- **ADRs** ([docs/adr/](docs/adr/)) — decisiones de arquitectura con su porqué (ADR-001..087). *El número sale de `ls docs/adr`, no de acá: este renglón dijo 083 con 84 archivos en disco.*
   Leé los relevantes antes de cambiar un área ya decidida; no las re-litigues.
 
 El **qué/por qué** del producto y el diseño viven en [ROADMAP.md](ROADMAP.md) (norte + checklist del

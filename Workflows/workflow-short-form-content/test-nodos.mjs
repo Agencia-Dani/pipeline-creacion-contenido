@@ -339,7 +339,7 @@ seccion('Invariantes que no se tocan');
 // `this` mockeado; el mock cuenta llamadas y concurrencia en vuelo)
 // ════════════════════════════════════════════════════════════════════════════
 const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
-const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia, backoff = 1, arranque = 0 } = {}) => {
+const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia, backoff = 1, arranque = 0, cache = null } = {}) => {
   const llamadas = [];
   let enVuelo = 0, maxEnVuelo = 0;
   const t0Mock = Date.now();
@@ -364,6 +364,12 @@ const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrenci
   const $ = (n) => {
     if (n === 'Config') return { first: () => ({ json: { presupuesto_transcribir_s: presupuesto, concurrencia_transcribir: concurrencia, backoff_transcribir_ms: backoff, arranque_transcribir_ms: arranque } }) };
     if (n === 'Heat-score v1') return { all: () => items.map((j) => ({ json: j })) };
+    // ADR-087. `cache: null` simula que la RPC no corrió o se cayó: el nodo tiene que hacer
+    // fail-open y transcribir todo, porque esto es plata y no memoria.
+    if (n === 'Leer caché de transcripts') {
+      if (cache === null) throw new Error('nodo sin ejecutar (mock)');
+      return { all: () => cache.map((j) => ({ json: j })) };
+    }
     throw new Error('nodo no mockeado: ' + n);
   };
   // El nodo lee sus videos POR NOMBRE (`$('Heat-score v1')`), nunca por `$input`. Eso importa más
@@ -488,7 +494,74 @@ await (async () => {
     check('con el presupuesto agotado el backoff no reintenta (no se cuelga el nodo)', llamadas.length < 12 * 5, llamadas.length + ' llamadas de 60 posibles');
   }
 
-  // ── `_tx_resuelta`: la bandera con la que se decide QUÉ se quema (ADR-029 §Enmienda) ──
+    // ── CACHÉ DE ASR (ADR-087): lo que ya se pagó no se vuelve a pagar ──
+  // Es la pieza que hace posible dejar de quemar lo que no se entrega. Sin ella, un video que el
+  // gate rechazó volvería en cada corrida y se re-transcribiría en cada corrida, para siempre.
+  {
+    const { out, llamadas } = await runTranscribir([tvid('c1')], {
+      cache: [{ external_id: 'c1', estado: 'listo', script: 'guion cacheado', idioma: 'en' }],
+    });
+    check('🟢 cache hit: CERO llamadas a Supadata y el guion sale de la tabla',
+      llamadas.length === 0 && out[0].transcripcion === 'guion cacheado', `llamadas=${llamadas.length} tx='${out[0].transcripcion}'`);
+  }
+  {
+    const { out } = await runTranscribir([tvid('c1')], {
+      cache: [{ external_id: 'c1', estado: 'listo', script: 'guion cacheado', idioma: 'en' }],
+    });
+    check('y viaja marcado como cache (para que no se re-escriba en la tabla)', out[0]._tx_origen === 'cache', String(out[0]._tx_origen));
+  }
+  {
+    // Un mudo cacheado vale tanto como un guion: evita pagarle a Supadata para que vuelva a decir
+    // que el video no tiene audio.
+    const { out, llamadas } = await runTranscribir([tvid('c2')], {
+      cache: [{ external_id: 'c2', estado: 'sin_transcript', script: null }],
+    });
+    check('🟢 mudo cacheado tampoco se re-pide (0 llamadas) y queda resuelto',
+      llamadas.length === 0 && out[0]._tx_resuelta === true, `llamadas=${llamadas.length} resuelta=${out[0]._tx_resuelta}`);
+  }
+  {
+    const { llamadas } = await runTranscribir([tvid('c3')], {
+      cache: [{ external_id: 'OTRO', estado: 'listo', script: 'no es de esta corrida' }],
+    });
+    check('un id que no es de esta corrida NO se aplica (sí se llama a Supadata)', llamadas.length === 1, `llamadas=${llamadas.length}`);
+  }
+  {
+    // Los estados que NO son respuesta definitiva no cachean: hay que ir a preguntar.
+    const { llamadas } = await runTranscribir([tvid('c4')], {
+      cache: [{ external_id: 'c4', estado: 'pendiente', script: null }],
+    });
+    check('un `pendiente` no es respuesta: se transcribe igual', llamadas.length === 1, `llamadas=${llamadas.length}`);
+  }
+  {
+    const { llamadas } = await runTranscribir([tvid('c5')], {
+      cache: [{ external_id: 'c5', estado: 'listo', script: '   ' }],
+    });
+    check('un `listo` con script vacío no cuenta como hit (se transcribe)', llamadas.length === 1, `llamadas=${llamadas.length}`);
+  }
+  {
+    // 🔒 El caso que decide que esto sea sumidero y no dependencia: un 42501 por el grant faltante
+    // viaja como {error:...}. Si el nodo lo tomara por bueno, cachearía un vacío y el video saldría
+    // sin guion — el gate lo mataría como sin_guion y se perdería POR SIEMPRE.
+    const { llamadas } = await runTranscribir([tvid('c6')], {
+      cache: [{ error: 'permission denied for function cache_transcripts' }],
+    });
+    check('🔒 un error de la RPC no cachea nada: se transcribe (se paga de más, no se pierde)', llamadas.length === 1, `llamadas=${llamadas.length}`);
+  }
+  {
+    const { llamadas } = await runTranscribir([tvid('c7')], { cache: null });
+    check('🔒 y si la RPC ni corrió, fail-open igual (cache es plata, no memoria)', llamadas.length === 1, `llamadas=${llamadas.length}`);
+  }
+  {
+    // El ahorro real, mezclado: 2 cacheados y 1 nuevo ⇒ una sola llamada.
+    const { llamadas, out } = await runTranscribir([tvid('m1'), tvid('m2'), tvid('m3')], {
+      cache: [{ external_id: 'm1', estado: 'listo', script: 'g1', idioma: 'en' },
+              { external_id: 'm3', estado: 'sin_transcript', script: null }],
+    });
+    check('lote mixto: solo el no-cacheado va a Supadata (1 de 3)', llamadas.length === 1, `llamadas=${llamadas.length}`);
+    check('y los tres salen con transcripción resuelta', out.every((o) => o._tx_resuelta === true), JSON.stringify(out.map((o) => o._tx_resuelta)));
+  }
+
+// ── `_tx_resuelta`: la bandera con la que se decide QUÉ se quema (ADR-029 §Enmienda) ──
   // Es la línea entre "Supadata contestó" y "no llegué a preguntar". Antes no existía y el
   // presupuesto quemaba: la corrida del 26/08 perdió 144 videos de 250 por una caída de Supadata.
   {
@@ -892,7 +965,7 @@ const runPreparar = ({ videos, runId, abrirRunFalla = false }) => {
   const out = new Function('$', '$input', jsCode('Preparar procesados'))($, $input);
   return out[0].json.batch;
 };
-const pvid = (id, extra = {}) => Object.assign({ external_id: id, plataforma: 'instagram', url: 'https://v/' + id, _tx_resuelta: true }, extra);
+const pvid = (id, extra = {}) => Object.assign({ external_id: id, plataforma: 'instagram', url: 'https://v/' + id, _entregado: true }, extra);
 
 seccion('Preparar procesados — atribuir la memoria a su corrida (H3, cierre 70)');
 {
@@ -923,21 +996,21 @@ seccion('Preparar procesados — atribuir la memoria a su corrida (H3, cierre 70
     cols === 'external_id,instance_id,platform,run_id', cols);
 }
 
-seccion('Preparar procesados — solo se quema lo que Supadata RESOLVIÓ (ADR-029 §Enmienda)');
+seccion('Preparar procesados — solo se quema lo ENTREGADO al Feed (ADR-087)');
 {
-  // El arreglo entero, en un test: el video sin respuesta definitiva no entra a la memoria del
-  // dedup, así que la próxima corrida lo vuelve a mirar. Antes este nodo colgaba de `Heat-score v1`
-  // y corría ANTES de transcribir, o sea que marcaba "ya visto" lo que nadie había mirado todavía.
-  const batch = runPreparar({ videos: [pvid('ok'), pvid('ppto', { _tx_resuelta: false })], runId: 'r-1' });
-  check('🔴 el que no se resolvió NO se quema', batch.length === 1 && batch[0].external_id === 'ok', JSON.stringify(batch.map((r) => r.external_id)));
+  // El arreglo entero, en un test. Medido el 2026-09-01: de 1.952 filas de processed_items, 1.401
+  // (71,8%) eran de videos que NUNCA se le mostraron a nadie — los mataba el gate o el corte por N
+  // después de haberlos pagado, y no volvían nunca. Ahora lo que no llega al Feed no se quema.
+  const batch = runPreparar({ videos: [pvid('ok'), pvid('rechazado', { _entregado: false })], runId: 'r-1' });
+  check('🔴 lo que NO se entregó al Feed NO se quema (vuelve la próxima corrida)', batch.length === 1 && batch[0].external_id === 'ok', JSON.stringify(batch.map((r) => r.external_id)));
 }
 {
   const batch = runPreparar({ videos: [pvid('a'), pvid('b')], runId: 'r-1' });
-  check('y el resuelto se quema igual que siempre (el camino normal no cambió)', batch.length === 2, 'quedaron ' + batch.length);
+  check('y lo entregado se quema igual que siempre (el camino normal no cambió)', batch.length === 2, 'quedaron ' + batch.length);
 }
 {
-  const batch = runPreparar({ videos: [pvid('x', { _tx_resuelta: false })], runId: 'r-1' });
-  check('si NINGUNO se resolvió, el batch va vacío y no rompe', batch.length === 0, JSON.stringify(batch));
+  const batch = runPreparar({ videos: [pvid('x', { _entregado: false })], runId: 'r-1' });
+  check('si NINGUNO se entregó, el batch va vacío y no rompe', batch.length === 0, JSON.stringify(batch));
 }
 {
   // El guard del cableado. Sin él, colgar este nodo del lugar equivocado deja al motor sin memoria
@@ -946,11 +1019,77 @@ seccion('Preparar procesados — solo se quema lo que Supadata RESOLVIÓ (ADR-02
   let msg = '';
   try { runPreparar({ videos: [{ external_id: 'z', plataforma: 'instagram' }], runId: 'r-1' }); }
   catch (e) { msg = e.message; }
-  check('🔒 sin la bandera aborta ruidoso (mal cableado ⇒ corrida verde sin dedup)', msg.includes('_tx_resuelta'), msg || 'no tiró');
+  check('🔒 sin la bandera aborta ruidoso (mal cableado ⇒ corrida verde sin dedup)', msg.includes('_entregado'), msg || 'no tiró');
 }
 {
   const batch = runPreparar({ videos: [], runId: 'r-1' });
   check('pero una entrada VACÍA no es un cableado roto: batch vacío, sin abortar', batch.length === 0, JSON.stringify(batch));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Preparar transcripciones — el libro del ASR (ADR-087). Lo que esta corrida le pagó a Supadata
+// queda guardado para que NINGUNA corrida futura lo vuelva a pagar. Es la pieza que hace seguro
+// dejar de quemar lo no entregado: sin ella, un rechazado del gate volvería y se re-transcribiría
+// en cada corrida, para siempre.
+// ════════════════════════════════════════════════════════════════════════════
+const runPrepTx = (videos, iid = 'inst-42') => {
+  const $ = (n) => {
+    if (n === 'Config') return { first: () => ({ json: { instance_id: iid } }) };
+    if (n === 'Transcribir (Supadata)') return { all: () => videos.map((j) => ({ json: j })) };
+    throw new Error('nodo no mockeado: ' + n);
+  };
+  const out = new Function('$', '$input', 'console', jsCode('Preparar transcripciones'))(
+    $, { all: () => [] }, { log: () => {} });
+  return out[0].json.filas;
+};
+const txvid = (id, extra = {}) => Object.assign(
+  { external_id: id, plataforma: 'instagram', url: 'https://v/' + id,
+    transcripcion: 'guion de ' + id, idioma_detectado: 'en',
+    _tx_resuelta: true, _tx_origen: 'supadata' }, extra);
+
+seccion('Preparar transcripciones — la caché de ASR (ADR-087)');
+{
+  const filas = runPrepTx([txvid('a')]);
+  check('un video transcrito se guarda como listo, con su guion', filas.length === 1 && filas[0].estado === 'listo' && filas[0].script === 'guion de a', JSON.stringify(filas));
+}
+{
+  const filas = runPrepTx([txvid('a')]);
+  check('y va marcado origen=motor (sin eso inunda la pantalla del equipo)', filas[0].origen === 'motor', String(filas[0].origen));
+}
+{
+  // Un mudo se guarda IGUAL, y ahí está medio ahorro: sin esta fila, cada corrida futura le paga a
+  // Supadata para que vuelva a contestar que el video no tiene audio.
+  const filas = runPrepTx([txvid('mudo', { transcripcion: '' })]);
+  check('🟢 el mudo se guarda como sin_transcript (no se le vuelve a preguntar nunca)', filas.length === 1 && filas[0].estado === 'sin_transcript' && filas[0].script === null, JSON.stringify(filas));
+}
+{
+  const filas = runPrepTx([txvid('cacheado', { _tx_origen: 'cache' })]);
+  check('lo que YA vino de la caché no se re-escribe (tráfico al pedo)', filas.length === 0, JSON.stringify(filas));
+}
+{
+  // Mismo criterio que ADR-084: un 429 o un presupuesto agotado NO son una respuesta. Cachear ese
+  // vacío sería peor que no cachear: le clavaría "sin guion" al video para siempre.
+  const filas = runPrepTx([txvid('ppto', { _tx_resuelta: false, transcripcion: '' })]);
+  check('🔴 lo NO resuelto no se cachea (un 429 no es una respuesta)', filas.length === 0, JSON.stringify(filas));
+}
+{
+  const filas = runPrepTx([txvid('a'), txvid('a'), txvid('b')]);
+  check('el fan-out no duplica: una fila por video distinto', filas.length === 2, 'quedaron ' + filas.length);
+}
+{
+  // `plataforma`, `external_id`, `url` e `instance_id` son NOT NULL y plataforma es un enum. Una
+  // fila incompleta NO rebota sola: PostgREST manda el array en una transacción y se lleva puesto
+  // el lote entero. Se filtra acá.
+  const filas = runPrepTx([txvid('ok'), txvid('malo', { plataforma: '' }), txvid('malo2', { url: '' })]);
+  check('🔒 filtra las filas incompletas en vez de perder el lote entero', filas.length === 1 && filas[0].external_id === 'ok', JSON.stringify(filas.map((f) => f.external_id)));
+}
+{
+  const filas = runPrepTx([txvid('x', { plataforma: 'youtube' })]);
+  check('🔒 y una plataforma fuera del enum tampoco pasa', filas.length === 0, JSON.stringify(filas));
+}
+{
+  const filas = runPrepTx([]);
+  check('sin nada que guardar devuelve un item vacío y no corta la cadena', Array.isArray(filas) && filas.length === 0, JSON.stringify(filas));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1076,13 +1215,18 @@ const IID = 'inst-42';
 const RUN_ID = 'run-7';
 // `run` es lo que devolvió `Abrir run en el registro`. El default trae el id; el caso interesante es
 // pasarle `{}`, que es lo que deja un registro caído — ese nodo es SUMIDERO (invariante #1).
+// 🔑 Desde ADR-087 este nodo lee `$('Armar candidato')` por NOMBRE y ya no `$input`: le metieron
+// `Preparar procesados` → `POST processed_items` delante, así que su entrada directa pasó a ser la
+// respuesta del POST. El mock refleja eso — `$input` va vacío a propósito, para que el test falle
+// si alguien vuelve a leer la entrada directa.
 const runPrepCandidatos = (videos, run = { id: RUN_ID }) => {
   const $ = (n) => {
     if (n === 'Config') return { first: () => ({ json: { instance_id: IID } }) };
     if (n === 'Abrir run en el registro') return { first: () => ({ json: run }) };
+    if (n === 'Armar candidato') return { all: () => videos.map((j) => ({ json: j })) };
     throw new Error('nodo no mockeado: ' + n);
   };
-  const $input = { all: () => videos.map((j) => ({ json: j })) };
+  const $input = { all: () => [] };
   const out = new Function('$', '$input', 'console', jsCode('Preparar candidatos'))($, $input, { log: () => {} });
   return out.length ? out[0].json.filas : [];
 };
@@ -1221,6 +1365,26 @@ seccion('Preparar descartes — misma regla, misma instancia');
   const filas = out.length ? out[0].json.filas : [];
   check('el descarte auditable lleva su instance_id', filas.length === 1 && filas[0].instance_id === IID, JSON.stringify(filas));
   check('sin_guion sigue sin subir (ADR-030 intacto)', filas.length === 1, 'subieron ' + filas.length);
+}
+{
+  // ADR-087. Hasta hoy un descarte no se podía volver a encontrar: `rescatar-huerfanos.mjs` tenía
+  // que decodificar el shortcode de Instagram desde `url_referente` para reconstruirlo. Todo video
+  // en la herramienta se identifica por (plataforma, external_id) — ésta era la única superficie
+  // que no lo hacía.
+  const corr = (items) => {
+    const $ = (n) => {
+      if (n === 'Config') return { first: () => ({ json: { instance_id: IID } }) };
+      if (n === 'Gate de relevancia') return { all: () => items.map((j) => ({ json: j })) };
+      throw new Error('nodo no mockeado: ' + n);
+    };
+    const out = new Function('$', 'console', jsCode('Preparar descartes'))($, { log: () => {} });
+    return out.length ? out[0].json.filas : [];
+  };
+  const base = { _descarte: true, descarte_razon: 'no_relevante', proyecto_id: 'P1', username: 'ref', script: 'g' };
+  const conId = corr([Object.assign({}, base, { external_id: 'EXT-1' })]);
+  check('el descarte viaja con su external_id (ya no hay que decodificar la URL)', conId[0].external_id === 'EXT-1', JSON.stringify(conId[0].external_id));
+  const sinId = corr([Object.assign({}, base)]);
+  check('y sin él la fila sale igual, con null (no tumba el POST del lote)', sinId[0].external_id === null, JSON.stringify(sinId[0].external_id));
 }
 
 console.log(fail ? `\n${fail} test(s) en rojo` : '\nTodo en verde');
