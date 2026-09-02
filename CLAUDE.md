@@ -32,6 +32,13 @@ en §Agent skills; acá solo se ubican.
   **Sin migración, sin n8n, sin `core/`.** Su hallazgo ordenador: *el default de las cuatro es "no
   reordenes"*, porque las cuatro ya llegan ordenadas por alguien y reproducir esas reglas serían
   dos implementaciones de cada una.
+- [docs/agents/plan-cascada-de-entrega.md](docs/agents/plan-cascada-de-entrega.md) — **el pendiente
+  vivo del audit del 01/09**: llenar N no es una decisión sino una **cascada de cinco escalones**, y
+  el orden es todo el diseño. **2 de 5 puestos, y el que está puesto dispara antes de tiempo.** Su
+  hallazgo ordenador: *`Gate de relevancia` NO SABE cuánto falta para N* —ese corte vive dos nodos
+  más abajo, en `Armar candidato`— así que el escalón "dejar pasar para rellenar" **nunca pudo vivir
+  en el gate**. Trae el estado de todo lo aplicado, lo pendiente en orden de retorno, las
+  mediciones escritas antes de mirarlas, y los invariantes que no hay que re-litigar.
 - [docs/agents/plan-motor-linkedin.md](docs/agents/plan-motor-linkedin.md) — de **esqueleto a motor**:
   las fases 0–4 para que el pipeline de LinkedIn corra. Su hallazgo ordenador: **los dos carriles no
   comparten bloqueos** — el personal está a un pedido (los few-shot) y el copiable necesita los tres.

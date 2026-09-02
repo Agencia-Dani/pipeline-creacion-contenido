@@ -76,6 +76,21 @@
 > - 🔕 **`app.descartes` queda dormida** con `MIN_REL = 0`. Los nodos siguen ahí y vuelven solos si
 >   alguien sube el knob. `v_auditoria_descartes` va a mostrar 0 expuestos, que es **honesto**.
 >
+> ## 🔴 CORREGIDO EL MISMO DÍA — dispara antes de tiempo
+>
+> Mani, al verlo: *"eso de entregar los 6 rechazados no debe ser"*. **Este cierre es el ÚLTIMO
+> escalón de una cascada de cinco y hoy dispara siempre**, en vez de sólo cuando N quedó corto.
+> El plan completo, con los 5 escalones y el estado de cada uno, está en
+> [plan-cascada-de-entrega.md](./plan-cascada-de-entrega.md) — **leer ese doc antes de retomar**.
+>
+> 🔑 **El porqué estructural: `Gate de relevancia` no sabe cuánto falta para N** (ese corte vive en
+> `Armar candidato`, dos nodos abajo), así que el condicional **nunca pudo vivir en el gate**. El
+> arreglo son ~10 líneas en `Armar candidato` y **ninguna migración**: la marca `_bajo_umbral` ya
+> viaja.
+>
+> 📌 **0 corridas desde el push**, canarios en cero ⇒ **no entregó ni un video dudoso**. Nada que
+> limpiar. Y la válvula mientras tanto es un knob: `Relevancia mínima` en ~0,55 (hoy está en 0).
+>
 > ## 🔴 PENDIENTE — la medición, y es la que puede revertir esto
 >
 > **La métrica de éxito NO es la obvia:** no *"cuántos entregó"* sino **cuántos 🔥/👍 ABSOLUTOS por

@@ -116,6 +116,31 @@ con las 422 filas históricas** justo cuando hay que medir si el cambio sirvió.
 nuevos: que el rechazado entra, que va marcado, que el aprobado no, que el score sigue ordenando, y
 las dos puntas de `MIN_REL`).
 
+## 🔴 Enmienda PENDIENTE (2026-09-01, mismo día) — el escalón dispara antes de tiempo
+
+Mani, al ver la implementación: *"eso de entregar los 6 rechazados no debe ser"*. Tiene razón, y el
+error es de **momento**, no de dirección.
+
+Este ADR es **el último escalón de una cascada de cinco** ([plan-cascada-de-entrega.md](../agents/plan-cascada-de-entrega.md)),
+y hoy dispara **siempre** en vez de sólo cuando N quedó corto. Faltan los escalones de arriba:
+ofrecerle el video a los demás proyectos (escalón 2) y rellenar con lo ya transcrito (escalón 4).
+
+🔑 **Y hay una razón estructural por la que salió así: `Gate de relevancia` no sabe cuánto falta
+para N.** Ese corte vive en `Armar candidato`, dos nodos más abajo. Un gate no puede decidir *"dejo
+pasar para rellenar"* porque no tiene el número. **El condicional pertenece a `Armar candidato`:**
+
+1. llenar N con los aprobados (`_bajo_umbral !== true`), por `composite` — lo de siempre;
+2. ¿quedó corto? recién ahí, completar con los `_bajo_umbral`;
+3. lo que sobra no se entrega **y no se quema** (ADR-087).
+
+La marca `_bajo_umbral` **ya existe y ya viaja**, así que son ~10 líneas y **ninguna migración**.
+
+**Mientras tanto la válvula es un knob, no un rollback:** `Relevancia mínima` en ~0,55 restaura el
+veto viejo, porque este ADR la convirtió en el único veto. ⚠️ Al 01/09 está en **0**.
+
+📌 **Nada de esto llegó a producir un video todavía: 0 corridas desde el push.** Los canarios siguen
+en cero, así que no hay nada que limpiar — sólo que ordenar antes de la primera corrida real.
+
 ## Hecho cuando
 
 1. Una corrida real reporta `metricas.bajo_umbral > 0` y **entrega más que su gate anterior**.
