@@ -185,8 +185,17 @@ en §Agent skills; acá solo se ubican.
   `Preparar candidatos`, empujados al live). ⚠️ *Escribir no es leer, y guardar no autoriza a
   bloquear: **falta la medición**, que la hace la primera corrida de redes.* Las tres consultas que
   hay que correr después de esa corrida están en el handoff.
-  🔴 **La [`037`](core/schema/037_origen_transcripciones_y_descartes_id.sql) (ADR-087) está
-  ESCRITA y PENDIENTE de aplicar** (01/09). Agrega `app.transcripciones.origen`
+  ✅ **La [`037`](core/schema/037_origen_transcripciones_y_descartes_id.sql) (ADR-087) está
+  APLICADA** (Mani, 01/09), verificada **por su efecto y con cuatro señales**: `transcripciones =
+  manual = 130` y **`motor = 0`** · **`descartes_con_id = 0`** (los dos ceros prueban que el *sin
+  backfill* es un hecho medido y no una intención) · la RPC existe · y
+  **`has_function_privilege` da `true` para `service_role` y `authenticated`** — que era la pata
+  cuyo fallo habría sido mudo. Y una quinta, por el camino real: la RPC contestada por PostgREST
+  con `POST` + `Content-Profile: app` devuelve **200 y 3 filas con guion**, y un id inventado
+  devuelve `[]` con 200.
+  ✅ **El motor ya corre esto en el live** (01/09): `n8n:push --apply` sobre 10 nodos, **40 en
+  total**, workflow activo, y **`n8n:diff` verde en los 5**. Snapshot de rollback en
+  `.n8n-snapshots/motor-2026-09-02T00-59-22-928Z.json`. Agrega `app.transcripciones.origen`
   (`manual` | `motor`), `app.descartes.external_id` y la RPC `app.cache_transcripts`. Ejecuta el
   cambio de modelo que ataca el desperdicio más grande medido del sistema: **`processed_items`
   tiene 1.952 filas y solo 866 videos llegaron alguna vez al Feed ⇒ 1.401 (71,8%) se pagaron, se

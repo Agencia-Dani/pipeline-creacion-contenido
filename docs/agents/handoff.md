@@ -54,11 +54,23 @@
 >   = *"¿ya se lo mostré?"*, `estado='sin_transcript'` = *"¿tiene audio?"*.
 > - ✅ **Migración [`037`](../../core/schema/037_origen_transcripciones_y_descartes_id.sql)
 >   ESCRITA** — `app.transcripciones.origen`, `app.descartes.external_id`, y la RPC
->   `app.cache_transcripts`. **🔴 PENDIENTE DE APLICAR** (gate humano, SQL Editor).
+>   `app.cache_transcripts`. ✅ **APLICADA** (Mani, 01/09) y verificada por efecto con **cinco
+>   señales**: `transcripciones = manual = 130` · **`motor = 0`** · **`descartes_con_id = 0`** (los
+>   dos ceros prueban el *sin backfill*) · la RPC existe con
+>   **`has_function_privilege = true`** para `service_role` y `authenticated` · y la RPC llamada
+>   **por el camino real del motor** (`POST` + `Content-Profile: app`) devuelve **200 con 3 filas y
+>   sus guiones**, y `[]` con 200 para un id inventado.
 > - ✅ **Motor: 36 → 40 nodos.** Nuevos: `Pedir caché de transcripts`, `Leer caché de transcripts`,
 >   `Preparar transcripciones`, `POST Transcripciones`. Movidos: `Preparar procesados` y
 >   `POST processed_items` pasan a colgar de `Armar candidato`.
 >   `auditar-workflows.mjs` **sin hallazgos**, `test-nodos.mjs` en **193 checks** (eran 172).
+>   ✅ **EMPUJADO AL LIVE** (01/09): `n8n:push --apply`, 40 nodos, workflow activo, **`n8n:diff`
+>   verde en los 5**. Rollback: `.n8n-snapshots/motor-2026-09-02T00-59-22-928Z.json`.
+>   🩸 **El push pide `--borrar` para los 4 nodos que cambian de destino** (`IF — hay videos
+>   nuevos`, `Transcribir`, `POST processed_items`, `Armar candidato`). Ninguno desaparece: la
+>   bandera autoriza el **recableado**, no un borrado. *Y el `npm error` que salió primero era
+>   correr `npm run` desde la raíz — no hay `package.json` ahí, los scripts viven en
+>   `core/scripts`.*
 > - ✅ **App: las 5 lecturas de `lib/transcripciones.ts` filtran `origen = 'manual'`.**
 >   typecheck limpio · **494 tests** · `npm run build` OK.
 >
@@ -84,18 +96,22 @@
 >    de ADR-084 usaba `'_tx_resuelta' in json` justamente por eso. **El test que ya existía lo cazó
 >    en el primer intento.**
 >
-> ## 🔴 PENDIENTE — en este orden, y el orden importa
+> ## ✅ Aplicado y verificado (01/09) · 🔴 lo que falta
 >
-> 1. **Aplicar la `037`** en el SQL Editor. Su §4 trae las consultas de verificación, incluida
->    `has_function_privilege` para el grant de la RPC — **cuyo fallo sería mudo**: un `42501` lo
->    traga el `onError: continue` y la corrida cierra en verde, sin caché, re-pagando.
-> 2. **Empujar el motor al live**: `npm run n8n:push -- motor --nodos "..."`. Es **topología**
->    (4 nodos nuevos), así que `--nodos` es obligatorio. Después `npm run n8n:diff` verde en los 5.
-> 3. **Deployar la app** — ⚠️ **nunca antes del paso 1**: sin la columna `origen`, PostgREST
->    responde `42703` y las 5 consultas mueren.
-> 4. **Medir en la primera corrida real:** `llamadas.supadata` contra videos distintos entrados (el
->    ahorro de la caché), y que `processed_items` deje de crecer más rápido que
->    `candidatos + outputs`.
+> 1. ✅ **La `037` está APLICADA**, con las cinco señales de arriba. La que importaba era
+>    `has_function_privilege`: su fallo habría sido **mudo** — un `42501` lo traga el
+>    `onError: continue` y la corrida cierra en verde, sin caché, re-pagándole a Supadata.
+> 2. ✅ **El motor está en el live**: 40 nodos, activo, `n8n:diff` verde en los 5.
+> 3. 🔴 **FALTA deployar la app.** El commit está en `main` local, sin pushear. **Ya se puede**
+>    (la migración está aplicada), y **conviene hacerlo antes de la próxima corrida**: desde que el
+>    motor escriba su primera fila `origen='motor'`, la pantalla Transcribir del equipo la mostraría
+>    sin el filtro.
+> 4. 🔴 **FALTA medir, y la mide la primera corrida real** (decisión de Mani: se mide con uso del
+>    equipo, no con una corrida de prueba). Tres consultas:
+>    · `select count(*) from app.transcripciones where origen='motor'` — el canario, nace en 0 y la
+>      primera fila la escribe el motor.
+>    · `llamadas.supadata` de `runs.metricas` contra los videos distintos que entraron — el ahorro.
+>    · que `processed_items` deje de crecer más rápido que `candidatos + outputs`.
 >
 > ## Lo que este cierre NO resuelve, dicho sin eufemismo
 >
