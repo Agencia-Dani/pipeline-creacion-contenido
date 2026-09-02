@@ -360,8 +360,11 @@ con 30% de percentil métrico que no aporta nada.
 El detalle entero, con qué se cae y qué NO se cae de ADR-088, está en
 [ADR-088 §Enmienda 2](../adr/ADR-088-el-gate-ordena-no-veta.md).
 
-⛔ **Esto NO habilita reordenar por `relevancia_score` de rebote**: toca ADR-024 y ADR-030 y va
-decidido aparte. 🕳️ **Pero sí obliga a re-mirar el cierre de "re-pesar el heat-score"** (ROADMAP §5
+✅ **Decidido y aplicado el mismo día como [ADR-090](../adr/ADR-090-la-metrica-no-rankea-videos-desempata.md):**
+`peso_relevancia` **0,7 → 1**. El hallazgo que lo volvió binario: `relevancia_score` toma **27
+valores** con paso **0,01**, así que el 30% métrico **no rankea, desempata** — y para ser desempate
+estricto haría falta `peso > 0,990`. **No hay punto medio.** Y el Feed ordena por `heat_score`
+igual que el corte, así que un solo valor arregla las dos superficies. 🕳️ **Pero sí obliga a re-mirar el cierre de "re-pesar el heat-score"** (ROADMAP §5
 punto 2, AUC 0,706, techo ≈0,71): ese 0,706 se parece mucho a los números **globales** de arriba y
 **no consta que se haya estratificado**. *Un obstáculo escrito se re-mide.* Y sigue en pie que hay
 señales gratis sin usar: `duracion_seg` (se guarda desde ADR-086 y **no la lee nadie**),

@@ -1190,7 +1190,9 @@ const runGate = async ({ items = [], projects = {}, cfg = {}, haikuFalla = false
     return { content: [{ text: JSON.stringify({ juicio }) }] };
   } } };
   const $ = (n) => {
-    if (n === 'Config') return { first: () => ({ json: Object.assign({ peso_relevancia: 0.7, min_relevancia: 0, cap_descartes: 10 }, cfg) }) };
+    // ⚠️ Espeja el `Config` del workflow.json vivo. Decía 0.7 y allá dice 1 desde ADR-090; el mismo
+    // drift que ya se pagó con `cap_top_n` (100 acá, 250 allá). Si allá cambia, acá también.
+    if (n === 'Config') return { first: () => ({ json: Object.assign({ peso_relevancia: 1, min_relevancia: 0, cap_descartes: 10 }, cfg) }) };
     if (n === 'Armar plan de corrida') return { first: () => ({ json: { projects, ajustes: {} } }) };
     throw new Error('nodo no mockeado: ' + n);
   };
@@ -1200,6 +1202,69 @@ const runGate = async ({ items = [], projects = {}, cfg = {}, haikuFalla = false
   return { out: out.map((i) => i.json), logs, llamadas, maxEnVuelo: () => maxEnVuelo };
 };
 const gvid = (id, pid = 'P1', extra = {}) => Object.assign({ external_id: id, proyecto_id: pid, heat_score: 0.5, descripcion: 'caption ' + id, script: 'guion de ' + id, username: 'ref' }, extra);
+
+// Los mocks de arriba ESPEJAN el nodo `Config` a mano, y un espejo desincronizado miente en verde.
+// Ya pasó con `cap_top_n` (100 acá, 250 allá) y el arreglo fue un comentario, que no verifica nada.
+//
+// 🔑 Lo que NO se verifica: que el mock valga lo mismo que producción. Un fixture difiere a
+// propósito — `piso_referente` es 0 acá y 5 en el live justamente para probar el corte sin piso, y
+// `cap_resultados_referente` es 50 para que el clamp muerda. Exigir igualdad daría falsas alarmas y
+// empujaría a alinear fixtures con prod, que es al revés de lo que sirve.
+// Lo que SÍ es invariante: que la clave EXISTA (un mock de un knob renombrado prueba nada), y que
+// el valor de los knobs cuyo default es una DECISIÓN esté donde la decisión dice.
+seccion('Los mocks de Config apuntan a knobs que existen, y los defaults decididos están puestos');
+{
+  const cfgVivo = {};
+  for (const a of (w.nodes.find((n) => n.name === 'Config').parameters.assignments.assignments || [])) cfgVivo[a.name] = a.value;
+  // Solo los que ESPEJAN Config. `min_relevancia` y `cap_descartes` no viven ahí: llegan por
+  // `plan.ajustes` (knobs del cockpit) y el gate cae a `|| 0` / `|| 10`. Que el único veto que dejó
+  // ADR-088 no tenga default en Config es correcto — su default es "no vetar".
+  const mockeadas = [...Object.keys(CFG_PLAN), ...Object.keys(CFG_CAND), 'peso_relevancia'];
+  const fantasmas = mockeadas.filter((k) => !(k in cfgVivo));
+  check('cada knob mockeado existe en el Config real', fantasmas.length === 0, 'no están en Config: ' + fantasmas.join(', '));
+  // ADR-090: el 30% métrico no rankea videos y ni siquiera alcanza para desempatar (paso 0,01 de
+  // relevancia exigiría peso > 0,990). Si esto vuelve a 0,7 sin ADR, el orden vuelve a la moneda.
+  check('ADR-090: peso_relevancia = 1 en el Config que corre', Number(cfgVivo.peso_relevancia) === 1, String(cfgVivo.peso_relevancia));
+}
+
+seccion('ADR-090 — la métrica no rankea: el composite es relevancia pura, salvo sin juicio');
+await (async () => {
+  {
+    // El caso que decide: dos videos con relevancia DISTINTA por el paso mínimo medido (0,01) y
+    // métricas invertidas. Con peso 0,7 el percentil métrico daba vuelta el orden; con 1 no puede.
+    const items = [gvid('bajo-rel-alta-metrica', 'P1', { heat_score: 0.99 }), gvid('alta-rel-baja-metrica', 'P1', { heat_score: 0.01 })];
+    const { out } = await runGate({
+      items, projects: { P1: { nombre: 'P1', criterios: 'x' } },
+      juicioFn: (id) => ({ id, relevante: true, score: id === 'alta-rel-baja-metrica' ? 0.81 : 0.80, razon: 'r' }),
+    });
+    const k = out.filter((o) => !o._descarte).sort((a, b) => b.heat_score - a.heat_score);
+    check('un 0,01 más de relevancia le gana a TODO el percentil métrico (era al revés con 0,7)',
+      k[0].external_id === 'alta-rel-baja-metrica', JSON.stringify(k.map((o) => [o.external_id, o.heat_score])));
+    check('y el heat_score ES la relevancia, sin diluir', k[0].heat_score === 0.81 && k[1].heat_score === 0.8,
+      JSON.stringify(k.map((o) => o.heat_score)));
+  }
+  {
+    // La única parte donde la métrica sigue mandando, y es correcta: sin juicio no hay relevancia.
+    const { out } = await runGate({
+      items: [gvid('sin-juicio', 'P1', { heat_score: 0.42 })],
+      projects: { P1: { nombre: 'P1', criterios: 'x' } }, haikuFalla: true,
+    });
+    const k = out.find((o) => o.external_id === 'sin-juicio');
+    check('lo que se quedó sin juicio sigue ordenando por su percentil métrico (fail-open, ADR-044)',
+      k && k.relevancia_score === null && k.heat_score === 1, JSON.stringify([k && k.relevancia_score, k && k.heat_score]));
+  }
+  {
+    // El knob sigue siendo knob: el cockpit lo puede bajar sin deploy si esto sale mal.
+    const items = [gvid('m1', 'P1', { heat_score: 0.99 }), gvid('m2', 'P1', { heat_score: 0.01 })];
+    const { out } = await runGate({
+      items, projects: { P1: { nombre: 'P1', criterios: 'x' } }, cfg: { peso_relevancia: 0.7 },
+      juicioFn: (id) => ({ id, relevante: true, score: id === 'm2' ? 0.81 : 0.80, razon: 'r' }),
+    });
+    const k = out.filter((o) => !o._descarte).sort((a, b) => b.heat_score - a.heat_score);
+    check('bajando el knob a 0,7 vuelve el comportamiento viejo (la métrica da vuelta el orden)',
+      k[0].external_id === 'm1', JSON.stringify(k.map((o) => [o.external_id, o.heat_score])));
+  }
+})();
 
 seccion('Gate de relevancia — descarte duro de sin-guion (ADR-030)');
 await (async () => {

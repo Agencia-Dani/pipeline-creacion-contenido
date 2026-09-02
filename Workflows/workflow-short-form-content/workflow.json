@@ -169,7 +169,7 @@
             {
               "id": "c_relev",
               "name": "peso_relevancia",
-              "value": 0.7,
+              "value": 1,
               "type": "number"
             },
             {

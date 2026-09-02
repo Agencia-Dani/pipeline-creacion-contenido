@@ -22,6 +22,59 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # ⚖️ CIERRE 136 (2026-09-01) — El 30% métrico no rankeaba: desempataba, y al revés
+>
+> Mani, tras ver la medición del 135: *"quiero aplicar el cambio necesario ya. Si toca, hagamos lo de
+> sacar el 30% del corte"*. **Evaluado y aplicado**, con un hallazgo que cambió cuál era el arreglo.
+>
+> ## 🔑 La decisión resultó BINARIA, y por un dato que no estaba mirado
+>
+> La reacción obvia era *"bajemos el peso métrico a algo chico que solo desempate"*. **No se puede.**
+> `relevancia_score` toma **27 valores distintos** en 420 filas (rango 0,60–0,96) con paso **0,01**,
+> y los empates por proyecto son de **5,42 en promedio, hasta 14**. O sea que el 30% métrico **hoy no
+> rankea: rompe empates** — y lo hace a 0,407, en la dirección equivocada. Para ser desempate
+> **estricto** haría falta `(1-P) < P·0,01` ⇒ **`P > 0,990`**. *Cualquier valor intermedio conserva el
+> defecto y aparenta arreglarlo.*
+>
+> ## Lo que quedó hecho
+>
+> - ✅ **[ADR-090](../adr/ADR-090-la-metrica-no-rankea-videos-desempata.md)** — `peso_relevancia`
+>   **0,7 → 1**. Un valor en `Config`, que además es knob del cockpit (*Peso de relevancia*) ⇒
+>   **reversible sin deploy**.
+> - ✅ **En el live**: push de 1 nodo, **`n8n:diff` verde en los 5**. Rollback:
+>   `.n8n-snapshots/motor-2026-09-02T04-54-20-106Z.json`.
+> - ✅ `test-nodos.mjs` **213 checks** (eran 207), auditor sin hallazgos, validador verde.
+>
+> ## 📏 Por qué se aplicó: tres patas, no una
+>
+> 1. **Mecanismo:** un promedio ponderado no mejora mezclando un término sin información.
+> 2. **AUC** (muestra grande): composite **0,523** contra relevancia **0,638** dentro de la cuenta.
+> 3. **Simulacro sobre el norte de ADR-089** (muestra chica, 3 grupos 100% calificados): a mitad de
+>    cupo, relevancia captura **22 aprobados contra 19**, gana o empata **3 de 3, nunca pierde**.
+>
+> ## 🔍 Dos cosas que aparecieron mirando, y no eran el tema
+>
+> - **El Feed ordena por `heat_score`** (`lib/candidatos.ts:88`), no sólo el corte. O sea que el
+>   composite decidía **qué mira primero el equipo**, con **211 sin calificar de 422**. El orden de
+>   atención es tan palanca del norte como el corte, y con un solo valor se arreglaron los dos.
+> - 🩸 **El comentario que avisaba del drift mock↔Config no verificaba nada**, y yo acababa de cambiar
+>   los dos a mano. Ahora hay guard. **Y el primer guard que escribí estaba MAL**: exigía que el mock
+>   valiera lo mismo que prod y salió en rojo contra fixtures deliberados (`piso_referente` 0 acá / 5
+>   allá, para probar el corte sin piso). *Un fixture difiere a propósito; lo invariante es que el
+>   knob EXISTA y que los defaults que son una DECISIÓN estén puestos.* Eso es lo que verifica.
+>
+> ## ⚠️ Lo que NO hace
+>
+> - **Los empates quedan en orden arbitrario, a propósito.** No hay información para ordenarlos y el
+>   desempate viejo apuntaba al revés. *Un orden arbitrario es mejor que uno equivocado.*
+> - **`heat_score` cambia de significado desde hoy**; las 422 históricas guardan el composite y no se
+>   pueden recomputar. `relevancia_score` sí es comparable entre épocas.
+> - **NO ataca el cuello.** El orden muerde en **7 de 21**; la cobertura falla en **14 de 21**. Esto
+>   es precisión. Lo que falta sigue siendo el **escalón 2**.
+> - **Anotado, no hecho:** desempatar por `engagement` (0,674 dentro del proyecto) sería higiene de
+>   catálogo disfrazada de orden de video — dentro de la misma cuenta cae a 0,527. La poda de
+>   referentes es del equipo (ADR-022) y tiene su propio pendiente.
+
 > # 🧭 CIERRE 135 (2026-09-01) — Una sola métrica, y la tabla de señales apuntaba al revés
 >
 > Mani, sobre el cierre 134: *"¿por completa por heat? el heat es una fórmula poco confiable para
