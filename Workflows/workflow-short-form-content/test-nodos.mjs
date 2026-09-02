@@ -1402,6 +1402,60 @@ seccion('Los mocks de Config apuntan a knobs que existen, y los defaults decidid
   check('ADR-090: peso_relevancia = 1 en el Config que corre', Number(cfgVivo.peso_relevancia) === 1, String(cfgVivo.peso_relevancia));
 }
 
+seccion('ADR-093 — el jurado VE la métrica, como contexto débil');
+await (async () => {
+  {
+    const items = [
+      gvid('popular', 'P1', { heat_score: 0.99 }),
+      gvid('mediano', 'P1', { heat_score: 0.50 }),
+      gvid('flojo', 'P1', { heat_score: 0.01 }),
+    ];
+    const { llamadas } = await runGate({ items, projects: { P1: { nombre: 'P1', criterios: 'x' } } });
+    const usr = ((llamadas[0].body.messages || [])[0] || {}).content || '';
+    const enviados = JSON.parse(usr.slice(usr.indexOf('VIDEOS:\n') + 8));
+    const pops = Object.fromEntries(enviados.map((v) => [v.id, v.pop]));
+    check('cada video viaja con su percentil de popularidad', enviados.every((v) => typeof v.pop === 'number'), JSON.stringify(pops));
+    check('y es un PERCENTIL del lote (0-100), no las vistas crudas: sin eso el número no dice nada',
+      pops.popular === 100 && pops.flojo > 0 && pops.flojo < pops.mediano && pops.mediano < pops.popular, JSON.stringify(pops));
+  }
+  {
+    const { llamadas } = await runGate({ items: [gvid('a')], projects: { P1: { nombre: 'P1', criterios: 'x' } } });
+    const sys = llamadas[0].body.system || '';
+    // El prompt está redactado CONTRA una medición: dentro del proyecto la métrica predice RECHAZO
+    // (0,407 / 0,311) y dentro de la misma cuenta se evapora. Si estas frases se caen, el prompt
+    // pasa a inyectar una señal anti-predictiva adentro de la única que funciona.
+    check('el prompt le dice que la señal es DÉBIL y de la CUENTA, no del video',
+      /DEBIL/.test(sys) && /CUENTA que publico, no al video/.test(sys), sys.slice(-300));
+    check('que sólo sirve para DESEMPATAR entre videos que cumplen igual', /SOLO para desempatar/.test(sys), sys.slice(-300));
+    check('y que un off-topic popular sigue siendo off-topic (el modo de falla que se teme)',
+      /off-topic con pop 99 sigue siendo off-topic/.test(sys), sys.slice(-300));
+  }
+  {
+    // El knob tiene que apagar LAS DOS PATAS: el dato y la instrucción. Apagar una sola dejaría el
+    // prompt hablando de un campo que no llega, o el campo llegando sin cómo leerlo.
+    const { llamadas } = await runGate({ items: [gvid('a', 'P1', { heat_score: 0.9 })], projects: { P1: { nombre: 'P1', criterios: 'x' } }, cfg: { gate_ve_metrica: 0 } });
+    const usr = ((llamadas[0].body.messages || [])[0] || {}).content || '';
+    const enviados = JSON.parse(usr.slice(usr.indexOf('VIDEOS:\n') + 8));
+    check('con el knob en 0 el dato NO viaja', enviados.every((v) => v.pop === undefined), JSON.stringify(enviados));
+    check('y la instrucción tampoco (si no, el prompt habla de un campo que no llega)',
+      !/pop/.test(llamadas[0].body.system || ''), (llamadas[0].body.system || '').slice(-200));
+  }
+  {
+    // El veredicto lo sigue dando Haiku: la métrica no puede colarse en el score por otra vía.
+    const items = [gvid('pop-alto', 'P1', { heat_score: 0.99 }), gvid('pop-bajo', 'P1', { heat_score: 0.01 })];
+    const { out } = await runGate({
+      items, projects: { P1: { nombre: 'P1', criterios: 'x' } },
+      juicioFn: (id) => ({ id, relevante: true, score: id === 'pop-bajo' ? 0.9 : 0.2, razon: 'r' }),
+    });
+    const k = out.filter((o) => !o._descarte);
+    const alto = k.find((o) => o.external_id === 'pop-alto'), bajo = k.find((o) => o.external_id === 'pop-bajo');
+    check('el score final sigue siendo el de Haiku: la métrica no vota (ADR-090 intacto)',
+      bajo.heat_score === 0.9 && alto.heat_score === 0.2, JSON.stringify([alto.heat_score, bajo.heat_score]));
+    check('y la métrica sobrevive al lado, para desempatar (ADR-092)',
+      alto.prescore_metrico === 0.99 && bajo.prescore_metrico === 0.01, JSON.stringify([alto.prescore_metrico, bajo.prescore_metrico]));
+  }
+})();
+
 seccion('ADR-090 — la métrica no rankea: el composite es relevancia pura, salvo sin juicio');
 await (async () => {
   {
