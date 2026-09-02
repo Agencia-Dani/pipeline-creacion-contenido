@@ -281,6 +281,59 @@ videos» mejor que la ráfaga**. Anotado, no resuelto acá."* Sigue anotado y si
 
 ---
 
+## §6.bis · Tres pendientes sueltos que no entran en la cascada
+
+**1. 🕳️ El gate juzga sobre 1.500 caracteres, y nadie midió qué cuesta.**
+`Gate de relevancia` trunca el transcript a **1.500 chars** antes de mandárselo a Haiku
+(`.slice(0, 1500)`), mientras `Transcribir` guarda hasta **6.000**. Un reel de 2-3 minutos supera
+holgado los 1.500 ⇒ **una parte del catálogo se juzga por su primer tercio.** Experimento barato:
+re-juzgar una muestra con el transcript completo y comparar veredictos. Podría explicar parte del
+ruido del punto 2.
+
+**2. 📏 El `relevancia_score` casi no predice el veredicto humano, y eso pide señales nuevas.**
+Sobre los 211 candidatos calificados:
+
+| Señal | Correlación con 🔥/👍 |
+|---|---|
+| `log(views)` | **0,493** |
+| `seguidores` | 0,242 |
+| `relevancia_score` (Haiku sobre el transcript) | **0,218** |
+| `engagement` | 0,178 |
+| `heat_score` | 0,162 |
+
+⚠️ **Caveat honesto:** se mide sobre los que **pasaron** el gate (rango 0,60–0,96), y un rango
+restringido baja cualquier correlación. Prueba que el gate **ordena mal a los que deja pasar**;
+**no** prueba que rechace bien o mal — eso lo contesta la medición 3 del §4.
+
+⛔ **Esto NO habilita re-pesar el heat-score**, que ya se cerró (ROADMAP §5 punto 2: AUC 0,706, techo
+≈0,71). Apunta al mismo lado que esa conclusión: **agregar señales, no mover pesos.** Candidatas que
+ya llegan gratis y hoy se tiran o no se usan: `duracion_seg` (se guarda desde ADR-086 y **no la lee
+nadie**), comentarios/views, y el formato del video.
+
+**3. 📄 Deuda de doc.** La fila de **ADR-085 en `docs/adr/README.md` tiene texto de ADR-084 pegado
+adentro** (dice *"es el ADR nuevo sobre compensar la memoria"*, que no es suyo). Pre-existente al
+audit, no se tocó.
+
+---
+
+## §6.ter · Dónde vive el audit completo
+
+Este doc es **el pendiente**, no el diagnóstico. El audit entero —embudo etapa por etapa, los
+**9 componentes lógicos** del motor con los factores que mueve cada uno, el **mapa de elasticidad**
+(si muevo esto, qué pasa con oferta/costo/calidad), los **18 puntos donde muere un video** con su
+columna de *permanente vs reversible*, la salud por referente y la economía por corrida— vive en dos
+lados **fuera del repo**:
+
+- **Artifact publicado (para compartir con el equipo):**
+  https://claude.ai/code/artifact/f6c6d1c3-2cf8-4e7e-8ec9-d144439b7ab8
+- **El informe largo**, en el plan de la sesión del 01/09 (`~/.claude/plans/`, máquina de Mani).
+
+🔴 **Pendiente #9 del §2: llevar la anatomía (§2 y §2.bis de ese informe) a
+[`dev-doc.md`](./dev-doc.md)**, que hoy es nodo-por-nodo y **no tiene la vista de componentes**.
+Mientras no se haga, el mejor mapa del motor no está en el repo.
+
+---
+
 ## §7 · Sesión aparte, a pedido de Mani
 
 **Research de herramientas, adiciones y alternativas** para las capas que ya existen: scraping
