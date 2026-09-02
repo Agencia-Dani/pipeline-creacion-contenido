@@ -31,6 +31,7 @@ const check = (nombre, cond, detalle) => {
   if (!cond) fail++;
 };
 const seccion = (t) => console.log('\n── ' + t);
+const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
 
 // ════════════════════════════════════════════════════════════════════════════
 // Armar plan de corrida — C.1 (N por proyecto) + C.2 (gate por Voces.activo)
@@ -176,7 +177,21 @@ seccion('El tope de resultados por cuenta AVISA cuando recorta (era mudo)');
 // Armar candidato — el corte final por proyecto (C.1) + dedup (ADR-018) + piso (ADR-017)
 // ════════════════════════════════════════════════════════════════════════════
 const CFG_CAND = { top_n: 100, piso_referente: 0 };
-const runCorte = (items, plan, cfg = {}) => {
+// ADR-091: el nodo pasa a ser ASYNC y puede llamar a Haiku (escalón 2). Los proyectos del mock no
+// traen `criterios`, así que por defecto el escalón NO corre y no gasta una llamada — igual que en
+// producción con un proyecto sin rúbrica. Los tests que sí lo ejercitan pasan `criterios`.
+const runCorte = async (items, plan, cfg = {}, { juicio2 = null, falla2 = false } = {}) => {
+  const llamadas2 = [];
+  const thisMock = { helpers: { httpRequest: async (opts) => {
+    llamadas2.push(opts);
+    if (falla2) throw new Error('haiku caído (mock)');
+    const usr = (((opts.body || {}).messages || [])[0] || {}).content || '';
+    const tema = (usr.match(/^TEMA: (.*)$/m) || [])[1] || '';
+    let ids = [];
+    try { ids = JSON.parse(usr.slice(usr.indexOf('VIDEOS:\n') + 8)).map((v) => v.id); } catch (e) {}
+    const j = ids.map((id) => (juicio2 ? juicio2(id, tema) : { id, relevante: false, score: 0, razon: 'no' }));
+    return { content: [{ text: JSON.stringify({ juicio: j.filter(Boolean) }) }] };
+  } } };
   const $ = (n) => {
     if (n === 'Armar plan de corrida') return { first: () => ({ json: plan }) };
     if (n === 'Config') return { first: () => ({ json: Object.assign({}, CFG_CAND, cfg) }) };
@@ -184,8 +199,8 @@ const runCorte = (items, plan, cfg = {}) => {
   };
   const $input = { all: () => items.map((j) => ({ json: j })) };
   const logs = [];
-  const out = new Function('$', '$input', 'console', jsCode('Armar candidato'))($, $input, { log: (m) => logs.push(m) });
-  return { out: out.map((i) => i.json), logs };
+  const out = await new AsyncFn('$', '$input', 'console', jsCode('Armar candidato')).call(thisMock, $, $input, { log: (m) => logs.push(m) });
+  return { out: out.map((i) => i.json), logs, llamadas2 };
 };
 const vid = (id, pid, heat, extra = {}) => Object.assign(
   { external_id: id, proyecto_id: pid, heat_score: heat, username: 'ref1', descripcion: 'v' + id, script: 'txt', url: '', plataforma: 'ig' }, extra);
@@ -218,7 +233,7 @@ seccion('C.1 — el corte final va por proyecto');
   const items = [];
   for (let i = 0; i < 10; i++) items.push(vid('a' + i, 'P1', 1 - i / 100));
   for (let i = 0; i < 10; i++) items.push(vid('b' + i, 'P2', 1 - i / 100));
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 }, P2: { nombre: 'P2', n: 5 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 }, P2: { nombre: 'P2', n: 5 } } });
   const n1 = out.filter((o) => o.proyecto_id === 'P1').length;
   const n2 = out.filter((o) => o.proyecto_id === 'P2').length;
   check('cada proyecto entrega su N (3 y 5)', n1 === 3 && n2 === 5, `P1=${n1} P2=${n2}`);
@@ -226,13 +241,13 @@ seccion('C.1 — el corte final va por proyecto');
 {
   const items = [];
   for (let i = 0; i < 10; i++) items.push(vid('c' + i, 'P3', 1 - i / 100));
-  const { out } = runCorte(items, { top_n: 4, projects: { P3: { nombre: 'P3' } } }); // sin n
+  const { out } = await runCorte(items, { top_n: 4, projects: { P3: { nombre: 'P3' } } }); // sin n
   check('proyecto sin N usa el global como default (4)', out.length === 4, 'entregó ' + out.length);
 }
 {
   const items = [];
   for (let i = 0; i < 3; i++) items.push(vid('z' + i, 'P1', 0.5));
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 999 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 999 } } });
   check('N no inventa candidatos: entrega lo disponible', out.length === 3, 'entregó ' + out.length);
 }
 
@@ -248,7 +263,7 @@ seccion('El orden dedup→corte (lo que motivó invertirlo)');
     vid('v4', 'P2', 0.60, { relevancia_score: 0.8 }),
     vid('v5', 'P2', 0.50, { relevancia_score: 0.8 }),
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 }, P2: { nombre: 'P2', n: 2 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 }, P2: { nombre: 'P2', n: 2 } } });
   const v1s = out.filter((o) => o.external_id === 'v1');
   check('el video disputado va UNA sola vez (ADR-018)', v1s.length === 1, v1s.length + ' copias');
   check('gana el proyecto que lo juzgó más relevante (P1)', v1s[0] && v1s[0].proyecto_id === 'P1', v1s[0] && v1s[0].proyecto_id);
@@ -268,7 +283,7 @@ seccion('Spillover (enmienda ADR-024, decisión Mani 2026-07-17): los sobrantes 
     vid('s2', 'TP', 0.98, { relevancia_score: 0.7 }),  // la copia de TP: pasó SU gate → spillover
     vid('s3', 'TP', 0.50, { relevancia_score: 0.8 }),
   ];
-  const { out, logs } = runCorte(items, { top_n: 100, projects: { TFT: { nombre: 'TfT', n: 1 }, TP: { nombre: 'TP', n: 5 } } });
+  const { out, logs } = await runCorte(items, { top_n: 100, projects: { TFT: { nombre: 'TfT', n: 1 }, TP: { nombre: 'TP', n: 5 } } });
   const s2 = out.filter((o) => o.external_id === 's2');
   check('el sobrante se entrega al proyecto hambriento que también lo gateó', s2.length === 1 && s2[0].proyecto_id === 'TP', JSON.stringify(s2.map((o) => o.proyecto_id)));
   check('con LA COPIA de ese proyecto (su relevancia, no la del ganador)', s2[0] && s2[0].relevancia_score === 0.7, s2[0] && String(s2[0].relevancia_score));
@@ -283,7 +298,7 @@ seccion('Spillover (enmienda ADR-024, decisión Mani 2026-07-17): los sobrantes 
     vid('w1', 'P1', 0.9, { relevancia_score: 0.9 }),
     vid('w1', 'P2', 0.9, { relevancia_score: 0.8 }),
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 }, P2: { nombre: 'P2', n: 5 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 }, P2: { nombre: 'P2', n: 5 } } });
   check('un video entregado NO se duplica a otro proyecto con cupo', out.length === 1 && out[0].proyecto_id === 'P1', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
 }
 {
@@ -294,7 +309,7 @@ seccion('Spillover (enmienda ADR-024, decisión Mani 2026-07-17): los sobrantes 
     vid('x2', 'P2', 0.80, { relevancia_score: 0.5 }), // su alternativa: P2... también lleno
     vid('x3', 'P2', 0.70, { relevancia_score: 0.9 }),
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: { nombre: 'P2', n: 1 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: { nombre: 'P2', n: 1 } } });
   check('sobrante con TODOS los proyectos llenos se descarta (N techo en ambos)', out.length === 2 && !out.some((o) => o.external_id === 'x2'), JSON.stringify(out.map((o) => o.external_id)));
 }
 {
@@ -304,7 +319,7 @@ seccion('Spillover (enmienda ADR-024, decisión Mani 2026-07-17): los sobrantes 
     vid('y2', 'P1', 0.80, { relevancia_score: 0.9 }),
     vid('y2', 'P2', 0.80, { relevancia_score: 0.6 }), // lo único de P2 es la copia perdedora de y2
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: { nombre: 'P2', n: 3 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: { nombre: 'P2', n: 3 } } });
   const p2 = out.filter((o) => o.proyecto_id === 'P2');
   check('proyecto sin ganadores propios igual recibe spillover', p2.length === 1 && p2[0].external_id === 'y2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
 }
@@ -318,7 +333,7 @@ seccion('Escalón 5 (ADR-088 §Enmienda): el bajo-umbral rellena, no compite');
     vid('a1', 'P1', 0.30), vid('a2', 'P1', 0.20), vid('a3', 'P1', 0.10),
     vid('b1', 'P1', 0.99, { _bajo_umbral: true }), // heat altísimo y NO debe entrar
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 } } });
   check('con aprobados de sobra, el bajo-umbral NO entra aunque tenga más heat',
     out.length === 2 && !out.some((o) => o.external_id === 'b1'), JSON.stringify(out.map((o) => o.external_id)));
 }
@@ -331,7 +346,7 @@ seccion('Escalón 5 (ADR-088 §Enmienda): el bajo-umbral rellena, no compite');
     vid('b2', 'P1', 0.60, { _bajo_umbral: true }),
     vid('b3', 'P1', 0.50, { _bajo_umbral: true }),
   ];
-  const { out, logs } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 } } });
+  const { out, logs } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 } } });
   const bu = out.filter((o) => o.external_id[0] === 'b');
   check('si N queda corto, entra SÓLO lo que falta (1 de 3), y el mejor por heat',
     out.length === 3 && bu.length === 1 && bu[0].external_id === 'b1', JSON.stringify(out.map((o) => o.external_id)));
@@ -343,7 +358,7 @@ seccion('Escalón 5 (ADR-088 §Enmienda): el bajo-umbral rellena, no compite');
 }
 {
   const items = [vid('b1', 'P1', 0.9, { _bajo_umbral: true }), vid('b2', 'P1', 0.8, { _bajo_umbral: true })];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
   check('un proyecto sin NINGÚN aprobado entrega su reserva entera (no se queda en cero)',
     out.length === 2, JSON.stringify(out.map((o) => o.external_id)));
 }
@@ -355,7 +370,7 @@ seccion('Escalón 5 (ADR-088 §Enmienda): el bajo-umbral rellena, no compite');
     vid('v1', 'P1', 0.9, { relevancia_score: 0.9, _bajo_umbral: true }),
     vid('v1', 'P2', 0.9, { relevancia_score: 0.5 }),
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 }, P2: { nombre: 'P2', n: 5 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 }, P2: { nombre: 'P2', n: 5 } } });
   check('del fan-out gana el proyecto que lo APROBÓ, aunque el otro le puso más score',
     out.length === 1 && out[0].proyecto_id === 'P2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
 }
@@ -369,7 +384,7 @@ seccion('Escalón 5 (ADR-088 §Enmienda): el bajo-umbral rellena, no compite');
     vid('t3', 'TFT', 0.99, { relevancia_score: 0.95, _bajo_umbral: true }),
     vid('t3', 'TP', 0.99, { relevancia_score: 0.5, _bajo_umbral: true }),
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { TFT: { nombre: 'TfT', n: 1 }, TP: { nombre: 'TP', n: 1 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { TFT: { nombre: 'TfT', n: 1 }, TP: { nombre: 'TP', n: 1 } } });
   const tp = out.filter((o) => o.proyecto_id === 'TP');
   check('el spillover también prefiere al aprobado (t2) sobre el bajo-umbral de más heat (t3)',
     tp.length === 1 && tp[0].external_id === 't2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
@@ -382,9 +397,107 @@ seccion('Escalón 5 (ADR-088 §Enmienda): el bajo-umbral rellena, no compite');
     vid('o1', 'P1', 0.50, { username: 'otra' }),
     vid('b1', 'P1', 0.99, { username: 'hog', _bajo_umbral: true }),
   ];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 } } }, { piso_referente: 1 });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 3 } } }, { piso_referente: 1 });
   check('el PISO sigue repartiendo los aprobados y la reserva no se cuela en su lugar',
     out.length === 3 && !out.some((o) => o.external_id === 'b1'), JSON.stringify(out.map((o) => o.external_id)));
+}
+
+seccion('ADR-092 — la métrica desempata PASIVO: nunca invierte una diferencia de relevancia');
+{
+  // Mani: "el heat_score es una etiqueta que sirve como desempate pasivo... no es la voz final".
+  // Es lexicográfico y no un peso: ADR-090 midió que NO existe peso que desempate sin rankear
+  // (haría falta > 0,990 contra un paso de relevancia de 0,01).
+  const items = [
+    vid('empate-metrica-baja', 'P1', 0.80, { prescore_metrico: 0.10 }),
+    vid('empate-metrica-alta', 'P1', 0.80, { prescore_metrico: 0.99 }),
+  ];
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 } } });
+  check('con relevancia empatada, la métrica decide', out.length === 1 && out[0].external_id === 'empate-metrica-alta', JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  const items = [
+    vid('rel-alta', 'P1', 0.81, { prescore_metrico: 0.00 }),
+    vid('rel-baja', 'P1', 0.80, { prescore_metrico: 1.00 }),
+  ];
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 } } });
+  check('un paso de relevancia (0,01) le gana a TODA la métrica: no puede invertirla nunca',
+    out.length === 1 && out[0].external_id === 'rel-alta', JSON.stringify(out.map((o) => o.external_id)));
+  check('y la etiqueta viaja a la salida (antes moría acá: es un percentil de SU corrida, no se recomputa)',
+    out[0].prescore_metrico === 0, JSON.stringify(out.map((o) => o.prescore_metrico)));
+}
+
+seccion('ADR-091 — Escalón 2: la segunda oportunidad cross-proyecto');
+const P2 = (extra = {}) => Object.assign({ nombre: 'P2', n: 5, criterios: 'tema de P2' }, extra);
+{
+  // El caso central: un video que P1 no se llevó (N lleno) y que P2 NUNCA VIO porque su referente
+  // no está en la lista de P2. Hoy se perdía; el escalón se lo ofrece.
+  const items = [
+    vid('gana', 'P1', 0.90, { relevancia_score: 0.9 }),
+    vid('huerfano', 'P1', 0.80, { relevancia_score: 0.8 }),
+  ];
+  const { out, logs, llamadas2 } = await runCorte(
+    items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2() } },
+    {}, { juicio2: (id) => ({ id, relevante: true, score: 0.77, razon: 'calza en P2' }) });
+  const h = out.find((o) => o.external_id === 'huerfano');
+  check('el huérfano entra al proyecto que nunca lo había visto', !!h && h.proyecto_id === 'P2', JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
+  check('con la identidad del proyecto NUEVO (nombre y score suyos, no los del que lo descartó)',
+    h && h.proyecto_nombre === 'P2' && h.relevancia_score === 0.77, JSON.stringify([h && h.proyecto_nombre, h && h.relevancia_score]));
+  check('y la razón lleva el prefijo con el que se mide sin migración (ADR-089)',
+    h && /^\[2da oportunidad\] /.test(h.relevancia_razon), h && h.relevancia_razon);
+  check('solo se preguntó por el huérfano, no por el entregado', llamadas2.length === 1, llamadas2.length + ' llamadas');
+  check('y lo dice en el log', logs.some((l) => /\[2da oportunidad\] huerfano/.test(l)), JSON.stringify(logs.filter((l) => /2da/.test(l))));
+}
+{
+  // No se le vuelve a preguntar al proyecto que YA lo juzgó: eso ya lo resolvió el spillover.
+  const items = [
+    vid('g', 'P1', 0.90, { relevancia_score: 0.9 }),
+    vid('h', 'P1', 0.80, { relevancia_score: 0.8 }),
+    vid('h', 'P2', 0.80, { relevancia_score: 0.3 }), // P2 YA lo vio
+  ];
+  const { llamadas2 } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2({ n: 0 }) } },
+    {}, { juicio2: (id) => ({ id, relevante: true, score: 0.9, razon: 'x' }) });
+  check('a un proyecto que ya lo vio NO se le vuelve a preguntar (ni se le paga)', llamadas2.length === 0, llamadas2.length + ' llamadas');
+}
+{
+  const items = [vid('a', 'P1', 0.9, { relevancia_score: 0.9 }), vid('b', 'P1', 0.8, { relevancia_score: 0.8 })];
+  const { llamadas2 } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2({ criterios: '' }) } });
+  check('un proyecto sin rúbrica no se pregunta (igual que el gate)', llamadas2.length === 0, llamadas2.length + ' llamadas');
+}
+{
+  // ⚠️ `n: 0` NO sirve para esto: `_nDe` lo lee como "usá el N global" y el proyecto queda con 100 de
+  // cupo. Para que P2 esté lleno de verdad hay que llenarlo con lo suyo.
+  const items = [vid('a', 'P1', 0.9, { relevancia_score: 0.9 }), vid('b', 'P1', 0.8, { relevancia_score: 0.8 }),
+                 vid('c', 'P2', 0.7, { relevancia_score: 0.7 })];
+  const { llamadas2, out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2({ n: 1 }) } });
+  check('con TODOS los proyectos llenos no se gasta un centavo', llamadas2.length === 0 && out.length === 2, llamadas2.length + ' llamadas, ' + out.length + ' entregados');
+}
+{
+  const items = [vid('a', 'P1', 0.9, { relevancia_score: 0.9 }), vid('h1', 'P1', 0.8), vid('h2', 'P1', 0.7)];
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2({ n: 1 }) } },
+    {}, { juicio2: (id) => ({ id, relevante: true, score: 0.9, razon: 'x' }) });
+  check('N sigue siendo techo exacto: P2 toma 1, no los 2 huérfanos', out.filter((o) => o.proyecto_id === 'P2').length === 1, JSON.stringify(out.map((o) => [o.external_id, o.proyecto_id])));
+  check('GARANTÍA: ningún video sale en 2 proyectos', new Set(out.map((o) => o.external_id)).size === out.length, JSON.stringify(out.map((o) => o.external_id)));
+}
+{
+  const items = [vid('a', 'P1', 0.9, { relevancia_score: 0.9 }), vid('singuion', 'P1', 0.8, { script: '' })];
+  const { llamadas2 } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2() } },
+    {}, { juicio2: (id) => ({ id, relevante: true, score: 0.9, razon: 'x' }) });
+  check('un huérfano SIN GUION no se ofrece (ADR-030: no hay qué juzgar)', llamadas2.length === 0, llamadas2.length + ' llamadas');
+}
+{
+  // FAIL-OPEN duro: el escalón es relleno y jamás puede tumbar una entrega ya decidida.
+  const items = [vid('a', 'P1', 0.9, { relevancia_score: 0.9 }), vid('h', 'P1', 0.8, { relevancia_score: 0.8 })];
+  const { out, logs } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2() } }, {}, { falla2: true });
+  check('si Haiku se cae, la corrida entrega igual lo que ya tenía (invariante #1)',
+    out.length === 1 && out[0].external_id === 'a', JSON.stringify(out.map((o) => o.external_id)));
+  check('y el fallo queda en el log, no en silencio', logs.some((l) => /2da oportunidad/.test(l)), JSON.stringify(logs.filter((l) => /2da/.test(l))));
+}
+{
+  // El que Haiku rechaza en la segunda vuelta no entra — y no se quema (ADR-087): vuelve gratis.
+  const items = [vid('a', 'P1', 0.9, { relevancia_score: 0.9 }), vid('h', 'P1', 0.8, { relevancia_score: 0.8 })];
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 1 }, P2: P2() } },
+    {}, { juicio2: (id) => ({ id, relevante: false, score: 0.1, razon: 'no calza' }) });
+  check('si ningún proyecto lo quiere, no entra (y al no entregarse, no se quema)', out.length === 1, JSON.stringify(out.map((o) => o.external_id)));
 }
 
 seccion('Invariantes que no se tocan');
@@ -392,22 +505,22 @@ seccion('Invariantes que no se tocan');
   const items = [];
   for (let i = 0; i < 5; i++) items.push(vid('h' + i, 'P1', 0.9 - i / 100, { username: 'hog' })); // una cuenta acapara
   for (let i = 0; i < 5; i++) items.push(vid('o' + i, 'P1', 0.5 - i / 100, { username: 'otra' }));
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 4 } } }, { piso_referente: 2 });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 4 } } }, { piso_referente: 2 });
   const otra = out.filter((o) => o.referente === 'otra').length;
   check('PISO reparte dentro del proyecto (ADR-017)', out.length === 4 && otra >= 2, `otra=${otra} total=${out.length}`);
 }
 {
   const items = [vid('d1', 'P1', 0.99, { _descarte: true }), vid('e1', 'P1', 0.50), vid('e2', 'P1', 0.40)];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 2 } } });
   check('los _descarte no entran ni consumen N (ADR-021)', out.length === 2 && !out.some((o) => o.external_id === 'd1'), JSON.stringify(out.map((o) => o.external_id)));
 }
 {
   const items = [vid('l1', 'P1', 0.5, { idioma: 'ingles' }), vid('l2', 'P1', 0.4, { idioma: 'ru' })];
-  const { out } = runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
+  const { out } = await runCorte(items, { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
   check('normLang canoniza el idioma (ingles→en, ru→otro) — cierre 34', out[0].idioma === 'en' && out[1].idioma === 'otro', out.map((o) => o.idioma).join(','));
 }
 {
-  const { out } = runCorte([vid('s1', 'P1', 0.5, { script: '' })], { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
+  const { out } = await runCorte([vid('s1', 'P1', 0.5, { script: '' })], { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } });
   check('sin transcript pasa igual, con marca visible (fail-open, decisión #6)', out.length === 1 && out[0].titulo.startsWith('⚠️ SIN GUION'), out[0] && out[0].titulo);
 }
 
@@ -416,7 +529,6 @@ seccion('Invariantes que no se tocan');
 // (jsCode async con this.helpers.httpRequest → se compila como AsyncFunction y se corre con un
 // `this` mockeado; el mock cuenta llamadas y concurrencia en vuelo)
 // ════════════════════════════════════════════════════════════════════════════
-const AsyncFn = Object.getPrototypeOf(async function () {}).constructor;
 const runTranscribir = async (items, { presupuesto = 0, delayMs = 5, concurrencia, respuesta, falla, secuencia, backoff = 1, arranque = 0, cache = null } = {}) => {
   const llamadas = [];
   let enVuelo = 0, maxEnVuelo = 0;
@@ -1482,7 +1594,7 @@ seccion('Armar candidato — el título se corta sin partir un emoji (ejecución
   // El caso se construye igual que el que explotó: relleno hasta que el emoji quede justo en el borde.
   const relleno = 'a'.repeat(79);
   const conEmoji = relleno + '😀' + ' cola que se descarta';
-  const { out } = runCorte([vid('e1', 'p1', 0.9, { descripcion: conEmoji })], { projects: { p1: { n: 10 } } });
+  const { out } = await runCorte([vid('e1', 'p1', 0.9, { descripcion: conEmoji })], { projects: { p1: { n: 10 } } });
   const t = out[0].titulo;
 
   // ⚠️ Se recorre por CODE UNITS y no con `[...t]`: el spread itera puntos de código, así que un
@@ -1508,7 +1620,7 @@ seccion('Armar candidato — el título se corta sin partir un emoji (ejecución
   check('sigue cortando (no se pasa del tope)', [...t].length <= 80, 'largo ' + [...t].length);
 
   // Y que el corte no se haya vuelto tonto: un título sin emoji tiene que seguir midiendo 80.
-  const { out: out2 } = runCorte([vid('e2', 'p1', 0.9, { descripcion: 'b'.repeat(200) })], { projects: { p1: { n: 10 } } });
+  const { out: out2 } = await runCorte([vid('e2', 'p1', 0.9, { descripcion: 'b'.repeat(200) })], { projects: { p1: { n: 10 } } });
   check('un título largo sin emoji sigue cortando en 80', [...out2[0].titulo].length === 80, 'midió ' + [...out2[0].titulo].length);
 }
 
@@ -1549,7 +1661,7 @@ seccion('Armar candidato — la huella de contenido y la duración (ADR-086)');
   // trae un pk nuevo. Estos dos campos son lo único con lo que se puede reconocer el contenido, y
   // hasta hoy `Armar candidato` los tiraba — es el único nodo de la cadena que reconstruye el
   // objeto desde cero.
-  const { out } = runCorte(
+  const { out } = await runCorte(
     [vid('h1', 'P1', 0.9, { transcripcion: 'Hola, ¿cómo estás?  Muy bien.', duracion_video: 47.8 })],
     { top_n: 100, projects: { P1: { nombre: 'P1', n: 5 } } },
   );
@@ -1561,19 +1673,19 @@ seccion('Armar candidato — la huella de contenido y la duración (ADR-086)');
   // llega el estrés" / "cuando golpea el estrés"), y por eso el hash del traducido caza 1 de 17
   // pares. Si alguien cambia `d.transcripcion` por `d.script`, esto se rompe acá y no en producción
   // tres semanas después.
-  const a = runCorte([vid('h2', 'P1', 0.9, { transcripcion: 'same audio here', script: 'cuando llega el estres' })], { top_n: 100, projects: { P1: { n: 5 } } });
-  const b = runCorte([vid('h3', 'P1', 0.9, { transcripcion: 'same audio here', script: 'cuando golpea el estres' })], { top_n: 100, projects: { P1: { n: 5 } } });
+  const a = await runCorte([vid('h2', 'P1', 0.9, { transcripcion: 'same audio here', script: 'cuando llega el estres' })], { top_n: 100, projects: { P1: { n: 5 } } });
+  const b = await runCorte([vid('h3', 'P1', 0.9, { transcripcion: 'same audio here', script: 'cuando golpea el estres' })], { top_n: 100, projects: { P1: { n: 5 } } });
   check('dos traducciones distintas del mismo audio dan LA MISMA huella', a.out[0].huella_guion === b.out[0].huella_guion && a.out[0].huella_guion === 'same audio here', `${a.out[0].huella_guion} | ${b.out[0].huella_guion}`);
 }
 {
   // Los dos son datos de MEDICIÓN, así que su ausencia viaja como null y no como '' ni 0: una
   // huella '' haría match con cualquier otra huella vacía y el aviso marcaría videos al azar.
-  const { out } = runCorte([vid('h4', 'P1', 0.9)], { top_n: 100, projects: { P1: { n: 5 } } });
+  const { out } = await runCorte([vid('h4', 'P1', 0.9)], { top_n: 100, projects: { P1: { n: 5 } } });
   check('sin transcripción la huella va null, no "" (una huella vacía matchea con cualquiera)', out[0].huella_guion === null, JSON.stringify(out[0].huella_guion));
   check('sin duración va null, no 0 (0 sería una duración que colisiona con todo)', out[0].duracion_seg === null, JSON.stringify(out[0].duracion_seg));
 }
 {
-  const { out } = runCorte([vid('h5', 'P1', 0.9, { transcripcion: 'x'.repeat(500) })], { top_n: 100, projects: { P1: { n: 5 } } });
+  const { out } = await runCorte([vid('h5', 'P1', 0.9, { transcripcion: 'x'.repeat(500) })], { top_n: 100, projects: { P1: { n: 5 } } });
   check('la huella se corta a 200: es una llave, no una copia del guion', out[0].huella_guion.length === 200, String(out[0].huella_guion.length));
 }
 

@@ -22,6 +22,79 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🎁 CIERRE 137 (2026-09-02) — La segunda oportunidad, y el heat vuelve como etiqueta
+>
+> ## 🔴 LO PRIMERO, PORQUE BLOQUEA: falta aplicar la `038`
+>
+> **[`core/schema/038_candidatos_prescore.sql`](../../core/schema/038_candidatos_prescore.sql) está
+> ESCRITA y SIN APLICAR**, y por eso **`Preparar candidatos` quedó SIN EMPUJAR a propósito** — manda
+> la columna nueva y sin ella PostgREST responde `PGRST204` y **tumba el POST del lote entero**: la
+> corrida paga Apify + Supadata + Haiku y no entrega nada. `n8n:diff` lo muestra como el único
+> `[drift]` del motor, que es el estado honesto. **Orden: migración → push de ese nodo.**
+>
+> ## ✅ [ADR-091](../adr/ADR-091-la-segunda-oportunidad-cross-proyecto.md) — escalón 2, en el live
+>
+> Después del corte y del spillover, los huérfanos se le ofrecen a los proyectos **con cupo que no
+> los vieron y tienen rúbrica**. **Sólo Haiku**: el transcript ya está pagado y `Transcribir` dedupea
+> por video ⇒ **cero ASR extra**.
+>
+> 📏 **El problema, medido:** el fan-out por referente ofrece cada video a **~3,5 proyectos de los
+> 11 activos** — dos tercios nunca lo miran.
+>
+> 🔑 **Vive DENTRO de `Armar candidato`** porque es el único lugar que sabe las dos cosas que hay que
+> cruzar: quién quedó sin dueño y cuánto cupo queda. Un nodo aparte tendría que **re-implementar el
+> corte**, y dos implementaciones de la misma regla es el error que `plan-orden-y-filtro` ya dejó
+> escrito. **El costo de esa elección, dicho:** el nodo que decide la entrega hace una llamada paga ⇒
+> **fail-open duro** (invariante #1), presupuesto de 120 s y tope de 1.500 pares.
+>
+> **Seguimiento, que Mani pidió explícito:** `metricas.segunda_oportunidad` + el prefijo
+> `[2da oportunidad] ` en `relevancia_razon`, que permite el norte de ADR-089 **por candidato y sin
+> migración**. ⚠️ **Criterio escrito ANTES de mirar: si da 0 corrida tras corrida, el escalón no es
+> la palanca y hay que decirlo, no defenderlo.**
+>
+> ## ✅ [ADR-092](../adr/ADR-092-el-heat-score-es-una-etiqueta-que-desempata.md) — el heat vuelve, como etiqueta
+>
+> Mani: *"el heat_score es una etiqueta que sirve como desempate PASIVO… no es la voz final"*.
+>
+> 🔑 **Y con eso corrigió un razonamiento mío.** ADR-090 dejó los empates en orden arbitrario porque
+> buscó el desempate como un **peso** y demostró que haría falta `> 0,990`. **La conclusión no se
+> seguía de la premisa:** un orden **lexicográfico** (relevancia, y métrica sólo si empata) es
+> desempate **estricto por construcción, sin peso ninguno**. *El problema nunca fue el valor del
+> peso: era haberlo modelado como un peso.* No es cosmético: relevancia toma **27 valores** y los
+> grupos empatados por proyecto son de **5,42, hasta 14**.
+>
+> Y la métrica se **persiste** (`038`): hasta hoy **no existía en ningún lado** porque el gate pisa
+> `heat_score`. **No se puede recomputar**: es un percentil relativo al pool de SU corrida y se pierde
+> con ella — mismo caso que `run_id` en ADR-081.
+>
+> 🕳️ **Lo que Mani pidió y NO se hizo: *"que haiku la conozca"*** (pasarle la métrica al prompt del
+> gate). Se difiere con motivo: cambia la distribución de scores y rompe la comparabilidad con las
+> 422 históricas, y sobre todo **no se puede medir en la misma corrida que estrena el escalón 2**.
+> *Dos cambios que se miden con la misma métrica no entran en la misma corrida.*
+>
+> ## 🩸 Un error mío que vale más que el código
+>
+> **ADR-090 no estaba vigente y yo dije que sí.** Los ajustes del cockpit **pisan al `Config`**, y
+> `app.ajustes` tenía `Peso de relevancia = 0.7`: el push llegó, **`n8n:diff` cerró verde en los 5**,
+> y el valor que corría seguía siendo el viejo. **`n8n:diff` verde prueba que el live corre el
+> WORKFLOW del repo, no que un VALOR esté vigente** — hay una capa de config en Postgres que el diff
+> no mira ni puede mirar. Corregido en `app.ajustes` y verificado por el camino real (la fachada
+> devuelve 1). **Todo knob con fila en `app.ajustes` tiene el mismo punto ciego.**
+>
+> ## 📏 Y una medición que reordena las prioridades
+>
+> **El 98,7% de los pares muere en pisos + dedup ANTES de transcribir** (01/09: 3.306 → 42). Ese paso
+> tenía **un solo contador para tres filtros**, así que los muertos eran anónimos (pendiente #9).
+> **Ya está instrumentado** (`metricas.filtrados_por_motivo`, con los pisos vigentes al lado) y lo
+> contesta la próxima corrida. ⚠️ **`Mínimo de vistas` está en 100.000.** Si resulta que mata más que
+> el dedup, bajarlo es **cero código** y da más cobertura que cualquier escalón.
+>
+> ## Estado
+>
+> `test-nodos.mjs` **236 checks** (eran 219), auditor sin hallazgos, validador verde. En el live:
+> `Armar candidato` + `Resumen del run` + `Heat-score v1`, `n8n:diff` con el único drift esperado.
+> Rollback: `.n8n-snapshots/motor-2026-09-02T05-37-53-482Z.json`.
+
 > # ⚖️ CIERRE 136 (2026-09-01) — El 30% métrico no rankeaba: desempataba, y al revés
 >
 > Mani, tras ver la medición del 135: *"quiero aplicar el cambio necesario ya. Si toca, hagamos lo de

@@ -1,6 +1,6 @@
 # Plan — La cascada de entrega: agotar lo bueno antes de aflojar
 
-> **Estado: 3 de 5 escalones puestos, y el que disparaba antes de tiempo ya está en su lugar.**
+> **Estado: 4 de 5 escalones puestos. Falta el 4 (rellenar con los ya transcritos).**
 > Este doc es el pendiente vivo del audit del 2026-09-01 (cierres 132, 133 y 134). Leerlo entero
 > antes de tocar el motor. **Lo que falta son los escalones 2 y 4**, que son los que le dan trabajo
 > a los de arriba antes de que el 5 tenga que actuar.
@@ -46,7 +46,14 @@ de videos que nunca vio nadie**.
 
 ---
 
-### 🔴 Escalón 2 — Antes de irse, ofrecer el video a los DEMÁS proyectos · **NO EXISTE**
+### 🟢 Escalón 2 — Antes de irse, ofrecer el video a los DEMÁS proyectos · **APLICADO (ADR-091)**
+
+> **Hecho el 2026-09-02** ([ADR-091](../adr/ADR-091-la-segunda-oportunidad-cross-proyecto.md), cierre
+> 137), en el live. Vive **dentro de `Armar candidato`**: es el único nodo que sabe quién quedó sin
+> dueño Y cuánto cupo queda. Se descartó el fan-out completo (3× pre-trim y gate, y acerca los
+> presupuestos al fail-open). Se mide con `metricas.segunda_oportunidad` y el prefijo
+> `[2da oportunidad]` en `relevancia_razon`. ⚠️ **Su techo lo pone otro muro:** el 98,7% de los pares
+> muere en pisos + dedup antes de transcribir. Lo que sigue abajo es el diagnóstico original.
 
 **Qué es.** Que todo video tenga chance de matchear con algún proyecto, no sólo con los que su
 referente ya tiene linkeados.
