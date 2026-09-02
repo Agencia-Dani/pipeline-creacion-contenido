@@ -22,6 +22,81 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🎚️ CIERRE 139 (2026-09-02) — El jurado ve la métrica, y el piso de 100k tiene un dato en contra
+>
+> ## ✅ [ADR-093](../adr/ADR-093-el-jurado-ve-la-metrica-como-contexto-debil.md) — el #4, en el live
+>
+> La otra mitad del pedido de Mani (*"que haiku la conozca, no es la voz final"*), que ADR-092 había
+> dejado anotada. Cada video viaja al gate con **`pop`**: su percentil de popularidad (0-100) dentro
+> de su proyecto.
+>
+> 🔴 **El riesgo salía de nuestra propia medición y cambió la REDACCIÓN, no la decisión:** dentro del
+> proyecto más vistas y más seguidores predicen **RECHAZO** (0,407 y 0,311) y dentro de la misma
+> cuenta la métrica se evapora ⇒ decirle *"tiene muchas vistas"* a secas sería **inyectar una señal
+> anti-predictiva dentro de la única que funciona**. Por eso el prompt lleva **el calibre escrito**:
+> débil, de la cuenta, sólo para desempatar, y *"un off-topic con pop 99 sigue siendo off-topic"*.
+>
+> Va el **percentil y no las views crudas**: un absoluto no dice nada sin referencia y **cambiaría de
+> escala** entre una corrida de cuentas chicas y una de grandes.
+>
+> ⚠️ **Levanta el *"el prompt NO cambia"* de ADR-088, cuyo motivo era real:** mueve la distribución de
+> scores. La mitigación es **marcar la época** — `metricas.gate_ve_metrica` va en cada corrida, y sin
+> eso cualquier medición que cruce las dos mezcla escalas. **Y NO entró en la misma corrida que
+> ADR-091:** dos cambios que se miden con la misma métrica no entran juntos.
+>
+> 🩸 **Un comentario mío que corregí antes de commitear:** escribí que el knob era *"reversible sin
+> deploy"* y **es falso** — `gate_ve_metrica` no está en el `AJUSTE_MAP` ni en el CATALOGO, así que
+> una fila en `app.ajustes` **no lo tocaría**. Se apaga con `Config` + `n8n:push`. *Era exactamente
+> el error de ADR-090, dos días después.*
+>
+> `test-nodos.mjs` **251 checks** (eran 242), auditor sin hallazgos, `n8n:diff` verde en los 5.
+> Rollback: `.n8n-snapshots/motor-2026-09-02T06-16-06-925Z.json`.
+>
+> ## 🚧 El #3 (el piso de 100k) está BLOQUEADO, y no por falta de ganas
+>
+> **No hay ninguna corrida el 02/09**, así que `metricas.filtrados_por_motivo` todavía no existe. Los
+> videos que mata el piso **mueren antes de tocar cualquier tabla**, o sea que *no se pueden contar
+> desde los datos guardados*: por eso hubo que instrumentarlo. **Lo desbloquea la primera corrida del
+> equipo.**
+>
+> ### 📏 Pero hay una pregunta vecina que sí se pudo contestar, y aporta
+>
+> *¿Los aprobados viven pegados al piso o muy por encima?*
+>
+> | tramo | entregados | calificados | aprobados | % aprob |
+> |---|---|---|---|---|
+> | **100k–200k** (pegado al piso) | **212** | 86 | 29 | **33,7%** |
+> | 200k–500k | 121 | 64 | 49 | **76,6%** |
+> | 500k–1M | 57 | 44 | 25 | 56,8% |
+> | 1M+ | 32 | 17 | 12 | 70,6% |
+>
+> **La banda pegada al piso es la mitad del volumen y la PEOR tasa.** Bajar el piso traería más de lo
+> que menos funciona ⇒ **por CALIDAD, el dato está en contra de bajarlo.**
+>
+> ⚠️ **Con dos matices que impiden cerrarlo acá:**
+>
+> 1. **Está confundido por proyecto y por cuenta**, igual que la tabla de señales que ya nos mordió
+>    (ADR-088 §Enmienda 2). La banda 100k–200k puede estar dominada por las 6 cuentas de tasa 0%.
+> 2. 🔑 **Por COBERTURA apunta al revés, y ADR-089 juzga el producto de las dos.** Cuando N no se
+>    llena —**14 de 21**— sumar material al 33,7% **igual sube los aprobados absolutos**. Y hay un
+>    detalle que lo decide: **`cap_top_n` = 350 ya acota el gasto**, así que el piso **no ahorra
+>    plata: sólo decide QUIÉN ocupa los 350 lugares.** En la corrida del 01/09 sobrevivieron **42
+>    pares** al piso, muy por debajo de 350 ⇒ **ahí el que ataba era el piso, no el techo.**
+>
+> **Conclusión honesta: no se decide hoy.** El desglose de la corrida dice cuánto mata el piso frente
+> al dedup, y **recién con eso** se elige. Si el dedup mata la mayoría, bajar el piso no cambia nada
+> y el trabajo está en otro lado.
+>
+> ```sql
+> -- Lo primero que hay que correr después de la primera corrida del equipo:
+> select to_char(inicio,'DD/MM HH24:MI') as corrida,
+>        metricas->'filtrados_por_motivo' as murieron_por,
+>        metricas->>'segunda_oportunidad' as escalon2,
+>        metricas->>'bajo_umbral_entregados' as escalon5,
+>        metricas->>'gate_ve_metrica' as vio_metrica
+> from public.runs where metricas ? 'filtrados_por_motivo' order by inicio desc;
+> ```
+
 > # 🔇 CIERRE 138 (2026-09-02) — Cuando el equipo no recibe nada, la herramienta le mentía
 >
 > Auditoría del repo contra el objetivo de Mani: *"cubrir las solicitudes de videos del equipo de
