@@ -401,6 +401,67 @@ Mientras no se haga, el mejor mapa del motor no está en el repo.
 
 ---
 
+## §8 · Candidato: los dos modos (cantidad / calidad) — **idea de Mani, 2026-09-02, NO decidido**
+
+> Mani: *"¿qué pasa si el workflow tuviese dos modos? Uno muy fiel a la cantidad que estoy pidiendo…
+> y otro de calidad, que se enfoca en ponerle los pisos duros y buscar unos que tengan muchos likes,
+> muchos views… que el equipo de redes sepa que si lo ejecutan con eso, es muy seguro que les lleguen
+> menos videos."* Y su propio timing: **después** de aplicar todo lo de este plan.
+
+### 🔑 Lo que vale de la idea NO es el mecanismo: es la expectativa
+
+**Los dos modos ya existen y son presets de perillas, no un refactor.** Modo cantidad = `Mínimo de
+vistas` bajo + `Relevancia mínima` 0 + el escalón 5 rellenando. Modo calidad = pisos altos +
+`Relevancia mínima` arriba. Todo eso **ya corre**.
+
+Lo que **no** existe es que el equipo **sepa qué está eligiendo**. Hoy el trade-off vive escondido en
+perillas que nadie entiende, y cuando llegan 13 de 100 nadie sabe si fue el sistema, el catálogo o
+una decisión. **Un modo con nombre comunica; una perilla no.** Ese es el aporte real.
+
+### 🔴 El defecto de la idea tal como está descrita
+
+*"Pisos duros, muchos likes, muchos views"* está construido sobre **la señal que ya medimos que no
+sirve a nivel video** ([ADR-088 §Enmienda 2](../adr/ADR-088-el-gate-ordena-no-veta.md)): dentro de un
+proyecto, `log(views)` da **0,407** y `seguidores` **0,311** —predicen RECHAZO— y dentro de la misma
+cuenta se evaporan. **Un modo calidad hecho con views/likes entregaría MENOS y NO mejor:** subiría el
+*tamaño de la cuenta*, no la calidad del video.
+
+El ingrediente correcto ya existe: **`Relevancia mínima`** (0,638–0,717, la única que sobrevive las
+tres estratificaciones). *Modo calidad = esa perilla en ~0,7, no `Mínimo de vistas` en 500k.*
+
+### 💰 Y no cuestan igual, que era la duda de Mani
+
+| se construye con | dónde corta | costo |
+|---|---|---|
+| Pisos (`min_views`) | **antes** de transcribir | **más barato** — se transcribe menos |
+| `Relevancia mínima` | **después** de transcribir | **mismo costo**, menos entregado |
+
+🔑 **La señal buena es la cara.** El modo calidad que de verdad funciona **paga lo mismo** que el de
+cantidad y entrega menos; el que ahorra plata es justamente el que usa la señal que no discrimina.
+
+### ⚖️ La objeción de fondo: ADR-089 ya castiga las dos puntas
+
+El norte es `aprobados / N` = **cobertura × precisión**. Cantidad puro baja precisión; calidad puro
+baja cobertura. **La métrica que ya elegimos dice que el óptimo no está en ninguna punta**, y un
+switch le pide al equipo elegir una punta.
+
+### Si se hace, dos correcciones de forma
+
+1. **Por proyecto, no global.** El supply falla por proyecto (Ansiedad llena su N, Trading Psychology
+   no): un modo global le aplica la misma medicina al que sobra y al que no llega. Cada proyecto ya
+   tiene su N.
+2. **Como PRESETS con su efecto escrito al lado, no como modos.** Cero refactor, reversible, y
+   comunica igual. Si con dos o tres corridas resulta que el dial es real, ahí se promueve.
+
+### ⏳ Por qué no ahora, y es más fuerte que "después de los cambios"
+
+**No hay datos para diseñar el dial: 0 corridas con la instrumentación nueva.** Diseñar un control
+cantidad↔calidad sin saber dónde está hoy el punto es adivinar. 🗣️ Del panel, la voz que disiente
+(Howard Marks): *"todos asumen que existe un dial cantidad↔calidad; sus propios números no muestran
+que exista. Están por construir el control de una palanca que quizá no está conectada a nada."*
+
+---
+
 ## §7 · Sesión aparte, a pedido de Mani
 
 **Research de herramientas, adiciones y alternativas** para las capas que ya existen: scraping

@@ -17,6 +17,7 @@ en §Agent skills; acá solo se ubican.
 
 **Estado y dominio (para trabajar)**
 - [docs/agents/handoff.md](docs/agents/handoff.md) — estado vivo del repo (leelo al empezar la sesión).
+  🚦 **Su §ARRANCÁ POR ACÁ es lo primero**: al 2026-09-02 hay 6 cambios empujados al live y **0 corridas que los midan**, con los criterios de éxito escritos ANTES de mirar. *Construido y verde no es medido.*
 - [docs/agents/context.md](docs/agents/context.md) — glosario de dominio (lenguaje ubicuo).
 - [docs/agents/dev-doc.md](docs/agents/dev-doc.md) — los 3 workflows nodo por nodo + mapa de datos (por tabla).
 - [docs/agents/mapa-campos.md](docs/agents/mapa-campos.md) — 🪦 **HISTÓRICO, no vigente.** Mapea la

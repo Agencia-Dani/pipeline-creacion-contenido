@@ -20,6 +20,74 @@
 
 **Estados:** ⬜ libre · 🔧 en curso · ✅ hecho · ⛔ bloqueado
 
+## 🚦 ARRANCÁ POR ACÁ — sesión del 2026-09-02 en adelante
+
+> **Prioridad #1, pedida por Mani al cerrar: mirar las corridas recientes del equipo de redes y
+> evaluar con ellas TODO lo que se cambió el 01 y el 02/09.** Al cerrar la sesión había **0 corridas
+> desde los cambios**, así que **nada de esto está medido todavía** — está construido, empujado y
+> verde, que no es lo mismo.
+
+**Lo primero, una sola consulta.** Si devuelve 0 filas, el equipo no corrió y no hay nada que evaluar:
+
+```sql
+select to_char(inicio,'DD/MM HH24:MI') as corrida, estado,
+       metricas->'filtrados_por_motivo'   as murieron_por,     -- ¿el piso de 100k o el dedup?
+       metricas->>'segunda_oportunidad'   as escalon2,          -- ADR-091, nace en 0
+       metricas->>'bajo_umbral_entregados' as escalon5,         -- ADR-088 §Enm 1, nace en 0
+       metricas->>'gate_ve_metrica'       as vio_metrica,       -- ADR-093: marca de ÉPOCA
+       metricas->'por_proyecto'           as norte_por_proyecto
+from public.runs
+where metricas ? 'filtrados_por_motivo'
+order by inicio desc;
+```
+
+**Y el norte ([ADR-089](../adr/ADR-089-una-sola-metrica-aprobados-contra-lo-pedido.md)), que es con
+lo que se juzga todo:** `aprobados / N pedido`, por proyecto y por corrida, **con
+`calificados/entregados` al lado** — un candidato sin calificar **no es un rechazo**, y sin ese
+tercer número el norte castiga al motor por algo que pasó en el Feed. La consulta completa está en el
+ADR. 📏 **Línea base a superar: 45% del pedido** (31/08 17:22 — Ansiedad 90%, Depresión 60%).
+
+### Los criterios están escritos ANTES de mirar. Respetarlos, no re-litigarlos.
+
+| qué se mide | criterio escrito de antemano |
+|---|---|
+| `segunda_oportunidad` (ADR-091) | **0 corrida tras corrida ⇒ el escalón 2 NO es la palanca.** Decirlo, no defenderlo |
+| `gate_ve_metrica` (ADR-093) | si el norte **baja** o sube el 👎 con cobertura completa ⇒ **se apaga el knob** |
+| `filtrados_por_motivo` | si el **dedup** mata la mayoría, bajar el piso de 100k **no cambia nada** y el trabajo está en otro lado |
+| `bajo_umbral_entregados` | si sale **0**, el escalón 5 es una red que nadie usa |
+
+⚠️ **Dos trampas de medición, ya pagadas una vez cada una:**
+- **Nunca cruzar corridas con `gate_ve_metrica` distinto** para comparar `relevancia_score`: son dos
+  escalas (ADR-093).
+- **Estratificar por proyecto y por cuenta** antes de creerle a cualquier correlación. Sin eso, la
+  tabla de señales del repo apuntó **al revés durante semanas** (ADR-088 §Enmienda 2).
+
+### 🔴 Bloqueantes que NO son código y valen más que todo lo construido
+
+1. **Las 4 voces están en `activo = false`.** Verificado por la fachada: devuelve **0 voces, 0
+   proyectos**. Si el equipo aprieta Ejecutar, **no recibe un solo video** (no se paga nada, pero
+   tampoco pasa nada). Desde el cierre 138 al menos **avisa** por qué. **Sin esto no hay corridas que
+   evaluar.**
+2. **Podar 6 cuentas y decidir 5 propuestas.** `thejessicaweiss` **36 entregados · 26 calificados ·
+   26 rechazados · 0 aprobados**; las 6 juntas **86 entregados, 46 calificados, 46 rechazados, 0
+   aprobados**. ADR-022 fija que **la poda es del equipo** ⇒ va con Dani, no por SQL.
+
+### Pendientes de código, en orden de efecto sobre el norte
+
+| # | Qué | Dónde |
+|---|---|---|
+| 1 | **Decidir el piso de 100k** con `filtrados_por_motivo` | knob, cero código |
+| 2 | **Escalón 4** — rescatar lo pagado que se cayó de la ventana | medir primero (§1 del plan) |
+| 3 | **El norte en la pantalla Entender** — hoy muestra `entregados/pedidos`, no aprobados contra pedido | app |
+| 4 | `descartes_expuestos` se lee y no se renderiza (`lib/entender.ts:40`) | app |
+| 5 | **Los dos modos cantidad/calidad** — candidato con su análisis en [plan §8](./plan-cascada-de-entrega.md) | no antes de tener datos |
+| 6 | T2a/T2b/T3 y la anatomía en `dev-doc.md` | §2 del plan |
+
+📄 **Deuda de doc pre-existente, no la creó esta sesión:** la fila de **ADR-085 en
+[`docs/adr/README.md`](../adr/README.md) tiene texto de ADR-084 pegado adentro.**
+
+---
+
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
 > # 🎚️ CIERRE 139 (2026-09-02) — El jurado ve la métrica, y el piso de 100k tiene un dato en contra
@@ -5223,7 +5291,10 @@ El detalle de cada componente y el "hecho cuando" viven en
 ADRs cerrados que gobiernan el refactor: [ADR-023](../adr/ADR-023-disparo-on-demand-boton-airtable.md)
 (disparo on-demand), [ADR-024](../adr/ADR-024-enmienda-adr016-n-por-proyecto.md) (N por proyecto).
 
-## Para la próxima sesión — arrancá por acá
+## Para la próxima sesión — arrancá por acá (🪦 SUPERSEDED, ver §ARRANCÁ POR ACÁ arriba)
+
+> 🪦 **Esta sección quedó superseded el 2026-09-02.** El arranque vigente es **§ARRANCÁ POR ACÁ**, al
+> principio del archivo. Lo de abajo es arqueología del refactor Voces→Proyectos y de Airtable.
 
 > ✅ **Al 2026-08-22 no hay bloqueantes.** n8n volvió, el fix del emoji partido está empujado y
 > `n8n:diff` da verde en los 5. Arrancá por el **cierre 115**, arriba del todo.
