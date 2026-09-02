@@ -187,7 +187,7 @@ correcto**: el bajo-umbral no entra si no hace falta.
 | # | Qué | Dónde | ¿ADR? |
 |---|---|---|---|
 | ~~1~~ | ~~**Escalón 5 al lugar correcto**~~ | ✅ **hecho** (cierre 134, ADR-088 §Enmienda) | — |
-| 1 | **Escalón 2** (segunda oportunidad cross-proyecto) | motor | **sí, nueva** |
+| 1 | **Escalón 2** (segunda oportunidad cross-proyecto) — 🔑 **ataca COBERTURA, que es el factor que muerde** (ADR-089). Mani, 01/09: *"es clave; toca hacer seguimiento de si esto sirve o no"* ⇒ **entra con su instrumentación o no entra** | motor | **sí, nueva** |
 | 2 | **Medir el escalón 4** (¿cuántos pagados se caen de la ventana?) | SQL | no |
 | 3 | **Las mediciones que ya están escritas** (§4) | SQL, tras una corrida real | no |
 | 4 | **T0 del audit: knobs y datos, cero código** | cockpit | no |
@@ -233,6 +233,10 @@ Tres invariantes bloquean cambios sin ADR nueva. **No re-litigar:**
 Y dos cosas **ya cerradas** que no hay que reabrir:
 - **Re-pesar el heat-score.** ROADMAP §5 punto 2: barrido sobre 217 videos etiquetados, **AUC 0,706**,
   techo ≈0,71. *"Las mejoras tienen que venir de señales nuevas, no de re-pesar."*
+  🕳️ **Sigue cerrado, pero con una grieta abierta el 01/09:** ese 0,706 se parece mucho a los AUC
+  **globales** del §6.bis —los que resultaron ser confounder de proyecto— y **no consta que se haya
+  estratificado**. No es permiso para re-pesar; es permiso para **re-medir el cierre** antes de
+  citarlo otra vez.
 - **El "modo reponer"** (correr el motor otra vez si entregó poco). ADR-030 lo descartó por escrito:
   *"mismo pool, doble costo, cero candidatos nuevos"* — y el 01/09 se confirmó **dos veces**.
 
@@ -260,7 +264,14 @@ from app.candidatos where creado_en > '<primera corrida con ADR-088>'
 group by 1;
 ```
 
-**Y una cuarta, que no necesita SQL y sale de `runs.metricas` de la primera corrida:**
+🧭 **Antes que las cuatro, el norte ([ADR-089](../adr/ADR-089-una-sola-metrica-aprobados-contra-lo-pedido.md)):
+`aprobados / N pedido`, por proyecto y por corrida**, con `calificados/entregados` al lado para saber
+si el número es resultado o piso. Las de abajo son **diagnóstico de por qué el norte da lo que da**,
+no evidencia de que un cambio sirvió. 📏 Línea base medida el 01/09 sobre las 5 corridas con
+`run_id`: el techo es **45% del pedido** (31/08 17:22 — Ansiedad 90%, Depresión 60%) y en **15 de 21**
+proyecto × corrida el motor **ni llena N**.
+
+**Y una cuarta de diagnóstico, que no necesita SQL y sale de `runs.metricas` de la primera corrida:**
 **`bajo_umbral_entregados`** (cierre 134). Es la que dice si el escalón 5 sirve de algo: cuenta lo
 que hizo falta para llenar N, no lo que el gate admitió. 🔑 **Si sale 0 en varias corridas, el
 escalón 5 es una red que nadie usa** y el cuello está donde dice el §5 — en el supply.
@@ -317,25 +328,44 @@ holgado los 1.500 ⇒ **una parte del catálogo se juzga por su primer tercio.**
 re-juzgar una muestra con el transcript completo y comparar veredictos. Podría explicar parte del
 ruido del punto 2.
 
-**2. 📏 El `relevancia_score` casi no predice el veredicto humano, y eso pide señales nuevas.**
-Sobre los 211 candidatos calificados:
+**2. 🩸 ESA TABLA ESTABA CONFUNDIDA Y APUNTABA AL REVÉS — corregida el 01/09.**
+Este renglón decía que `relevancia_score` *"casi no predice el veredicto humano"* (0,218) contra
+`log(views)` (0,493), y ése era el **argumento #2 de ADR-088**. Es **falso**, y lo destapó Mani
+preguntando por qué el escalón 5 rellena por heat.
 
-| Señal | Correlación con 🔥/👍 |
-|---|---|
-| `log(views)` | **0,493** |
-| `seguidores` | 0,242 |
-| `relevancia_score` (Haiku sobre el transcript) | **0,218** |
-| `engagement` | 0,178 |
-| `heat_score` | 0,162 |
+La tabla vieja era **correlación de Pearson global**, con dos defectos que la invierten: el
+**confounder de proyecto** (`Ansiedad` aprueba 83% de lo calificado, `Comunicación de parejas` **0 de
+27**, así que cualquier señal que varíe por cuenta hereda esa diferencia sin saber nada del video) y
+**Pearson sobre variables de cola pesada**. Medido con **AUC** (0,5 = moneda al aire) y
+estratificando:
 
-⚠️ **Caveat honesto:** se mide sobre los que **pasaron** el gate (rango 0,60–0,96), y un rango
-restringido baja cualquier correlación. Prueba que el gate **ordena mal a los que deja pasar**;
-**no** prueba que rechace bien o mal — eso lo contesta la medición 3 del §4.
+| señal | global (11.040 pares) | dentro del proyecto (1.106) | mismo proyecto **y misma cuenta** (130) |
+|---|---|---|---|
+| **`relevancia_score`** | 0,630 | **0,717** | **0,638** |
+| `engagement` | **0,765** | 0,674 | 0,527 |
+| `log(views)` | 0,703 | **0,407** | 0,500 |
+| `seguidores` | 0,610 | **0,311** | 0,604 |
+| **`heat_score` (composite)** | **0,583** | 0,658 | **0,523** |
 
-⛔ **Esto NO habilita re-pesar el heat-score**, que ya se cerró (ROADMAP §5 punto 2: AUC 0,706, techo
-≈0,71). Apunta al mismo lado que esa conclusión: **agregar señales, no mover pesos.** Candidatas que
-ya llegan gratis y hoy se tiran o no se usan: `duracion_seg` (se guarda desde ADR-086 y **no la lee
-nadie**), comentarios/views, y el formato del video.
+🔑 **Las métricas son señal de CUENTA, no de video.** Dentro del proyecto, `log(views)` (0,407) y
+`seguidores` (0,311) predicen **rechazo** —replicado en los 3 proyectos que ponen 1.045 de los 1.106
+pares, ninguno por encima de 0,5— y dentro de la **misma cuenta** todas se evaporan a 0,50–0,60.
+**La única que sobrevive las tres estratificaciones es `relevancia_score`**, y está **subestimada**
+porque sólo se mide sobre los que pasaron el gate (rango restringido baja el AUC): 0,638 es un piso.
+
+⇒ **La palanca métrica es podar y sumar referentes, no re-pesar una fórmula** (ADR-082 y el T0 otra
+vez, ahora con mecanismo). Y **el `composite` es 0,523 a nivel video**: diluye su única señal buena
+con 30% de percentil métrico que no aporta nada.
+
+El detalle entero, con qué se cae y qué NO se cae de ADR-088, está en
+[ADR-088 §Enmienda 2](../adr/ADR-088-el-gate-ordena-no-veta.md).
+
+⛔ **Esto NO habilita reordenar por `relevancia_score` de rebote**: toca ADR-024 y ADR-030 y va
+decidido aparte. 🕳️ **Pero sí obliga a re-mirar el cierre de "re-pesar el heat-score"** (ROADMAP §5
+punto 2, AUC 0,706, techo ≈0,71): ese 0,706 se parece mucho a los números **globales** de arriba y
+**no consta que se haya estratificado**. *Un obstáculo escrito se re-mide.* Y sigue en pie que hay
+señales gratis sin usar: `duracion_seg` (se guarda desde ADR-086 y **no la lee nadie**),
+comentarios, y el formato del video.
 
 **3. 📄 Deuda de doc.** La fila de **ADR-085 en `docs/adr/README.md` tiene texto de ADR-084 pegado
 adentro** (dice *"es el ADR nuevo sobre compensar la memoria"*, que no es suyo). Pre-existente al

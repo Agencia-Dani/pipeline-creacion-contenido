@@ -22,6 +22,81 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # 🧭 CIERRE 135 (2026-09-01) — Una sola métrica, y la tabla de señales apuntaba al revés
+>
+> Mani, sobre el cierre 134: *"¿por completa por heat? el heat es una fórmula poco confiable para
+> vetear los videos"*. Al ir a medirlo **se cayó uno de los tres pilares de ADR-088**. Y en la misma
+> vuelta fijó el norte de todo el workflow: *"que de los videos colectados se cumpla con lo que pide
+> cada proyecto y que sean APROBADOS"*.
+>
+> ## ✅ [ADR-089](../adr/ADR-089-una-sola-metrica-aprobados-contra-lo-pedido.md) — el norte
+>
+> **`aprobados / N pedido`, por proyecto y por corrida.** Se descompone en **cobertura ×
+> precisión**, y **el tercer número no es opcional**: `calificados/entregados`, porque un candidato
+> sin calificar **no es un rechazo** y sin eso el norte castiga al motor por algo que pasó en el Feed.
+>
+> 📏 **Línea base contra prod.** `run_id` existe desde ADR-081 sin backfill ⇒ sólo se puede calcular
+> sobre las **5 corridas** desde el 31/08 04:30. El techo es la del **31/08 17:22**, la única en que
+> los 4 proyectos entregaron su N completo:
+>
+> | | colectados | N | entregados | calificados | aprobados | **norte** |
+> |---|---|---|---|---|---|---|
+> | 31/08 17:22 | 1.088 | 80 | **80** | 47 | **36** | **45,0%** |
+> | …Ansiedad | | 20 | 20 | 20 | **18** | **90%** |
+> | …Depresión | | 20 | 20 | 20 | 12 | **60%** |
+>
+> 🔑 **Cuando la cobertura llega a N y el equipo califica, la precisión es 60–90% ⇒ el norte NO está
+> limitado por la precisión, está limitado por la cobertura.** En **15 de 21** (proyecto × corrida)
+> `razon_faltante` es `supply` o `mixta`: el motor ni junta para llenar N. **~30 videos crudos por
+> cada aprobado.**
+>
+> ## 🩸 [ADR-088 §Enmienda 2](../adr/ADR-088-el-gate-ordena-no-veta.md) — la tabla de señales estaba confundida
+>
+> El repo venía citando *"`relevancia_score` 0,218 contra `log(views)` 0,493 ⇒ el filtro caro decide
+> peor que un dato gratis"* en **tres docs**. Es **falso**: era correlación de **Pearson global**, con
+> el confounder de proyecto adentro (`Ansiedad` aprueba 83%, `Comunicación de parejas` **0 de 27**).
+>
+> **AUC** (0,5 = moneda al aire), estratificando:
+>
+> | señal | global (11.040 pares) | dentro del proyecto (1.106) | mismo proyecto **y cuenta** (130) |
+> |---|---|---|---|
+> | **`relevancia_score`** | 0,630 | **0,717** | **0,638** |
+> | `engagement` | **0,765** | 0,674 | 0,527 |
+> | `log(views)` | 0,703 | **0,407** | 0,500 |
+> | `seguidores` | 0,610 | **0,311** | 0,604 |
+> | **`heat_score` (composite)** | **0,583** | 0,658 | **0,523** |
+>
+> 🔑 **Las métricas son señal de CUENTA, no de video.** Dentro del proyecto `log(views)` y
+> `seguidores` predicen **rechazo** (replicado en los 3 proyectos con ≥300 pares, **ninguno** sobre
+> 0,5); dentro de la misma cuenta **todas se evaporan**. La única que sobrevive las tres
+> estratificaciones es `relevancia_score`, y **está subestimada** porque sólo se mide sobre
+> gate-passers. ⇒ **la palanca métrica es podar y sumar referentes, no re-pesar una fórmula**, que es
+> ADR-082 y el T0 otra vez, ahora con mecanismo.
+>
+> **El `composite` a nivel video es 0,523**: diluye su única señal buena con 30% de ruido.
+>
+> ## Qué se cae y qué no
+>
+> - ❌ **El argumento #2 de ADR-088.** ✅ Siguen en pie el #1 (vetar no ahorra un centavo: es de
+>   costo), el #3 (el humano ya filtra) y el contrafactual de +232 (es de conteo).
+> - ⚠️ **El balance cambia:** dejar entrar lo bajo-umbral cuesta más precisión de la supuesta. Lo
+>   hace tolerable la §Enmienda 1 del cierre 134 — entran **sólo si N quedó corto**.
+> - 🕳️ **Grieta abierta:** el cierre de *"re-pesar el heat-score"* (ROADMAP §5, AUC 0,706) se parece
+>   mucho a los AUC **globales** de arriba y **no consta que se haya estratificado**. No es permiso
+>   para re-pesar; es permiso para **re-medir el cierre antes de citarlo**.
+>
+> ## 🔴 Lo que quedó ABIERTO y es decisión de Mani
+>
+> **Por qué se ordena el corte, ahora que se sabe que el composite es una moneda al aire.** Toca
+> ADR-024 y ADR-030 ⇒ **no se cambió de rebote**. Las opciones y el trade-off están en la respuesta de
+> la sesión; el default de hoy sigue siendo el composite.
+>
+> ## Qué sigue
+>
+> **Escalón 2** (segunda oportunidad cross-proyecto): es lo que ataca **cobertura**, que es el factor
+> que muerde. Pide ADR nueva, y Mani pidió explícito que **entre con su seguimiento** — o sea con el
+> norte de ADR-089 medido antes y después, no con una métrica propia.
+
 > # 🪜 CIERRE 134 (2026-09-01) — El escalón 5 dejó de disparar antes de tiempo
 >
 > El **#1 del pendiente** de [plan-cascada-de-entrega.md](./plan-cascada-de-entrega.md), cobrado.

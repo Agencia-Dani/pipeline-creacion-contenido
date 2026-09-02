@@ -182,6 +182,85 @@ porque este ADR la convirtió en el único veto. ⚠️ Al 01/09 está en **0**,
 con el escalón 5 en su lugar, el bajo-umbral ya no entra si no hace falta.
 
 
+## 🩸 Enmienda 2 (2026-09-01) — el argumento #2 estaba confundido, y apunta al revés
+
+Mani, sobre el escalón 5: *"siento que el heat es una fórmula poco confiable para vetear los videos
+(definir si entran o no; no es descriptivo de lo que es en realidad)"*. Al ir a medirlo **se cayó el
+argumento #2 de este ADR**, que era uno de sus tres pilares.
+
+### Qué decía y por qué era falso
+
+Este ADR afirmó: *"`relevancia_score` correlaciona **0,218** con el veredicto humano contra **0,493**
+de `log(views)` ⇒ el filtro caro decide peor que un dato que llega gratis"*. Esa tabla es de
+**correlación de Pearson global**, y tiene dos defectos que la invierten:
+
+1. **El confounder de proyecto.** `Ansiedad` aprueba 83% de lo calificado y `Comunicación de parejas`
+   **0 de 27**. Cualquier señal que varíe por cuenta hereda esa diferencia sin saber nada del video.
+2. **Pearson sobre variables sesgadas.** `engagement` y `views` tienen cola pesada; Pearson las
+   subestima y una medida de **rango** las ordena distinto.
+
+### 📏 Lo medido el 2026-09-01, con AUC y estratificando
+
+**AUC** = probabilidad de que un aprobado puntúe más alto que un rechazado. **0,5 = moneda al aire.**
+
+| señal | global (11.040 pares) | dentro del proyecto (1.106) | mismo proyecto **y misma cuenta** (130) |
+|---|---|---|---|
+| **`relevancia_score` (Haiku)** | 0,630 | **0,717** | **0,638** |
+| `engagement` | **0,765** | 0,674 | 0,527 |
+| `likes` | 0,752 | 0,542 | — |
+| `log(views)` | 0,703 | **0,407** | 0,500 |
+| `seguidores` | 0,610 | **0,311** | 0,604 |
+| **`heat_score` (el composite)** | **0,583** | 0,658 | **0,523** |
+
+🔑 **Tres lecturas, y la tercera es la que manda:**
+
+- **Globalmente**, las métricas parecen ganar. Eso es el confounder: es casi todo identidad de
+  proyecto.
+- **Dentro del proyecto**, `log(views)` cae a **0,407** y `seguidores` a **0,311** — o sea que
+  **más vistas y más seguidores predicen RECHAZO**. Replicado en los 3 proyectos que ponen 1.045 de
+  los 1.106 pares: `log(views)` da 0,472 · 0,470 · 0,188 y `seguidores` 0,311 · 0,356 · 0,250,
+  **ninguno por encima de 0,5 en ninguno**.
+- **Dentro del proyecto Y de la misma cuenta**, todas las métricas se **evaporan** (0,50–0,60) y
+  **la única que sobrevive las tres estratificaciones es `relevancia_score`**.
+
+### Las tres conclusiones
+
+1. **Las señales métricas son de CUENTA, no de video.** Entre dos videos del mismo creador para el
+   mismo proyecto, views/likes/seguidores/engagement no dicen nada. Es
+   [ADR-082](./ADR-082-un-video-quemado-se-rescata-borrandole-la-memoria.md) y el T0 del audit otra
+   vez, ahora con mecanismo: `thejessicaweiss` es 0 de 26 **por ser esa cuenta**, no por sus videos.
+   ⇒ **la palanca métrica es podar y sumar referentes, no re-pesar una fórmula.**
+2. **`relevancia_score` es la mejor señal a nivel video que hay**, no la peor. Y **está subestimada**:
+   sólo se mide sobre los que pasaron el gate (rango 0,60–0,96), y un rango restringido **baja** el
+   AUC. El 0,638 es un piso.
+3. **El `composite` (`heat_score` post-gate) es 0,523 a nivel video: una moneda al aire.** No porque
+   `relevancia` sea mala sino porque le mezcla **30% de un percentil métrico que no aporta nada** a
+   ese nivel. *La fórmula diluye su única señal buena con ruido.*
+
+### Qué se cae y qué NO se cae de este ADR
+
+- ❌ **Se cae el argumento #2.** El gate no decidía peor que un dato gratis: decidía **mejor** que
+  todos ellos a nivel video.
+- ✅ **Sigue en pie el #1** (*vetar no ahorra un centavo*: el gate corre después de pagar). Es de
+  costo y no depende de ninguna correlación.
+- ✅ **Sigue en pie el #3** (*el humano ya filtra: 96 👎 de 211*).
+- ✅ **Sigue en pie el contrafactual** de +232 entregados, que es de conteo.
+- ⚠️ **Pero el balance cambia de forma:** con el #2 dado vuelta, dejar entrar lo bajo-umbral cuesta
+  **más precisión de la que este ADR supuso**. Lo que lo hace tolerable es la §Enmienda 1: entran
+  **sólo si N quedó corto**, y hoy N queda corto casi siempre (ADR-089: `razon_faltante` es `supply`
+  o `mixta` en **15 de 21** proyecto × corrida).
+
+### ⚠️ Lo que esto NO autoriza todavía
+
+- **No autoriza reordenar por `relevancia_score`.** Es la conclusión que pide el instinto y **toca
+  ADR-024 y ADR-030**; va decidida aparte, no de rebote acá.
+- **No reabre "re-pesar el heat-score"** por sí solo (ROADMAP §5 punto 2, AUC 0,706, techo ≈0,71) —
+  🕳️ **pero sí obliga a re-mirar ese cierre**, porque ese 0,706 se parece mucho a los números
+  **globales** de la tabla de arriba y **no consta que se haya estratificado**. *Un obstáculo escrito
+  se re-mide.*
+- **No dice nada sobre lo que el gate RECHAZÓ**, que es el único lado que puede revertir este ADR
+  entero. Eso sigue siendo la medición 3 del §Hecho cuando, y sigue pendiente.
+
 ## Hecho cuando
 
 1. Una corrida real **entrega más que su gate anterior**. El número a leer es
