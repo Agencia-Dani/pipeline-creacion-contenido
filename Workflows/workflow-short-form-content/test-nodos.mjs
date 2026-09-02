@@ -1151,7 +1151,61 @@ await (async () => {
     const sinG = out.find((o) => o.external_id === 'f');
     const bordG = out.find((o) => o.external_id === 'g' && o._descarte);
     check('el sin-guion se marca por sin_guion, no por el gate', sinG && sinG.descarte_razon === 'sin_guion', JSON.stringify(sinG));
-    check('el con-guion rechazado sí es descarte de auditoría (razón ≠ sin_guion)', !!bordG && bordG.descarte_razon !== 'sin_guion', JSON.stringify(bordG && bordG.descarte_razon));
+    // ADR-088: el con-guion rechazado por Haiku YA NO es un descarte — entra al Feed marcado.
+    check('🟢 el con-guion rechazado ya NO se descarta (ADR-088)', !bordG, JSON.stringify(bordG && bordG.descarte_razon));
+  }
+  // ── ADR-088: EL GATE ORDENA, NO VETA ──
+  // El gate corre después de pagar la transcripción, así que vetar no ahorra nada: solo achica la
+  // entrega. Medido sobre 12 corridas: 417 → 649 videos (+56%) entregando los top-N en vez de vetar.
+  {
+    const { out } = await runGate({
+      items: [gvid('r1'), gvid('r2')], projects: { P1: { nombre: 'P1', criterios: 'trading' } },
+      juicioFn: (id) => ({ id, relevante: false, score: 0.2, razon: 'off-topic' }),
+    });
+    const vivos = out.filter((o) => !o._descarte);
+    check('🟢 Haiku dice que NO a todo y los dos entran igual al Feed', vivos.length === 2, 'entraron ' + vivos.length);
+  }
+  {
+    const { out } = await runGate({
+      items: [gvid('b1')], projects: { P1: { nombre: 'P1', criterios: 'trading' } },
+      juicioFn: (id) => ({ id, relevante: false, score: 0.2, razon: 'off-topic' }),
+    });
+    check('y viaja marcado _bajo_umbral (es LA métrica que decide si el veto servía)', out[0]._bajo_umbral === true, String(out[0]._bajo_umbral));
+  }
+  {
+    const { out } = await runGate({
+      items: [gvid('ok1')], projects: { P1: { nombre: 'P1', criterios: 'trading' } },
+      juicioFn: (id) => ({ id, relevante: true, score: 0.9, razon: 'sí' }),
+    });
+    check('un aprobado NO se marca bajo umbral', out[0]._bajo_umbral === false, String(out[0]._bajo_umbral));
+  }
+  {
+    // El score sigue mandando en el ORDEN: es lo único que hace el gate ahora.
+    const { out } = await runGate({
+      items: [gvid('lo'), gvid('hi')], projects: { P1: { nombre: 'P1', criterios: 'trading' } },
+      juicioFn: (id) => ({ id, relevante: id === 'hi', score: id === 'hi' ? 0.95 : 0.1, razon: '' }),
+    });
+    const hi = out.find((o) => o.external_id === 'hi'), lo = out.find((o) => o.external_id === 'lo');
+    check('el score sigue ordenando: el bueno queda arriba del dudoso', hi.heat_score > lo.heat_score, `hi=${hi.heat_score} lo=${lo.heat_score}`);
+  }
+  {
+    // 🔧 `Relevancia mínima` deja de ser un knob inerte: pasa a ser el ÚNICO veto, y por eso ahora
+    // su nombre dice la verdad. Es la válvula de escape si el Feed queda muy ruidoso.
+    const { out } = await runGate({
+      items: [gvid('bajo'), gvid('alto')], projects: { P1: { nombre: 'P1', criterios: 'trading' } },
+      cfg: { min_relevancia: 0.5 },
+      juicioFn: (id) => ({ id, relevante: true, score: id === 'alto' ? 0.9 : 0.1, razon: '' }),
+    });
+    const vivos = out.filter((o) => !o._descarte).map((o) => o.external_id);
+    check('🔧 `Relevancia mínima` YA NO es inerte: en 0.5 sí veta al de score 0.1', vivos.length === 1 && vivos[0] === 'alto', JSON.stringify(vivos));
+  }
+  {
+    const { out } = await runGate({
+      items: [gvid('z')], projects: { P1: { nombre: 'P1', criterios: 'trading' } },
+      cfg: { min_relevancia: 0 },
+      juicioFn: (id) => ({ id, relevante: false, score: 0, razon: '' }),
+    });
+    check('🔒 y en 0 (el default) no veta ni al peor: el default es NO vetar', out.filter((o) => !o._descarte).length === 1, JSON.stringify(out.map((o) => o._descarte)));
   }
 })();
 

@@ -22,6 +22,76 @@
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
 
+> # ⚖️ CIERRE 133 (2026-09-01) — El gate ordena, no veta
+>
+> Segundo movimiento del mismo audit, y **sólo era posible después del cierre 132**: hasta ayer lo
+> que quedaba afuera por cupo se quemaba igual, así que entregar los top-N seguía perdiendo el
+> resto. Con la memoria arreglada, lo que no entra **vuelve gratis la próxima corrida**.
+>
+> ## 📏 El contrafactual, medido sobre 12 corridas
+>
+> **417 entregados de verdad → 649 con top-N = +232 videos (+56%)**, y en 8 de las 12 habría
+> entregado más. Se puede simular exacto porque `llamadas.supadata` = videos distintos que llegaron
+> a transcribirse = el pool real en el momento del gate.
+>
+> ## Los tres argumentos, en orden de peso
+>
+> 1. **Vetar no ahorra un centavo.** El gate corre **después** de `Transcribir` y `Traducir`: el
+>    video que rechaza **ya se pagó** (~USD 0,014). Descartarlo no recupera plata ni cupo.
+> 2. **La señal que vetaba es la más débil que hay.** Sobre 211 calificados: `relevancia_score`
+>    correlaciona **0,218** con el veredicto humano, `log(views)` **0,493**. Y por tramos **no es
+>    monótona** (0,80–0,84 aprueba 38,9%; 0,60 aprueba 50%).
+> 3. **El humano ya es el filtro y funciona:** 96 de 211 son 👎 (45,5%).
+>
+> ## Lo que quedó hecho
+>
+> - ✅ **[ADR-088](../adr/ADR-088-el-gate-ordena-no-veta.md)** — `relevante:false` deja de descartar
+>   y pasa a ser señal. El `composite` (0,7·Haiku + 0,3·métrica) sigue ordenando. **`sin_guion`
+>   sigue vetando** (ADR-030).
+> - 🔧 **`Relevancia mínima` deja de ser un knob INERTE** y pasa a ser el único veto. Estaba en 0 sin
+>   filtrar nada mientras el descarte real lo decidía un booleano que ninguna perilla tocaba: quien
+>   lo movía creyendo que aflojaba el filtro, **no aflojaba nada**. Ahora el nombre dice la verdad, y
+>   es la **válvula de escape** si el Feed queda muy ruidoso.
+> - ✅ **`metricas.bajo_umbral`** — videos distintos que el gate viejo habría tirado.
+> - ✅ **En el live** (01/09): `n8n:push --apply` sobre 2 nodos, `n8n:diff` verde en los 5.
+>   Rollback: `.n8n-snapshots/motor-2026-09-02T01-09-30-343Z.json`.
+>   `test-nodos.mjs` en **199 checks** (eran 193), `auditar-workflows.mjs` sin hallazgos.
+>
+> ## 🔑 Dos decisiones que se tomaron por medición y no por instinto
+>
+> - **NO se fuerza que los bajo-umbral queden siempre abajo.** Suena obvio y la medición lo
+>   desaconseja: con `relevancia_score` en 0,218 y las métricas en 0,493, forzar el grupo
+>   **privilegia la señal más débil**. Un viral que Haiku creyó off-topic puede ser mejor apuesta
+>   que un on-topic de 20 mil vistas.
+> - **NO se marcan en el Feed todavía.** Sería mostrarle al equipo como autoritativa una señal que
+>   predice su propio veredicto con 0,218, y podría hacerles saltear videos buenos. El
+>   `relevancia_score` ya se persiste por candidato ⇒ primero se mide, después se decide.
+>
+> ## ⚖️ Lo que empeora, dicho sin maquillar
+>
+> - 📉 **La calidad promedio del Feed baja** (los nuevos traen score 0,00–0,50 contra 0,60–0,96) y
+>   **el 👎 va a subir. Eso es esperado, no un fallo.**
+> - ⏱️ **Cuesta atención, que es el recurso escaso real:** hay **211 sin calificar de 422**. Si el
+>   Feed se vuelve impracticable, la reacción correcta es **subir `Relevancia mínima`**, no revertir.
+> - 🔕 **`app.descartes` queda dormida** con `MIN_REL = 0`. Los nodos siguen ahí y vuelven solos si
+>   alguien sube el knob. `v_auditoria_descartes` va a mostrar 0 expuestos, que es **honesto**.
+>
+> ## 🔴 PENDIENTE — la medición, y es la que puede revertir esto
+>
+> **La métrica de éxito NO es la obvia:** no *"cuántos entregó"* sino **cuántos 🔥/👍 ABSOLUTOS por
+> corrida**. Medir precisión premiaría al sistema por entregar menos.
+>
+> ```sql
+> select (relevancia_score < 0.55) as habria_sido_vetado,
+>        count(*) filter (where calificacion is not null) as calificados,
+>        count(*) filter (where calificacion in ('🔥','👍')) as aprobados
+> from app.candidatos where creado_en > '<primera corrida con ADR-088>'
+> group by 1;
+> ```
+>
+> **Si los *habría sido vetado* aprueban ~0%, el veto tenía razón y esto se revierte subiendo
+> `Relevancia mínima`.** Si aprueban 30% o más, se estaban tirando videos buenos.
+
 > # 🧠 CIERRE 132 (2026-09-01) — La memoria recordaba lo evaluado, no lo entregado
 >
 > Auditoría de por qué la corrida del 01/09 09:17 entregó **13 de 100** pedidos. La hipótesis de
