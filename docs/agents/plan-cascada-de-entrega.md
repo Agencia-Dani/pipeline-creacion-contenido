@@ -54,6 +54,13 @@ de videos que nunca vio nadie**.
 > presupuestos al fail-open). Se mide con `metricas.segunda_oportunidad` y el prefijo
 > `[2da oportunidad]` en `relevancia_razon`. ⚠️ **Su techo lo pone otro muro:** el 98,7% de los pares
 > muere en pisos + dedup antes de transcribir. Lo que sigue abajo es el diagnóstico original.
+>
+> 📏 **Medido contra las 2 primeras corridas reales post-deploy (cierre 140, 02/09 14:14 y 16:11):
+> `segunda_oportunidad` dio 0 en las DOS.** Con solo 2 corridas es poco para descartarlo del todo —
+> pero la lectura honesta, siguiendo el criterio ya escrito en el [handoff](./handoff.md), es: **hasta
+> ahora no es la palanca de cobertura que se esperaba.** Se re-mide con más corridas antes de decidir
+> si se abandona o si el escenario que lo activa (proyectos sin dueño con cupo libre) simplemente no
+> se dio todavía en esas 2.
 
 **Qué es.** Que todo video tenga chance de matchear con algún proyecto, no sólo con los que su
 referente ya tiene linkeados.
@@ -251,6 +258,12 @@ Y dos cosas **ya cerradas** que no hay que reabrir:
 
 ## §4 · Las mediciones pendientes, escritas antes de mirarlas
 
+> ✅ **Actualización del cierre 140 (02/09):** esta sección decía "0 corridas desde el push" y dejó de
+> ser cierto el mismo día — el equipo corrió 2 veces (14:14 y 16:11). El norte ya se midió: **80,0% y
+> 76,0%** (ambas con cobertura de calificación casi completa, o sea resultado y no piso), muy por
+> encima del techo anterior de 45%. **Nueva línea base: 76%.** El detalle completo, con las 4
+> consultas del handoff, vive en el [cierre 140](./handoff.md).
+
 **Ninguna corrió todavía: al 2026-09-01 23:xx hay 0 corridas desde el push.** Los dos canarios
 nacen en cero por definición, así que su primer valor ya es uso real.
 
@@ -275,13 +288,23 @@ group by 1;
 `aprobados / N pedido`, por proyecto y por corrida**, con `calificados/entregados` al lado para saber
 si el número es resultado o piso. Las de abajo son **diagnóstico de por qué el norte da lo que da**,
 no evidencia de que un cambio sirvió. 📏 Línea base medida el 01/09 sobre las 5 corridas con
-`run_id`: el techo es **45% del pedido** (31/08 17:22 — Ansiedad 90%, Depresión 60%) y en **14 de 21**
+`run_id`: el techo era **45% del pedido** (31/08 17:22 — Ansiedad 90%, Depresión 60%) y en **14 de 21**
 proyecto × corrida el motor **ni llena N**.
+
+✅ **Superada el 02/09 (cierre 140, ver [handoff](./handoff.md)).** Las 2 corridas post-deploy dieron
+**80,0%** (Comunicación en empresas, 15/15 calificados) y **76,0%** (Comunicación de parejas, 49/50
+calificados) — ambas con cobertura de calificación casi completa, ergo **resultado y no piso**. Una
+tercera corrida (Comunicación en empresas otra vez, 16:11) dio 46,7% pero con solo 47% de cobertura —
+ese número todavía puede subir, es un **piso**. 📏 **Nueva línea base a superar: 76%.**
 
 **Y una cuarta de diagnóstico, que no necesita SQL y sale de `runs.metricas` de la primera corrida:**
 **`bajo_umbral_entregados`** (cierre 134). Es la que dice si el escalón 5 sirve de algo: cuenta lo
 que hizo falta para llenar N, no lo que el gate admitió. 🔑 **Si sale 0 en varias corridas, el
 escalón 5 es una red que nadie usa** y el cuello está donde dice el §5 — en el supply.
+
+✅ **Medido el 02/09 (cierre 140): dio 0 en las 2 corridas.** Con 76-80% de aprobación el corte normal
+llenó N solo — es la lectura buena, no un escalón roto. Sigue siendo poco (2 corridas) para declarar
+que el escalón 5 nunca hace falta; se re-mide cuando una corrida real quede corta de N.
 
 > **La métrica de éxito NO es la obvia.** No *"cuántos entregó"* sino **cuántos 🔥/👍 ABSOLUTOS por
 > corrida**. Medir precisión premiaría al sistema por entregar menos.
@@ -289,6 +312,18 @@ escalón 5 es una red que nadie usa** y el cuello está donde dice el §5 — en
 **Criterio escrito antes de medir (3):** si los *habría sido vetado* aprueban **~0%**, el veto tenía
 razón ⇒ subir `Relevancia mínima` y el escalón 5 queda como red de último recurso. Si aprueban
 **30% o más**, se estaban tirando videos buenos.
+
+### 🔴 Lo que queda pendiente para la próxima sesión (cierre 140), en orden de efecto
+
+1. **Medir el escalón 4** — cuántos videos pagados se caen de la ventana del scrape. Sigue sin
+   hacerse; es la única de las 4 mediciones de arriba que ninguna corrida contestó todavía.
+2. **Activar las 3 voces restantes** (Vieira, Sánchez, Gomez) — clics, cero código. Es la palanca de
+   cobertura más barata: `Milena Morales` sola ya produjo las 2 corridas que dieron 76-80%.
+3. **Podar/decidir las 6 cuentas y las 5 propuestas** — con Dani, ADR-022 lo fija así, no por SQL.
+4. ~~Llevar el norte a la pantalla Entender~~ ✅ **hecho el 02/09** — ADR-089 "hecho cuando" #1
+   cumplido. Detalle en el [handoff](./handoff.md).
+5. **Los dos modos cantidad/calidad** (§8, abajo) — las 2 corridas nuevas no alcanzan para diseñar el
+   dial; sigue **NO decidido**.
 
 ---
 
@@ -455,8 +490,10 @@ switch le pide al equipo elegir una punta.
 
 ### ⏳ Por qué no ahora, y es más fuerte que "después de los cambios"
 
-**No hay datos para diseñar el dial: 0 corridas con la instrumentación nueva.** Diseñar un control
-cantidad↔calidad sin saber dónde está hoy el punto es adivinar. 🗣️ Del panel, la voz que disiente
+**No hay datos para diseñar el dial:** al cierre 140 hay **2 corridas** con la instrumentación nueva
+(80,0% y 76,0% de norte), y **2 sigue siendo poco** para ubicar dónde está hoy el punto
+cantidad↔calidad — sobre todo porque las dos son del mismo proyecto/franja horaria. Diseñar el
+control sin más variación entre corridas es adivinar igual que antes. 🗣️ Del panel, la voz que disiente
 (Howard Marks): *"todos asumen que existe un dial cantidad↔calidad; sus propios números no muestran
 que exista. Están por construir el control de una palanca que quizá no está conectada a nada."*
 

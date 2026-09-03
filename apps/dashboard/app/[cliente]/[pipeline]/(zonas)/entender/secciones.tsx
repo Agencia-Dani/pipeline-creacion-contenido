@@ -1,6 +1,7 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { calidadGlobal, diagnosticoCriterio } from "@/domain/entender";
+import type { Corrida } from "@/domain/corrida";
+import { calidadGlobal, diagnosticoCriterio, type NorteProyecto } from "@/domain/entender";
 import { fecha, fechaHora } from "@/lib/fechas";
 import type {
   FilaAuditoria,
@@ -29,6 +30,99 @@ export function ErrorLectura({ que }: { que: string }) {
         Supabase no respondió. Recargá en un rato; si persiste, avisale a un dev.
       </AlertDescription>
     </Alert>
+  );
+}
+
+// ── El norte: aprobados contra lo pedido (ADR-089, cierre 140) ──────────────────
+
+function EstadoNorte({ n }: { n: NorteProyecto }) {
+  if (n.estado === "sin_entrega") {
+    return <span className="text-muted-foreground">no se le entregó nada esta corrida</span>;
+  }
+  if (n.estado === "sin_dato") {
+    return (
+      <span className="text-muted-foreground">
+        sin datos vivos para calcularlo — probablemente ya se archivó
+      </span>
+    );
+  }
+  return (
+    <span>
+      <span className="font-medium">{pct(n.norte)}</span>{" "}
+      <span className="text-muted-foreground">
+        ({n.aprobados}/{n.nPedido} pedidos)
+      </span>
+      {n.estado === "piso" && (
+        <span className="text-muted-foreground">
+          {" "}
+          — piso: solo {n.calificados}/{n.entregados} calificados, puede subir
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function Norte({
+  historico,
+}: {
+  historico: { corrida: Corrida; filas: NorteProyecto[] }[];
+}) {
+  if (historico.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Todavía no hay corridas del motor con desglose por proyecto.
+      </p>
+    );
+  }
+  const [ultima, ...anteriores] = historico;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-medium">{fechaHora(ultima.corrida.inicio)}</p>
+      <div className="space-y-1.5">
+        {ultima.filas.map((n) => (
+          <div key={n.nombre} className="flex flex-wrap items-baseline gap-x-3 text-sm">
+            <span className="font-medium">{n.nombre}</span>
+            <EstadoNorte n={n} />
+          </div>
+        ))}
+      </div>
+      {anteriores.length > 0 && (
+        <>
+          <Separator />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-1 pr-4 font-normal">Corrida</th>
+                  <th className="py-1 pr-4 font-normal">Proyecto</th>
+                  <th className="py-1 pr-4 text-right font-normal">Pedido</th>
+                  <th className="py-1 pr-4 text-right font-normal">Aprobados</th>
+                  <th className="py-1 text-right font-normal">Norte</th>
+                </tr>
+              </thead>
+              <tbody>
+                {anteriores.flatMap((h) =>
+                  h.filas.map((n) => (
+                    <tr key={`${h.corrida.id}-${n.nombre}`} className="border-t border-border/50">
+                      <td className="py-1 pr-4 whitespace-nowrap">{fechaHora(h.corrida.inicio)}</td>
+                      <td className="py-1 pr-4">{n.nombre}</td>
+                      <td className="py-1 pr-4 text-right">{n.nPedido}</td>
+                      <td className="py-1 pr-4 text-right">{n.aprobados}</td>
+                      <td className="py-1 text-right">
+                        {n.estado === "sin_entrega" || n.estado === "sin_dato"
+                          ? "—"
+                          : `${pct(n.norte)}${n.estado === "piso" ? " (piso)" : ""}`}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

@@ -1,5 +1,9 @@
 import { z } from "zod";
+import type { Corrida } from "@/domain/corrida";
+import { norteHistorico, type NorteProyecto } from "@/domain/entender";
 import type { TenantContext } from "@/domain/tenant";
+import { leerConteosPorCorrida } from "@/lib/candidatos";
+import { ultimasCorridasMotor } from "@/lib/runs";
 import { scoped, type Tabla } from "@/lib/supabase/scoped";
 
 // Lecturas de la zona Entender: las vistas de las migraciones 008 (D2) y 013 (D7). Read-only
@@ -97,6 +101,24 @@ export const leerCostos = (ctx: TenantContext) => leerVista(ctx, "app.v_costos_s
 export const leerAuditoria = (ctx: TenantContext) => leerVista(ctx, "app.v_auditoria_descartes", filaAuditoria, 8);
 export const leerDescubrimiento = (ctx: TenantContext) =>
   leerVista(ctx, "app.v_embudo_descubrimiento", filaDescubrimiento, 8);
+
+// ── El norte (ADR-089, cierre 140) ────────────────────────────────────────────
+//
+// No es una vista de las de arriba: junta dos lecturas que ya existían por separado
+// (`runs.metricas.por_proyecto` vía `ultimasCorridasMotor`, y `app.candidatos` vía
+// `leerConteosPorCorrida`) porque ninguna vista de Postgres las tenía juntas. Antes de esto,
+// leer "aprobados contra pedido" era escribir el join a mano en el SQL Editor cada vez.
+
+/** Cuántas corridas del motor se traen a mirar; `norteHistorico` corta a 5 con embudo real. */
+const CORRIDAS_PARA_NORTE = 8;
+
+export async function leerNorte(
+  ctx: TenantContext,
+): Promise<{ corrida: Corrida; filas: NorteProyecto[] }[]> {
+  const corridas = await ultimasCorridasMotor(ctx, CORRIDAS_PARA_NORTE);
+  const conteos = await leerConteosPorCorrida(ctx, corridas.map((c) => c.id));
+  return norteHistorico(corridas, conteos);
+}
 
 // ── La auditoría de quién tocó qué (app.eventos) ─────────────────────────────
 //

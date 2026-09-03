@@ -15,8 +15,9 @@ import {
   leerDescubrimiento,
   leerEmbudo,
   leerEventos,
+  leerNorte,
 } from "@/lib/entender";
-import { Auditoria, Calidad, Costos, Descubrimiento, Embudo, ErrorLectura } from "./secciones";
+import { Auditoria, Calidad, Costos, Descubrimiento, Embudo, ErrorLectura, Norte } from "./secciones";
 import { ActividadConMas } from "./actividad-con-mas";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +42,9 @@ export default async function EntenderPage({
   const puedeVerCostos = veCostos(rol);
 
   // `allSettled` y no `all`: una vista que falle apaga su tarjeta, no la página entera.
-  const [calidad, embudo, auditoria, descubrimiento, costos, eventos, proyectos] =
+  const [norte, calidad, embudo, auditoria, descubrimiento, costos, eventos, proyectos] =
     await Promise.allSettled([
+      leerNorte(ctx),
       leerCalidad(ctx),
       leerEmbudo(ctx),
       leerAuditoria(ctx),
@@ -76,6 +78,24 @@ export default async function EntenderPage({
           base — acá no se edita nada.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>El norte: aprobados contra lo pedido</CardTitle>
+          <CardDescription>
+            De lo que cada proyecto pidió, cuánto terminó en 🔥/👍 — el único número que dice si
+            el motor cumplió (ADR-089). Un candidato sin calificar no es un rechazo: cuando falta
+            calificación se marca como piso, no como resultado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {norte.status === "fulfilled" ? (
+            <Norte historico={norte.value} />
+          ) : (
+            <ErrorLectura que="el norte" />
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

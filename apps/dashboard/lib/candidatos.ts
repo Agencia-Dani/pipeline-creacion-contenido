@@ -11,6 +11,7 @@ import {
   type Filtro,
   type TextosCandidato,
 } from "@/domain/feed";
+import type { ConteoProyecto } from "@/domain/entender";
 import { detectarRepetidos, type Gemelo } from "@/domain/repetidos";
 import type { TenantContext } from "@/domain/tenant";
 import { fechaHora } from "@/lib/fechas";
@@ -157,6 +158,62 @@ async function etiquetasDeCorrida(
     );
   } catch (e) {
     console.error("[candidatos] no se pudieron leer las corridas del feed (ADR-081):", e);
+    return new Map();
+  }
+}
+
+/**
+ * Cuántos candidatos de cada corrida quedan vivos en `app.candidatos`, por proyecto: `vistos`
+ * (cualquier estado), `calificados` (`estado != 'nuevo'`) y `aprobados` (`estado = 'aprobado'`,
+ * ya deriva 🔥 y 👍 juntos — ADR-034). Para el norte de Entender (ADR-089, cierre 140).
+ *
+ * 🔑 **Es sumidero, y tiene que serlo por una razón específica: `app.candidatos` se vacía al
+ * archivar (ADR-036).** Una corrida vieja puede devolver 0 filas acá aunque el equipo la haya
+ * calificado entera — el 0 no significa "nadie miró", significa "esto se probó de otra manera".
+ * `domain/entender.ts` (`norteDeCorrida`) es quien distingue los dos casos, mirando `vistos`; acá
+ * solo se cuenta lo que hay.
+ *
+ * Join por NOMBRE de proyecto y no por id, mismo motivo que `armarVistaOperar` (domain/corrida.ts):
+ * las claves de `metricas.por_proyecto` en corridas viejas fueron ids de Airtable.
+ */
+export async function leerConteosPorCorrida(
+  ctx: TenantContext,
+  runIds: readonly string[],
+): Promise<Map<string, Map<string, ConteoProyecto>>> {
+  if (runIds.length === 0) return new Map();
+  try {
+    const { data, error } = await (await scoped(ctx))
+      .select("app.candidatos", "run_id, estado, proyectos(nombre)")
+      .in("run_id", [...runIds]);
+    if (error) throw new Error(error.message);
+
+    const filas = z
+      .array(
+        z.object({
+          run_id: z.string().nullable(),
+          estado: z.string(),
+          proyectos: z.object({ nombre: z.string() }).nullable(),
+        }),
+      )
+      .parse(data ?? []);
+
+    const porCorrida = new Map<string, Map<string, ConteoProyecto>>();
+    for (const f of filas) {
+      if (!f.run_id || !f.proyectos) continue;
+      let porProyecto = porCorrida.get(f.run_id);
+      if (!porProyecto) {
+        porProyecto = new Map();
+        porCorrida.set(f.run_id, porProyecto);
+      }
+      const actual = porProyecto.get(f.proyectos.nombre) ?? { vistos: 0, calificados: 0, aprobados: 0 };
+      actual.vistos += 1;
+      if (f.estado !== "nuevo") actual.calificados += 1;
+      if (f.estado === "aprobado") actual.aprobados += 1;
+      porProyecto.set(f.proyectos.nombre, actual);
+    }
+    return porCorrida;
+  } catch (e) {
+    console.error("[candidatos] no se pudieron leer los conteos por corrida (ADR-089):", e);
     return new Map();
   }
 }

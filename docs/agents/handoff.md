@@ -20,68 +20,63 @@
 
 **Estados:** ⬜ libre · 🔧 en curso · ✅ hecho · ⛔ bloqueado
 
-## 🚦 ARRANCÁ POR ACÁ — sesión del 2026-09-02 en adelante
+## 🚦 ARRANCÁ POR ACÁ — sesión del 2026-09-02 en adelante (post cierre 140)
 
-> **Prioridad #1, pedida por Mani al cerrar: mirar las corridas recientes del equipo de redes y
-> evaluar con ellas TODO lo que se cambió el 01 y el 02/09.** Al cerrar la sesión había **0 corridas
-> desde los cambios**, así que **nada de esto está medido todavía** — está construido, empujado y
-> verde, que no es lo mismo.
+> ⚠️ **Lo que había acá decía "0 corridas desde los cambios" — era cierto al cerrar 139 y dejó de
+> serlo tres horas después.** El equipo corrió DOS VECES el mismo 02/09 (14:14 y 16:11) y el cierre
+> 140 evaluó los 6 cambios (ADR-088 §Enm 1/2, 089, 090, 091, 092, 093) contra esas corridas reales.
+> *Un "0 corridas" no es un estado, es una foto — y esta caducó rápido.* El detalle completo, con las
+> consultas usadas, vive en el cierre 140 más abajo; acá el resumen para arrancar la próxima sesión.
 
-**Lo primero, una sola consulta.** Si devuelve 0 filas, el equipo no corrió y no hay nada que evaluar:
+**El norte (ADR-089) casi se duplicó.** La corrida de **14:14** dio **80,0%** (Comunicación en
+empresas, 15/15 calificados) y **76,0%** (Comunicación de parejas, 49/50 calificados) — las dos con
+cobertura de calificación casi completa, o sea **resultado, no piso**. 📏 **Nueva línea base a
+superar: 76%** (la más baja de las dos corridas de 14:14, para no anclar en el mejor caso). La
+corrida de **16:11** dio 46,7%, pero con solo **47% de cobertura de calificación** — puede subir, es
+un piso, no un resultado.
 
-```sql
-select to_char(inicio,'DD/MM HH24:MI') as corrida, estado,
-       metricas->'filtrados_por_motivo'   as murieron_por,     -- ¿el piso de 100k o el dedup?
-       metricas->>'segunda_oportunidad'   as escalon2,          -- ADR-091, nace en 0
-       metricas->>'bajo_umbral_entregados' as escalon5,         -- ADR-088 §Enm 1, nace en 0
-       metricas->>'gate_ve_metrica'       as vio_metrica,       -- ADR-093: marca de ÉPOCA
-       metricas->'por_proyecto'           as norte_por_proyecto
-from public.runs
-where metricas ? 'filtrados_por_motivo'
-order by inicio desc;
-```
+### Los criterios que estaban escritos ANTES de mirar, ya resueltos con datos reales
 
-**Y el norte ([ADR-089](../adr/ADR-089-una-sola-metrica-aprobados-contra-lo-pedido.md)), que es con
-lo que se juzga todo:** `aprobados / N pedido`, por proyecto y por corrida, **con
-`calificados/entregados` al lado** — un candidato sin calificar **no es un rechazo**, y sin ese
-tercer número el norte castiga al motor por algo que pasó en el Feed. La consulta completa está en el
-ADR. 📏 **Línea base a superar: 45% del pedido** (31/08 17:22 — Ansiedad 90%, Depresión 60%).
+| qué se midió | criterio escrito de antemano | resultado |
+|---|---|---|
+| `segunda_oportunidad` (ADR-091, escalón 2) | 0 corrida tras corrida ⇒ **no es la palanca** | **0 en las 2 corridas** ⇒ **confirmado: no es la palanca.** Dicho, no defendido |
+| `bajo_umbral_entregados` (escalón 5) | si sale 0, es una red que nadie usa | **0 en las 2** — lectura buena: con 76-80% de aprobación el corte normal llenó N solo, la red no hizo falta |
+| `filtrados_por_motivo` (piso de 100k) | si el dedup mata la mayoría, bajarlo no cambia nada | dedup mató **286**, el piso mató **0** ⇒ **decidido: no bajar el piso**, el cuello es el dedup |
+| `gate_ve_metrica` (ADR-093) | si el norte baja o sube el 👎 con cobertura completa ⇒ apagar el knob | `true` en las 2, norte alto con cobertura casi completa ⇒ **el knob se queda prendido** |
 
-### Los criterios están escritos ANTES de mirar. Respetarlos, no re-litigarlos.
+### 🔴 Bloqueantes que NO son código, actualizados
 
-| qué se mide | criterio escrito de antemano |
-|---|---|
-| `segunda_oportunidad` (ADR-091) | **0 corrida tras corrida ⇒ el escalón 2 NO es la palanca.** Decirlo, no defenderlo |
-| `gate_ve_metrica` (ADR-093) | si el norte **baja** o sube el 👎 con cobertura completa ⇒ **se apaga el knob** |
-| `filtrados_por_motivo` | si el **dedup** mata la mayoría, bajar el piso de 100k **no cambia nada** y el trabajo está en otro lado |
-| `bajo_umbral_entregados` | si sale **0**, el escalón 5 es una red que nadie usa |
-
-⚠️ **Dos trampas de medición, ya pagadas una vez cada una:**
-- **Nunca cruzar corridas con `gate_ve_metrica` distinto** para comparar `relevancia_score`: son dos
-  escalas (ADR-093).
-- **Estratificar por proyecto y por cuenta** antes de creerle a cualquier correlación. Sin eso, la
-  tabla de señales del repo apuntó **al revés durante semanas** (ADR-088 §Enmienda 2).
-
-### 🔴 Bloqueantes que NO son código y valen más que todo lo construido
-
-1. **Las 4 voces están en `activo = false`.** Verificado por la fachada: devuelve **0 voces, 0
-   proyectos**. Si el equipo aprieta Ejecutar, **no recibe un solo video** (no se paga nada, pero
-   tampoco pasa nada). Desde el cierre 138 al menos **avisa** por qué. **Sin esto no hay corridas que
-   evaluar.**
-2. **Podar 6 cuentas y decidir 5 propuestas.** `thejessicaweiss` **36 entregados · 26 calificados ·
-   26 rechazados · 0 aprobados**; las 6 juntas **86 entregados, 46 calificados, 46 rechazados, 0
-   aprobados**. ADR-022 fija que **la poda es del equipo** ⇒ va con Dani, no por SQL.
+1. 🟡 **Voces: ya NO son las 4 apagadas.** `Milena Morales` está `activo=true` — es la que permitió
+   las 2 corridas del 02/09. **Vieira, Sánchez y Gomez siguen en `activo=false`.** Prenderlas es la
+   palanca de cobertura más barata que queda: clics, cero código.
+2. 🔴 **Podar 6 cuentas y decidir 5 propuestas — sin tocar.** `thejessicaweiss` **36 entregados · 26
+   calificados · 26 rechazados · 0 aprobados**; las 6 juntas **86 entregados, 46 calificados, 46
+   rechazados, 0 aprobados**. ADR-022 fija que **la poda es del equipo** ⇒ va con Dani, no por SQL.
 
 ### Pendientes de código, en orden de efecto sobre el norte
 
-| # | Qué | Dónde |
+| # | Qué | Estado |
 |---|---|---|
-| 1 | **Decidir el piso de 100k** con `filtrados_por_motivo` | knob, cero código |
-| 2 | **Escalón 4** — rescatar lo pagado que se cayó de la ventana | medir primero (§1 del plan) |
-| 3 | **El norte en la pantalla Entender** — hoy muestra `entregados/pedidos`, no aprobados contra pedido | app |
-| 4 | `descartes_expuestos` se lee y no se renderiza (`lib/entender.ts:40`) | app |
-| 5 | **Los dos modos cantidad/calidad** — candidato con su análisis en [plan §8](./plan-cascada-de-entrega.md) | no antes de tener datos |
-| 6 | T2a/T2b/T3 y la anatomía en `dev-doc.md` | §2 del plan |
+| ~~1~~ | ~~Decidir el piso de 100k~~ | ✅ **decidido en el cierre 140: no bajarlo** (dedup domina, medido) |
+| 2 | **Escalón 4** — rescatar lo pagado que se cayó de la ventana | sigue sin medir (§1 del plan) |
+| ~~3~~ | ~~El norte en la pantalla Entender~~ | ✅ **hecho el 02/09** — tarjeta nueva "El norte", arriba de todo. ADR-089 "hecho cuando" #1 se cumple. Cambio de app, sin `core/`, sin migración, sin ADR (ver detalle abajo) |
+| 4 | `descartes_expuestos` se lee y no se renderiza (`lib/entender.ts:40`) | sin tocar |
+| 5 | **Los dos modos cantidad/calidad** — [plan §8](./plan-cascada-de-entrega.md) | sigue sin datos suficientes (2 corridas más no alcanzan) |
+| 6 | T2a/T2b/T3 y la anatomía en `dev-doc.md` | sin tocar |
+
+> ✅ **El norte llegó a Entender (02/09), sin tocar `core/`.** Todo lo que hacía falta ya se leía por
+> separado: `runs.metricas.por_proyecto` (N pedido, entregados) y `app.candidatos` (calificados,
+> aprobados, por `run_id`). El único código nuevo es lo que las junta: `domain/entender.ts`
+> (`norteDeCorrida`/`norteHistorico`, 9 tests nuevos, verificados contra los 3 números reales del
+> cierre 140 — 80,0%/76,0%/46,7% — leyendo `app.candidatos` en vivo), `lib/candidatos.ts`
+> (`leerConteosPorCorrida`) y `lib/entender.ts` (`leerNorte`). Un número se marca **piso** en vez de
+> resultado si `calificados/entregados < 80%`, y **`sin_dato`** en vez de 0% si una corrida vieja ya
+> no tiene candidatos vivos (ADR-036 los borra al archivar) — para no leer un archivado como un
+> rechazo. `npm run typecheck`, `npm test` (503, antes 494) y `npm run build` verdes. ⚠️ **No
+> verificado en el browser real**: el login del cockpit es passwordless (magic link) y no hay
+> credenciales de prueba a mano — la verificación fue típecheck + tests + build + una consulta SQL
+> directa contra prod que reprodujo exacto lo que `leerConteosPorCorrida` va a leer. Falta que
+> alguien con sesión lo mire una vez.
 
 📄 **Deuda de doc pre-existente, no la creó esta sesión:** la fila de **ADR-085 en
 [`docs/adr/README.md`](../adr/README.md) tiene texto de ADR-084 pegado adentro.**
@@ -89,6 +84,95 @@ ADR. 📏 **Línea base a superar: 45% del pedido** (31/08 17:22 — Ansiedad 90
 ---
 
 ## Pendiente vivo (arrastres manuales de Mani — antes de la próxima corrida real)
+
+> # 📈 CIERRE 140 (2026-09-02) — Las corridas que "no existían" ya dieron 80%, y el piso de 100k se cierra
+>
+> ## El hallazgo #0: el cierre 139 midió un estado que ya había cambiado
+>
+> El cierre 139 cerró con **"0 corridas desde los cambios"**. La consulta de esa sección, corrida de
+> nuevo al abrir esta sesión, devolvió **2 filas**: el equipo corrió el mismo 02/09 a las **14:14** y
+> **16:11**, cada una ~20-30 min, **1.458 y 1.168 videos colectados** (`public.runs`
+> `9fa96e50-2527-42ec-bf11-504b699ee8cb` y `491a958f-492f-4530-8696-ae07d33891b0`) — corridas reales,
+> no pruebas de escritorio. *Un "0 corridas" describe un instante, no un estado: hay que re-correr la
+> consulta, no citar el número del cierre anterior.*
+>
+> ## El norte (ADR-089): casi se duplicó
+>
+> | corrida | proyecto | N | entregados | calificados | aprobados | **norte** | cobertura de calificación |
+> |---|---|---|---|---|---|---|---|
+> | 02/09 14:14 | Comunicación en empresas | 15 | 15 | 15 | 12 | **80,0%** | 100% — resultado |
+> | 02/09 14:14 | Comunicación de parejas | 50 | 50 | 49 | 38 | **76,0%** | 98% — resultado |
+> | 02/09 16:11 | Comunicación en empresas | 15 | 15 | 7 | 7 | **46,7%** | 47% — **piso**, no resultado |
+>
+> Las dos corridas de las 14:14 casi duplican el techo anterior (**45%**, 31/08 17:22) y con cobertura
+> de calificación casi completa — no son un piso inflado, son el mejor resultado medido hasta hoy.
+> 📏 **Nueva línea base: 76%.**
+>
+> ## Los cuatro criterios pre-escritos, resueltos con datos reales (no re-litigados)
+>
+> - **`segunda_oportunidad` (ADR-091, escalón 2): dio 0 en las DOS corridas.** El criterio decía "0
+>   corrida tras corrida ⇒ no es la palanca, decirlo, no defenderlo". **Con 2 corridas es poco para
+>   descartarlo del todo, pero la lectura honesta es: hasta ahora, no mueve nada medible.**
+> - **`bajo_umbral_entregados` (escalón 5): dio 0 en las DOS.** No es un escalón roto — con 76-80% de
+>   aprobación, el corte normal llenó N sin necesitar la red. Es la lectura buena del criterio.
+> - **`filtrados_por_motivo` (pendiente #1, piso de 100k): dedup mató 286, `min_likes` mató 1,
+>   `min_views` (el piso) mató 0**, en la corrida de 16:11. El dedup domina por completo. Por el
+>   criterio ya escrito ("si el dedup mata la mayoría, bajar el piso no cambia nada y el trabajo está
+>   en otro lado") **esto ya se cierra: no bajar el piso de 100k.** ⚠️ La corrida de 14:14 no trae este
+>   dato (`filtrados_por_motivo` da `null` ahí) — gap a anotar, no invalida la lectura de la otra.
+> - **`gate_ve_metrica` (ADR-093): `true` en las 2.** La época quedó marcada correctamente y el norte
+>   no bajó con cobertura completa ⇒ el knob se queda prendido. No hay corrida `false` comparable a
+>   este nivel de cobertura para aislar su efecto solo.
+>
+> ## Los dos bloqueantes que no eran código
+>
+> 1. **Voces: parcialmente resuelto.** `Milena Morales` está `activo=true` — es la que permitió estas
+>    2 corridas. `Juan Pablo Vieira`, `María José Sánchez` y `Rosario Gomez` siguen en
+>    `activo=false`. Prenderlas es la palanca de cobertura más barata que queda.
+> 2. **Las 6 cuentas con 0 aprobados: sin tocar.** Sigue siendo decisión de equipo con Dani (ADR-022).
+>
+> ## Consultas usadas (para no re-escribirlas la próxima vez)
+>
+> ```sql
+> -- la del cierre 139, re-corrida
+> select to_char(inicio,'DD/MM HH24:MI') as corrida, estado,
+>        metricas->'filtrados_por_motivo'   as murieron_por,
+>        metricas->>'segunda_oportunidad'   as escalon2,
+>        metricas->>'bajo_umbral_entregados' as escalon5,
+>        metricas->>'gate_ve_metrica'       as vio_metrica,
+>        metricas->'por_proyecto'           as norte_por_proyecto
+> from public.runs
+> where metricas ? 'filtrados_por_motivo'
+> order by inicio desc;
+>
+> -- el norte, ADR-089, completa
+> with d as (
+>   select r.id as run_id, r.inicio, v.key as pid,
+>          (v.value->>'nombre')::text     as proyecto,
+>          (v.value->>'n_objetivo')::int  as n_pedido,
+>          (v.value->>'entregados')::int  as entregados
+>   from public.runs r, jsonb_each(r.metricas->'por_proyecto') v
+>   where r.metricas ? 'por_proyecto'
+> )
+> select to_char(d.inicio,'DD/MM HH24:MI') as corrida, d.proyecto, d.n_pedido, d.entregados,
+>        count(c.calificacion) as calificados,
+>        count(*) filter (where c.calificacion in ('🔥','👍')) as aprobados,
+>        round(100.0*count(*) filter (where c.calificacion in ('🔥','👍'))/nullif(d.n_pedido,0),1) as pct_del_pedido
+> from d left join app.candidatos c on c.run_id = d.run_id and c.proyecto_id::text = d.pid
+> where d.n_pedido > 0
+> group by d.inicio, d.proyecto, d.n_pedido, d.entregados
+> order by d.inicio, pct_del_pedido desc;
+> ```
+>
+> ## Lo que queda pendiente, en orden de efecto
+>
+> 1. **Medir el escalón 4** (§1 del [plan](./plan-cascada-de-entrega.md)) — sigue sin hacerse.
+> 2. **Activar las 3 voces restantes** (Vieira, Sánchez, Gomez) — clics, cero código, cobertura barata.
+> 3. **Podar/decidir las 6 cuentas y las 5 propuestas** — con Dani, no por SQL.
+> 4. **Llevar el norte a la pantalla Entender** — ADR-089 "hecho cuando" #1 sigue sin cumplirse: hoy
+>    se lee con SQL a mano, como en este mismo cierre.
+> 5. **Los dos modos cantidad/calidad** ([plan §8](./plan-cascada-de-entrega.md)) — 2 corridas más no
+>    alcanzan para diseñar el dial; sigue "NO decidido".
 
 > # 🎚️ CIERRE 139 (2026-09-02) — El jurado ve la métrica, y el piso de 100k tiene un dato en contra
 >
